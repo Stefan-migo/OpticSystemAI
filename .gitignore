@@ -26,6 +26,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# Development scripts with credentials (optional - uncomment if you want to exclude from repo)
+# scripts/create-admin-via-api.js
+
 # Vercel
 .vercel
 

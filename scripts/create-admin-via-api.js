@@ -1,5 +1,11 @@
 // Create admin user via Supabase Auth API
 // This ensures the password is hashed correctly for Supabase Auth
+//
+// ⚠️ SECURITY WARNING: This script is for LOCAL DEVELOPMENT ONLY
+// - Never use hardcoded credentials in production
+// - Always use environment variables: ADMIN_EMAIL and ADMIN_PASSWORD
+// - This script should only be used with local Supabase instances
+// - For production, use SQL scripts or proper admin creation workflows
 
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
@@ -20,8 +26,19 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 async function createAdminUser() {
-  const email = 'admin@test.com';
-  const password = 'Admin123!';
+  // Use environment variables or command line arguments for security
+  // Never hardcode credentials in production!
+  const email = process.env.ADMIN_EMAIL || process.argv[2] || 'admin@test.com';
+  const password = process.env.ADMIN_PASSWORD || process.argv[3] || 'Admin123!';
+  
+  // Warn if using default credentials
+  if (email === 'admin@test.com' && password === 'Admin123!') {
+    console.warn('⚠️  WARNING: Using default test credentials!');
+    console.warn('⚠️  For production, use environment variables:');
+    console.warn('   export ADMIN_EMAIL="your-email@example.com"');
+    console.warn('   export ADMIN_PASSWORD="YourSecurePassword123!"');
+    console.warn('');
+  }
 
   try {
     // Create user via Auth API
@@ -90,4 +107,3 @@ async function createAdminUser() {
 }
 
 createAdminUser();
-

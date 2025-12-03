@@ -15,7 +15,7 @@
     "supabase:stop": "npx supabase stop",
     "supabase:status": "npx supabase status",
     "supabase:reset": "npx supabase db reset",
-    "admin:create": "node create-admin-via-api.js"
+    "admin:create": "node scripts/create-admin-via-api.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",

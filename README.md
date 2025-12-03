@@ -125,6 +125,8 @@ The application will be available at:
 
 After setting up the database, you need to create an admin user to access the admin panel.
 
+**⚠️ Security Note**: The `create-admin-via-api.js` script is for **local development only**. Never use hardcoded credentials in production. Always use environment variables or the SQL method for production environments.
+
 ### Method 1: Using SQL Script (Recommended)
 
 1. **Sign up a regular user** through the signup page at http://localhost:3000/signup
@@ -138,7 +140,30 @@ podman exec -i supabase_db_web psql -U postgres -d postgres < grant-admin-access
 
 Edit `grant-admin-access.sql` and change the email to your user's email before running.
 
-### Method 2: Using Supabase Studio
+### Method 2: Using Node.js Script (Development Only)
+
+**⚠️ Warning**: This method uses a development script. For production, use Method 1 (SQL Script).
+
+1. Set environment variables (optional, or pass as arguments):
+   ```bash
+   export ADMIN_EMAIL="your-email@example.com"
+   export ADMIN_PASSWORD="YourSecurePassword123!"
+   ```
+
+2. Run the script:
+   ```bash
+   # Using environment variables
+   node create-admin-via-api.js
+   
+   # Or pass credentials as arguments (less secure)
+   node create-admin-via-api.js your-email@example.com YourPassword123!
+   ```
+
+3. Log in at http://localhost:3000/login
+
+**Note**: The script uses example credentials by default. Always override them with environment variables or command-line arguments.
+
+### Method 3: Using Supabase Studio
 
 1. Open Supabase Studio: http://127.0.0.1:54323
 2. Go to **SQL Editor**

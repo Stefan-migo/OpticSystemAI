@@ -2,6 +2,29 @@
 const nextConfig = {
   experimental: {
     // typedRoutes: true, // Temporarily disabled
+    // Externalize packages that use native binaries
+    serverComponentsExternalPackages: ['@xenova/transformers', 'onnxruntime-node'],
+  },
+  // Webpack configuration to handle native modules
+  webpack: (config, { isServer }) => {
+    // Exclude native node modules from bundling
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        '@xenova/transformers': 'commonjs @xenova/transformers',
+        'onnxruntime-node': 'commonjs onnxruntime-node',
+      });
+    }
+    
+    // Ignore native .node files
+    config.module = config.module || {};
+    config.module.rules = config.module.rules || [];
+    config.module.rules.push({
+      test: /\.node$/,
+      use: 'ignore-loader',
+    });
+    
+    return config;
   },
   images: {
     remotePatterns: [

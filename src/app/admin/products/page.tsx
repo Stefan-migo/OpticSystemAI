@@ -425,7 +425,7 @@ export default function ProductsPage() {
     try {
       setDeleteLoading(true);
       
-      const response = await fetch(`/api/products/${productToDelete.id}`, {
+      const response = await fetch(`/api/admin/products/${productToDelete.id}`, {
         method: 'DELETE',
       });
       

@@ -1,0 +1,142 @@
+'use client'
+
+import { useEffect, useRef, useMemo } from 'react'
+import { MessageBubble } from './MessageBubble'
+import { TypingIndicator } from './TypingIndicator'
+import { Separator } from '@/components/ui/separator'
+
+interface Message {
+  id: string
+  role: 'user' | 'assistant' | 'system' | 'tool'
+  content: string
+  timestamp?: string
+  toolCalls?: any
+  toolResults?: any
+  metadata?: any
+}
+
+interface MessageListProps {
+  messages: Message[]
+  isStreaming?: boolean
+  onMessageAction?: (messageId: string, action: 'copy' | 'edit' | 'delete' | 'regenerate') => void
+}
+
+function formatDate(dateString: string | undefined): string {
+  if (!dateString) return 'Sin fecha'
+  
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) {
+      return 'Sin fecha'
+    }
+    
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    if (date.toDateString() === today.toDateString()) {
+      return 'Hoy'
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Ayer'
+    } else {
+      return date.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+      })
+    }
+  } catch (e) {
+    return 'Sin fecha'
+  }
+}
+
+function groupMessagesByDate(messages: Message[]): Array<{ date: string; messages: Message[] }> {
+  const groups: Record<string, Message[]> = {}
+
+  messages.forEach(message => {
+    if (!message.timestamp) {
+      if (!groups['Sin fecha']) {
+        groups['Sin fecha'] = []
+      }
+      groups['Sin fecha'].push(message)
+      return
+    }
+
+    const date = formatDate(message.timestamp)
+    if (!groups[date]) {
+      groups[date] = []
+    }
+    groups[date].push(message)
+  })
+
+  return Object.entries(groups).map(([date, messages]) => ({
+    date,
+    messages
+  }))
+}
+
+export function MessageList({ messages, isStreaming, onMessageAction }: MessageListProps) {
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  
+  const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages])
+  
+  useEffect(() => {
+    // Use setTimeout to avoid infinite loops
+    const timeoutId = setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      }
+    }, 100)
+    
+    return () => clearTimeout(timeoutId)
+  }, [messages.length, isStreaming])
+  
+  return (
+    <div className="h-full">
+      <div className="p-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="text-center text-admin-text-secondary py-12">
+            <p className="text-sm font-medium">Inicia una conversación con el asistente</p>
+            <p className="text-xs mt-2 opacity-70">
+              Puedes preguntar sobre productos, pedidos, clientes y más
+            </p>
+          </div>
+        )}
+        
+        {groupedMessages.map((group, groupIndex) => (
+          <div key={group.date} className="space-y-2">
+            {groupIndex > 0 && <Separator className="my-4" />}
+            
+            <div className="sticky top-0 z-10 flex items-center gap-2 mb-2">
+              <Separator className="flex-1" />
+              <span className="text-xs text-admin-text-secondary bg-admin-bg-primary px-2 py-1 rounded">
+                {group.date}
+              </span>
+              <Separator className="flex-1" />
+            </div>
+            
+            {group.messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                role={message.role}
+                content={message.content}
+                timestamp={message.timestamp}
+                toolCalls={message.toolCalls}
+                toolResults={message.toolResults}
+                metadata={message.metadata}
+                onCopy={() => onMessageAction?.(message.id, 'copy')}
+                onEdit={() => onMessageAction?.(message.id, 'edit')}
+                onDelete={() => onMessageAction?.(message.id, 'delete')}
+                onRegenerate={() => onMessageAction?.(message.id, 'regenerate')}
+              />
+            ))}
+          </div>
+        ))}
+        
+        {isStreaming && <TypingIndicator />}
+        
+        <div ref={messagesEndRef} />
+      </div>
+    </div>
+  )
+}

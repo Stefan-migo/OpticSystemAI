@@ -26,6 +26,7 @@ import {
   Tag
 } from 'lucide-react';
 import AdminNotificationDropdown from '@/components/admin/AdminNotificationDropdown';
+import Chatbot from '@/components/admin/Chatbot';
 import { ThemeSelector } from '@/components/theme-selector';
 import businessConfig from '@/config/business';
 
@@ -35,6 +36,12 @@ interface AdminLayoutProps {
 
 // Admin navigation items - will be populated dynamically
 const createNavigationItems = (ordersCount?: number) => [
+  {
+    href: '/admin/chat',
+    label: 'Chatbot IA',
+    icon: MessageSquare,
+    description: 'Asistente inteligente'
+  },
   {
     href: '/admin',
     label: 'Dashboard',
@@ -103,6 +110,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [chatbotOpen, setChatbotOpen] = useState(false);
 
   // Admin state management - using combined state to prevent race conditions
   const [adminState, setAdminState] = useState<{
@@ -420,7 +428,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-80 p-0">
-                <AdminSidebar pathname={pathname} onNavigate={() => setSidebarOpen(false)} stats={stats} />
+                <AdminSidebar 
+                  pathname={pathname} 
+                  onNavigate={() => setSidebarOpen(false)} 
+                  stats={stats}
+                />
               </SheetContent>
             </Sheet>
             
@@ -440,7 +452,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <div className="lg:flex">
         {/* Desktop Sidebar */}
         <div className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0">
-          <AdminSidebar pathname={pathname} stats={stats} />
+          <AdminSidebar 
+            pathname={pathname} 
+            stats={stats}
+            onChatbotClick={() => setChatbotOpen(true)}
+          />
         </div>
 
         {/* Main Content */}
@@ -500,6 +516,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </main>
         </div>
       </div>
+      
+      {/* Chatbot - Floating Button */}
+      <Chatbot />
     </div>
   );
 }

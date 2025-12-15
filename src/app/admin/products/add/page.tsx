@@ -180,7 +180,7 @@ export default function AddProductPage() {
         published_at: status === 'active' ? new Date().toISOString() : null
       };
 
-      const response = await fetch('/api/products', {
+      const response = await fetch('/api/admin/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

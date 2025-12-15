@@ -13,6 +13,7 @@ A comprehensive, generic business management system built with Next.js 14, TypeS
 - **Admin User Management**: Multi-admin system with role-based access control
 - **System Configuration**: System settings, health monitoring, and maintenance tools
 - **User Profile Management**: Complete user profile pages with preferences and order history
+- **AI Chatbot Agent**: Natural language interface for managing the application autonomously
 
 ### Technical Features
 - **Next.js 14** with App Router
@@ -23,6 +24,8 @@ A comprehensive, generic business management system built with Next.js 14, TypeS
 - **Responsive Design** for mobile and desktop
 - **Role-Based Access Control** (RBAC)
 - **Real-time Updates** and notifications
+- **Multi-Provider AI Support**: OpenAI, Anthropic, Google Gemini, DeepSeek
+- **AI Agent with Tool Calling**: Autonomous database operations via natural language
 
 ## 📋 Prerequisites
 
@@ -382,6 +385,31 @@ Optional (for production features):
 - `MERCADOPAGO_ACCESS_TOKEN` - For payment processing
 - `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY` - For payment processing
 
+### AI Chatbot Configuration
+
+The system includes an AI-powered chatbot agent that can manage the application through natural language. Configure at least one LLM provider:
+
+```env
+# AI / LLM Providers
+AI_DEFAULT_PROVIDER=openai
+AI_DEFAULT_MODEL=gpt-4-turbo-preview
+AI_FALLBACK_PROVIDERS=deepseek,google
+
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
+
+# Anthropic (Claude)
+ANTHROPIC_API_KEY=your_anthropic_api_key
+
+# Google (Gemini)
+GOOGLE_API_KEY=your_google_api_key
+
+# DeepSeek
+DEEPSEEK_API_KEY=your_deepseek_api_key
+```
+
+The chatbot supports multiple providers with automatic fallback. You can switch providers from the chat interface.
+
 ## 📚 Documentation
 
 - [Local Setup Guide](../SETUP_LOCAL.md) - Detailed local development setup
@@ -399,6 +427,35 @@ Optional (for production features):
 ## 📄 License
 
 [Add your license here]
+
+## 🤖 AI Chatbot Agent
+
+The application includes an intelligent chatbot agent that allows administrators to manage the system through natural language. The chatbot can:
+
+- **Search and manage products**: Find products, update inventory, create new products
+- **Handle orders**: View orders, update status, track payments
+- **Manage customers**: View profiles, update information, check order history
+- **Provide analytics**: Dashboard stats, revenue trends, sales reports
+- **Handle support**: Manage tickets, respond to customers
+
+### Using the Chatbot
+
+1. Click the chat button (bottom-right corner) in the admin panel
+2. Select your preferred AI provider (OpenAI, Anthropic, Google, DeepSeek)
+3. Ask questions or give commands in natural language
+4. The agent will execute the appropriate tools to fulfill your request
+
+### Example Commands
+
+- "Muéstrame los productos con stock bajo"
+- "Actualiza el stock del producto X a 50 unidades"
+- "¿Cuántos pedidos pendientes hay?"
+- "Dame las estadísticas del dashboard"
+- "Crea un nuevo producto llamado..."
+
+### Provider Configuration
+
+Configure at least one LLM provider in your `.env.local` file. The system supports automatic fallback if the primary provider fails.
 
 ## 🆘 Support
 

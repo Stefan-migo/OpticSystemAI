@@ -98,7 +98,7 @@ export default function EditProductPage() {
         setLoading(true);
 
         // Fetch product data including archived products for admin editing
-        const productResponse = await fetch(`/api/products/${productId}?include_archived=true`);
+        const productResponse = await fetch(`/api/admin/products/${productId}?include_archived=true`);
         if (!productResponse.ok) {
           throw new Error('Failed to fetch product');
         }
@@ -197,7 +197,7 @@ export default function EditProductPage() {
         weight: formData.weight ? parseFloat(formData.weight) : null,
       };
 
-      const response = await fetch(`/api/products/${productId}`, {
+      const response = await fetch(`/api/admin/products/${productId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -118,22 +118,90 @@ export async function GET(request: NextRequest) {
     ).length;
     const returningCustomers = customers.length - newCustomers;
 
-    // === RECENT ORDERS ===
-    const recentOrders = orders
-      .slice(0, 5)
-      .map(o => ({
-        id: o.id,
-        order_number: o.order_number,
-        customer_name: o.shipping_first_name && o.shipping_last_name 
-          ? `${o.shipping_first_name} ${o.shipping_last_name}`
+    // === APPOINTMENTS METRICS (Optical Shop) ===
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const { data: appointmentsData } = await supabase
+      .from('appointments')
+      .select('*')
+      .gte('appointment_date', today.toISOString().split('T')[0])
+      .lt('appointment_date', tomorrow.toISOString().split('T')[0]);
+
+    const appointments = appointmentsData || [];
+    const todayAppointments = appointments.length;
+    const scheduledAppointments = appointments.filter(a => a.status === 'scheduled').length;
+    const confirmedAppointments = appointments.filter(a => a.status === 'confirmed').length;
+    const pendingAppointments = appointments.filter(a => a.status === 'scheduled' || a.status === 'pending').length;
+
+    // === WORK ORDERS METRICS (Optical Shop) ===
+    const { data: workOrdersData } = await supabase
+      .from('lab_work_orders')
+      .select('*');
+
+    const workOrders = workOrdersData || [];
+    // Trabajos en progreso: enviados al lab, en lab, listos en lab, recibidos, montados, control calidad
+    const inProgressWorkOrders = workOrders.filter(wo => 
+      ['sent_to_lab', 'in_progress_lab', 'ready_at_lab', 'received_from_lab', 'mounted', 'quality_check'].includes(wo.status)
+    ).length;
+    // Trabajos nuevos/pendientes: ordenados (recién creados, no enviados aún)
+    const pendingWorkOrders = workOrders.filter(wo => 
+      wo.status === 'ordered' || wo.status === 'quote'
+    ).length;
+    // Trabajos completados: entregados
+    const completedWorkOrders = workOrders.filter(wo => 
+      wo.status === 'delivered'
+    ).length;
+
+    // === QUOTES METRICS (Optical Shop) ===
+    const { data: quotesData } = await supabase
+      .from('quotes')
+      .select('*');
+
+    const quotes = quotesData || [];
+    // Presupuestos pendientes: borrador, enviado (esperando respuesta)
+    const pendingQuotes = quotes.filter(q => 
+      ['draft', 'sent'].includes(q.status) && !q.converted_to_work_order_id
+    ).length;
+    // Presupuestos convertidos: aceptados o convertidos a trabajo
+    const convertedQuotes = quotes.filter(q => 
+      q.status === 'accepted' || q.converted_to_work_order_id
+    ).length;
+
+    // === TODAY'S APPOINTMENTS ===
+    const { data: todayAppointmentsData } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('appointment_date', today.toISOString().split('T')[0])
+      .order('appointment_time', { ascending: true })
+      .limit(10);
+
+    // Fetch customer data manually
+    const customerIds = [...new Set((todayAppointmentsData || []).map((a: any) => a.customer_id).filter(Boolean))];
+    const { data: customersData } = customerIds.length > 0
+      ? await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, phone')
+          .in('id', customerIds)
+      : { data: [] };
+
+    const todayAppointmentsList = (todayAppointmentsData || []).map((apt: any) => {
+      const customer = customersData?.find((c: any) => c.id === apt.customer_id);
+      return {
+        id: apt.id,
+        customer_name: customer
+          ? `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email || 'Cliente'
           : 'Cliente',
-        customer_email: o.email,
-        total_amount: o.total_amount,
-        status: o.status,
-        payment_status: o.payment_status,
-        created_at: o.created_at,
-        items_count: o.order_items?.length || 0
-      }));
+        customer_email: customer?.email || null,
+        appointment_time: apt.appointment_time,
+        appointment_type: apt.appointment_type || 'consultation',
+        status: apt.status,
+        duration_minutes: apt.duration_minutes || 30,
+        notes: apt.notes
+      };
+    });
 
     // === REVENUE TREND (Last 7 days) ===
     const last7Days = [];
@@ -214,15 +282,32 @@ export async function GET(request: NextRequest) {
           current: currentMonthRevenue,
           previous: lastMonthRevenue,
           change: revenueChange,
-          currency: 'ARS'
+          currency: 'CLP'
         },
         customers: {
           total: customers.length,
           new: newCustomers,
           returning: returningCustomers
+        },
+        appointments: {
+          today: todayAppointments,
+          scheduled: scheduledAppointments,
+          confirmed: confirmedAppointments,
+          pending: pendingAppointments
+        },
+        workOrders: {
+          total: workOrders.length,
+          inProgress: inProgressWorkOrders,
+          pending: pendingWorkOrders,
+          completed: completedWorkOrders
+        },
+        quotes: {
+          total: quotes.length,
+          pending: pendingQuotes,
+          converted: convertedQuotes
         }
       },
-      recentOrders,
+      todayAppointments: todayAppointmentsList,
       lowStockProducts,
       charts: {
         revenueTrend: last7Days,

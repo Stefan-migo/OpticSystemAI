@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { X, Plus, Save, ArrowLeft, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { useProductOptions } from "@/hooks/useProductOptions";
 
 interface Category {
   id: string;
@@ -40,6 +41,7 @@ export default function AddProductPage() {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showPublishAlert, setShowPublishAlert] = useState(false);
+  const { options: productOptions, loading: optionsLoading } = useProductOptions();
   
   // 🚀 Protected form state with auto data-loss prevention
   const {
@@ -62,34 +64,197 @@ export default function AddProductPage() {
     inventory_quantity: '0',
     is_featured: false,
     status: 'active',
-    skin_type: [] as string[],
-    benefits: [] as string[],
-    certifications: [] as string[],
-    usage_instructions: '',
-    precautions: '',
-    ingredients: [] as Array<{name: string, percentage?: number}>,
-    weight: '',
-    dimensions: '',
-    package_characteristics: '',
+    // Optical product fields
+    product_type: 'frame',
+    optical_category: '',
+    sku: '',
+    barcode: '',
+    brand: '',
+    manufacturer: '',
+    model_number: '',
+    // Frame fields
+    frame_type: '',
+    frame_material: '',
+    frame_shape: '',
+    frame_color: '',
+    frame_colors: [] as string[],
+    frame_brand: '',
+    frame_model: '',
+    frame_sku: '',
+    frame_gender: '',
+    frame_age_group: '',
+    frame_size: '',
+    frame_features: [] as string[],
+    frame_measurements: {
+      lens_width: '',
+      bridge_width: '',
+      temple_length: '',
+      lens_height: '',
+      total_width: ''
+    },
+    // Lens fields
+    lens_type: '',
+    lens_material: '',
+    lens_index: '',
+    lens_coatings: [] as string[],
+    lens_tint_options: [] as string[],
+    uv_protection: '',
+    blue_light_filter: false,
+    blue_light_filter_percentage: '',
+    photochromic: false,
+    prescription_available: false,
+    prescription_range: {
+      sph_min: '',
+      sph_max: '',
+      cyl_min: '',
+      cyl_max: '',
+      add_min: '',
+      add_max: ''
+    },
+    requires_prescription: false,
+    is_customizable: false,
+    warranty_months: '',
+    warranty_details: '',
   });
 
-  // Available options
-  const skinTypes = [
-    { value: 'dry', label: 'Seco' },
-    { value: 'oily', label: 'Graso' },
-    { value: 'combination', label: 'Mixto' },
-    { value: 'sensitive', label: 'Sensible' },
-    { value: 'normal', label: 'Normal' },
-    { value: 'mature', label: 'Maduro' }
+  // Helper function to get options from database or fallback to defaults
+  const getOptions = (fieldKey: string, fallback: any[] = []) => {
+    if (optionsLoading) return fallback;
+    const dbOptions = productOptions[fieldKey];
+    if (dbOptions && dbOptions.length > 0) {
+      return dbOptions.map(opt => ({ value: opt.value, label: opt.label }));
+    }
+    return fallback;
+  };
+
+  // Get options from database, with fallbacks for backwards compatibility
+  const productTypes = getOptions('product_type', [
+    { value: 'frame', label: 'Armazón' },
+    { value: 'lens', label: 'Lente' },
+    { value: 'accessory', label: 'Accesorio' },
+    { value: 'service', label: 'Servicio' }
+  ]);
+
+  const opticalCategories = getOptions('optical_category', [
+    { value: 'sunglasses', label: 'Lentes de Sol' },
+    { value: 'prescription_glasses', label: 'Lentes con Receta' },
+    { value: 'reading_glasses', label: 'Lentes de Lectura' },
+    { value: 'safety_glasses', label: 'Lentes de Seguridad' },
+    { value: 'contact_lenses', label: 'Lentes de Contacto' },
+    { value: 'accessories', label: 'Accesorios' },
+    { value: 'services', label: 'Servicios' }
+  ]);
+
+  const frameTypes = getOptions('frame_type', [
+    { value: 'full_frame', label: 'Marco Completo' },
+    { value: 'half_frame', label: 'Media Montura' },
+    { value: 'rimless', label: 'Sin Marco' },
+    { value: 'semi_rimless', label: 'Semi Sin Marco' },
+    { value: 'browline', label: 'Browline' },
+    { value: 'cat_eye', label: 'Ojo de Gato' },
+    { value: 'aviator', label: 'Aviador' },
+    { value: 'round', label: 'Redondo' },
+    { value: 'square', label: 'Cuadrado' },
+    { value: 'rectangular', label: 'Rectangular' },
+    { value: 'oval', label: 'Oval' },
+    { value: 'geometric', label: 'Geométrico' }
+  ]);
+
+  const frameMaterials = getOptions('frame_material', [
+    { value: 'acetate', label: 'Acetato' },
+    { value: 'metal', label: 'Metal' },
+    { value: 'titanium', label: 'Titanio' },
+    { value: 'stainless_steel', label: 'Acero Inoxidable' },
+    { value: 'aluminum', label: 'Aluminio' },
+    { value: 'carbon_fiber', label: 'Fibra de Carbono' },
+    { value: 'wood', label: 'Madera' },
+    { value: 'horn', label: 'Cuerno' },
+    { value: 'plastic', label: 'Plástico' },
+    { value: 'tr90', label: 'TR90' },
+    { value: 'monel', label: 'Monel' },
+    { value: 'beta_titanium', label: 'Beta Titanio' }
+  ]);
+
+  const frameShapes = getOptions('frame_shape', [
+    { value: 'round', label: 'Redondo' },
+    { value: 'square', label: 'Cuadrado' },
+    { value: 'rectangular', label: 'Rectangular' },
+    { value: 'oval', label: 'Oval' },
+    { value: 'cat_eye', label: 'Ojo de Gato' },
+    { value: 'aviator', label: 'Aviador' },
+    { value: 'browline', label: 'Browline' },
+    { value: 'geometric', label: 'Geométrico' },
+    { value: 'shield', label: 'Escudo' },
+    { value: 'wrap', label: 'Wrap' },
+    { value: 'sport', label: 'Deportivo' }
+  ]);
+
+  const frameGenders = getOptions('frame_gender', [
+    { value: 'mens', label: 'Hombre' },
+    { value: 'womens', label: 'Mujer' },
+    { value: 'unisex', label: 'Unisex' },
+    { value: 'kids', label: 'Niños' },
+    { value: 'youth', label: 'Juvenil' }
+  ]);
+
+  const frameSizes = getOptions('frame_size', [
+    { value: 'narrow', label: 'Estrecho' },
+    { value: 'medium', label: 'Mediano' },
+    { value: 'wide', label: 'Ancho' },
+    { value: 'extra_wide', label: 'Extra Ancho' }
+  ]);
+
+  // For array fields, we need to get the values array
+  const frameFeatures = productOptions['frame_features']?.map(opt => opt.value) || [
+    'spring_hinges',
+    'adjustable_nose_pads',
+    'flexible_temples',
+    'lightweight',
+    'durable',
+    'sports_ready',
+    'memory_metal'
   ];
-  const benefitOptions = ['Hidratante', 'Anti-edad', 'Regenerador', 'Nutritivo', 'Tonificante', 'Equilibrante', 'Refrescante', 'Exfoliante', 'Antibacteriano', 'Relajante', 'Aromático'];
-  const certificationOptions = [
-    { value: 'organic', label: 'Orgánico' },
-    { value: 'cruelty-free', label: 'Libre de Crueldad' },
-    { value: 'vegan', label: 'Vegano' },
-    { value: 'natural', label: 'Natural' },
-    { value: 'eco-friendly', label: 'Ecológico' }
+
+  const lensTypes = getOptions('lens_type', [
+    { value: 'single_vision', label: 'Monofocal' },
+    { value: 'bifocal', label: 'Bifocal' },
+    { value: 'trifocal', label: 'Trifocal' },
+    { value: 'progressive', label: 'Progresivo' },
+    { value: 'reading', label: 'Lectura' },
+    { value: 'computer', label: 'Computadora' },
+    { value: 'driving', label: 'Conducción' },
+    { value: 'sports', label: 'Deportivo' },
+    { value: 'photochromic', label: 'Fotocromático' },
+    { value: 'polarized', label: 'Polarizado' }
+  ]);
+
+  const lensMaterials = getOptions('lens_material', [
+    { value: 'cr39', label: 'CR-39' },
+    { value: 'polycarbonate', label: 'Policarbonato' },
+    { value: 'high_index_1_67', label: 'Alto Índice 1.67' },
+    { value: 'high_index_1_74', label: 'Alto Índice 1.74' },
+    { value: 'trivex', label: 'Trivex' },
+    { value: 'glass', label: 'Vidrio' },
+    { value: 'photochromic', label: 'Fotocromático' }
+  ]);
+
+  const lensCoatings = productOptions['lens_coatings']?.map(opt => opt.value) || [
+    'anti_reflective',
+    'blue_light_filter',
+    'uv_protection',
+    'scratch_resistant',
+    'anti_fog',
+    'mirror',
+    'tint',
+    'polarized'
   ];
+
+  const uvProtectionLevels = getOptions('uv_protection', [
+    { value: 'none', label: 'Ninguno' },
+    { value: 'uv400', label: 'UV400' },
+    { value: 'uv380', label: 'UV380' },
+    { value: 'uv350', label: 'UV350' }
+  ]);
 
   useEffect(() => {
     fetchCategories();
@@ -129,39 +294,38 @@ export default function AddProductPage() {
     updateFormData(updates);
   };
 
-  const addToArray = (field: 'skin_type' | 'benefits' | 'certifications', value: string) => {
-    if (!formData[field].includes(value)) {
+  const addToArray = (field: string, value: string) => {
+    const currentArray = formData[field as keyof typeof formData] as string[];
+    if (!currentArray.includes(value)) {
       updateFormData({
-        [field]: [...formData[field], value]
+        [field]: [...currentArray, value]
       });
     }
   };
 
-  const removeFromArray = (field: 'skin_type' | 'benefits' | 'certifications', value: string) => {
+  const removeFromArray = (field: string, value: string) => {
+    const currentArray = formData[field as keyof typeof formData] as string[];
     updateFormData({
-      [field]: formData[field].filter(item => item !== value)
+      [field]: currentArray.filter(item => item !== value)
     });
   };
 
-  const addIngredient = () => {
+  const updateFrameMeasurement = (field: string, value: string) => {
     updateFormData({
-      ingredients: [...formData.ingredients, { name: '', percentage: undefined }]
+      frame_measurements: {
+        ...formData.frame_measurements,
+        [field]: value
+      }
     });
   };
 
-  const removeIngredient = (index: number) => {
+  const updatePrescriptionRange = (field: string, value: string) => {
     updateFormData({
-      ingredients: formData.ingredients.filter((_, i) => i !== index)
+      prescription_range: {
+        ...formData.prescription_range,
+        [field]: value
+      }
     });
-  };
-
-  const updateIngredient = (index: number, field: 'name' | 'percentage', value: string | number) => {
-    const updatedIngredients = [...formData.ingredients];
-    updatedIngredients[index] = {
-      ...updatedIngredients[index],
-      [field]: value
-    };
-    updateFormData({ ingredients: updatedIngredients });
   };
 
 
@@ -171,13 +335,52 @@ export default function AddProductPage() {
     markAsSaving(); // 🚀 Allow navigation during save process
 
     try {
+      // Prepare frame measurements - convert empty strings to null
+      const frameMeasurements = formData.frame_measurements.lens_width || 
+        formData.frame_measurements.bridge_width || 
+        formData.frame_measurements.temple_length ? {
+          lens_width: formData.frame_measurements.lens_width ? parseInt(formData.frame_measurements.lens_width) : null,
+          bridge_width: formData.frame_measurements.bridge_width ? parseInt(formData.frame_measurements.bridge_width) : null,
+          temple_length: formData.frame_measurements.temple_length ? parseInt(formData.frame_measurements.temple_length) : null,
+          lens_height: formData.frame_measurements.lens_height ? parseInt(formData.frame_measurements.lens_height) : null,
+          total_width: formData.frame_measurements.total_width ? parseInt(formData.frame_measurements.total_width) : null,
+        } : null;
+
+      // Prepare prescription range
+      const prescriptionRange = formData.prescription_available && (
+        formData.prescription_range.sph_min || formData.prescription_range.sph_max ||
+        formData.prescription_range.cyl_min || formData.prescription_range.cyl_max ||
+        formData.prescription_range.add_min || formData.prescription_range.add_max
+      ) ? {
+        sph_min: formData.prescription_range.sph_min ? parseFloat(formData.prescription_range.sph_min) : null,
+        sph_max: formData.prescription_range.sph_max ? parseFloat(formData.prescription_range.sph_max) : null,
+        cyl_min: formData.prescription_range.cyl_min ? parseFloat(formData.prescription_range.cyl_min) : null,
+        cyl_max: formData.prescription_range.cyl_max ? parseFloat(formData.prescription_range.cyl_max) : null,
+        add_min: formData.prescription_range.add_min ? parseFloat(formData.prescription_range.add_min) : null,
+        add_max: formData.prescription_range.add_max ? parseFloat(formData.prescription_range.add_max) : null,
+      } : null;
+
       const productData = {
         ...formData,
         status: status,
         price: parseFloat(formData.price),
         compare_at_price: formData.compare_at_price ? parseFloat(formData.compare_at_price) : null,
         inventory_quantity: parseInt(formData.inventory_quantity),
-        published_at: status === 'active' ? new Date().toISOString() : null
+        published_at: status === 'active' ? new Date().toISOString() : null,
+        // Optical fields
+        frame_measurements: frameMeasurements,
+        prescription_range: prescriptionRange,
+        lens_index: formData.lens_index ? parseFloat(formData.lens_index) : null,
+        warranty_months: formData.warranty_months ? parseInt(formData.warranty_months) : null,
+        blue_light_filter_percentage: formData.blue_light_filter_percentage ? parseInt(formData.blue_light_filter_percentage) : null,
+        // Remove cosmetics fields that don't apply
+        skin_type: undefined,
+        benefits: undefined,
+        certifications: undefined,
+        ingredients: undefined,
+        usage_instructions: undefined,
+        precautions: undefined,
+        package_characteristics: undefined,
       };
 
       const response = await fetch('/api/admin/products', {
@@ -242,7 +445,7 @@ export default function AddProductPage() {
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="Ej: Crema Hidratante de Rosa Mosqueta"
+                  placeholder="Ej: Ray-Ban RB2140 Wayfarer"
                   required
                   className='border-black/20'
                 />
@@ -327,13 +530,46 @@ export default function AddProductPage() {
           </CardContent>
         </Card>
 
+        {/* Product Type & Category */}
         <Card className='bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'>
           <CardHeader>
-            <CardTitle>Categoría</CardTitle>
+            <CardTitle>Tipo de Producto</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="category">Categoría</Label>
+                <Label htmlFor="product_type">Tipo de Producto *</Label>
+                <Select value={formData.product_type} onValueChange={(value) => handleInputChange('product_type', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="optical_category">Categoría Óptica</Label>
+                <Select value={formData.optical_category} onValueChange={(value) => handleInputChange('optical_category', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opticalCategories.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="category">Categoría General</Label>
                 <Select value={formData.category_id} onValueChange={(value) => handleInputChange('category_id', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar categoría" />
@@ -346,6 +582,69 @@ export default function AddProductPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+          </CardContent>
+        </Card>
+
+        {/* Brand & Model Information */}
+        <Card className='bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'>
+          <CardHeader>
+            <CardTitle>Marca y Modelo</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="brand">Marca</Label>
+                <Input
+                  id="brand"
+                  value={formData.brand}
+                  onChange={(e) => handleInputChange('brand', e.target.value)}
+                  placeholder="Ej: Ray-Ban"
+                  className='border-black/20'
+                />
+              </div>
+              <div>
+                <Label htmlFor="manufacturer">Fabricante</Label>
+                <Input
+                  id="manufacturer"
+                  value={formData.manufacturer}
+                  onChange={(e) => handleInputChange('manufacturer', e.target.value)}
+                  placeholder="Ej: Luxottica"
+                  className='border-black/20'
+                />
+              </div>
+              <div>
+                <Label htmlFor="model_number">Número de Modelo</Label>
+                <Input
+                  id="model_number"
+                  value={formData.model_number}
+                  onChange={(e) => handleInputChange('model_number', e.target.value)}
+                  placeholder="Ej: RB2140"
+                  className='border-black/20'
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="sku">SKU</Label>
+                <Input
+                  id="sku"
+                  value={formData.sku}
+                  onChange={(e) => handleInputChange('sku', e.target.value)}
+                  placeholder="Código SKU"
+                  className='border-black/20'
+                />
+              </div>
+              <div>
+                <Label htmlFor="barcode">Código de Barras</Label>
+                <Input
+                  id="barcode"
+                  value={formData.barcode}
+                  onChange={(e) => handleInputChange('barcode', e.target.value)}
+                  placeholder="Código de barras"
+                  className='border-black/20'
+                />
+              </div>
               </div>
           </CardContent>
         </Card>
@@ -405,31 +704,22 @@ export default function AddProductPage() {
           </CardContent>
         </Card>
 
+        {/* Frame Specifications - Only show if product_type is 'frame' */}
+        {formData.product_type === 'frame' && (
         <Card className='bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'>
           <CardHeader>
-            <CardTitle>Atributos del Producto</CardTitle>
+              <CardTitle>Especificaciones del Armazón</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Skin Types */}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>Tipos de Piel</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.skin_type.map((type) => {
-                  const skinTypeLabel = skinTypes.find(st => st.value === type)?.label || type;
-                  return (
-                  <Badge key={type} variant="secondary" className="flex items-center gap-1">
-                      {skinTypeLabel}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => removeFromArray('skin_type', type)} />
-                  </Badge>
-                  );
-                })}
-              </div>
-              <Select onValueChange={(value) => addToArray('skin_type', value)}>
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Agregar tipo de piel" />
+                  <Label>Tipo de Armazón</Label>
+                  <Select value={formData.frame_type} onValueChange={(value) => handleInputChange('frame_type', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {skinTypes.filter(type => !formData.skin_type.includes(type.value)).map((type) => (
+                      {frameTypes.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
                     </SelectItem>
@@ -437,166 +727,423 @@ export default function AddProductPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Benefits */}
             <div>
-              <Label>Beneficios</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.benefits.map((benefit) => (
-                  <Badge key={benefit} variant="secondary" className="flex items-center gap-1">
-                    {benefit}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => removeFromArray('benefits', benefit)} />
-                  </Badge>
-                ))}
+                  <Label>Material del Armazón</Label>
+                  <Select value={formData.frame_material} onValueChange={(value) => handleInputChange('frame_material', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar material" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {frameMaterials.map((material) => (
+                        <SelectItem key={material.value} value={material.value}>
+                          {material.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
               </div>
-              <Select onValueChange={(value) => addToArray('benefits', value)}>
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Agregar beneficio" />
+                <div>
+                  <Label>Forma del Armazón</Label>
+                  <Select value={formData.frame_shape} onValueChange={(value) => handleInputChange('frame_shape', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar forma" />
                 </SelectTrigger>
                 <SelectContent>
-                  {benefitOptions.filter(benefit => !formData.benefits.includes(benefit)).map((benefit) => (
-                    <SelectItem key={benefit} value={benefit}>
-                      {benefit}
+                      {frameShapes.map((shape) => (
+                        <SelectItem key={shape.value} value={shape.value}>
+                          {shape.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Certifications */}
             <div>
-              <Label>Certificaciones</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.certifications.map((cert) => {
-                  const certLabel = certificationOptions.find(co => co.value === cert)?.label || cert;
-                  return (
-                  <Badge key={cert} variant="secondary" className="flex items-center gap-1">
-                      {certLabel}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => removeFromArray('certifications', cert)} />
-                  </Badge>
-                  );
-                })}
+                  <Label>Género</Label>
+                  <Select value={formData.frame_gender} onValueChange={(value) => handleInputChange('frame_gender', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar género" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {frameGenders.map((gender) => (
+                        <SelectItem key={gender.value} value={gender.value}>
+                          {gender.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
               </div>
-              <Select onValueChange={(value) => addToArray('certifications', value)}>
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Agregar certificación" />
+                <div>
+                  <Label>Tamaño</Label>
+                  <Select value={formData.frame_size} onValueChange={(value) => handleInputChange('frame_size', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tamaño" />
                 </SelectTrigger>
                 <SelectContent>
-                  {certificationOptions.filter(cert => !formData.certifications.includes(cert.value)).map((cert) => (
-                    <SelectItem key={cert.value} value={cert.value}>
-                      {cert.label}
+                      {frameSizes.map((size) => (
+                        <SelectItem key={size.value} value={size.value}>
+                          {size.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+                </div>
+                <div>
+                  <Label>Color Principal</Label>
+                  <Input
+                    value={formData.frame_color}
+                    onChange={(e) => handleInputChange('frame_color', e.target.value)}
+                    placeholder="Ej: Negro"
+                    className='border-black/20'
+                  />
+                </div>
             </div>
 
-            {/* Ingredients */}
+              {/* Frame Measurements */}
             <div>
-              <Label>Ingredientes</Label>
-              <div className="space-y-3 mt-2">
-                {formData.ingredients.map((ingredient, index) => (
-                  <div key={index} className="flex gap-2 items-center">
-                    <Input
-                      placeholder="Nombre del ingrediente"
-                      value={ingredient.name}
-                      onChange={(e) => updateIngredient(index, 'name', e.target.value)}
-                      className="flex-1"
-                    />
+                <Label className="mb-2 block">Medidas del Armazón (mm)</Label>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div>
+                    <Label className="text-xs">Ancho de Lente</Label>
                     <Input
                       type="number"
-                      placeholder="%"
-                      value={ingredient.percentage || ''}
-                      onChange={(e) => updateIngredient(index, 'percentage', parseFloat(e.target.value) || 0)}
-                      className="w-20"
+                      value={formData.frame_measurements.lens_width}
+                      onChange={(e) => updateFrameMeasurement('lens_width', e.target.value)}
+                      placeholder="52"
+                      className='border-black/20'
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeIngredient(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
                   </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addIngredient}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Ingrediente
-                </Button>
+                  <div>
+                    <Label className="text-xs">Puente</Label>
+                    <Input
+                      type="number"
+                      value={formData.frame_measurements.bridge_width}
+                      onChange={(e) => updateFrameMeasurement('bridge_width', e.target.value)}
+                      placeholder="18"
+                      className='border-black/20'
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Largo de Varilla</Label>
+                    <Input
+                      type="number"
+                      value={formData.frame_measurements.temple_length}
+                      onChange={(e) => updateFrameMeasurement('temple_length', e.target.value)}
+                      placeholder="140"
+                      className='border-black/20'
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Alto de Lente</Label>
+                    <Input
+                      type="number"
+                      value={formData.frame_measurements.lens_height}
+                      onChange={(e) => updateFrameMeasurement('lens_height', e.target.value)}
+                      placeholder="40"
+                      className='border-black/20'
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Ancho Total</Label>
+                    <Input
+                      type="number"
+                      value={formData.frame_measurements.total_width}
+                      onChange={(e) => updateFrameMeasurement('total_width', e.target.value)}
+                      placeholder="140"
+                      className='border-black/20'
+                    />
+                  </div>
+                </div>
               </div>
+
+              {/* Frame Features */}
+              <div>
+                <Label>Características del Armazón</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {formData.frame_features.map((feature) => (
+                    <Badge key={feature} variant="secondary" className="flex items-center gap-1">
+                      {feature.replace(/_/g, ' ')}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => removeFromArray('frame_features', feature)} />
+                    </Badge>
+                  ))}
+              </div>
+                <Select onValueChange={(value) => addToArray('frame_features', value)}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Agregar característica" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {frameFeatures.filter(f => !formData.frame_features.includes(f)).map((feature) => (
+                      <SelectItem key={feature} value={feature}>
+                        {feature.replace(/_/g, ' ')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
             </div>
           </CardContent>
         </Card>
+        )}
 
+        {/* Lens Specifications - Only show if product_type is 'lens' */}
+        {formData.product_type === 'lens' && (
         <Card className='bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'>
           <CardHeader>
-            <CardTitle>Instrucciones de Uso</CardTitle>
+              <CardTitle>Especificaciones del Lente</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="usage_instructions">Instrucciones de Uso</Label>
-              <RichTextEditor
-                value={formData.usage_instructions}
-                onChange={(value) => handleInputChange('usage_instructions', value)}
-                placeholder="Cómo usar el producto"
-                rows={3}
+                  <Label>Tipo de Lente</Label>
+                  <Select value={formData.lens_type} onValueChange={(value) => handleInputChange('lens_type', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lensTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Material del Lente</Label>
+                  <Select value={formData.lens_material} onValueChange={(value) => handleInputChange('lens_material', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar material" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lensMaterials.map((material) => (
+                        <SelectItem key={material.value} value={material.value}>
+                          {material.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Índice de Refracción</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.lens_index}
+                    onChange={(e) => handleInputChange('lens_index', e.target.value)}
+                    placeholder="Ej: 1.67"
+                    className='border-black/20'
               />
             </div>
             <div>
-              <Label htmlFor="precautions">Precauciones</Label>
-              <RichTextEditor
-                value={formData.precautions}
-                onChange={(value) => handleInputChange('precautions', value)}
-                placeholder="Advertencias y precauciones"
-                rows={2}
-              />
+                  <Label>Protección UV</Label>
+                  <Select value={formData.uv_protection} onValueChange={(value) => handleInputChange('uv_protection', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar nivel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {uvProtectionLevels.map((level) => (
+                        <SelectItem key={level.value} value={level.value}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="blue_light_filter"
+                    checked={formData.blue_light_filter}
+                    onChange={(e) => handleInputChange('blue_light_filter', e.target.checked)}
+                    className="rounded"
+                  />
+                  <Label htmlFor="blue_light_filter">Filtro de Luz Azul</Label>
             </div>
+                {formData.blue_light_filter && (
+                  <div>
+                    <Label>Porcentaje de Filtro (%)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.blue_light_filter_percentage}
+                      onChange={(e) => handleInputChange('blue_light_filter_percentage', e.target.value)}
+                      placeholder="Ej: 40"
+                      className='border-black/20'
+                    />
+                  </div>
+                )}
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="photochromic"
+                    checked={formData.photochromic}
+                    onChange={(e) => handleInputChange('photochromic', e.target.checked)}
+                    className="rounded"
+                  />
+                  <Label htmlFor="photochromic">Fotocromático (Transitions)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="prescription_available"
+                    checked={formData.prescription_available}
+                    onChange={(e) => handleInputChange('prescription_available', e.target.checked)}
+                    className="rounded"
+                  />
+                  <Label htmlFor="prescription_available">Disponible con Receta</Label>
+                </div>
+              </div>
+
+              {/* Lens Coatings */}
+              <div>
+                <Label>Tratamientos y Recubrimientos</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {formData.lens_coatings.map((coating) => (
+                    <Badge key={coating} variant="secondary" className="flex items-center gap-1">
+                      {coating.replace(/_/g, ' ')}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => removeFromArray('lens_coatings', coating)} />
+                    </Badge>
+                  ))}
+                </div>
+                <Select onValueChange={(value) => addToArray('lens_coatings', value)}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Agregar tratamiento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lensCoatings.filter(c => !formData.lens_coatings.includes(c)).map((coating) => (
+                      <SelectItem key={coating} value={coating}>
+                        {coating.replace(/_/g, ' ')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Prescription Range */}
+              {formData.prescription_available && (
+                <div>
+                  <Label className="mb-2 block">Rango de Receta Soportado</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-xs">SPH Mínimo</Label>
+                      <Input
+                        type="number"
+                        step="0.25"
+                        value={formData.prescription_range.sph_min}
+                        onChange={(e) => updatePrescriptionRange('sph_min', e.target.value)}
+                        placeholder="-10.00"
+                        className='border-black/20'
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">SPH Máximo</Label>
+                      <Input
+                        type="number"
+                        step="0.25"
+                        value={formData.prescription_range.sph_max}
+                        onChange={(e) => updatePrescriptionRange('sph_max', e.target.value)}
+                        placeholder="+6.00"
+                        className='border-black/20'
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">CIL Mínimo</Label>
+                      <Input
+                        type="number"
+                        step="0.25"
+                        value={formData.prescription_range.cyl_min}
+                        onChange={(e) => updatePrescriptionRange('cyl_min', e.target.value)}
+                        placeholder="-4.00"
+                        className='border-black/20'
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">CIL Máximo</Label>
+                      <Input
+                        type="number"
+                        step="0.25"
+                        value={formData.prescription_range.cyl_max}
+                        onChange={(e) => updatePrescriptionRange('cyl_max', e.target.value)}
+                        placeholder="+4.00"
+                        className='border-black/20'
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">ADD Mínimo</Label>
+                      <Input
+                        type="number"
+                        step="0.25"
+                        value={formData.prescription_range.add_min}
+                        onChange={(e) => updatePrescriptionRange('add_min', e.target.value)}
+                        placeholder="0.00"
+                        className='border-black/20'
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">ADD Máximo</Label>
+                      <Input
+                        type="number"
+                        step="0.25"
+                        value={formData.prescription_range.add_max}
+                        onChange={(e) => updatePrescriptionRange('add_max', e.target.value)}
+                        placeholder="+4.00"
+                        className='border-black/20'
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
           </CardContent>
         </Card>
+        )}
 
-        {/* Physical Details */}
+        {/* Warranty & Additional Info */}
         <Card className='bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'>
           <CardHeader>
-            <CardTitle>Detalles Físicos</CardTitle>
-            <p className="text-sm text-gray-600">Información sobre peso, dimensiones y características del empaque</p>
+            <CardTitle>Garantía e Información Adicional</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="weight">Peso (gramos)</Label>
+                <Label htmlFor="warranty_months">Garantía (meses)</Label>
                 <Input
-                  id="weight"
+                  id="warranty_months"
                   type="number"
-                  value={formData.weight}
-                  onChange={(e) => handleInputChange('weight', e.target.value)}
-                  placeholder="Ej: 500"
+                  value={formData.warranty_months}
+                  onChange={(e) => handleInputChange('warranty_months', e.target.value)}
+                  placeholder="Ej: 12"
                   className='border-black/20'
                 />
               </div>
-              <div>
-                <Label htmlFor="dimensions">Dimensiones</Label>
-                <Input
-                  id="dimensions"
-                  value={formData.dimensions}
-                  onChange={(e) => handleInputChange('dimensions', e.target.value)}
-                  placeholder="Ej: 15x10x5 cm"
-                  className='border-black/20'
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="requires_prescription"
+                  checked={formData.requires_prescription}
+                  onChange={(e) => handleInputChange('requires_prescription', e.target.checked)}
+                  className="rounded"
                 />
+                <Label htmlFor="requires_prescription">Requiere Receta</Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="is_customizable"
+                  checked={formData.is_customizable}
+                  onChange={(e) => handleInputChange('is_customizable', e.target.checked)}
+                  className="rounded"
+                />
+                <Label htmlFor="is_customizable">Personalizable</Label>
             </div>
-            
+            </div>
             <div>
-              <Label htmlFor="package_characteristics">Características del Empaque</Label>
+              <Label htmlFor="warranty_details">Detalles de Garantía</Label>
               <RichTextEditor
-                value={formData.package_characteristics}
-                onChange={(value) => handleInputChange('package_characteristics', value)}
-                placeholder="Describe las características específicas del empaque, materiales, diseño, etc."
+                value={formData.warranty_details}
+                onChange={(value) => handleInputChange('warranty_details', value)}
+                placeholder="Detalles de la garantía, condiciones, etc."
                 rows={3}
               />
             </div>

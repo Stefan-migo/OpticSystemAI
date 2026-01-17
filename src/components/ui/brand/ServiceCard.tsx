@@ -26,7 +26,6 @@ interface ServiceCardProps {
   category: string;
   imageUrl: string;
   rating: number;
-  reviewCount: number;
   location: 'online' | 'presencial' | 'ambos';
   groupSize: 'individual' | 'grupal' | 'ambos';
   features: string[];
@@ -46,7 +45,6 @@ export default function ServiceCard({
   category,
   imageUrl,
   rating,
-  reviewCount,
   location,
   groupSize,
   features,
@@ -169,9 +167,6 @@ export default function ServiceCard({
               <div className="flex items-center">
                 {renderStars(rating)}
               </div>
-              <span className="text-sm text-tierra-media">
-                ({reviewCount})
-              </span>
             </div>
           </div>
 

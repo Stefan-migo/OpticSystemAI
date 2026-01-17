@@ -41,29 +41,83 @@ async function createAdminUser() {
   }
 
   try {
-    // Create user via Auth API
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: {
-        first_name: 'Admin',
-        last_name: 'User'
+    // First, check if user already exists
+    let userId;
+    let userExists = false;
+    
+    console.log('🔍 Checking for existing user...');
+    const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
+    
+    if (!listError && existingUsers?.users) {
+      const existingUser = existingUsers.users.find(u => u.email === email);
+      if (existingUser) {
+        console.log('✅ User already exists, updating...');
+        userId = existingUser.id;
+        userExists = true;
+        
+        // Update password if needed
+        const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+          password: password,
+          email_confirm: true
+        });
+        
+        if (updateError) {
+          console.error('⚠️  Error updating user password (may already be correct):', updateError.message);
+        } else {
+          console.log('✅ User password updated');
+        }
+      } else {
+        console.log('ℹ️  User not found in list, will try to create...');
       }
-    });
-
-    if (authError) {
-      console.error('Error creating auth user:', authError);
-      return;
+    } else if (listError) {
+      console.log('⚠️  Could not list users:', listError.message);
+      console.log('ℹ️  Will try to create user anyway...');
     }
+    
+    if (!userExists) {
+      // Create user via Auth API
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          first_name: 'Admin',
+          last_name: 'User'
+        }
+      });
 
-    if (!authData.user) {
-      console.error('No user returned from auth');
-      return;
+      if (authError) {
+        // If user already exists error, try to find and use existing user
+        if (authError.message?.includes('already registered') || authError.status === 422 || authError.code === 'unexpected_failure') {
+          console.log('⚠️  User already registered or database error, trying to find existing user...');
+          try {
+            const { data: existingUsers } = await supabase.auth.admin.listUsers();
+            const existingUser = existingUsers?.users?.find(u => u.email === email);
+            if (existingUser) {
+              userId = existingUser.id;
+              userExists = true;
+              console.log('✅ Found existing user:', userId);
+            } else {
+              console.error('Error creating auth user and user not found:', authError);
+              console.log('⚠️  Will try to continue with profile/admin setup anyway...');
+              return;
+            }
+          } catch (listErr) {
+            console.error('Error listing users:', listErr);
+            return;
+          }
+        } else {
+          console.error('Error creating auth user:', authError);
+          return;
+        }
+      } else if (authData?.user) {
+        userId = authData.user.id;
+        console.log('✅ Auth user created:', userId);
+      } else {
+        console.error('No user returned from auth');
+        return;
+      }
     }
-
-    const userId = authData.user.id;
-    console.log('✅ Auth user created:', userId);
 
     // Wait a moment for profile to be created by trigger
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -81,12 +135,13 @@ async function createAdminUser() {
     }
 
     // Create admin_users entry
+    // Use 'super_admin' as role since 'admin' is not in the allowed values
     const { error: adminError } = await supabase
       .from('admin_users')
       .insert({
         id: userId,
         email: email,
-        role: 'admin',
+        role: 'super_admin', // Use super_admin instead of admin
         is_active: true
       });
 

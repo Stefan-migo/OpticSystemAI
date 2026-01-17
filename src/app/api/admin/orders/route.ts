@@ -307,6 +307,15 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Manual order created successfully:', newOrder.id);
 
+      // Create notification for new sale (non-blocking)
+      const { NotificationService } = await import('@/lib/notifications/notification-service');
+      NotificationService.notifyNewSale(
+        newOrder.id,
+        newOrder.order_number,
+        newOrder.email,
+        newOrder.total_amount
+      ).catch(err => console.error('Error creating notification:', err));
+
       return NextResponse.json({
         success: true,
         order: newOrder

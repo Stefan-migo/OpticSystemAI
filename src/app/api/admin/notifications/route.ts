@@ -9,10 +9,15 @@ export async function GET(request: NextRequest) {
     // Check admin authorization
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
+      console.error('❌ Auth error in notifications:', userError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin, error: adminCheckError } = await supabase.rpc('is_admin', { user_id: user.id });
+    if (adminCheckError) {
+      console.error('❌ Admin check error:', adminCheckError);
+      return NextResponse.json({ error: 'Admin verification failed' }, { status: 500 });
+    }
     if (!isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
@@ -78,10 +83,15 @@ export async function PATCH(request: NextRequest) {
     // Check admin authorization
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
+      console.error('❌ Auth error in notifications PATCH:', userError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin, error: adminCheckError } = await supabase.rpc('is_admin', { user_id: user.id });
+    if (adminCheckError) {
+      console.error('❌ Admin check error:', adminCheckError);
+      return NextResponse.json({ error: 'Admin verification failed' }, { status: 500 });
+    }
     if (!isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }

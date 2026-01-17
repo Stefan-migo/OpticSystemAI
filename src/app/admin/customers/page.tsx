@@ -49,8 +49,6 @@ interface Customer {
   last_name?: string;
   email: string;
   phone?: string;
-  membership_tier: string;
-  is_member: boolean;
   created_at: string;
   orders?: any[];
   analytics?: {
@@ -65,9 +63,8 @@ interface Customer {
 
 interface CustomerStats {
   totalCustomers: number;
-  activeMembers: number;
+  activeCustomers: number;
   newCustomersThisMonth: number;
-  membershipDistribution: Record<string, number>;
 }
 
 export default function CustomersPage() {
@@ -79,7 +76,6 @@ export default function CustomersPage() {
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [membershipFilter, setMembershipFilter] = useState('all');
   const [segmentFilter, setSegmentFilter] = useState('all');
 
   // Pagination
@@ -90,7 +86,7 @@ export default function CustomersPage() {
   useEffect(() => {
     fetchCustomers();
     fetchStats();
-  }, [currentPage, membershipFilter, segmentFilter]);
+  }, [currentPage, segmentFilter]);
 
   const fetchCustomers = async () => {
     try {
@@ -98,7 +94,6 @@ export default function CustomersPage() {
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: '20',
-        ...(membershipFilter !== 'all' && { membership_tier: membershipFilter }),
         ...(segmentFilter !== 'all' && { segment: segmentFilter })
       });
 
@@ -140,9 +135,9 @@ export default function CustomersPage() {
   };
 
   const formatPrice = (amount: number) => 
-    new Intl.NumberFormat('es-AR', { 
+    new Intl.NumberFormat('es-CL', { 
       style: 'currency', 
-      currency: 'ARS',
+      currency: 'CLP',
       minimumFractionDigits: 0
     }).format(amount);
 
@@ -166,25 +161,6 @@ export default function CustomersPage() {
     );
   };
 
-  const getMembershipBadge = (tier: string, isMember: boolean) => {
-    // If tier is 'none' or empty, show "Sin Membresía"
-    if (!tier || tier === 'none') {
-      return <Badge variant="outline">Sin Membresía</Badge>;
-    }
-
-    // If tier exists but isMember is false, still show the tier but with different styling
-    const config: Record<string, { variant: any; label: string }> = {
-      basic: { variant: 'secondary', label: 'Básica' },
-      premium: { variant: 'default', label: 'Premium' }
-    };
-
-    const tierConfig = config[tier] || { variant: 'outline', label: tier };
-    
-    // If isMember is false, use outline variant to indicate inactive status
-    const variant = isMember ? tierConfig.variant : 'outline';
-    
-    return <Badge variant={variant}>{tierConfig.label}</Badge>;
-  };
 
   if (loading && customers.length === 0) {
     return (
@@ -249,7 +225,7 @@ export default function CustomersPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -265,10 +241,10 @@ export default function CustomersPage() {
           <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
             <CardContent className="p-6">
               <div className="flex items-center">
-                <Crown className="h-8 w-8 text-dorado" />
+                <CheckCircle className="h-8 w-8 text-verde-suave" />
                 <div className="ml-4">
-                  <p className="text-sm text-tierra-media">Miembros Activos</p>
-                  <p className="text-2xl font-bold text-dorado">{stats.activeMembers}</p>
+                  <p className="text-sm text-tierra-media">Clientes Activos</p>
+                  <p className="text-2xl font-bold text-verde-suave">{stats.activeCustomers || stats.totalCustomers}</p>
                 </div>
               </div>
             </CardContent>
@@ -277,22 +253,10 @@ export default function CustomersPage() {
           <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
             <CardContent className="p-6">
               <div className="flex items-center">
-                <ArrowUpRight className="h-8 w-8 text-verde-suave" />
+                <ArrowUpRight className="h-8 w-8 text-azul-profundo" />
                 <div className="ml-4">
                   <p className="text-sm text-tierra-media">Nuevos Este Mes</p>
-                  <p className="text-2xl font-bold text-verde-suave">{stats.newCustomersThisMonth}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <TrendingUp className="h-8 w-8 text-red-500" />
-                <div className="ml-4">
-                  <p className="text-sm text-tierra-media">Premium</p>
-                  <p className="text-2xl font-bold text-red-500">{stats.membershipDistribution.premium || 0}</p>
+                  <p className="text-2xl font-bold text-azul-profundo">{stats.newCustomersThisMonth}</p>
                 </div>
               </div>
             </CardContent>
@@ -316,18 +280,6 @@ export default function CustomersPage() {
               </div>
             </div>
             
-            <Select value={membershipFilter} onValueChange={setMembershipFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Membresía" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las membresías</SelectItem>
-                <SelectItem value="none">Sin membresía</SelectItem>
-                <SelectItem value="basic">Básica</SelectItem>
-                <SelectItem value="premium">Premium</SelectItem>
-              </SelectContent>
-            </Select>
-
             <Select value={segmentFilter} onValueChange={setSegmentFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Segmento" />
@@ -369,7 +321,6 @@ export default function CustomersPage() {
               <TableRow>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Contacto</TableHead>
-                <TableHead>Membresía</TableHead>
                 <TableHead>Pedidos</TableHead>
                 <TableHead>Total Gastado</TableHead>
                 <TableHead>Segmento</TableHead>
@@ -414,10 +365,6 @@ export default function CustomersPage() {
                         </div>
                       )}
                     </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    {getMembershipBadge(customer.membership_tier, customer.is_member)}
                   </TableCell>
                   
                   <TableCell>

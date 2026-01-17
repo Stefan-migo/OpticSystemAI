@@ -29,7 +29,6 @@ interface ProductCardProps {
   category: string;
   imageUrl: string;
   rating: number;
-  reviewCount: number;
   isNatural?: boolean;
   isNew?: boolean;
   isOnSale?: boolean;
@@ -96,7 +95,6 @@ export default function ProductCard({
   category,
   imageUrl,
   rating,
-  reviewCount,
   isNatural = true,
   isNew = false,
   isOnSale = false,
@@ -273,9 +271,6 @@ export default function ProductCard({
                 <div className="flex items-center gap-1">
                   {renderStars(rating)}
                 </div>
-                <span className="text-sm text-text-secondary font-medium">
-                  ({reviewCount} {reviewCount === 1 ? 'reseña' : 'reseñas'})
-                </span>
               </div>
 
               {/* Price */}
@@ -437,9 +432,6 @@ export default function ProductCard({
                     />
                   ))}
                 </div>
-                <span className="text-xs text-text-secondary">
-                  ({reviewCount})
-                </span>
               </div>
 
               {/* Price - Prominent, Left aligned */}

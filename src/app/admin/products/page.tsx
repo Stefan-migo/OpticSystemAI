@@ -59,7 +59,8 @@ import {
   Grid3X3,
   List,
   X,
-  ChevronDown
+  ChevronDown,
+  Tag
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -91,12 +92,46 @@ export default function ProductsPage() {
   
   // View state
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  
+  // Product customization settings
+  const [productSettings, setProductSettings] = useState({
+    visibleColumns: {
+      name: true,
+      price: true,
+      stock: true,
+      category: true,
+      status: true,
+      featured: true,
+      createdAt: false
+    },
+    itemsPerPage: 12,
+    defaultView: 'grid' as 'grid' | 'table',
+    showLowStockWarning: true,
+    autoRefresh: false
+  });
 
-  // Load view preference from localStorage
+  // Load preferences from localStorage
   useEffect(() => {
     const savedViewMode = localStorage.getItem('admin-products-view-mode');
     if (savedViewMode === 'grid' || savedViewMode === 'table') {
       setViewMode(savedViewMode);
+    }
+
+    const savedSettings = localStorage.getItem('admin-products-settings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setProductSettings(prev => ({ ...prev, ...parsed }));
+        if (parsed.itemsPerPage) {
+          setItemsPerPage(parsed.itemsPerPage);
+        }
+        if (parsed.defaultView) {
+          setViewMode(parsed.defaultView);
+        }
+      } catch (e) {
+        console.error('Error loading product settings:', e);
+      }
     }
   }, []);
 
@@ -104,6 +139,34 @@ export default function ProductsPage() {
   const handleViewModeChange = (mode: 'grid' | 'table') => {
     setViewMode(mode);
     localStorage.setItem('admin-products-view-mode', mode);
+    const updatedSettings = { ...productSettings, defaultView: mode };
+    setProductSettings(updatedSettings);
+    localStorage.setItem('admin-products-settings', JSON.stringify(updatedSettings));
+  };
+
+  // Save settings
+  const handleSaveSettings = () => {
+    const updatedSettings = {
+      ...productSettings,
+      itemsPerPage,
+      defaultView: viewMode
+    };
+    setProductSettings(updatedSettings);
+    localStorage.setItem('admin-products-settings', JSON.stringify(updatedSettings));
+    setItemsPerPage(updatedSettings.itemsPerPage);
+    toast.success('Configuración guardada exitosamente');
+    setShowSettingsDialog(false);
+  };
+
+  // Toggle column visibility
+  const toggleColumnVisibility = (column: string) => {
+    setProductSettings(prev => ({
+      ...prev,
+      visibleColumns: {
+        ...prev.visibleColumns,
+        [column]: !prev.visibleColumns[column as keyof typeof prev.visibleColumns]
+      }
+    }));
   };
   
   // Product data
@@ -154,6 +217,17 @@ export default function ProductsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<any>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Categories management state (must be before early returns)
+  const [categoriesTabActive, setCategoriesTabActive] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: '',
+    slug: '',
+    description: ''
+  });
+  const [categoryFormLoading, setCategoryFormLoading] = useState(false);
 
   useEffect(() => {
     console.log('🚀 ProductsPage component mounted');
@@ -706,6 +780,125 @@ export default function ProductsPage() {
 
   console.log('🎨 ProductsPage rendering, loading:', loading, 'error:', error);
   
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+  };
+
+  const handleCategoryInputChange = (field: string, value: string) => {
+    setCategoryFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+
+    if (field === 'name') {
+      setCategoryFormData(prev => ({
+        ...prev,
+        name: value,
+        slug: generateSlug(value)
+      }));
+    }
+  };
+
+  const openCreateCategoryDialog = () => {
+    setEditingCategory(null);
+    setCategoryFormData({ name: '', slug: '', description: '' });
+    setCategoryDialogOpen(true);
+  };
+
+  const openEditCategoryDialog = (category: any) => {
+    setEditingCategory(category);
+    setCategoryFormData({
+      name: category.name,
+      slug: category.slug,
+      description: category.description || ''
+    });
+    setCategoryDialogOpen(true);
+  };
+
+  const handleCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!categoryFormData.name.trim()) {
+      toast.error('El nombre de la categoría es requerido');
+      return;
+    }
+
+    try {
+      setCategoryFormLoading(true);
+      
+      const url = editingCategory 
+        ? `/api/categories/${editingCategory.id}`
+        : '/api/categories';
+      
+      const method = editingCategory ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(categoryFormData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save category');
+      }
+
+      const result = await response.json();
+      
+      if (editingCategory) {
+        setCategories(prev => 
+          prev.map(cat => cat.id === editingCategory.id ? result.category : cat)
+        );
+        toast.success('Categoría actualizada exitosamente');
+      } else {
+        setCategories(prev => [...prev, result.category]);
+        toast.success('Categoría creada exitosamente');
+      }
+      
+      setCategoryDialogOpen(false);
+      setCategoryFormData({ name: '', slug: '', description: '' });
+      
+    } catch (error) {
+      console.error('Error saving category:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al guardar la categoría');
+    } finally {
+      setCategoryFormLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (category: any) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar la categoría "${category.name}"?`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/categories/${category.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete category');
+      }
+
+      setCategories(prev => prev.filter(cat => cat.id !== category.id));
+      toast.success('Categoría eliminada exitosamente');
+      
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar la categoría');
+    }
+  };
+  
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -713,11 +906,18 @@ export default function ProductsPage() {
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Gestión de Productos</h1>
           <p className="text-tierra-media">
-            Administra tu catálogo de productos biocosmética
+            Administra tu catálogo de productos y categorías
           </p>
         </div>
         
         <div className="flex space-x-2">
+          <Link href="/admin/products/options">
+            <Button variant="outline" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Opciones
+            </Button>
+          </Link>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="flex items-center gap-2">
@@ -754,8 +954,22 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Stats Cards - Always show global stats regardless of filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Tabs for Products and Categories */}
+      <Tabs value={categoriesTabActive ? 'categories' : 'products'} onValueChange={(value) => setCategoriesTabActive(value === 'categories')} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="products">
+            <Package className="h-4 w-4 mr-2" />
+            Productos
+          </TabsTrigger>
+          <TabsTrigger value="categories">
+            <Tag className="h-4 w-4 mr-2" />
+            Categorías
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="products" className="space-y-6 mt-6">
+          {/* Stats Cards - Always show global stats regardless of filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -1314,6 +1528,155 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-6 mt-6">
+          {/* Categories Management */}
+          <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-azul-profundo">Gestión de Categorías</CardTitle>
+                <Button onClick={openCreateCategoryDialog}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Categoría
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {categories.length === 0 ? (
+                <div className="text-center py-12">
+                  <Tag className="h-16 w-16 text-tierra-media mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-azul-profundo mb-2">
+                    No hay categorías
+                  </h3>
+                  <p className="text-tierra-media mb-6">
+                    Crea categorías para organizar tus productos
+                  </p>
+                  <Button onClick={openCreateCategoryDialog}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Primera Categoría
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {categories.map((category) => (
+                    <Card key={category.id} className="bg-admin-bg-secondary">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg text-azul-profundo">
+                              {category.name}
+                            </CardTitle>
+                            <p className="text-sm text-tierra-media mt-1">
+                              {category.slug}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditCategoryDialog(category)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteCategory(category)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {category.description && (
+                          <p className="text-sm text-gray-600 line-clamp-3">
+                            {category.description}
+                          </p>
+                        )}
+                        <div className="mt-4 text-xs text-gray-500">
+                          Creada: {new Date(category.created_at).toLocaleDateString('es-ES')}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Category Create/Edit Dialog */}
+          <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingCategory 
+                    ? 'Modifica los datos de la categoría'
+                    : 'Crea una nueva categoría para organizar tus productos'
+                  }
+                </DialogDescription>
+              </DialogHeader>
+              
+              <form onSubmit={handleCategorySubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="category-name">Nombre *</Label>
+                  <Input
+                    id="category-name"
+                    value={categoryFormData.name}
+                    onChange={(e) => handleCategoryInputChange('name', e.target.value)}
+                    placeholder="Ej: Lentes de Sol"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="category-slug">Slug</Label>
+                  <Input
+                    id="category-slug"
+                    value={categoryFormData.slug}
+                    onChange={(e) => handleCategoryInputChange('slug', e.target.value)}
+                    placeholder="lentes-de-sol"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    URL amigable (se genera automáticamente)
+                  </p>
+                </div>
+                
+                <div>
+                  <Label htmlFor="category-description">Descripción</Label>
+                  <Textarea
+                    id="category-description"
+                    value={categoryFormData.description}
+                    onChange={(e) => handleCategoryInputChange('description', e.target.value)}
+                    placeholder="Descripción opcional de la categoría"
+                    rows={3}
+                  />
+                </div>
+                
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCategoryDialogOpen(false)}
+                    disabled={categoryFormLoading}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={categoryFormLoading}>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {categoryFormLoading ? 'Guardando...' : (editingCategory ? 'Actualizar' : 'Crear')}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+      </Tabs>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

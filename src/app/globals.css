@@ -473,3 +473,13 @@ html.theme-green {
 html.theme-red {
   color-scheme: light;
 }
+
+/* Sonner Toast Styles - Ensure toasts are visible */
+[data-sonner-toaster] {
+  z-index: 9999 !important;
+}
+
+[data-sonner-toast] {
+  z-index: 9999 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}

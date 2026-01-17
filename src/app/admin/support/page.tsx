@@ -95,6 +95,7 @@ interface SupportStats {
 }
 
 export default function SupportPage() {
+  // Updated for optical shop context
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [stats, setStats] = useState<SupportStats | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
@@ -412,7 +413,7 @@ export default function SupportPage() {
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Soporte al Cliente</h1>
           <p className="text-tierra-media">
-            Gestiona tickets de soporte y comunicación con clientes
+            Gestiona tickets de soporte y comunicación con pacientes/clientes de la óptica
           </p>
         </div>
         

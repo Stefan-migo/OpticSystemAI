@@ -23,7 +23,10 @@ import {
   Home,
   MessageSquare,
   Server,
-  Tag
+  Tag,
+  Receipt,
+  FileText,
+  Calendar
 } from 'lucide-react';
 import AdminNotificationDropdown from '@/components/admin/AdminNotificationDropdown';
 import Chatbot from '@/components/admin/Chatbot';
@@ -35,7 +38,7 @@ interface AdminLayoutProps {
 }
 
 // Admin navigation items - will be populated dynamically
-const createNavigationItems = (ordersCount?: number) => [
+const createNavigationItems = (newWorkOrdersCount?: number) => [
   {
     href: '/admin/chat',
     label: 'Chatbot IA',
@@ -49,29 +52,35 @@ const createNavigationItems = (ordersCount?: number) => [
     description: 'Visión general y KPIs'
   },
   {
-    href: '/admin/orders',
-    label: 'Pedidos',
+    href: '/admin/pos',
+    label: 'Punto de Venta',
     icon: ShoppingCart,
-    description: 'Gestión de pedidos',
-    badge: ordersCount !== undefined ? ordersCount.toString() : undefined
+    description: 'Sistema POS'
+  },
+  {
+    href: '/admin/work-orders',
+    label: 'Trabajos',
+    icon: Package,
+    description: 'Gestión de trabajos de laboratorio',
+    badge: newWorkOrdersCount !== undefined && newWorkOrdersCount > 0 ? newWorkOrdersCount.toString() : undefined
+  },
+  {
+    href: '/admin/quotes',
+    label: 'Presupuestos',
+    icon: Receipt,
+    description: 'Crear y gestionar presupuestos',
+  },
+  {
+    href: '/admin/appointments',
+    label: 'Citas y Agenda',
+    icon: Calendar,
+    description: 'Gestión de citas y agenda',
   },
   {
     href: '/admin/products',
     label: 'Productos',
     icon: Package,
     description: 'Catálogo e inventario'
-  },
-  {
-    href: '/admin/categories',
-    label: 'Categorías',
-    icon: Tag,
-    description: 'Gestión de categorías'
-  },
-  {
-    href: '/admin/reviews',
-    label: 'Reseñas',
-    icon: MessageSquare,
-    description: 'Moderación de reseñas'
   },
   {
     href: '/admin/customers',
@@ -125,17 +134,26 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     checkedUserId: null
   });
 
-  // Dynamic stats state
+  // Dynamic stats state - Updated for Optical Shop
   const [stats, setStats] = useState<{
     todayOrders: number;
     totalOrders: number;
     revenue: number;
     lowStock: number;
+    // Optical Shop specific stats
+    newWorkOrders: number; // Trabajos nuevos/pendientes
+    inProgressWorkOrders: number; // Trabajos en progreso
+    pendingQuotes: number; // Presupuestos pendientes
+    todayAppointments: number; // Citas de hoy
   }>({
     todayOrders: 0,
     totalOrders: 0,
     revenue: 0,
-    lowStock: 0
+    lowStock: 0,
+    newWorkOrders: 0,
+    inProgressWorkOrders: 0,
+    pendingQuotes: 0,
+    todayAppointments: 0
   });
 
   // Add state to prevent multiple simultaneous admin checks
@@ -156,11 +174,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         const response = await fetch('/api/admin/dashboard');
         if (response.ok) {
           const data = await response.json();
+          // Extract optical shop specific data
+          const workOrders = data.kpis?.workOrders || {};
+          const quotes = data.kpis?.quotes || {};
+          const appointments = data.kpis?.appointments || {};
+          
           setStats({
-            todayOrders: data.todayOrders || 0,
-            totalOrders: data.pendingOrders || 0,
-            revenue: data.revenue || 0,
-            lowStock: data.lowStockProducts?.length || 0
+            todayOrders: data.kpis?.orders?.pending || 0,
+            totalOrders: workOrders.pending || 0, // Trabajos pendientes para el badge
+            revenue: data.kpis?.revenue?.current || 0,
+            lowStock: data.kpis?.products?.lowStock || 0,
+            // Optical Shop specific
+            newWorkOrders: workOrders.pending || 0, // Trabajos nuevos/pendientes
+            inProgressWorkOrders: workOrders.inProgress || 0, // Trabajos en progreso
+            pendingQuotes: quotes.pending || 0, // Presupuestos pendientes
+            todayAppointments: appointments.today || 0 // Citas de hoy
           });
         }
       } catch (error) {
@@ -169,8 +197,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     };
 
     fetchStats();
-    // Refresh stats every 60 seconds
-    const interval = setInterval(fetchStats, 60000);
+    // Refresh stats every 30 seconds for real-time updates
+    const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
   }, [adminState.isAdmin]);
 
@@ -333,8 +361,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
           // Check admin access - only redirect if we've definitely checked and user is not admin
           if (!adminState.isAdmin) {
-            console.log('🚫 User not admin after delay, redirecting to home');
-            router.push('/');
+            console.log('🚫 User not admin after delay, redirecting to login');
+            router.push('/login');
             return;
           }
         }, 500); // 500ms delay to let auth stabilize
@@ -556,25 +584,27 @@ function AdminSidebar({
         </Link>
       </div>
 
-      {/* Quick Stats */}
+      {/* Quick Stats - Optical Shop Focused */}
       <div className="px-6 bg-admin-bg-primary">
         <div className="admin-card">
           <div className="admin-card-content">
             <h3 className="admin-card-title">Resumen Rápido</h3>
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Pedidos Hoy</span>
-                <span className="font-medium text-foreground">{stats.todayOrders}</span>
+                <span className="text-muted-foreground">Trabajos Pendientes</span>
+                <span className="font-medium text-orange-600">{stats.newWorkOrders}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Ventas</span>
-                <span className="font-medium text-admin-success">
-                  ${stats.revenue.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </span>
+                <span className="text-muted-foreground">En Proceso</span>
+                <span className="font-medium text-blue-600">{stats.inProgressWorkOrders}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Stock Bajo</span>
-                <span className="font-medium text-admin-error">{stats.lowStock}</span>
+                <span className="text-muted-foreground">Presupuestos Pendientes</span>
+                <span className="font-medium text-purple-600">{stats.pendingQuotes}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Citas Hoy</span>
+                <span className="font-medium text-green-600">{stats.todayAppointments}</span>
               </div>
             </div>
           </div>
@@ -584,20 +614,7 @@ function AdminSidebar({
       {/* Navigation */}
       <nav className="admin-sidebar-nav bg-admin-bg-primary">
         <ul role="list" className="flex flex-1 flex-col gap-y-1">
-          {/* Quick Return to Site */}
-          <li className="mb-4">
-            <Link
-              href="/"
-              className="admin-nav-item"
-              onClick={onNavigate}
-            >
-              <Home className="h-5 w-5 shrink-0" />
-              <span>Volver al Sitio</span>
-              <ChevronRight className="h-4 w-4 ml-auto opacity-50 group-hover:opacity-100" />
-            </Link>
-          </li>
-
-          {createNavigationItems(stats.totalOrders).map((item) => {
+          {createNavigationItems(stats.newWorkOrders).map((item) => {
             const isActive = pathname === item.href || 
               (item.href !== '/admin' && pathname.startsWith(item.href));
             

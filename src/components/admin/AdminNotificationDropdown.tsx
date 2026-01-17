@@ -37,8 +37,6 @@ const notificationIcons: Record<string, any> = {
   order_status_change: Package,
   low_stock: AlertTriangle,
   out_of_stock: AlertTriangle,
-  new_review: MessageSquare,
-  review_pending: MessageSquare,
   support_ticket_new: MessageSquare,
   support_ticket_update: MessageSquare,
   payment_received: TrendingUp,

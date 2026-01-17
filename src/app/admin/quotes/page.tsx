@@ -1,0 +1,543 @@
+"use client";
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { 
+  Search, 
+  Plus,
+  Eye,
+  FileText,
+  Calendar,
+  User,
+  DollarSign,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Send,
+  RefreshCw,
+  Settings,
+  Trash2
+} from 'lucide-react';
+import { toast } from 'sonner';
+import Link from 'next/link';
+import CreateQuoteForm from '@/components/admin/CreateQuoteForm';
+
+interface Quote {
+  id: string;
+  quote_number: string;
+  quote_date: string;
+  expiration_date?: string;
+  customer: {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+  };
+  prescription?: any;
+  frame_name?: string;
+  lens_type?: string;
+  lens_material?: string;
+  total_amount: number;
+  status: string;
+  original_status?: string;
+  converted_to_work_order_id?: string;
+  created_at: string;
+}
+
+export default function QuotesPage() {
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showCreateQuote, setShowCreateQuote] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalQuotes, setTotalQuotes] = useState(0);
+  const quotesPerPage = 20;
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    fetchQuotes();
+  }, [currentPage, statusFilter]);
+
+  const fetchQuotes = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: quotesPerPage.toString(),
+        ...(statusFilter !== 'all' && { status: statusFilter })
+      });
+
+      const response = await fetch(`/api/admin/quotes?${params}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch quotes');
+      }
+
+      const data = await response.json();
+      setQuotes(data.quotes || []);
+      setTotalPages(data.pagination?.totalPages || 1);
+      setTotalQuotes(data.pagination?.total || 0);
+    } catch (error) {
+      console.error('Error fetching quotes:', error);
+      toast.error('Error al cargar presupuestos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatPrice = (amount: number) => 
+    new Intl.NumberFormat('es-CL', { 
+      style: 'currency', 
+      currency: 'CLP',
+      minimumFractionDigits: 0
+    }).format(amount);
+
+  const getStatusBadge = (status: string, isConverted: boolean = false) => {
+    // Always show the current status (which should be 'accepted' when converted)
+    const displayStatus = status;
+    
+    const config: Record<string, { variant: any; label: string; icon: any }> = {
+      draft: { variant: 'outline', label: 'Borrador', icon: FileText },
+      sent: { variant: 'secondary', label: 'Enviado', icon: Send },
+      accepted: { variant: 'default', label: 'Aceptado', icon: CheckCircle },
+      rejected: { variant: 'destructive', label: 'Rechazado', icon: XCircle },
+      expired: { variant: 'outline', label: 'Expirado', icon: Clock },
+      converted_to_work: { variant: 'default', label: 'Convertido', icon: RefreshCw }
+    };
+
+    const statusConfig = config[displayStatus] || { variant: 'outline', label: displayStatus, icon: FileText };
+    const Icon = statusConfig.icon;
+
+    return (
+      <Badge variant={statusConfig.variant} className="flex items-center gap-1">
+        <Icon className="h-3 w-3" />
+        {statusConfig.label}
+      </Badge>
+    );
+  };
+
+  const filteredQuotes = quotes.filter(quote => {
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        quote.quote_number.toLowerCase().includes(searchLower) ||
+        quote.customer?.email?.toLowerCase().includes(searchLower) ||
+        `${quote.customer?.first_name || ''} ${quote.customer?.last_name || ''}`.toLowerCase().includes(searchLower) ||
+        quote.frame_name?.toLowerCase().includes(searchLower)
+      );
+    }
+    return true;
+  });
+
+  const handleQuoteCreated = () => {
+    setShowCreateQuote(false);
+    fetchQuotes();
+  };
+
+  const handleDeleteClick = (quoteId: string) => {
+    setQuoteToDelete(quoteId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!quoteToDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/quotes/${quoteToDelete}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al eliminar presupuesto');
+      }
+
+      toast.success('Presupuesto eliminado exitosamente');
+      setDeleteDialogOpen(false);
+      setQuoteToDelete(null);
+      fetchQuotes();
+    } catch (error: any) {
+      console.error('Error deleting quote:', error);
+      toast.error(error.message || 'Error al eliminar presupuesto');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-azul-profundo">Presupuestos</h1>
+          <p className="text-tierra-media">Gestiona presupuestos para trabajos de lentes</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/quotes/settings">
+            <Button variant="outline">
+              <Settings className="h-4 w-4 mr-2" />
+              Configuración
+            </Button>
+          </Link>
+          <Button onClick={() => setShowCreateQuote(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Presupuesto
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-tierra-media" />
+                <Input
+                  placeholder="Buscar por número, cliente, email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="draft">Borrador</SelectItem>
+                <SelectItem value="sent">Enviado</SelectItem>
+                <SelectItem value="accepted">Aceptado</SelectItem>
+                <SelectItem value="rejected">Rechazado</SelectItem>
+                <SelectItem value="expired">Expirado</SelectItem>
+                <SelectItem value="converted_to_work">Convertido</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quotes Table */}
+      <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+        <CardHeader>
+          <CardTitle>Presupuestos ({totalQuotes})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-12">
+              <RefreshCw className="h-8 w-8 animate-spin text-azul-profundo mx-auto mb-4" />
+              <p className="text-tierra-media">Cargando presupuestos...</p>
+            </div>
+          ) : filteredQuotes.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 text-tierra-media mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-azul-profundo mb-2">No hay presupuestos</h3>
+              <p className="text-tierra-media mb-4">
+                {searchTerm ? 'No se encontraron presupuestos que coincidan con la búsqueda' : 'Comienza creando tu primer presupuesto'}
+              </p>
+              {!searchTerm && (
+                <Button onClick={() => setShowCreateQuote(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Presupuesto
+                </Button>
+              )}
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Marco</TableHead>
+                    <TableHead>Lente</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Convertido</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredQuotes.map((quote) => (
+                    <TableRow key={quote.id}>
+                      <TableCell className="font-medium">{quote.quote_number}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">
+                            {quote.customer?.first_name || ''} {quote.customer?.last_name || ''}
+                          </div>
+                          <div className="text-sm text-tierra-media">{quote.customer?.email}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{quote.frame_name || '-'}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{quote.lens_type || '-'}</div>
+                          <div className="text-sm text-tierra-media">{quote.lens_material || ''}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold text-verde-suave">
+                        {formatPrice(quote.total_amount)}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const isConverted = quote.status === 'accepted' && !!quote.converted_to_work_order_id;
+                          // Always show the current status (which should be 'accepted' when converted)
+                          const displayStatus = quote.status;
+                          
+                          return (
+                            <Select
+                              value={displayStatus}
+                              disabled={isConverted}
+                              onValueChange={async (newStatus) => {
+                                if (isConverted) {
+                                  toast.error('No se puede cambiar el estado de un presupuesto convertido');
+                                  return;
+                                }
+                                
+                                try {
+                                  const response = await fetch(`/api/admin/quotes/${quote.id}/status`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    credentials: 'include',
+                                    body: JSON.stringify({ status: newStatus })
+                                  });
+
+                                  if (!response.ok) {
+                                    const errorData = await response.json().catch(() => ({}));
+                                    throw new Error(errorData.error || 'Failed to update status');
+                                  }
+
+                                  const result = await response.json();
+                                  
+                                  // Update local state
+                                  setQuotes(prev => prev.map(q => 
+                                    q.id === quote.id ? { ...q, status: newStatus } : q
+                                  ));
+                                  toast.success('Estado actualizado');
+                                } catch (error) {
+                                  console.error('Error updating status:', error);
+                                  const errorMessage = error instanceof Error ? error.message : 'Error al actualizar estado';
+                                  toast.error(errorMessage);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-auto border-0 p-0 h-auto bg-transparent hover:bg-transparent focus:ring-0 focus:ring-offset-0 shadow-none [&>svg]:hidden [&_svg]:hidden [&_[data-radix-select-icon]]:hidden">
+                                <SelectValue asChild>
+                                  <div className={`cursor-pointer ${isConverted ? 'cursor-not-allowed opacity-75' : ''}`}>
+                                    {getStatusBadge(displayStatus, isConverted)}
+                                  </div>
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="draft">
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="h-3 w-3" />
+                                    Borrador
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="sent">
+                                  <div className="flex items-center gap-2">
+                                    <Send className="h-3 w-3" />
+                                    Enviado
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="accepted">
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle className="h-3 w-3" />
+                                    Aceptado
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="rejected">
+                                  <div className="flex items-center gap-2">
+                                    <XCircle className="h-3 w-3" />
+                                    Rechazado
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="expired">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-3 w-3" />
+                                    Expirado
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell>
+                        {quote.converted_to_work_order_id ? (
+                          <Badge variant="default" className="flex items-center gap-1 bg-green-600">
+                            <RefreshCw className="h-3 w-3" />
+                            Convertido
+                          </Badge>
+                        ) : (
+                          <span className="text-tierra-media text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div>{new Date(quote.quote_date).toLocaleDateString('es-CL')}</div>
+                          {quote.expiration_date && (
+                            <div className={`text-xs ${
+                              new Date(quote.expiration_date) < new Date() 
+                                ? 'text-red-500' 
+                                : 'text-tierra-media'
+                            }`}>
+                              Exp: {new Date(quote.expiration_date).toLocaleDateString('es-CL')}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/admin/quotes/${quote.id}`}>
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-1" />
+                              Ver
+                            </Button>
+                          </Link>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleDeleteClick(quote.id)}
+                            disabled={!!quote.converted_to_work_order_id}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-tierra-media">
+                    Página {currentPage} de {totalPages}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create Quote Dialog */}
+      <Dialog open={showCreateQuote} onOpenChange={setShowCreateQuote}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nuevo Presupuesto</DialogTitle>
+            <DialogDescription>
+              Crea un presupuesto para un trabajo de lentes
+            </DialogDescription>
+          </DialogHeader>
+          <CreateQuoteForm 
+            onSuccess={handleQuoteCreated}
+            onCancel={() => setShowCreateQuote(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar presupuesto?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. El presupuesto será eliminado permanentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setQuoteToDelete(null);
+              }}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+

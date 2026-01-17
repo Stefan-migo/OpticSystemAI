@@ -76,20 +76,67 @@ export async function GET(
 
     console.log('✅ Orders fetched:', orders?.length || 0);
 
-    // Get customer memberships
-    console.log('👑 Fetching customer memberships...');
-    const { data: memberships, error: membershipsError } = await supabase
-      .from('memberships')
-      .select('*')
-      .eq('user_id', params.id)
-      .order('created_at', { ascending: false });
 
-    if (membershipsError) {
-      console.error('❌ Error fetching memberships:', membershipsError);
-      // Continue without memberships rather than failing
+    // Get customer prescriptions (recetas)
+    console.log('👓 Fetching customer prescriptions...');
+    const { data: prescriptions, error: prescriptionsError } = await supabase
+      .from('prescriptions')
+      .select('*')
+      .eq('customer_id', params.id)
+      .order('prescription_date', { ascending: false });
+
+    if (prescriptionsError) {
+      console.error('❌ Error fetching prescriptions:', prescriptionsError);
+      // Continue without prescriptions rather than failing
     }
 
-    console.log('✅ Memberships fetched:', memberships?.length || 0);
+    console.log('✅ Prescriptions fetched:', prescriptions?.length || 0);
+
+    // Get customer appointments (citas)
+    console.log('📅 Fetching customer appointments...');
+    const { data: appointments, error: appointmentsError } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('customer_id', params.id)
+      .order('appointment_date', { ascending: false })
+      .order('appointment_time', { ascending: false });
+
+    if (appointmentsError) {
+      console.error('❌ Error fetching appointments:', appointmentsError);
+      // Continue without appointments rather than failing
+    }
+
+    console.log('✅ Appointments fetched:', appointments?.length || 0);
+
+    // Get customer lens purchases
+    console.log('🛍️ Fetching customer lens purchases...');
+    const { data: lensPurchases, error: lensPurchasesError } = await supabase
+      .from('customer_lens_purchases')
+      .select('*')
+      .eq('customer_id', params.id)
+      .order('purchase_date', { ascending: false });
+
+    if (lensPurchasesError) {
+      console.error('❌ Error fetching lens purchases:', lensPurchasesError);
+      // Continue without lens purchases rather than failing
+    }
+
+    console.log('✅ Lens purchases fetched:', lensPurchases?.length || 0);
+
+    // Get customer quotes (presupuestos)
+    console.log('📋 Fetching customer quotes...');
+    const { data: quotes, error: quotesError } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('customer_id', params.id)
+      .order('created_at', { ascending: false });
+
+    if (quotesError) {
+      console.error('❌ Error fetching quotes:', quotesError);
+      // Continue without quotes rather than failing
+    }
+
+    console.log('✅ Quotes fetched:', quotes?.length || 0);
 
     // Calculate analytics
     console.log('📊 Calculating customer analytics...');
@@ -190,7 +237,10 @@ export async function GET(
       customer: {
         ...customer,
         orders: orders || [],
-        memberships: memberships || [],
+        prescriptions: prescriptions || [],
+        appointments: appointments || [],
+        lensPurchases: lensPurchases || [],
+        quotes: quotes || [],
         analytics
       }
     });
@@ -245,11 +295,7 @@ export async function PUT(
       city: body.city || null,
       state: body.state || null,
       postal_code: body.postal_code || null,
-      country: body.country || 'Argentina',
-      membership_tier: body.membership_tier || 'none',
-      is_member: body.is_member || false,
-      membership_start_date: body.membership_start_date ? new Date(body.membership_start_date).toISOString() : null,
-      membership_end_date: body.membership_end_date ? new Date(body.membership_end_date).toISOString() : null,
+      country: body.country || 'Chile',
       newsletter_subscribed: body.newsletter_subscribed || false,
       updated_at: new Date().toISOString()
     };

@@ -34,7 +34,6 @@ interface Product {
   category: string;
   imageUrl: string;
   rating: number;
-  reviewCount: number;
   isNatural?: boolean;
   isNew?: boolean;
   isOnSale?: boolean;
@@ -407,7 +406,6 @@ export default function ProductGrid({
               category={product.category}
               imageUrl={product.imageUrl}
               rating={product.rating}
-              reviewCount={product.reviewCount}
               isNatural={product.isNatural}
               isNew={product.isNew}
               isOnSale={product.isOnSale}

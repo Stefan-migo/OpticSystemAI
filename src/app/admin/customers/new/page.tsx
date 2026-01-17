@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   ArrowLeft,
@@ -16,9 +15,9 @@ import {
   Mail,
   Phone,
   MapPin,
-  Crown,
   AlertTriangle
 } from 'lucide-react';
+import { formatRUT } from '@/lib/utils/rut';
 import { toast } from 'sonner';
 
 export default function NewCustomerPage() {
@@ -32,17 +31,13 @@ export default function NewCustomerPage() {
     last_name: '',
     email: '',
     phone: '',
+    rut: '',
     address_line_1: '',
     address_line_2: '',
     city: '',
     state: '',
     postal_code: '',
-    country: 'Argentina',
-    membership_tier: 'none',
-    is_member: false,
-    membership_start_date: '',
-    membership_end_date: '',
-    newsletter_subscribed: false
+    country: 'Chile'
   });
 
   const handleInputChange = (field: string, value: any) => {
@@ -58,12 +53,12 @@ export default function NewCustomerPage() {
       setError(null);
       
       // Validate required fields
-      if (!formData.email) {
-        throw new Error('El email es requerido');
-      }
-
       if (!formData.first_name && !formData.last_name) {
         throw new Error('Al menos el nombre o apellido es requerido');
+      }
+      
+      if (!formData.rut || formData.rut.trim() === '') {
+        throw new Error('El RUT es requerido');
       }
       
       const response = await fetch('/api/admin/customers', {
@@ -80,6 +75,14 @@ export default function NewCustomerPage() {
       }
 
       const result = await response.json();
+      
+      console.log('📦 API Response:', result);
+      
+      if (!result.customer || !result.customer.id) {
+        console.error('❌ Invalid response structure:', result);
+        throw new Error('La respuesta del servidor no contiene información del cliente creado');
+      }
+      
       toast.success('Cliente creado exitosamente');
       router.push(`/admin/customers/${result.customer.id}`);
     } catch (err) {
@@ -162,7 +165,7 @@ export default function NewCustomerPage() {
             </div>
             
             <div>
-              <Label htmlFor="email">Email *</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -181,15 +184,28 @@ export default function NewCustomerPage() {
                 placeholder="+54 9 11 1234-5678"
               />
             </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="newsletter_subscribed"
-                checked={formData.newsletter_subscribed}
-                onCheckedChange={(checked) => handleInputChange('newsletter_subscribed', checked)}
+            
+            <div>
+              <Label htmlFor="rut">RUT *</Label>
+              <Input
+                id="rut"
+                value={formData.rut}
+                onChange={(e) => {
+                  const formatted = formatRUT(e.target.value);
+                  handleInputChange('rut', formatted);
+                }}
+                onBlur={(e) => {
+                  const formatted = formatRUT(e.target.value);
+                  if (formatted !== e.target.value) {
+                    handleInputChange('rut', formatted);
+                  }
+                }}
+                placeholder="12.345.678-9 o 123456789"
+                required
               />
-              <Label htmlFor="newsletter_subscribed">Suscrito al newsletter</Label>
+              <p className="text-xs text-gray-500 mt-1">Rol Único Tributario (requerido)</p>
             </div>
+
           </CardContent>
         </Card>
 
@@ -263,68 +279,6 @@ export default function NewCustomerPage() {
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Membership Information */}
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Crown className="h-5 w-5 mr-2" />
-              Membresía
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="is_member"
-                checked={formData.is_member}
-                onCheckedChange={(checked) => handleInputChange('is_member', checked)}
-              />
-              <Label htmlFor="is_member">Es miembro</Label>
-            </div>
-
-            {formData.is_member && (
-              <>
-                <div>
-                  <Label htmlFor="membership_tier">Tipo de Membresía</Label>
-                  <Select
-                    value={formData.membership_tier}
-                    onValueChange={(value) => handleInputChange('membership_tier', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin membresía</SelectItem>
-                      <SelectItem value="basic">Básica</SelectItem>
-                      <SelectItem value="premium">Premium</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="membership_start_date">Fecha de Inicio</Label>
-                    <Input
-                      id="membership_start_date"
-                      type="date"
-                      value={formData.membership_start_date}
-                      onChange={(e) => handleInputChange('membership_start_date', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="membership_end_date">Fecha de Fin</Label>
-                    <Input
-                      id="membership_end_date"
-                      type="date"
-                      value={formData.membership_end_date}
-                      onChange={(e) => handleInputChange('membership_end_date', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
           </CardContent>
         </Card>
 

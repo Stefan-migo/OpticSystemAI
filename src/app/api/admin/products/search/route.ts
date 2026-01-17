@@ -18,21 +18,41 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q') || '';
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const type = searchParams.get('type') || '';
+    const limit = parseInt(searchParams.get('limit') || '20');
 
-    if (!query || query.length < 2) {
+    if (!query || query.trim().length === 0) {
       return NextResponse.json({
         success: true,
         products: []
       });
     }
 
-    // Search products by name or description
-    const { data: products, error: searchError } = await supabase
+    const trimmedQuery = query.trim();
+    
+    // Build search conditions - search by name, description, SKU, or barcode
+    // For exact matches (SKU/barcode), prioritize them
+    let searchConditions = `name.ilike.%${trimmedQuery}%,description.ilike.%${trimmedQuery}%`;
+    
+    // Add SKU and barcode search if query looks like a code (numbers or alphanumeric)
+    if (/^[A-Z0-9]+$/i.test(trimmedQuery)) {
+      searchConditions += `,sku.ilike.%${trimmedQuery}%,barcode.ilike.%${trimmedQuery}%`;
+    }
+
+    // Build query
+    let productsQuery = supabase
       .from('products')
-      .select('id, name, price, inventory_quantity, status, featured_image')
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
-      .eq('status', 'active')
+      .select('id, name, price, inventory_quantity, status, featured_image, sku, barcode, product_type, frame_brand, frame_model, frame_color, frame_size')
+      .or(searchConditions)
+      .eq('status', 'active');
+
+    // Filter by product type if provided
+    if (type) {
+      productsQuery = productsQuery.eq('product_type', type);
+    }
+
+    const { data: products, error: searchError } = await productsQuery
+      .order('name', { ascending: true })
       .limit(limit);
 
     if (searchError) {

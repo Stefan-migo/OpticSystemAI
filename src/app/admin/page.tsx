@@ -19,7 +19,8 @@ import {
   Calendar,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  FileText
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -38,6 +39,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import businessConfig from '@/config/business';
+import { DashboardSearch } from '@/components/admin/DashboardSearch';
 
 // Colors from the brand palette
 const COLORS = {
@@ -78,7 +80,7 @@ interface DashboardData {
       returning: number;
     };
   };
-  recentOrders: any[];
+  todayAppointments: any[];
   lowStockProducts: any[];
   charts: {
     revenueTrend: any[];
@@ -93,7 +95,7 @@ const defaultDashboardData: DashboardData = {
       current: 0,
       previous: 0,
       change: 0,
-      currency: 'ARS'
+      currency: 'CLP'
     },
     orders: {
       total: 0,
@@ -111,9 +113,26 @@ const defaultDashboardData: DashboardData = {
       total: 0,
       new: 0,
       returning: 0
+    },
+    appointments: {
+      today: 0,
+      scheduled: 0,
+      confirmed: 0,
+      pending: 0
+    },
+    workOrders: {
+      total: 0,
+      inProgress: 0,
+      pending: 0,
+      completed: 0
+    },
+    quotes: {
+      total: 0,
+      pending: 0,
+      converted: 0
     }
   },
-  recentOrders: [],
+  todayAppointments: [],
   lowStockProducts: [],
   charts: {
     revenueTrend: [],
@@ -153,9 +172,9 @@ export default function AdminDashboard() {
   }, []);
 
   const formatPrice = (amount: number) => {
-    return new Intl.NumberFormat('es-AR', {
+    return new Intl.NumberFormat('es-CL', {
       style: 'currency',
-      currency: 'ARS',
+      currency: 'CLP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount);
@@ -170,29 +189,29 @@ export default function AdminDashboard() {
     });
   };
 
-  const getOrderStatusBadge = (status: string) => {
+  const getAppointmentStatusBadge = (status: string) => {
     switch (status) {
+      case 'scheduled':
+        return <Badge className="bg-blue-100 text-blue-700 text-xs border-blue-200"><Clock className="h-3 w-3 mr-1" />Programada</Badge>;
+      case 'confirmed':
+        return <Badge className="bg-green-100 text-green-700 text-xs border-green-200"><CheckCircle className="h-3 w-3 mr-1" />Confirmada</Badge>;
       case 'completed':
-        return <Badge className="bg-verde-suave text-white text-xs"><CheckCircle className="h-3 w-3 mr-1" />Completado</Badge>;
-      case 'pending':
-        return <Badge className="bg-dorado text-azul-profundo text-xs"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>;
-      case 'processing':
-        return <Badge className="bg-azul-profundo text-white text-xs"><Package className="h-3 w-3 mr-1" />Procesando</Badge>;
-      case 'failed':
-        return <Badge variant="destructive" className="text-xs"><XCircle className="h-3 w-3 mr-1" />Fallido</Badge>;
+        return <Badge className="bg-orange-100 text-orange-700 text-xs border-orange-200"><CheckCircle className="h-3 w-3 mr-1" />Completada</Badge>;
+      case 'cancelled':
+        return <Badge variant="destructive" className="text-xs"><XCircle className="h-3 w-3 mr-1" />Cancelada</Badge>;
+      case 'no_show':
+        return <Badge className="bg-gray-100 text-gray-700 text-xs border-gray-200"><XCircle className="h-3 w-3 mr-1" />No asistió</Badge>;
       default:
         return <Badge variant="secondary" className="text-xs">{status}</Badge>;
     }
   };
 
-  // Prepare chart data
-  const ordersStatusData = data.charts.ordersStatus ? [
-    { name: 'Pendiente', value: data.charts.ordersStatus.pending || 0 },
-    { name: 'Procesando', value: data.charts.ordersStatus.processing || 0 },
-    { name: 'Completado', value: data.charts.ordersStatus.completed || 0 },
-    { name: 'Enviado', value: data.charts.ordersStatus.shipped || 0 },
-    { name: 'Fallido', value: data.charts.ordersStatus.failed || 0 }
-  ].filter(item => item.value > 0) : [];
+  const formatTime = (time: string) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    return `${hours}:${minutes}`;
+  };
+
 
   if (isLoading) {
     return (
@@ -234,28 +253,35 @@ export default function AdminDashboard() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-azul-profundo">Dashboard</h1>
           <p className="text-sm md:text-base text-tierra-media">
-            Welcome to the {businessConfig.displayName || businessConfig.name} admin panel
+            Panel de administración - Óptica
           </p>
         </div>
         
         <div className="flex flex-wrap gap-2">
-
-          <Link href="/admin/products/add">
-          <Button 
-                      className="group btn-enhanced px-6 py-3 lg:px-8 lg:py-4 text-white font-semibold text-sm lg:text-base w-full sm:w-auto"
-          >
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Producto
-            </Button>  
-            </Link>
-          <Link href="/admin/orders">
-          <Button 
-            className="group btn-enhanced px-6 py-3 lg:px-8 lg:py-4 text-white font-semibold text-sm lg:text-base w-full sm:w-auto"
-          >
-              <Eye className="h-4 w-4 mr-2" />
-              Ver Pedidos
-          </Button>
-            </Link>
+          <Link href="/admin/pos">
+            <Button 
+              className="group btn-enhanced px-6 py-3 lg:px-8 lg:py-4 text-white font-semibold text-sm lg:text-base w-full sm:w-auto"
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Punto de Venta
+            </Button>
+          </Link>
+          <Link href="/admin/appointments">
+            <Button 
+              className="group btn-enhanced px-6 py-3 lg:px-8 lg:py-4 text-white font-semibold text-sm lg:text-base w-full sm:w-auto"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Ver Citas
+            </Button>
+          </Link>
+          <Link href="/admin/work-orders">
+            <Button 
+              className="group btn-enhanced px-6 py-3 lg:px-8 lg:py-4 text-white font-semibold text-sm lg:text-base w-full sm:w-auto"
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Trabajos
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -327,22 +353,22 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Orders Card */}
+        {/* Appointments Card */}
         <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           <CardContent className="p-4 md:p-6">
             <div className="flex items-start gap-3">
-              <ShoppingCart className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
+              <Calendar className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Pedidos</p>
+                <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Citas Hoy</p>
                 <p className="text-lg md:text-2xl font-bold text-azul-profundo">
-                  {data.kpis.orders.total}
+                  {data.kpis.appointments?.today || 0}
                 </p>
                 <div className="flex flex-wrap items-center gap-2 text-xs mt-1">
-                  <span className="text-orange-600 truncate">{data.kpis.orders.pending} pend.</span>
-                  <span className="text-green-600 truncate">{data.kpis.orders.completed} comp.</span>
+                  <span className="text-blue-600 truncate">{data.kpis.appointments?.scheduled || 0} programadas</span>
+                  <span className="text-green-600 truncate">{data.kpis.appointments?.confirmed || 0} confirmadas</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1 truncate">
-                  {data.kpis.orders.processing} en proceso
+                  {data.kpis.appointments?.pending || 0} pendientes
                 </p>
               </div>
             </div>
@@ -452,18 +478,22 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Orders Status Distribution */}
+        {/* Work Orders Status Distribution */}
         <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           <CardHeader>
-            <CardTitle>Estado de Pedidos (30 días)</CardTitle>
+            <CardTitle>Estado de Trabajos</CardTitle>
             <p className="text-sm text-tierra-media">Distribución por estado</p>
           </CardHeader>
           <CardContent>
-            {ordersStatusData.length > 0 ? (
+            {data.kpis.workOrders.total > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    data={ordersStatusData}
+                    data={[
+                      { name: 'En Progreso', value: data.kpis.workOrders.inProgress },
+                      { name: 'Pendientes', value: data.kpis.workOrders.pending },
+                      { name: 'Completados', value: data.kpis.workOrders.completed }
+                    ].filter(item => item.value > 0)}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -472,7 +502,11 @@ export default function AdminDashboard() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {ordersStatusData.map((entry, index) => (
+                    {[
+                      { name: 'En Progreso', value: data.kpis.workOrders.inProgress },
+                      { name: 'Pendientes', value: data.kpis.workOrders.pending },
+                      { name: 'Completados', value: data.kpis.workOrders.completed }
+                    ].filter(item => item.value > 0).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
@@ -482,7 +516,7 @@ export default function AdminDashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-[300px] text-center">
-                <p className="text-tierra-media">No hay pedidos recientes</p>
+                <p className="text-tierra-media">No hay trabajos registrados</p>
               </div>
             )}
           </CardContent>
@@ -516,17 +550,17 @@ export default function AdminDashboard() {
         </Card>
       )}
 
-      {/* Recent Orders & Quick Actions */}
+      {/* Today's Appointments & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        {/* Recent Orders - Takes 2 columns */}
+        {/* Today's Appointments - Takes 2 columns */}
         <div className="lg:col-span-2">
           <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
             <CardHeader className="pb-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <CardTitle className="text-lg md:text-xl">Pedidos Recientes</CardTitle>
-                  <Link href="/admin/orders">
+                <CardTitle className="text-lg md:text-xl">Citas de Hoy</CardTitle>
+                  <Link href="/admin/appointments">
                   <Button variant="ghost" size="sm" className="self-start sm:self-auto">
-                    Ver todos
+                    Ver todas
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                   </Link>
@@ -534,37 +568,42 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {data.recentOrders.length > 0 ? (
-                  data.recentOrders.map((order) => (
-                    <div key={order.id} className="flex flex-col p-3 rounded-lg hover:bg-[#AE000025] transition-colors border border-transparent hover:border-[#AE0000]/20">
+                {data.todayAppointments.length > 0 ? (
+                  data.todayAppointments.map((appointment) => (
+                    <div key={appointment.id} className="flex flex-col p-3 rounded-lg hover:bg-[#AE000025] transition-colors border border-transparent hover:border-[#AE0000]/20">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-2 gap-2">
-                          <p className="font-medium text-azul-profundo text-sm truncate">
-                            #{order.order_number}
-                          </p>
-                          {getOrderStatusBadge(order.status)}
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <Clock className="h-4 w-4 text-azul-profundo flex-shrink-0" />
+                            <p className="font-medium text-azul-profundo text-sm truncate">
+                              {formatTime(appointment.appointment_time)}
+                            </p>
+                            <span className="text-xs text-tierra-media">
+                              ({appointment.duration_minutes} min)
+                            </span>
+                          </div>
+                          {getAppointmentStatusBadge(appointment.status)}
                         </div>
-                        <p className="text-xs text-tierra-media mb-2 truncate">
-                          {order.customer_name} • {order.items_count} producto{order.items_count !== 1 ? 's' : ''}
+                        <p className="text-sm font-medium text-azul-profundo mb-1 truncate">
+                          {appointment.customer_name}
                         </p>
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-semibold text-verde-suave text-sm">
-                            {formatPrice(order.total_amount)}
+                        <p className="text-xs text-tierra-media mb-2 capitalize">
+                          {appointment.appointment_type?.replace(/_/g, ' ') || 'Consulta'}
+                        </p>
+                        {appointment.notes && (
+                          <p className="text-xs text-gray-600 italic truncate">
+                            {appointment.notes}
                           </p>
-                          <p className="text-xs text-tierra-media flex items-center flex-shrink-0">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {formatDate(order.created_at)}
-                          </p>
-                        </div>
+                        )}
                       </div>
                     </div>
                   ))
                 ) : (
                   <div className="flex items-center justify-center h-[200px] text-center">
                     <div>
-                      <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <p className="text-sm text-tierra-media">
-                        No hay pedidos recientes para mostrar.
+                        No hay citas programadas para hoy.
                       </p>
                     </div>
                   </div>
@@ -619,43 +658,47 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <Link href="/admin/products/add">
-              <Button 
-                variant="outline" 
+              {/* Search Actions */}
+              <DashboardSearch type="customer" placeholder="Buscar Cliente" />
+              <DashboardSearch type="product" placeholder="Buscar Producto" />
+
+              {/* Quick Action Buttons */}
+              <Link href="/admin/quotes">
+                <Button 
+                  variant="outline" 
                   className="w-full justify-start h-10 hover:bg-[#AE0000]/5 hover:border-[#AE0000] border-gray-300 transition-all duration-300"
-              >
-                  <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <span className="truncate">Nuevo Producto</span>
+                >
+                  <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">Nuevo Presupuesto</span>
                 </Button>
-                </Link>
-              <Link href="/admin/orders">
-              <Button 
-                variant="outline" 
+              </Link>
+              <Link href="/admin/appointments">
+                <Button 
+                  variant="outline" 
                   className="w-full justify-start h-10 hover:bg-[#AE0000]/5 hover:border-[#AE0000] border-gray-300 transition-all duration-300"
-              >
+                >
+                  <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">Agenda y Citas</span>
+                </Button>
+              </Link>
+              <Link href="/admin/pos">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-10 hover:bg-[#AE0000]/5 hover:border-[#AE0000] border-gray-300 transition-all duration-300"
+                >
                   <ShoppingCart className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <span className="truncate">Gestionar Pedidos</span>
+                  <span className="truncate">Punto de Venta</span>
                 </Button>
-                </Link>
-              <Link href="/admin/customers">
-              <Button 
-                variant="outline" 
-                  className="w-full justify-start h-10 hover:bg-[#AE0000]/5 hover:border-[#AE0000] border-gray-300 transition-all duration-300"
-              >
-                  <Users className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <span className="truncate">Ver Clientes</span>
-                </Button>
-                </Link>
+              </Link>
               <Link href="/admin/products">
-              <Button 
-                variant="outline" 
+                <Button 
+                  variant="outline" 
                   className="w-full justify-start h-10 hover:bg-[#AE0000]/5 hover:border-[#AE0000] border-gray-300 transition-all duration-300"
-              >
+                >
                   <Package className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span className="truncate">Inventario</span>
                 </Button>
-                </Link>
+              </Link>
             </div>
           </CardContent>
         </Card>

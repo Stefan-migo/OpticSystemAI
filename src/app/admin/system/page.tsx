@@ -60,17 +60,11 @@ import {
   RotateCcw,
   FileText,
   Calendar,
-  CreditCard,
-  Truck,
-  Globe,
-  Zap
+  Bell
 } from 'lucide-react';
 import { toast } from 'sonner';
-import PaymentConfig from '@/components/admin/PaymentConfig';
 import EmailTemplatesManager from '@/components/admin/EmailTemplatesManager';
-import ShippingManager from '@/components/admin/ShippingManager';
-import WebhookMonitor from '@/components/admin/WebhookMonitor';
-import SEOManager from '@/components/admin/SEOManager';
+import NotificationSettings from '@/components/admin/NotificationSettings';
 
 interface SystemConfig {
   id: string;
@@ -160,13 +154,23 @@ export default function SystemAdministrationPage() {
       setLoadingBackups(true);
       const response = await fetch('/api/admin/system/backups');
       if (!response.ok) {
+        // Silently fail if endpoint doesn't exist (403/404) - feature may not be implemented
+        if (response.status === 403 || response.status === 404) {
+          console.log('Backups endpoint not available');
+          setAvailableBackups([]);
+          return;
+        }
         throw new Error('Error al cargar backups');
       }
       const data = await response.json();
       setAvailableBackups(data.backups || []);
     } catch (error) {
       console.error('Error fetching backups:', error);
-      toast.error('Error al cargar lista de backups');
+      // Only show error toast for unexpected errors (not 403/404)
+      if (error instanceof Error && !error.message.includes('403') && !error.message.includes('404')) {
+        toast.error('Error al cargar lista de backups');
+      }
+      setAvailableBackups([]);
     } finally {
       setLoadingBackups(false);
     }
@@ -681,7 +685,7 @@ export default function SystemAdministrationPage() {
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Administración del Sistema</h1>
           <p className="text-tierra-media">
-            Configuración, monitoreo y mantenimiento del sistema
+            Configuración, monitoreo y mantenimiento del sistema de gestión óptica
           </p>
         </div>
         
@@ -758,25 +762,13 @@ export default function SystemAdministrationPage() {
         <TabsList className="flex w-full justify-between gap-1 h-auto">
           <TabsTrigger value="overview" className="flex-1">Resumen</TabsTrigger>
           <TabsTrigger value="config" className="flex-1">Configuración</TabsTrigger>
-          <TabsTrigger value="pagos" className="flex-1">
-            <CreditCard className="h-4 w-4 mr-1" />
-            Pagos
-          </TabsTrigger>
           <TabsTrigger value="email" className="flex-1">
             <Mail className="h-4 w-4 mr-1" />
             Email
           </TabsTrigger>
-          <TabsTrigger value="envios" className="flex-1">
-            <Truck className="h-4 w-4 mr-1" />
-            Envíos
-          </TabsTrigger>
-          <TabsTrigger value="seo" className="flex-1">
-            <Globe className="h-4 w-4 mr-1" />
-            SEO
-          </TabsTrigger>
-          <TabsTrigger value="webhooks" className="flex-1">
-            <Zap className="h-4 w-4 mr-1" />
-            Webhooks
+          <TabsTrigger value="notifications" className="flex-1">
+            <Bell className="h-4 w-4 mr-1" />
+            Notificaciones
           </TabsTrigger>
           <TabsTrigger value="health" className="flex-1">Salud</TabsTrigger>
           <TabsTrigger value="maintenance" className="flex-1">Mantenimiento</TabsTrigger>
@@ -798,25 +790,13 @@ export default function SystemAdministrationPage() {
                     <Settings className="h-4 w-4 mr-2" />
                     Configuración
                   </Button>
-                  <Button variant="outline" className="justify-start" onClick={() => setActiveTab('pagos')}>
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Pagos
-                  </Button>
                   <Button variant="outline" className="justify-start" onClick={() => setActiveTab('email')}>
                     <Mail className="h-4 w-4 mr-2" />
                     Plantillas Email
                   </Button>
-                  <Button variant="outline" className="justify-start" onClick={() => setActiveTab('envios')}>
-                    <Truck className="h-4 w-4 mr-2" />
-                    Envíos
-                  </Button>
-                  <Button variant="outline" className="justify-start" onClick={() => setActiveTab('seo')}>
-                    <Globe className="h-4 w-4 mr-2" />
-                    SEO
-                  </Button>
-                  <Button variant="outline" className="justify-start" onClick={() => setActiveTab('webhooks')}>
-                    <Zap className="h-4 w-4 mr-2" />
-                    Webhooks
+                  <Button variant="outline" className="justify-start" onClick={() => setActiveTab('notifications')}>
+                    <Bell className="h-4 w-4 mr-2" />
+                    Notificaciones
                   </Button>
                   <Button variant="outline" className="justify-start" onClick={() => setActiveTab('health')}>
                     <Activity className="h-4 w-4 mr-2" />
@@ -1085,27 +1065,12 @@ export default function SystemAdministrationPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="pagos" className="space-y-6">
-          <PaymentConfig 
-            configs={configs.filter(c => c.category === 'payments')}
-            onUpdate={handleUpdateConfig}
-          />
-        </TabsContent>
-
         <TabsContent value="email" className="space-y-6">
           <EmailTemplatesManager />
         </TabsContent>
 
-        <TabsContent value="envios" className="space-y-6">
-          <ShippingManager />
-        </TabsContent>
-
-        <TabsContent value="seo" className="space-y-6">
-          <SEOManager />
-        </TabsContent>
-
-        <TabsContent value="webhooks" className="space-y-6">
-          <WebhookMonitor />
+        <TabsContent value="notifications" className="space-y-6">
+          <NotificationSettings />
         </TabsContent>
 
         <TabsContent value="health" className="space-y-6">

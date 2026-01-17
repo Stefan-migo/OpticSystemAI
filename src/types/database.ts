@@ -129,7 +129,6 @@ export type Database = {
           category_id: string | null
           image_url: string | null
           rating: number | null
-          review_count: number | null
           is_natural: boolean | null
           is_new: boolean | null
           is_on_sale: boolean | null
@@ -147,7 +146,6 @@ export type Database = {
           category_id?: string | null
           image_url?: string | null
           rating?: number | null
-          review_count?: number | null
           is_natural?: boolean | null
           is_new?: boolean | null
           is_on_sale?: boolean | null
@@ -165,7 +163,6 @@ export type Database = {
           category_id?: string | null
           image_url?: string | null
           rating?: number | null
-          review_count?: number | null
           is_natural?: boolean | null
           is_new?: boolean | null
           is_on_sale?: boolean | null

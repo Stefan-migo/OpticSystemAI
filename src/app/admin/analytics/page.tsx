@@ -135,9 +135,9 @@ export default function AnalyticsPage() {
   };
 
   const formatPrice = (amount: number) => 
-    new Intl.NumberFormat('es-AR', { 
+    new Intl.NumberFormat('es-CL', { 
       style: 'currency', 
-      currency: 'ARS',
+      currency: 'CLP',
       minimumFractionDigits: 0
     }).format(amount);
 
@@ -207,7 +207,7 @@ export default function AnalyticsPage() {
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Analíticas y Reportes</h1>
           <p className="text-tierra-media">
-            Insights de negocio para los últimos {analytics.period.days} días
+            Métricas y análisis de la óptica - Últimos {analytics.period.days} días
           </p>
         </div>
         

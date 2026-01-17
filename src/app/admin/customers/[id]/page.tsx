@@ -25,7 +25,6 @@ import {
   CreditCard,
   TrendingUp,
   Star,
-  Crown,
   AlertTriangle,
   CheckCircle,
   MessageSquare,
@@ -33,9 +32,25 @@ import {
   ShoppingBag,
   DollarSign,
   Activity,
-  Edit
+  Edit,
+  Eye,
+  FileText,
+  Clock,
+  Plus,
+  X,
+  Crown,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import Link from 'next/link';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import CreatePrescriptionForm from '@/components/admin/CreatePrescriptionForm';
+import CreateAppointmentForm from '@/components/admin/CreateAppointmentForm';
 
 interface Customer {
   id: string;
@@ -49,15 +64,31 @@ interface Customer {
   state?: string;
   postal_code?: string;
   country?: string;
-  membership_tier: string;
-  is_member: boolean;
-  membership_start_date?: string;
-  membership_end_date?: string;
   newsletter_subscribed: boolean;
   created_at: string;
   updated_at: string;
+  // Optical shop fields
+  rut?: string;
+  date_of_birth?: string;
+  gender?: string;
+  medical_conditions?: string[];
+  allergies?: string[];
+  medications?: string[];
+  medical_notes?: string;
+  last_eye_exam_date?: string;
+  next_eye_exam_due?: string;
+  preferred_contact_method?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  insurance_provider?: string;
+  insurance_policy_number?: string;
+  is_active_customer?: boolean;
+  // Relations
   orders?: any[];
-  memberships?: any[];
+  prescriptions?: Prescription[];
+  appointments?: Appointment[];
+  lensPurchases?: LensPurchase[];
+  quotes?: Quote[];
   analytics?: {
     totalSpent: number;
     orderCount: number;
@@ -71,6 +102,90 @@ interface Customer {
   };
 }
 
+interface Prescription {
+  id: string;
+  customer_id: string;
+  prescription_date: string;
+  expiration_date?: string;
+  prescription_number?: string;
+  issued_by?: string;
+  issued_by_license?: string;
+  od_sphere?: number;
+  od_cylinder?: number;
+  od_axis?: number;
+  od_add?: number;
+  od_pd?: number;
+  os_sphere?: number;
+  os_cylinder?: number;
+  os_axis?: number;
+  os_add?: number;
+  os_pd?: number;
+  prescription_type?: string;
+  lens_type?: string;
+  lens_material?: string;
+  notes?: string;
+  is_active: boolean;
+  is_current: boolean;
+  created_at: string;
+}
+
+interface Appointment {
+  id: string;
+  customer_id: string;
+  appointment_date: string;
+  appointment_time: string;
+  duration_minutes: number;
+  appointment_type: string;
+  status: string;
+  notes?: string;
+  reason?: string;
+  outcome?: string;
+  follow_up_required: boolean;
+  follow_up_date?: string;
+  created_at: string;
+}
+
+interface LensPurchase {
+  id: string;
+  customer_id: string;
+  order_id?: string;
+  prescription_id?: string;
+  product_id?: string;
+  product_name: string;
+  product_type: string;
+  purchase_date: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  lens_type?: string;
+  frame_brand?: string;
+  status: string;
+  delivery_date?: string;
+  created_at: string;
+}
+
+interface Quote {
+  id: string;
+  customer_id: string;
+  quote_number: string;
+  quote_date: string;
+  expiration_date?: string;
+  status: string;
+  frame_name?: string;
+  frame_price?: number;
+  lens_type?: string;
+  lens_material?: string;
+  lens_cost?: number;
+  treatments_cost?: number;
+  labor_cost?: number;
+  subtotal?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  total_amount?: number;
+  created_at: string;
+  converted_to_work_order_id?: string;
+}
+
 export default function CustomerDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -80,6 +195,10 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [showCreatePrescription, setShowCreatePrescription] = useState(false);
+  const [editingPrescription, setEditingPrescription] = useState<Prescription | null>(null);
+  const [showCreateAppointment, setShowCreateAppointment] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
 
   useEffect(() => {
     if (customerId) {
@@ -107,9 +226,9 @@ export default function CustomerDetailPage() {
   };
 
   const formatPrice = (amount: number) => 
-    new Intl.NumberFormat('es-AR', { 
+    new Intl.NumberFormat('es-CL', { 
       style: 'currency', 
-      currency: 'ARS',
+      currency: 'CLP',
       minimumFractionDigits: 0
     }).format(amount);
 
@@ -133,19 +252,6 @@ export default function CustomerDetailPage() {
     );
   };
 
-  const getMembershipBadge = (tier: string, isMember: boolean) => {
-    if (!isMember || tier === 'none') {
-      return <Badge variant="outline">Sin Membresía</Badge>;
-    }
-
-    const config: Record<string, { variant: any; label: string }> = {
-      basic: { variant: 'secondary', label: 'Básica' },
-      premium: { variant: 'default', label: 'Premium' }
-    };
-
-    const tierConfig = config[tier] || { variant: 'outline', label: tier };
-    return <Badge variant={tierConfig.variant}>{tierConfig.label}</Badge>;
-  };
 
   const toggleOrderExpansion = (orderId: string) => {
     setExpandedOrders(prev => {
@@ -237,13 +343,12 @@ export default function CustomerDetailPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-azul-profundo">{customerName}</h1>
-            <p className="text-tierra-media">{customer.email}</p>
+            <p className="text-tierra-media">{customer.email || 'Sin email'}</p>
           </div>
         </div>
         
         <div className="flex items-center space-x-2">
           {customer.analytics?.segment && getSegmentBadge(customer.analytics.segment)}
-          {getMembershipBadge(customer.membership_tier, customer.is_member)}
           <Link href={`/admin/customers/${customer.id}/edit`}>
             <Button>
               <Edit className="h-4 w-4 mr-2" />
@@ -304,7 +409,7 @@ export default function CustomerDetailPage() {
               <div className="ml-4">
                 <p className="text-sm text-tierra-media">Cliente Desde</p>
                 <p className="text-lg font-bold text-red-500">
-                  {new Date(customer.created_at).toLocaleDateString('es-AR')}
+                  {new Date(customer.created_at).toLocaleDateString('es-CL')}
                 </p>
               </div>
             </div>
@@ -314,11 +419,14 @@ export default function CustomerDetailPage() {
 
       {/* Main Content */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview">Resumen</TabsTrigger>
+          <TabsTrigger value="prescriptions">Recetas</TabsTrigger>
+          <TabsTrigger value="appointments">Citas</TabsTrigger>
+          <TabsTrigger value="quotes">Presupuestos</TabsTrigger>
+          <TabsTrigger value="lens-purchases">Lentes</TabsTrigger>
           <TabsTrigger value="orders">Pedidos</TabsTrigger>
           <TabsTrigger value="analytics">Analíticas</TabsTrigger>
-          <TabsTrigger value="membership">Membresía</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -342,6 +450,13 @@ export default function CustomerDetailPage() {
                     <p className="font-medium">{customer.last_name || 'No especificado'}</p>
                   </div>
                 </div>
+
+                {customer.rut && (
+                  <div>
+                    <p className="text-sm text-tierra-media">RUT</p>
+                    <p className="font-medium">{customer.rut}</p>
+                  </div>
+                )}
                 
                 <div>
                   <p className="text-sm text-tierra-media">Email</p>
@@ -355,10 +470,72 @@ export default function CustomerDetailPage() {
                   </div>
                 )}
 
+                {customer.date_of_birth && (
+                  <div>
+                    <p className="text-sm text-tierra-media">Fecha de Nacimiento</p>
+                    <p className="font-medium">{new Date(customer.date_of_birth).toLocaleDateString('es-CL')}</p>
+                  </div>
+                )}
+
+                {customer.last_eye_exam_date && (
+                  <div>
+                    <p className="text-sm text-tierra-media">Último Examen de la Vista</p>
+                    <p className="font-medium">{new Date(customer.last_eye_exam_date).toLocaleDateString('es-CL')}</p>
+                  </div>
+                )}
+
+                {customer.next_eye_exam_due && (
+                  <div>
+                    <p className="text-sm text-tierra-media">Próximo Examen Recomendado</p>
+                    <p className="font-medium text-azul-profundo">
+                      {new Date(customer.next_eye_exam_due).toLocaleDateString('es-CL')}
+                    </p>
+                  </div>
+                )}
+
+                {(customer.medical_conditions && customer.medical_conditions.length > 0) && (
+                  <div>
+                    <p className="text-sm text-tierra-media">Condiciones Médicas</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {customer.medical_conditions.map((condition, idx) => (
+                        <Badge key={idx} variant="outline">{condition}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(customer.allergies && customer.allergies.length > 0) && (
+                  <div>
+                    <p className="text-sm text-tierra-media">Alergias</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {customer.allergies.map((allergy, idx) => (
+                        <Badge key={idx} variant="outline" className="bg-red-50 text-red-700">{allergy}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {customer.emergency_contact_name && (
+                  <div>
+                    <p className="text-sm text-tierra-media">Contacto de Emergencia</p>
+                    <p className="font-medium">{customer.emergency_contact_name}</p>
+                    {customer.emergency_contact_phone && (
+                      <p className="text-sm text-tierra-media">{customer.emergency_contact_phone}</p>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <p className="text-sm text-tierra-media">Newsletter</p>
                   <Badge variant={customer.newsletter_subscribed ? "default" : "outline"}>
                     {customer.newsletter_subscribed ? "Suscrito" : "No suscrito"}
+                  </Badge>
+                </div>
+
+                <div>
+                  <p className="text-sm text-tierra-media">Estado</p>
+                  <Badge variant={customer.is_active_customer !== false ? "default" : "outline"}>
+                    {customer.is_active_customer !== false ? "Cliente Activo" : "Cliente Inactivo"}
                   </Badge>
                 </div>
               </CardContent>
@@ -401,7 +578,7 @@ export default function CustomerDetailPage() {
                       </div>
                       <div>
                         <p className="text-sm text-tierra-media">País</p>
-                        <p className="font-medium">{customer.country || 'Argentina'}</p>
+                        <p className="font-medium">{customer.country || 'Chile'}</p>
                       </div>
                     </div>
                   </>
@@ -434,7 +611,7 @@ export default function CustomerDetailPage() {
                         <div>
                           <p className="font-medium">#{order.order_number}</p>
                           <p className="text-sm text-tierra-media">
-                            {new Date(order.created_at).toLocaleDateString('es-AR')}
+                            {new Date(order.created_at).toLocaleDateString('es-CL')}
                           </p>
                         </div>
                       </div>
@@ -453,6 +630,496 @@ export default function CustomerDetailPage() {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="prescriptions" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center">
+              <Eye className="h-5 w-5 mr-2" />
+              Recetas Ópticas ({customer.prescriptions?.length || 0})
+            </CardTitle>
+            <Button onClick={() => {
+              setEditingPrescription(null);
+              setShowCreatePrescription(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Receta
+            </Button>
+          </div>
+
+          {customer.prescriptions && customer.prescriptions.length > 0 ? (
+            <div className="space-y-4">
+              {customer.prescriptions.map((prescription) => (
+                <Card key={prescription.id} className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">
+                          Receta #{prescription.prescription_number || prescription.id.slice(0, 8)}
+                        </CardTitle>
+                        <p className="text-sm text-tierra-media mt-1">
+                          Fecha: {new Date(prescription.prescription_date).toLocaleDateString('es-CL')}
+                          {prescription.expiration_date && (
+                            <> • Vence: {new Date(prescription.expiration_date).toLocaleDateString('es-CL')}</>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        {prescription.is_current && (
+                          <Badge variant="default">Actual</Badge>
+                        )}
+                        {prescription.is_active ? (
+                          <Badge variant="default">Activa</Badge>
+                        ) : (
+                          <Badge variant="outline">Inactiva</Badge>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingPrescription(prescription);
+                            setShowCreatePrescription(true);
+                          }}
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Editar
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Right Eye (OD) */}
+                      <div className="border-r pr-6">
+                        <h4 className="font-semibold mb-3 text-azul-profundo">Ojo Derecho (OD)</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-tierra-media">Esfera:</span>
+                            <p className="font-medium">{prescription.od_sphere !== null ? `${prescription.od_sphere > 0 ? '+' : ''}${prescription.od_sphere}` : '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-tierra-media">Cilindro:</span>
+                            <p className="font-medium">{prescription.od_cylinder !== null ? `${prescription.od_cylinder > 0 ? '+' : ''}${prescription.od_cylinder}` : '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-tierra-media">Eje:</span>
+                            <p className="font-medium">{prescription.od_axis !== null ? `${prescription.od_axis}°` : '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-tierra-media">ADD:</span>
+                            <p className="font-medium">{prescription.od_add !== null ? `+${prescription.od_add}` : '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-tierra-media">PD:</span>
+                            <p className="font-medium">{prescription.od_pd !== null ? `${prescription.od_pd} mm` : '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Left Eye (OS) */}
+                      <div>
+                        <h4 className="font-semibold mb-3 text-azul-profundo">Ojo Izquierdo (OS)</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-tierra-media">Esfera:</span>
+                            <p className="font-medium">{prescription.os_sphere !== null ? `${prescription.os_sphere > 0 ? '+' : ''}${prescription.os_sphere}` : '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-tierra-media">Cilindro:</span>
+                            <p className="font-medium">{prescription.os_cylinder !== null ? `${prescription.os_cylinder > 0 ? '+' : ''}${prescription.os_cylinder}` : '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-tierra-media">Eje:</span>
+                            <p className="font-medium">{prescription.os_axis !== null ? `${prescription.os_axis}°` : '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-tierra-media">ADD:</span>
+                            <p className="font-medium">{prescription.os_add !== null ? `+${prescription.os_add}` : '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-tierra-media">PD:</span>
+                            <p className="font-medium">{prescription.os_pd !== null ? `${prescription.os_pd} mm` : '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {(prescription.issued_by || prescription.prescription_type || prescription.notes) && (
+                      <div className="mt-4 pt-4 border-t space-y-2">
+                        {prescription.issued_by && (
+                          <p className="text-sm">
+                            <span className="text-tierra-media">Emitida por:</span>{' '}
+                            <span className="font-medium">{prescription.issued_by}</span>
+                            {prescription.issued_by_license && (
+                              <> ({prescription.issued_by_license})</>
+                            )}
+                          </p>
+                        )}
+                        {prescription.prescription_type && (
+                          <p className="text-sm">
+                            <span className="text-tierra-media">Tipo:</span>{' '}
+                            <Badge variant="outline">{prescription.prescription_type}</Badge>
+                          </p>
+                        )}
+                        {prescription.notes && (
+                          <p className="text-sm">
+                            <span className="text-tierra-media">Notas:</span>{' '}
+                            <span>{prescription.notes}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <CardContent className="text-center py-12">
+                <Eye className="h-12 w-12 text-tierra-media mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin recetas</h3>
+                <p className="text-tierra-media mb-4">Este cliente aún no tiene recetas registradas.</p>
+                <Button onClick={() => {
+                  setEditingPrescription(null);
+                  setShowCreatePrescription(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Primera Receta
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="appointments" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center">
+              <CalendarIcon className="h-5 w-5 mr-2" />
+              Citas y Agendas ({customer.appointments?.length || 0})
+            </CardTitle>
+            <Button onClick={() => {
+              setEditingAppointment(null);
+              setShowCreateAppointment(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Cita
+            </Button>
+          </div>
+
+          {customer.appointments && customer.appointments.length > 0 ? (
+            <div className="space-y-4">
+              {customer.appointments.map((appointment) => {
+                const appointmentDate = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
+                const isPast = appointmentDate < new Date();
+                const statusColors: Record<string, string> = {
+                  scheduled: 'bg-blue-100 text-blue-800',
+                  confirmed: 'bg-green-100 text-green-800',
+                  completed: 'bg-gray-100 text-gray-800',
+                  cancelled: 'bg-red-100 text-red-800',
+                  no_show: 'bg-orange-100 text-orange-800'
+                };
+
+                return (
+                  <Card key={appointment.id} className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">
+                            {appointment.appointment_type === 'eye_exam' && 'Examen de la Vista'}
+                            {appointment.appointment_type === 'consultation' && 'Consulta'}
+                            {appointment.appointment_type === 'fitting' && 'Ajuste de Lentes'}
+                            {appointment.appointment_type === 'delivery' && 'Entrega de Lentes'}
+                            {appointment.appointment_type === 'repair' && 'Reparación'}
+                            {appointment.appointment_type === 'follow_up' && 'Seguimiento'}
+                            {appointment.appointment_type === 'emergency' && 'Emergencia'}
+                            {!['eye_exam', 'consultation', 'fitting', 'delivery', 'repair', 'follow_up', 'emergency'].includes(appointment.appointment_type) && 'Cita'}
+                          </CardTitle>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-tierra-media">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              {appointmentDate.toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              {appointmentDate.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            <div>
+                              Duración: {appointment.duration_minutes} min
+                            </div>
+                          </div>
+                        </div>
+                        <Badge className={statusColors[appointment.status] || 'bg-gray-100 text-gray-800'}>
+                          {appointment.status === 'scheduled' && 'Programada'}
+                          {appointment.status === 'confirmed' && 'Confirmada'}
+                          {appointment.status === 'completed' && 'Completada'}
+                          {appointment.status === 'cancelled' && 'Cancelada'}
+                          {appointment.status === 'no_show' && 'No asistió'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {appointment.reason && (
+                        <div className="mb-3">
+                          <p className="text-sm text-tierra-media">Motivo:</p>
+                          <p className="font-medium">{appointment.reason}</p>
+                        </div>
+                      )}
+                      {appointment.notes && (
+                        <div className="mb-3">
+                          <p className="text-sm text-tierra-media">Notas:</p>
+                          <p>{appointment.notes}</p>
+                        </div>
+                      )}
+                      {appointment.outcome && (
+                        <div className="mb-3">
+                          <p className="text-sm text-tierra-media">Resultado:</p>
+                          <p>{appointment.outcome}</p>
+                        </div>
+                      )}
+                      {appointment.follow_up_required && appointment.follow_up_date && (
+                        <div className="mt-3 pt-3 border-t">
+                          <p className="text-sm text-tierra-media">Seguimiento requerido:</p>
+                          <p className="font-medium text-azul-profundo">
+                            {new Date(appointment.follow_up_date).toLocaleDateString('es-CL')}
+                          </p>
+                        </div>
+                      )}
+                      <div className="mt-4 pt-4 border-t flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingAppointment(appointment);
+                            setShowCreateAppointment(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar Cita
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <CardContent className="text-center py-12">
+                <CalendarIcon className="h-12 w-12 text-tierra-media mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin citas</h3>
+                <p className="text-tierra-media mb-4">Este cliente aún no tiene citas programadas.</p>
+                <Button onClick={() => {
+                  setEditingAppointment(null);
+                  setShowCreateAppointment(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agendar Primera Cita
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="quotes" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center">
+              <FileText className="h-5 w-5 mr-2" />
+              Presupuestos ({customer.quotes?.length || 0})
+            </CardTitle>
+            <Link href={`/admin/quotes/new?customer_id=${customer.id}`}>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Presupuesto
+              </Button>
+            </Link>
+          </div>
+
+          {customer.quotes && customer.quotes.length > 0 ? (
+            <div className="space-y-4">
+              {customer.quotes.map((quote) => {
+                const getStatusBadge = (status: string) => {
+                  const config: Record<string, { variant: any; label: string }> = {
+                    draft: { variant: 'outline', label: 'Borrador' },
+                    sent: { variant: 'default', label: 'Enviado' },
+                    accepted: { variant: 'default', label: 'Aceptado' },
+                    rejected: { variant: 'destructive', label: 'Rechazado' },
+                    expired: { variant: 'outline', label: 'Expirado' },
+                    converted_to_work: { variant: 'secondary', label: 'Convertido' }
+                  };
+                  const statusConfig = config[status] || { variant: 'outline', label: status };
+                  return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
+                };
+
+                return (
+                  <Card key={quote.id} className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">
+                            Presupuesto {quote.quote_number}
+                          </CardTitle>
+                          <p className="text-sm text-tierra-media mt-1">
+                            Fecha: {new Date(quote.quote_date).toLocaleDateString('es-CL')}
+                            {quote.expiration_date && (
+                              <> • Vence: {new Date(quote.expiration_date).toLocaleDateString('es-CL')}</>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 items-center">
+                          {getStatusBadge(quote.status)}
+                          {quote.converted_to_work_order_id && (
+                            <Link href={`/admin/work-orders/${quote.converted_to_work_order_id}`}>
+                              <Button variant="outline" size="sm">
+                                Ver Trabajo
+                              </Button>
+                            </Link>
+                          )}
+                          <Link href={`/admin/quotes/${quote.id}`}>
+                            <Button variant="outline" size="sm">
+                              Ver Detalle
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-sm text-tierra-media mb-2">Detalles del Presupuesto</p>
+                          <div className="space-y-1 text-sm">
+                            {quote.frame_name && (
+                              <p><span className="text-tierra-media">Marco:</span> <span className="font-medium">{quote.frame_name}</span></p>
+                            )}
+                            {quote.lens_type && (
+                              <p><span className="text-tierra-media">Tipo de lente:</span> <span className="font-medium">{quote.lens_type}</span></p>
+                            )}
+                            {quote.lens_material && (
+                              <p><span className="text-tierra-media">Material:</span> <span className="font-medium">{quote.lens_material}</span></p>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-tierra-media mb-2">Información de Precio</p>
+                          <div className="space-y-1 text-sm">
+                            {quote.frame_price && quote.frame_price > 0 && (
+                              <p><span className="text-tierra-media">Marco:</span> <span className="font-medium">{formatPrice(quote.frame_price)}</span></p>
+                            )}
+                            {quote.lens_cost && quote.lens_cost > 0 && (
+                              <p><span className="text-tierra-media">Lente:</span> <span className="font-medium">{formatPrice(quote.lens_cost)}</span></p>
+                            )}
+                            {quote.treatments_cost && quote.treatments_cost > 0 && (
+                              <p><span className="text-tierra-media">Tratamientos:</span> <span className="font-medium">{formatPrice(quote.treatments_cost)}</span></p>
+                            )}
+                            {quote.labor_cost && quote.labor_cost > 0 && (
+                              <p><span className="text-tierra-media">Mano de obra:</span> <span className="font-medium">{formatPrice(quote.labor_cost)}</span></p>
+                            )}
+                            {quote.total_amount && (
+                              <p className="pt-2 border-t"><span className="text-tierra-media">Total:</span> <span className="font-medium text-verde-suave text-base">{formatPrice(quote.total_amount)}</span></p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <CardContent className="text-center py-12">
+                <FileText className="h-12 w-12 text-tierra-media mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin presupuestos</h3>
+                <p className="text-tierra-media mb-4">Este cliente aún no tiene presupuestos registrados.</p>
+                <Link href={`/admin/quotes/new?customer_id=${customer.id}`}>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Primer Presupuesto
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lens-purchases" className="space-y-6">
+          <CardTitle className="flex items-center">
+            <ShoppingBag className="h-5 w-5 mr-2" />
+            Historial de Lentes y Armazones ({customer.lensPurchases?.length || 0})
+          </CardTitle>
+
+          {customer.lensPurchases && customer.lensPurchases.length > 0 ? (
+            <div className="space-y-4">
+              {customer.lensPurchases.map((purchase) => {
+                const statusColors: Record<string, string> = {
+                  ordered: 'bg-blue-100 text-blue-800',
+                  in_progress: 'bg-yellow-100 text-yellow-800',
+                  ready: 'bg-green-100 text-green-800',
+                  delivered: 'bg-gray-100 text-gray-800',
+                  cancelled: 'bg-red-100 text-red-800'
+                };
+
+                return (
+                  <Card key={purchase.id} className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">{purchase.product_name}</CardTitle>
+                          <p className="text-sm text-tierra-media mt-1">
+                            Fecha de compra: {new Date(purchase.purchase_date).toLocaleDateString('es-CL')}
+                            {purchase.delivery_date && (
+                              <> • Entregado: {new Date(purchase.delivery_date).toLocaleDateString('es-CL')}</>
+                            )}
+                          </p>
+                        </div>
+                        <Badge className={statusColors[purchase.status] || 'bg-gray-100 text-gray-800'}>
+                          {purchase.status === 'ordered' && 'Ordenado'}
+                          {purchase.status === 'in_progress' && 'En Proceso'}
+                          {purchase.status === 'ready' && 'Listo'}
+                          {purchase.status === 'delivered' && 'Entregado'}
+                          {purchase.status === 'cancelled' && 'Cancelado'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-sm text-tierra-media mb-2">Detalles del Producto</p>
+                          <div className="space-y-1 text-sm">
+                            <p><span className="text-tierra-media">Tipo:</span> <span className="font-medium">{purchase.product_type}</span></p>
+                            <p><span className="text-tierra-media">Cantidad:</span> <span className="font-medium">{purchase.quantity}</span></p>
+                            {purchase.lens_type && (
+                              <p><span className="text-tierra-media">Tipo de lente:</span> <span className="font-medium">{purchase.lens_type}</span></p>
+                            )}
+                            {purchase.frame_brand && (
+                              <p><span className="text-tierra-media">Marca:</span> <span className="font-medium">{purchase.frame_brand}</span></p>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-tierra-media mb-2">Información de Compra</p>
+                          <div className="space-y-1 text-sm">
+                            <p><span className="text-tierra-media">Precio unitario:</span> <span className="font-medium">{formatPrice(purchase.unit_price)}</span></p>
+                            <p><span className="text-tierra-media">Total:</span> <span className="font-medium text-verde-suave">{formatPrice(purchase.total_price)}</span></p>
+                            {purchase.prescription_id && (
+                              <p className="text-xs text-tierra-media">Con receta asociada</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <CardContent className="text-center py-12">
+                <ShoppingBag className="h-12 w-12 text-tierra-media mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin compras de lentes</h3>
+                <p className="text-tierra-media">Este cliente aún no ha comprado lentes o armazones.</p>
               </CardContent>
             </Card>
           )}
@@ -503,7 +1170,7 @@ export default function CustomerDetailPage() {
                           </TableCell>
                           
                           <TableCell>
-                            {new Date(order.created_at).toLocaleDateString('es-AR', {
+                            {new Date(order.created_at).toLocaleDateString('es-CL', {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric'
@@ -746,115 +1413,65 @@ export default function CustomerDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="membership" className="space-y-6">
-          <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Crown className="h-5 w-5 mr-2" />
-                Estado de Membresía
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {customer.is_member ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-tierra-media">Tipo de Membresía</p>
-                      {getMembershipBadge(customer.membership_tier, customer.is_member)}
-                    </div>
-                    {customer.membership_start_date && (
-                      <div>
-                        <p className="text-sm text-tierra-media">Fecha de Inicio</p>
-                        <p className="font-medium">
-                          {new Date(customer.membership_start_date).toLocaleDateString('es-AR')}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {customer.memberships && customer.memberships.length > 0 && (
-                    <div>
-                      <h4 className="font-medium mb-3 text-azul-profundo">Programa Actual</h4>
-                      {customer.memberships.map((membership: any) => (
-                        <div key={membership.id} className="p-4 border rounded-lg bg-[#F6FBD6] border-verde-suave/30">
-                          <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                              <p className="text-sm text-tierra-media">Estado</p>
-                              <Badge variant={membership.status === 'active' ? 'default' : 'outline'}>
-                                {membership.status === 'active' ? 'Activo' : 
-                                 membership.status === 'paused' ? 'Pausado' : 
-                                 membership.status === 'completed' ? 'Completado' : 
-                                 membership.status}
-                              </Badge>
-                            </div>
-                            <div>
-                              <p className="text-sm text-tierra-media">Semana Actual</p>
-                              <p className="font-medium text-azul-profundo">{membership.current_week || 1} / 28</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-tierra-media">Progreso</p>
-                              <div className="flex items-center space-x-2">
-                                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                  <div 
-                                    className="bg-verde-suave h-2 rounded-full transition-all"
-                                    style={{ width: `${membership.progress_percentage || 0}%` }}
-                                  />
-                                </div>
-                                <span className="font-medium text-sm text-verde-suave">
-                                  {membership.progress_percentage || 0}%
-                                </span>
-                              </div>
-                            </div>
-                            <div>
-                              <p className="text-sm text-tierra-media">Lecciones Completadas</p>
-                              <p className="font-medium text-azul-profundo">
-                                {membership.completed_lessons || 0} / {membership.total_lessons || 28}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          {membership.start_date && (
-                            <div className="pt-3 border-t border-verde-suave/20">
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <p className="text-tierra-media">Fecha de Inicio</p>
-                                  <p className="font-medium">
-                                    {new Date(membership.start_date).toLocaleDateString('es-AR')}
-                                  </p>
-                                </div>
-                                {membership.end_date && (
-                                  <div>
-                                    <p className="text-tierra-media">Fecha de Fin</p>
-                                    <p className="font-medium">
-                                      {new Date(membership.end_date).toLocaleDateString('es-AR')}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Crown className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin Membresía</h3>
-                  <p className="text-tierra-media mb-4">
-                    Este cliente no tiene una membresía activa en el programa de transformación.
-                  </p>
-                  <Button>
-                    <Crown className="h-4 w-4 mr-2" />
-                    Asignar Membresía
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
+
+      {/* Create/Edit Prescription Dialog */}
+      <Dialog open={showCreatePrescription} onOpenChange={setShowCreatePrescription}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingPrescription ? 'Editar Receta' : 'Nueva Receta'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingPrescription 
+                ? 'Modifica los datos de la receta oftalmológica'
+                : 'Crea una nueva receta oftalmológica para este cliente'}
+            </DialogDescription>
+          </DialogHeader>
+          <CreatePrescriptionForm
+            customerId={customerId}
+            initialData={editingPrescription || undefined}
+            onSuccess={() => {
+              setShowCreatePrescription(false);
+              setEditingPrescription(null);
+              fetchCustomer();
+            }}
+            onCancel={() => {
+              setShowCreatePrescription(false);
+              setEditingPrescription(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Edit Appointment Dialog */}
+      <Dialog open={showCreateAppointment} onOpenChange={setShowCreateAppointment}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingAppointment ? 'Editar Cita' : 'Nueva Cita'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingAppointment 
+                ? 'Modifica los detalles de la cita'
+                : 'Crea una nueva cita para este cliente'}
+            </DialogDescription>
+          </DialogHeader>
+          <CreateAppointmentForm
+            initialData={editingAppointment || undefined}
+            initialCustomerId={customerId}
+            onSuccess={() => {
+              setShowCreateAppointment(false);
+              setEditingAppointment(null);
+              fetchCustomer();
+            }}
+            onCancel={() => {
+              setShowCreateAppointment(false);
+              setEditingAppointment(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

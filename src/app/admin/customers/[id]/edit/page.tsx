@@ -16,7 +16,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Crown,
   AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -33,10 +32,6 @@ interface Customer {
   state?: string;
   postal_code?: string;
   country?: string;
-  membership_tier: string;
-  is_member: boolean;
-  membership_start_date?: string;
-  membership_end_date?: string;
   newsletter_subscribed: boolean;
   created_at: string;
   updated_at: string;
@@ -64,10 +59,6 @@ export default function CustomerEditPage() {
     state: '',
     postal_code: '',
     country: 'Argentina',
-    membership_tier: 'none',
-    is_member: false,
-    membership_start_date: '',
-    membership_end_date: '',
     newsletter_subscribed: false
   });
 
@@ -100,13 +91,7 @@ export default function CustomerEditPage() {
         city: customerData.city || '',
         state: customerData.state || '',
         postal_code: customerData.postal_code || '',
-        country: customerData.country || 'Argentina',
-        membership_tier: customerData.membership_tier || 'none',
-        is_member: customerData.is_member || false,
-        membership_start_date: customerData.membership_start_date ? 
-          new Date(customerData.membership_start_date).toISOString().split('T')[0] : '',
-        membership_end_date: customerData.membership_end_date ? 
-          new Date(customerData.membership_end_date).toISOString().split('T')[0] : '',
+        country: customerData.country || 'Chile',
         newsletter_subscribed: customerData.newsletter_subscribed || false
       });
       
@@ -366,68 +351,6 @@ export default function CustomerEditPage() {
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Membership Information */}
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Crown className="h-5 w-5 mr-2" />
-              Membresía
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="is_member"
-                checked={formData.is_member}
-                onCheckedChange={(checked) => handleInputChange('is_member', checked)}
-              />
-              <Label htmlFor="is_member">Es miembro</Label>
-            </div>
-
-            {formData.is_member && (
-              <>
-                <div>
-                  <Label htmlFor="membership_tier">Tipo de Membresía</Label>
-                  <Select
-                    value={formData.membership_tier}
-                    onValueChange={(value) => handleInputChange('membership_tier', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin membresía</SelectItem>
-                      <SelectItem value="basic">Básica</SelectItem>
-                      <SelectItem value="premium">Premium</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="membership_start_date">Fecha de Inicio</Label>
-                    <Input
-                      id="membership_start_date"
-                      type="date"
-                      value={formData.membership_start_date}
-                      onChange={(e) => handleInputChange('membership_start_date', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="membership_end_date">Fecha de Fin</Label>
-                    <Input
-                      id="membership_end_date"
-                      type="date"
-                      value={formData.membership_end_date}
-                      onChange={(e) => handleInputChange('membership_end_date', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
           </CardContent>
         </Card>
 

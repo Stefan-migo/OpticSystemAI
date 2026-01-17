@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { Toaster } from 'sonner'
+import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
 const inter = Inter({ 
@@ -38,7 +38,20 @@ export default function RootLayout({
         >
           <AuthProvider>
             {children}
-            <Toaster position="bottom-right" />
+            <Toaster 
+              position="bottom-right" 
+              richColors
+              closeButton
+              expand={true}
+              duration={4000}
+              toastOptions={{
+                style: {
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  border: '1px solid var(--border)',
+                },
+              }}
+            />
           </AuthProvider>
         </ThemeProvider>
       </body>

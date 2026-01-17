@@ -37,7 +37,6 @@ export const businessConfig = {
     customers: true,
     support: true,
     analytics: true,
-    reviews: true,
     categories: true,
   },
   

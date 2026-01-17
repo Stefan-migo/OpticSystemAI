@@ -151,6 +151,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    
+    console.log('📦 Creating product with data:', {
+      name: body.name,
+      product_type: body.product_type,
+      has_optical_fields: !!body.optical_category,
+      has_frame_fields: !!body.frame_type,
+      has_lens_fields: !!body.lens_type
+    });
 
     // Validate required fields
     if (!body.name || !body.name.trim()) {
@@ -207,12 +215,47 @@ export async function POST(request: NextRequest) {
       status: body.status || 'draft',
       featured_image: body.featured_image || null,
       gallery: body.gallery || [],
-      skin_type: body.skin_type || [],
-      benefits: body.benefits || [],
-      ingredients: body.ingredients || null,
       tags: body.tags || [],
       is_featured: body.is_featured || false,
       published_at: body.published_at || (body.status === 'active' ? new Date().toISOString() : null),
+      // Optical product fields
+      product_type: body.product_type || 'frame',
+      optical_category: (body.optical_category && body.optical_category.trim()) || null,
+      sku: (body.sku && body.sku.trim()) || null,
+      barcode: (body.barcode && body.barcode.trim()) || null,
+      brand: (body.brand && body.brand.trim()) || null,
+      manufacturer: (body.manufacturer && body.manufacturer.trim()) || null,
+      model_number: (body.model_number && body.model_number.trim()) || null,
+      // Frame fields
+      frame_type: (body.frame_type && body.frame_type.trim()) || null,
+      frame_material: (body.frame_material && body.frame_material.trim()) || null,
+      frame_shape: (body.frame_shape && body.frame_shape.trim()) || null,
+      frame_color: (body.frame_color && body.frame_color.trim()) || null,
+      frame_colors: body.frame_colors || [],
+      frame_brand: (body.frame_brand && body.frame_brand.trim()) || null,
+      frame_model: (body.frame_model && body.frame_model.trim()) || null,
+      frame_sku: (body.frame_sku && body.frame_sku.trim()) || null,
+      frame_gender: (body.frame_gender && body.frame_gender.trim()) || null,
+      frame_age_group: (body.frame_age_group && body.frame_age_group.trim()) || null,
+      frame_size: (body.frame_size && body.frame_size.trim()) || null,
+      frame_features: body.frame_features || [],
+      frame_measurements: body.frame_measurements || null,
+      // Lens fields
+      lens_type: (body.lens_type && body.lens_type.trim()) || null,
+      lens_material: (body.lens_material && body.lens_material.trim()) || null,
+      lens_index: body.lens_index ? parseFloat(body.lens_index) : null,
+      lens_coatings: body.lens_coatings || [],
+      lens_tint_options: body.lens_tint_options || [],
+      uv_protection: (body.uv_protection && body.uv_protection.trim()) || null,
+      blue_light_filter: body.blue_light_filter || false,
+      blue_light_filter_percentage: body.blue_light_filter_percentage ? parseInt(body.blue_light_filter_percentage) : null,
+      photochromic: body.photochromic || false,
+      prescription_available: body.prescription_available || false,
+      prescription_range: body.prescription_range || null,
+      requires_prescription: body.requires_prescription || false,
+      is_customizable: body.is_customizable || false,
+      warranty_months: body.warranty_months ? parseInt(body.warranty_months) : null,
+      warranty_details: (body.warranty_details && body.warranty_details.trim()) || null,
     }
     
     // Add optional fields only if they exist (and are valid DB columns)
@@ -221,18 +264,6 @@ export async function POST(request: NextRequest) {
     }
     if (body.dimensions !== undefined && body.dimensions !== null && typeof body.dimensions === 'object') {
       productData.dimensions = body.dimensions
-    }
-    if (body.package_characteristics !== undefined && body.package_characteristics !== null && body.package_characteristics !== '') {
-      productData.package_characteristics = body.package_characteristics
-    }
-    if (body.usage_instructions !== undefined && body.usage_instructions !== null && body.usage_instructions !== '') {
-      productData.usage_instructions = body.usage_instructions
-    }
-    if (body.precautions !== undefined && body.precautions !== null && body.precautions !== '') {
-      productData.precautions = body.precautions
-    }
-    if (body.certifications !== undefined && body.certifications !== null && Array.isArray(body.certifications) && body.certifications.length > 0) {
-      productData.certifications = body.certifications
     }
     if (body.shelf_life_months !== undefined && body.shelf_life_months !== null) {
       productData.shelf_life_months = parseInt(String(body.shelf_life_months)) || null
@@ -261,6 +292,21 @@ export async function POST(request: NextRequest) {
     if (body.vendor !== undefined && body.vendor !== null && body.vendor !== '') {
       productData.vendor = body.vendor
     }
+
+    // Convert empty strings to null for all string fields to avoid database constraint issues
+    Object.keys(productData).forEach(key => {
+      if (typeof productData[key] === 'string' && productData[key].trim() === '') {
+        productData[key] = null;
+      }
+    });
+
+    console.log('📦 Prepared product data (sample):', {
+      name: productData.name,
+      product_type: productData.product_type,
+      sku: productData.sku,
+      frame_type: productData.frame_type,
+      lens_type: productData.lens_type
+    });
 
     // Try with regular client first, fallback to service role if RLS fails
     let data, error;

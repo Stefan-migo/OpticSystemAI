@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/utils/supabase/server';
+import { NotificationService } from '@/lib/notifications/notification-service';
 
 export async function GET(request: NextRequest) {
   try {
     console.log('🔍 Customers API GET called');
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
-    const membership_tier = searchParams.get('membership_tier') || '';
     const status = searchParams.get('status') || '';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
 
-    console.log('📊 Query params:', { search, membership_tier, status, page, limit });
+    console.log('📊 Query params:', { search, status, page, limit });
 
     const supabase = await createClient();
     
@@ -50,9 +50,6 @@ export async function GET(request: NextRequest) {
       query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
     }
     
-    if (membership_tier && membership_tier !== 'all') {
-      query = query.eq('membership_tier', membership_tier);
-    }
 
     // Get total count for pagination
     console.log('📊 Getting customer count...');
@@ -81,11 +78,9 @@ export async function GET(request: NextRequest) {
     // Calculate customer analytics
     console.log('📊 Calculating customer analytics...');
     const customerStats = customers?.map(customer => {
-      // Basic segment classification based on membership
+      // Basic segment classification based on order count
       let segment = 'new';
-      if (customer.is_member) {
-        segment = customer.membership_tier === 'premium' ? 'vip' : 'regular';
-      }
+      // Segment will be calculated based on orders in the detail endpoint
 
       return {
         ...customer,
@@ -145,50 +140,56 @@ export async function POST(request: NextRequest) {
     // Get request body to determine action
     const body = await request.json();
     
-    // Check if this is a customer creation request (has email field)
-    if (body.email) {
+    // Check if this is a customer creation request (has first_name or last_name)
+    // Analytics requests have empty body or only summary-related fields
+    const isCustomerCreation = body.first_name || body.last_name;
+    
+    if (isCustomerCreation) {
       console.log('🔍 Customers API POST called (create new customer)');
       console.log('📝 Create customer data received:', body);
 
       // Validate required fields
-      if (!body.email) {
-        return NextResponse.json({ error: 'Email is required' }, { status: 400 });
-      }
-
       if (!body.first_name && !body.last_name) {
         return NextResponse.json({ error: 'At least first name or last name is required' }, { status: 400 });
       }
 
-      // Check if profile already exists
-      const { data: existingProfile, error: checkProfileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', body.email)
-        .maybeSingle();
+      // Generate a temporary email if none provided (for customers without email)
+      const customerEmail = body.email?.trim() || `no-email-${crypto.randomUUID()}@temporal.local`;
+      const hasRealEmail = !!body.email?.trim();
 
-      if (existingProfile) {
-        console.log('❌ Profile with this email already exists');
-        return NextResponse.json({ 
-          error: 'Ya existe un cliente con este email. Por favor, utiliza otro email o edita el cliente existente.' 
-        }, { status: 400 });
+      // Check if profile already exists (only if email is provided)
+      if (hasRealEmail) {
+        const { data: existingProfile, error: checkProfileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', customerEmail)
+          .maybeSingle();
+
+        if (existingProfile) {
+          console.log('❌ Profile with this email already exists');
+          return NextResponse.json({ 
+            error: 'Ya existe un cliente con este email. Por favor, utiliza otro email o edita el cliente existente.' 
+          }, { status: 400 });
+        }
       }
 
       // Use service role client to create auth user
       const supabaseServiceRole = await createServiceRoleClient();
 
-      // Generate a random password (customer will reset it later)
+      // Generate a random password (customer will reset it later if they have email)
       const randomPassword = crypto.randomUUID();
 
       console.log('👤 Creating Supabase Auth user with service role...');
       const { data: authData, error: authError } = await supabaseServiceRole.auth.admin.createUser({
-        email: body.email,
+        email: customerEmail,
         password: randomPassword,
         email_confirm: true, // Auto-confirm email for admin-created users
         user_metadata: {
           first_name: body.first_name || '',
           last_name: body.last_name || '',
           created_by_admin: true,
-          admin_created_at: new Date().toISOString()
+          admin_created_at: new Date().toISOString(),
+          has_real_email: hasRealEmail
         }
       });
 
@@ -214,19 +215,15 @@ export async function POST(request: NextRequest) {
         id: authData.user.id,
         first_name: body.first_name || null,
         last_name: body.last_name || null,
-        email: body.email,
+        email: hasRealEmail ? customerEmail : null, // Store null if no real email provided
         phone: body.phone || null,
+        rut: body.rut || null,
         address_line_1: body.address_line_1 || null,
         address_line_2: body.address_line_2 || null,
         city: body.city || null,
         state: body.state || null,
         postal_code: body.postal_code || null,
-        country: body.country || 'Argentina',
-        membership_tier: body.membership_tier || 'none',
-        is_member: body.is_member || false,
-        membership_start_date: body.membership_start_date ? new Date(body.membership_start_date).toISOString() : null,
-        membership_end_date: body.membership_end_date ? new Date(body.membership_end_date).toISOString() : null,
-        newsletter_subscribed: body.newsletter_subscribed || false,
+        country: body.country || 'Chile',
         updated_at: new Date().toISOString()
       };
 
@@ -251,35 +248,52 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to create customer profile' }, { status: 500 });
       }
 
-      console.log('✅ Customer profile created successfully:', newCustomer.email);
+      if (!newCustomer) {
+        console.error('❌ Customer profile was not created');
+        return NextResponse.json({ error: 'Failed to create customer profile' }, { status: 500 });
+      }
 
-      // Send welcome email and password reset email
-      try {
-        const { EmailNotificationService } = await import('@/lib/email/notifications');
-        
-        // Send welcome email
-        const customerName = `${body.first_name || ''} ${body.last_name || ''}`.trim() || 'Cliente';
-        await EmailNotificationService.sendAccountWelcome(customerName, body.email);
-        console.log('✅ Welcome email sent successfully');
+      console.log('✅ Customer profile created successfully:', newCustomer.email || 'No email (temporal)');
 
-        // Send password reset email so customer can set their own password
-        console.log('📧 Sending password reset email to customer...');
-        const { error: resetError } = await supabaseServiceRole.auth.resetPasswordForEmail(
-          body.email,
-          {
-            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/reset-password`
+      // Create notification for new customer (non-blocking)
+      const customerName = `${body.first_name || ''} ${body.last_name || ''}`.trim() || 'Cliente';
+      NotificationService.notifyNewCustomer(
+        newCustomer.id,
+        customerName,
+        hasRealEmail ? customerEmail : undefined
+      ).catch(err => console.error('Error creating notification:', err));
+
+      // Send welcome email and password reset email (only if customer has real email)
+      if (hasRealEmail) {
+        try {
+          const { EmailNotificationService } = await import('@/lib/email/notifications');
+          
+          // Send welcome email
+          const customerName = `${body.first_name || ''} ${body.last_name || ''}`.trim() || 'Cliente';
+          await EmailNotificationService.sendAccountWelcome(customerName, customerEmail);
+          console.log('✅ Welcome email sent successfully');
+
+          // Send password reset email so customer can set their own password
+          console.log('📧 Sending password reset email to customer...');
+          const { error: resetError } = await supabaseServiceRole.auth.resetPasswordForEmail(
+            customerEmail,
+            {
+              redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/reset-password`
+            }
+          );
+
+          if (resetError) {
+            console.warn('⚠️ Could not send password reset email:', resetError.message);
+            // Don't fail the entire operation for email issues
+          } else {
+            console.log('✅ Password reset email sent successfully');
           }
-        );
-
-        if (resetError) {
-          console.warn('⚠️ Could not send password reset email:', resetError.message);
-          // Don't fail the entire operation for email issues
-        } else {
-          console.log('✅ Password reset email sent successfully');
+        } catch (emailError) {
+          console.warn('⚠️ Email sending error (non-critical):', emailError);
+          // Continue - customer can use "forgot password" later
         }
-      } catch (emailError) {
-        console.warn('⚠️ Email sending error (non-critical):', emailError);
-        // Continue - customer can use "forgot password" later
+      } else {
+        console.log('ℹ️ Skipping email notifications - customer has no email address');
       }
 
       return NextResponse.json({
@@ -295,39 +309,21 @@ export async function POST(request: NextRequest) {
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
-      const { data: activeMembers, count: activeCount } = await supabase
+      const { data: activeCustomers, count: activeCount } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
-        .eq('is_member', true);
+        .eq('is_active_customer', true);
 
       const { data: recentCustomers, count: recentCount } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
-      // Get membership tier distribution
-      console.log('📊 Getting membership distribution...');
-      const { data: membershipDistribution, error: membershipError } = await supabase
-        .from('profiles')
-        .select('membership_tier')
-        .neq('membership_tier', 'none');
-
-      if (membershipError) {
-        console.error('❌ Error getting membership distribution:', membershipError);
-        // Continue with empty distribution rather than failing
-      }
-
-      const tierCounts = membershipDistribution?.reduce((acc: any, profile: any) => {
-        acc[profile.membership_tier] = (acc[profile.membership_tier] || 0) + 1;
-        return acc;
-      }, {}) || {};
-
       return NextResponse.json({
         summary: {
           totalCustomers: totalCount || 0,
-          activeMembers: activeCount || 0,
-          newCustomersThisMonth: recentCount || 0,
-          membershipDistribution: tierCounts || {}
+          activeCustomers: activeCount || totalCount || 0,
+          newCustomersThisMonth: recentCount || 0
         }
       });
     }

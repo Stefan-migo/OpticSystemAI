@@ -3,6 +3,7 @@ import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
 import { NotificationService } from "@/lib/notifications/notification-service";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function PUT(
   request: NextRequest,
@@ -21,10 +22,10 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin, error: adminCheckError } = await supabase.rpc(
+    const { data: isAdmin, error: adminCheckError } = (await supabase.rpc(
       "is_admin",
-      { user_id: user.id },
-    );
+      { user_id: user.id } as IsAdminParams,
+    )) as { data: IsAdminResult | null; error: Error | null };
     if (adminCheckError) {
       logger.error("Admin check error", adminCheckError);
       return NextResponse.json(
@@ -45,7 +46,7 @@ export async function PUT(
     const branchContext = await getBranchContext(request, user.id);
 
     // Build branch filter function
-    const applyBranchFilter = (query: any) => {
+    const applyBranchFilter = (query: ReturnType<typeof supabase.from>) => {
       return addBranchFilter(
         query,
         branchContext.branchId,

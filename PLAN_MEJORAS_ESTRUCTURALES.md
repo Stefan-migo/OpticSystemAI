@@ -2,8 +2,11 @@
 ## Proceso Sistemático, Minucioso y Quirúrgico
 
 **Fecha de Creación:** 2025-01-27  
-**Versión del Plan:** 1.0  
+**Versión del Plan:** 1.1  
+**Última Actualización:** 2025-01-27  
 **Objetivo:** Mejorar la calidad del código de forma incremental sin romper funcionalidad existente
+
+**Estrategia de Branching:** Branches por fase para mantener `main` estable y permitir revisión antes de mergear
 
 ---
 
@@ -20,6 +23,52 @@
 9. [Fase 6: Testing y Calidad](#fase-6-testing-y-calidad)
 10. [Checklist de Verificación](#checklist-de-verificación)
 11. [Procedimientos de Rollback](#procedimientos-de-rollback)
+
+---
+
+## 🚀 Guía Rápida de Branching
+
+### Comandos Esenciales
+
+#### Iniciar una Fase
+```bash
+git checkout main
+git pull origin main
+git checkout -b phase-X-nombre-fase
+```
+
+#### Trabajar en la Fase
+```bash
+# Hacer cambios y commits
+git add .
+git commit -m "tipo: descripción"
+git push origin phase-X-nombre-fase  # Opcional pero recomendado
+```
+
+#### Finalizar una Fase
+```bash
+# Verificar todo funciona
+npm run type-check && npm run lint && npm run build
+
+# Mergear a main
+git checkout main
+git merge phase-X-nombre-fase
+git push origin main
+
+# Limpiar (opcional)
+git branch -d phase-X-nombre-fase
+git push origin --delete phase-X-nombre-fase
+```
+
+### Nombres de Branches por Fase
+
+- `phase-0-preparation` - Preparación y configuración
+- `phase-1-stabilization` - Estabilización crítica
+- `phase-2-refactoring` - Refactorización de componentes
+- `phase-3-security` - Mejoras de seguridad
+- `phase-4-performance` - Optimización de performance
+- `phase-5-maintainability` - Mejoras de mantenibilidad
+- `phase-6-testing` - Testing y calidad
 
 ---
 
@@ -45,17 +94,105 @@
 
 ## Metodología de Trabajo
 
-### Flujo de Trabajo por Tarea
+### Estrategia de Branching
+
+**Recomendación: Branches por Fase**
+
+Para mantener `main` estable y permitir revisión antes de mergear, trabajaremos en branches separados por fase:
+
+```
+main (siempre estable)
+├── phase-0-preparation
+├── phase-1-stabilization
+├── phase-2-refactoring
+├── phase-3-security
+├── phase-4-performance
+├── phase-5-maintainability
+└── phase-6-testing
+```
+
+**Reglas de Branching:**
+- ✅ Cada fase tiene su propio branch
+- ✅ Commits frecuentes dentro de cada branch
+- ✅ Merge a `main` solo después de verificar toda la fase
+- ✅ `main` siempre debe estar en estado funcional
+- ✅ Si una fase falla, se puede revertir fácilmente
+
+### Flujo de Trabajo por Fase
+
+#### Inicio de Fase
+
+```bash
+# 1. Asegurarse de estar en main y actualizado
+git checkout main
+git pull origin main
+
+# 2. Crear branch para la fase
+git checkout -b phase-X-nombre-fase
+
+# 3. Verificar que el branch se creó correctamente
+git branch
+```
+
+#### Durante la Fase
+
+```bash
+# Para cada tarea completada:
+# 1. Verificar cambios
+git status
+git diff
+
+# 2. Agregar cambios
+git add .
+
+# 3. Commit descriptivo
+git commit -m "feat/fix/refactor: Descripción clara de la tarea"
+
+# 4. Push al branch (opcional, pero recomendado)
+git push origin phase-X-nombre-fase
+```
+
+#### Finalización de Fase
+
+```bash
+# 1. Verificar que todo funciona
+npm run type-check
+npm run lint
+npm run build
+npm run dev  # Verificar manualmente
+
+# 2. Si hay tests, ejecutarlos
+npm test
+
+# 3. Merge a main
+git checkout main
+git merge phase-X-nombre-fase
+
+# 4. Verificar que main sigue funcionando
+npm run build
+npm run dev
+
+# 5. Push a main
+git push origin main
+
+# 6. (Opcional) Eliminar branch local
+git branch -d phase-X-nombre-fase
+
+# 7. (Opcional) Eliminar branch remoto
+git push origin --delete phase-X-nombre-fase
+```
+
+### Flujo de Trabajo por Tarea (dentro de una fase)
 
 ```
 1. Leer y entender el código actual
-2. Crear branch específico para la tarea
-3. Implementar cambio
-4. Ejecutar verificaciones
-5. Commit con mensaje descriptivo
-6. Merge a main (si todo está OK)
-7. Verificar en producción/desarrollo
-8. Marcar tarea como completada
+2. Implementar cambio
+3. Ejecutar verificaciones (type-check, lint, build)
+4. Commit con mensaje descriptivo
+5. Continuar con siguiente tarea
+6. Al finalizar la fase: merge a main
+7. Verificar en desarrollo
+8. Marcar fase como completada
 ```
 
 ### Criterios de Aceptación
@@ -81,7 +218,33 @@ Cada tarea debe cumplir:
 ## Fase 0: Preparación y Configuración
 
 **Duración Estimada:** 3-5 días  
-**Objetivo:** Preparar el entorno para las mejoras
+**Objetivo:** Preparar el entorno para las mejoras  
+**Branch:** `phase-0-preparation`
+
+### Inicio de Fase 0
+
+```bash
+# Crear branch para esta fase
+git checkout main
+git pull origin main
+git checkout -b phase-0-preparation
+```
+
+### Finalización de Fase 0
+
+```bash
+# Verificar todo funciona
+npm run type-check
+npm run lint
+npm run build
+
+# Merge a main
+git checkout main
+git merge phase-0-preparation
+git push origin main
+
+# Actualizar PROGRESO_MEJORAS.md
+```
 
 ### Tarea 0.1: Configurar Testing Básico
 
@@ -244,7 +407,34 @@ Cada tarea debe cumplir:
 ## Fase 1: Estabilización Crítica
 
 **Duración Estimada:** 2-3 semanas  
-**Objetivo:** Resolver problemas críticos que afectan estabilidad
+**Objetivo:** Resolver problemas críticos que afectan estabilidad  
+**Branch:** `phase-1-stabilization`
+
+### Inicio de Fase 1
+
+```bash
+# Crear branch para esta fase
+git checkout main
+git pull origin main
+git checkout -b phase-1-stabilization
+```
+
+### Finalización de Fase 1
+
+```bash
+# Verificar todo funciona
+npm run type-check
+npm run lint
+npm run build
+npm run dev  # Verificar manualmente
+
+# Merge a main
+git checkout main
+git merge phase-1-stabilization
+git push origin main
+
+# Actualizar PROGRESO_MEJORAS.md
+```
 
 ### Tarea 1.1: Eliminar Console.log de Producción
 
@@ -416,7 +606,37 @@ export async function GET(request: NextRequest) {
 ## Fase 2: Refactorización de Componentes
 
 **Duración Estimada:** 3-4 semanas  
-**Objetivo:** Dividir componentes monolíticos en componentes más pequeños y manejables
+**Objetivo:** Dividir componentes monolíticos en componentes más pequeños y manejables  
+**Branch:** `phase-2-refactoring`
+
+⚠️ **Nota Importante:** Esta fase tiene alto riesgo. Trabajar en branch separado es **obligatorio**.
+
+### Inicio de Fase 2
+
+```bash
+# Crear branch para esta fase
+git checkout main
+git pull origin main
+git checkout -b phase-2-refactoring
+```
+
+### Finalización de Fase 2
+
+```bash
+# Verificación exhaustiva (esta fase es crítica)
+npm run type-check
+npm run lint
+npm run build
+npm test  # Si hay tests
+npm run dev  # Verificar manualmente todas las funcionalidades
+
+# Merge a main (solo si todo está OK)
+git checkout main
+git merge phase-2-refactoring
+git push origin main
+
+# Actualizar PROGRESO_MEJORAS.md
+```
 
 ### Tarea 2.1: Refactorizar CreateWorkOrderForm
 
@@ -621,7 +841,33 @@ Dividir en tabs/páginas separadas:
 ## Fase 3: Mejoras de Seguridad
 
 **Duración Estimada:** 1-2 semanas  
-**Objetivo:** Mejorar seguridad del sistema
+**Objetivo:** Mejorar seguridad del sistema  
+**Branch:** `phase-3-security`
+
+### Inicio de Fase 3
+
+```bash
+# Crear branch para esta fase
+git checkout main
+git pull origin main
+git checkout -b phase-3-security
+```
+
+### Finalización de Fase 3
+
+```bash
+# Verificar todo funciona
+npm run type-check
+npm run lint
+npm run build
+
+# Merge a main
+git checkout main
+git merge phase-3-security
+git push origin main
+
+# Actualizar PROGRESO_MEJORAS.md
+```
 
 ### Tarea 3.1: Validación Consistente con Zod
 
@@ -699,7 +945,34 @@ Implementar validación por módulos:
 ## Fase 4: Optimización de Performance
 
 **Duración Estimada:** 2-3 semanas  
-**Objetivo:** Mejorar rendimiento de la aplicación
+**Objetivo:** Mejorar rendimiento de la aplicación  
+**Branch:** `phase-4-performance`
+
+### Inicio de Fase 4
+
+```bash
+# Crear branch para esta fase
+git checkout main
+git pull origin main
+git checkout -b phase-4-performance
+```
+
+### Finalización de Fase 4
+
+```bash
+# Verificar performance mejorado
+npm run type-check
+npm run lint
+npm run build
+# Medir bundle size y tiempos de carga
+
+# Merge a main
+git checkout main
+git merge phase-4-performance
+git push origin main
+
+# Actualizar PROGRESO_MEJORAS.md
+```
 
 ### Tarea 4.1: Implementar Memoización
 
@@ -805,7 +1078,33 @@ Auditar y optimizar queries:
 ## Fase 5: Mejoras de Mantenibilidad
 
 **Duración Estimada:** 1-2 semanas  
-**Objetivo:** Mejorar mantenibilidad del código
+**Objetivo:** Mejorar mantenibilidad del código  
+**Branch:** `phase-5-maintainability`
+
+### Inicio de Fase 5
+
+```bash
+# Crear branch para esta fase
+git checkout main
+git pull origin main
+git checkout -b phase-5-maintainability
+```
+
+### Finalización de Fase 5
+
+```bash
+# Verificar todo funciona
+npm run type-check
+npm run lint
+npm run build
+
+# Merge a main
+git checkout main
+git merge phase-5-maintainability
+git push origin main
+
+# Actualizar PROGRESO_MEJORAS.md
+```
 
 ### Tarea 5.1: Reducir Código Duplicado
 
@@ -872,7 +1171,37 @@ Identificar y extraer código duplicado:
 ## Fase 6: Testing y Calidad
 
 **Duración Estimada:** 3-4 semanas  
-**Objetivo:** Implementar suite completa de tests
+**Objetivo:** Implementar suite completa de tests  
+**Branch:** `phase-6-testing`
+
+### Inicio de Fase 6
+
+```bash
+# Crear branch para esta fase
+git checkout main
+git pull origin main
+git checkout -b phase-6-testing
+```
+
+### Finalización de Fase 6
+
+```bash
+# Verificar tests pasan
+npm test
+npm run test:coverage  # Verificar coverage
+
+# Verificar todo funciona
+npm run type-check
+npm run lint
+npm run build
+
+# Merge a main
+git checkout main
+git merge phase-6-testing
+git push origin main
+
+# Actualizar PROGRESO_MEJORAS.md
+```
 
 ### Tarea 6.1: Tests Unitarios para Utilidades
 
@@ -978,6 +1307,12 @@ Usar Playwright o Cypress:
 
 ## Checklist de Verificación
 
+### Antes de Crear un Branch de Fase
+
+- [ ] Estar en `main` y actualizado (`git pull origin main`)
+- [ ] Verificar que `main` está limpio (`git status`)
+- [ ] Crear branch con nombre descriptivo (`git checkout -b phase-X-nombre`)
+
 ### Antes de Cada Commit
 
 - [ ] Código compila sin errores
@@ -987,48 +1322,132 @@ Usar Playwright o Cypress:
 - [ ] Funcionalidad probada manualmente
 - [ ] Sin console.log de debug
 - [ ] Mensaje de commit descriptivo
+- [ ] Cambios relacionados agrupados en el mismo commit
 
-### Antes de Cada Merge
+### Antes de Mergear una Fase a Main
 
 - [ ] Todas las tareas de la fase completadas
-- [ ] Tests pasando
-- [ ] Build de producción exitoso
-- [ ] Revisión de código (si aplica)
+- [ ] Estar en el branch de la fase (`git branch`)
+- [ ] Último commit en main traído (`git checkout main && git pull`)
+- [ ] Vuelto al branch de fase (`git checkout phase-X-nombre`)
+- [ ] Merge de main al branch (si hay cambios nuevos): `git merge main`
+- [ ] Resueltos conflictos (si los hay)
+- [ ] Tests pasando (`npm test`)
+- [ ] Build de producción exitoso (`npm run build`)
+- [ ] Verificación manual en desarrollo (`npm run dev`)
+- [ ] TypeScript sin errores (`npm run type-check`)
+- [ ] Linting pasa (`npm run lint`)
 - [ ] Documentación actualizada
+- [ ] PROGRESO_MEJORAS.md actualizado
+
+### Después de Mergear una Fase
+
+- [ ] Verificar que main funciona (`npm run build && npm run dev`)
+- [ ] Push a main (`git push origin main`)
+- [ ] (Opcional) Eliminar branch local (`git branch -d phase-X-nombre`)
+- [ ] (Opcional) Eliminar branch remoto (`git push origin --delete phase-X-nombre`)
+- [ ] Actualizar PROGRESO_MEJORAS.md
 
 ### Al Final de Cada Fase
 
 - [ ] Todas las tareas de la fase completadas
 - [ ] Verificación completa de funcionalidad
-- [ ] Performance medida y documentada
-- [ ] Tests con coverage adecuado
+- [ ] Performance medida y documentada (si aplica)
+- [ ] Tests con coverage adecuado (si aplica)
 - [ ] Documentación actualizada
-- [ ] Commit de resumen de fase
+- [ ] Branch mergeado a main
+- [ ] PROGRESO_MEJORAS.md actualizado
+- [ ] Branch eliminado (opcional, pero recomendado)
 
 ---
 
 ## Procedimientos de Rollback
 
-### Rollback de un Commit
+### Rollback de un Commit (dentro de un branch)
 
 ```bash
-# Ver commits recientes
-git log --oneline -10
+# Si estás en un branch de fase y algo salió mal:
 
-# Revertir último commit (mantiene historial)
+# Opción 1: Revertir último commit (mantiene historial)
 git revert HEAD
 
-# O resetear (cuidado: pierde cambios)
+# Opción 2: Resetear a commit anterior (cuidado: pierde cambios)
 git reset --hard HEAD~1
+
+# Opción 3: Ver commits y resetear a uno específico
+git log --oneline -10
+git reset --hard <commit-hash>
 ```
 
-### Rollback de una Fase Completa
+### Rollback de una Fase Completa (antes de mergear)
 
-1. Identificar último commit antes de la fase
-2. Crear branch de rollback
-3. Revertir commits de la fase
-4. Probar que todo funciona
-5. Merge a main si está OK
+Si una fase tiene problemas antes de mergear a main:
+
+```bash
+# 1. Identificar el commit antes de la fase
+git log --oneline -20
+
+# 2. Crear branch de rollback (opcional, para seguridad)
+git checkout main
+git checkout -b rollback-phase-X
+
+# 3. Si la fase no se ha mergeado, simplemente no mergear
+# Si ya se mergeó, revertir el merge commit
+git revert -m 1 <merge-commit-hash>
+
+# 4. Verificar que todo funciona
+npm run type-check
+npm run lint
+npm run build
+
+# 5. Push del rollback
+git push origin main
+```
+
+### Rollback de una Fase Completa (después de mergear)
+
+Si una fase ya está en main y hay problemas:
+
+```bash
+# 1. Identificar el merge commit de la fase
+git log --oneline --merges -10
+
+# 2. Revertir el merge commit
+git revert -m 1 <merge-commit-hash>
+
+# 3. Verificar que todo funciona
+npm run type-check
+npm run lint
+npm run build
+
+# 4. Push del rollback
+git push origin main
+
+# 5. Corregir problemas en el branch de la fase
+git checkout phase-X-nombre-fase
+# ... hacer correcciones ...
+git checkout main
+git merge phase-X-nombre-fase
+git push origin main
+```
+
+### Abandonar un Branch de Fase
+
+Si una fase no funciona y quieres empezar de nuevo:
+
+```bash
+# 1. Volver a main
+git checkout main
+
+# 2. Eliminar branch local
+git branch -D phase-X-nombre-fase
+
+# 3. Eliminar branch remoto (si existe)
+git push origin --delete phase-X-nombre-fase
+
+# 4. Crear nuevo branch con el mismo nombre
+git checkout -b phase-X-nombre-fase
+```
 
 ### Rollback de Emergencia
 

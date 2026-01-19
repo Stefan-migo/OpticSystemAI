@@ -6,8 +6,21 @@
  * Usage:
  *   node scripts/apply-products-branch-migration-local.js
  * 
- * This script connects directly to the local Supabase instance
+ * This script connects directly to the local Supabase instance.
+ * 
+ * Environment Variables (recommended):
+ *   - SUPABASE_SERVICE_ROLE_KEY: Service role key from local Supabase
+ * 
+ * To get your local Supabase service role key:
+ *   1. Run: npm run supabase:status
+ *   2. Copy the "service_role key" value
+ *   3. Add it to your .env.local file as SUPABASE_SERVICE_ROLE_KEY
+ * 
+ * The SUPABASE_SERVICE_ROLE_KEY is required for security best practices.
+ * Get it by running: npm run supabase:status
  */
+
+require('dotenv').config({ path: '.env.local' })
 
 const fs = require('fs')
 const path = require('path')
@@ -15,8 +28,21 @@ const { createClient } = require('@supabase/supabase-js')
 
 async function applyMigrations() {
   // Use local Supabase connection
-  const supabaseUrl = 'http://127.0.0.1:54321'
-  const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321'
+  
+  // Get service role key from environment variable (required for security best practices)
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!serviceRoleKey) {
+    console.error('❌ Error: SUPABASE_SERVICE_ROLE_KEY is required')
+    console.error('\nTo get your local Supabase service role key:')
+    console.error('  1. Run: npm run supabase:status')
+    console.error('  2. Copy the "service_role key" value')
+    console.error('  3. Add it to your .env.local file:')
+    console.error('     SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here')
+    console.error('\nThis ensures credentials are not hardcoded in the repository.')
+    process.exit(1)
+  }
 
   console.log('📦 Loading migration file...')
   const migrationPath = path.join(__dirname, '../supabase/migrations/20251217000000_add_branch_id_to_products.sql')

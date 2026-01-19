@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
   logger.info("Dashboard API endpoint called");
@@ -39,7 +40,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Build branch filter function
-    const applyBranchFilter = (query: ReturnType<typeof supabase.from>) => {
+    const applyBranchFilter = (
+      query: Parameters<typeof addBranchFilter>[0],
+    ) => {
       return addBranchFilter(
         query,
         branchContext.branchId,
@@ -134,62 +137,83 @@ export async function GET(request: NextRequest) {
     // === PRODUCTS METRICS ===
     // Use filteredProducts instead of products
     const activeProducts = filteredProducts.filter(
-      (p) => p.status === "active",
+      (p: { status: string }) => p.status === "active",
     );
     const lowStockProducts = activeProducts
       .filter(
-        (p) =>
+        (p: { inventory_quantity?: number | null }) =>
           (p.inventory_quantity || 0) <= 5 && (p.inventory_quantity || 0) > 0,
       )
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        currentStock: p.inventory_quantity || 0,
-        threshold: 5,
-        slug: p.slug,
-      }))
-      .sort((a, b) => a.currentStock - b.currentStock)
+      .map(
+        (p: {
+          id: string;
+          name: string;
+          inventory_quantity?: number | null;
+          slug: string;
+        }) => ({
+          id: p.id,
+          name: p.name,
+          currentStock: p.inventory_quantity || 0,
+          threshold: 5,
+          slug: p.slug,
+        }),
+      )
+      .sort(
+        (a: { currentStock: number }, b: { currentStock: number }) =>
+          a.currentStock - b.currentStock,
+      )
       .slice(0, 5);
 
     const outOfStockProducts = activeProducts.filter(
-      (p) => (p.inventory_quantity || 0) === 0,
+      (p: { inventory_quantity?: number | null }) =>
+        (p.inventory_quantity || 0) === 0,
     ).length;
 
     // === ORDERS METRICS ===
-    const pendingOrders = orders.filter((o) => o.status === "pending").length;
+    const pendingOrders = orders.filter(
+      (o: { status: string }) => o.status === "pending",
+    ).length;
     const processingOrders = orders.filter(
-      (o) => o.status === "processing",
+      (o: { status: string }) => o.status === "processing",
     ).length;
     const completedOrders = orders.filter(
-      (o) => o.status === "completed",
+      (o: { status: string }) => o.status === "completed",
     ).length;
-    const failedOrders = orders.filter((o) => o.status === "failed").length;
+    const failedOrders = orders.filter(
+      (o: { status: string }) => o.status === "failed",
+    ).length;
 
     // === REVENUE METRICS ===
     // Current month revenue (from completed or paid orders)
-    const currentMonthOrders = orders.filter((o) => {
-      const orderDate = new Date(o.created_at);
-      return (
-        orderDate >= startOfMonth &&
-        (o.status === "completed" || o.payment_status === "paid")
-      );
-    });
+    const currentMonthOrders = orders.filter(
+      (o: { created_at: string; status: string; payment_status?: string }) => {
+        const orderDate = new Date(o.created_at);
+        return (
+          orderDate >= startOfMonth &&
+          (o.status === "completed" || o.payment_status === "paid")
+        );
+      },
+    );
     const currentMonthRevenue = currentMonthOrders.reduce(
-      (sum, o) => sum + (o.total_amount || 0),
+      (sum: number, o: { total_amount?: number | null }) =>
+        sum + (o.total_amount || 0),
       0,
     );
 
     // Last month revenue for comparison
-    const lastMonthOrders = orders.filter((o) => {
-      const orderDate = new Date(o.created_at);
-      return (
-        orderDate >= startOfLastMonth &&
-        orderDate <= endOfLastMonth &&
-        (o.status === "completed" || o.payment_status === "paid")
-      );
-    });
+    const lastMonthOrders = orders.filter(
+      (o: { created_at: string; status: string; payment_status?: string }) => {
+        const orderDate = new Date(o.created_at);
+        return (
+          orderDate >= startOfLastMonth &&
+          orderDate <= endOfLastMonth &&
+          (o.status === "completed" || o.payment_status === "paid")
+        );
+      },
+    );
     const lastMonthRevenue = lastMonthOrders.reduce(
-      (sum, o) => sum + (o.total_amount || 0),
+      (sum: number, o: { total_amount?: number | null }) =>
+        sum + (o.total_amount || 0),
       0,
     );
 
@@ -201,7 +225,7 @@ export async function GET(request: NextRequest) {
 
     // === CUSTOMERS METRICS ===
     const newCustomers = customers.filter(
-      (c) => new Date(c.created_at) >= thirtyDaysAgo,
+      (c: { created_at: string }) => new Date(c.created_at) >= thirtyDaysAgo,
     ).length;
     const returningCustomers = customers.length - newCustomers;
 
@@ -222,13 +246,14 @@ export async function GET(request: NextRequest) {
     const appointments = appointmentsData || [];
     const todayAppointments = appointments.length;
     const scheduledAppointments = appointments.filter(
-      (a) => a.status === "scheduled",
+      (a: { status: string }) => a.status === "scheduled",
     ).length;
     const confirmedAppointments = appointments.filter(
-      (a) => a.status === "confirmed",
+      (a: { status: string }) => a.status === "confirmed",
     ).length;
     const pendingAppointments = appointments.filter(
-      (a) => a.status === "scheduled" || a.status === "pending",
+      (a: { status: string }) =>
+        a.status === "scheduled" || a.status === "pending",
     ).length;
 
     // === WORK ORDERS METRICS (Optical Shop) ===
@@ -238,7 +263,7 @@ export async function GET(request: NextRequest) {
 
     const workOrders = workOrdersData || [];
     // Trabajos en progreso: enviados al lab, en lab, listos en lab, recibidos, montados, control calidad
-    const inProgressWorkOrders = workOrders.filter((wo) =>
+    const inProgressWorkOrders = workOrders.filter((wo: { status: string }) =>
       [
         "sent_to_lab",
         "in_progress_lab",
@@ -250,11 +275,12 @@ export async function GET(request: NextRequest) {
     ).length;
     // Trabajos nuevos/pendientes: ordenados (recién creados, no enviados aún)
     const pendingWorkOrders = workOrders.filter(
-      (wo) => wo.status === "ordered" || wo.status === "quote",
+      (wo: { status: string }) =>
+        wo.status === "ordered" || wo.status === "quote",
     ).length;
     // Trabajos completados: entregados
     const completedWorkOrders = workOrders.filter(
-      (wo) => wo.status === "delivered",
+      (wo: { status: string }) => wo.status === "delivered",
     ).length;
 
     // === QUOTES METRICS (Optical Shop) ===
@@ -265,12 +291,13 @@ export async function GET(request: NextRequest) {
     const quotes = quotesData || [];
     // Presupuestos pendientes: borrador, enviado (esperando respuesta)
     const pendingQuotes = quotes.filter(
-      (q) =>
+      (q: { status: string; converted_to_work_order_id?: string | null }) =>
         ["draft", "sent"].includes(q.status) && !q.converted_to_work_order_id,
     ).length;
     // Presupuestos convertidos: aceptados o convertidos a trabajo
     const convertedQuotes = quotes.filter(
-      (q) => q.status === "accepted" || q.converted_to_work_order_id,
+      (q: { status: string; converted_to_work_order_id?: string | null }) =>
+        q.status === "accepted" || q.converted_to_work_order_id,
     ).length;
 
     // === TODAY'S APPOINTMENTS ===
@@ -307,6 +334,7 @@ export async function GET(request: NextRequest) {
         appointment_type: string | null;
         status: string;
         duration_minutes: number | null;
+        notes?: string | null;
       }) => {
         const customer = customersData?.find(
           (c: { id: string }) => c.id === apt.customer_id,
@@ -338,17 +366,24 @@ export async function GET(request: NextRequest) {
       const nextDate = new Date(date);
       nextDate.setDate(nextDate.getDate() + 1);
 
-      const dayOrders = orders.filter((o) => {
-        const orderDate = new Date(o.created_at);
-        return (
-          orderDate >= date &&
-          orderDate < nextDate &&
-          (o.status === "completed" || o.payment_status === "paid")
-        );
-      });
+      const dayOrders = orders.filter(
+        (o: {
+          created_at: string;
+          status: string;
+          payment_status?: string;
+        }) => {
+          const orderDate = new Date(o.created_at);
+          return (
+            orderDate >= date &&
+            orderDate < nextDate &&
+            (o.status === "completed" || o.payment_status === "paid")
+          );
+        },
+      );
 
       const dayRevenue = dayOrders.reduce(
-        (sum, o) => sum + (o.total_amount || 0),
+        (sum: number, o: { total_amount?: number | null }) =>
+          sum + (o.total_amount || 0),
         0,
       );
 
@@ -361,42 +396,61 @@ export async function GET(request: NextRequest) {
 
     // === ORDERS STATUS DISTRIBUTION (Last 30 days) ===
     const last30DaysOrders = orders.filter(
-      (o) => new Date(o.created_at) >= thirtyDaysAgo,
+      (o: { created_at: string }) => new Date(o.created_at) >= thirtyDaysAgo,
     );
 
     const statusDistribution = {
-      pending: last30DaysOrders.filter((o) => o.status === "pending").length,
-      processing: last30DaysOrders.filter((o) => o.status === "processing")
-        .length,
-      completed: last30DaysOrders.filter((o) => o.status === "completed")
-        .length,
-      failed: last30DaysOrders.filter((o) => o.status === "failed").length,
-      shipped: last30DaysOrders.filter((o) => o.status === "shipped").length,
+      pending: last30DaysOrders.filter(
+        (o: { status: string }) => o.status === "pending",
+      ).length,
+      processing: last30DaysOrders.filter(
+        (o: { status: string }) => o.status === "processing",
+      ).length,
+      completed: last30DaysOrders.filter(
+        (o: { status: string }) => o.status === "completed",
+      ).length,
+      failed: last30DaysOrders.filter(
+        (o: { status: string }) => o.status === "failed",
+      ).length,
+      shipped: last30DaysOrders.filter(
+        (o: { status: string }) => o.status === "shipped",
+      ).length,
     };
 
     // === TOP PRODUCTS (by revenue) ===
     const productRevenue = new Map();
 
     orders
-      .filter((o) => o.status === "completed" || o.payment_status === "paid")
-      .forEach((order) => {
-        order.order_items?.forEach(
-          (item: {
+      .filter(
+        (o: { status: string; payment_status?: string }) =>
+          o.status === "completed" || o.payment_status === "paid",
+      )
+      .forEach(
+        (order: {
+          order_items?: Array<{
             product_name: string;
             total_price: number | null;
             quantity: number | null;
-          }) => {
-            const current = productRevenue.get(item.product_name) || {
-              revenue: 0,
-              quantity: 0,
-            };
-            productRevenue.set(item.product_name, {
-              revenue: current.revenue + (item.total_price || 0),
-              quantity: current.quantity + (item.quantity || 0),
-            });
-          },
-        );
-      });
+          }>;
+        }) => {
+          order.order_items?.forEach(
+            (item: {
+              product_name: string;
+              total_price: number | null;
+              quantity: number | null;
+            }) => {
+              const current = productRevenue.get(item.product_name) || {
+                revenue: 0,
+                quantity: 0,
+              };
+              productRevenue.set(item.product_name, {
+                revenue: current.revenue + (item.total_price || 0),
+                quantity: current.quantity + (item.quantity || 0),
+              });
+            },
+          );
+        },
+      );
 
     const topProducts = Array.from(productRevenue.entries())
       .map(([name, data]) => ({ name, ...data }))

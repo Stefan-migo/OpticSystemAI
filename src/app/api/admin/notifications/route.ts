@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       { user_id: user.id },
     );
     if (adminCheckError) {
-      console.error("❌ Admin check error:", adminCheckError);
+      logger.error("Admin check error", adminCheckError);
       return NextResponse.json(
         { error: "Admin verification failed" },
         { status: 500 },

@@ -1,35 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
-import { getBranchContext, validateBranchAccess } from '@/lib/api/branch-middleware'
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import {
+  getBranchContext,
+  validateBranchAccess,
+} from "@/lib/api/branch-middleware";
+import { appLogger as logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get branch context
-    const branchContext = await getBranchContext(request, user.id)
+    const branchContext = await getBranchContext(request, user.id);
 
     // Get all branches (super admin) or user's accessible branches
-    let branches
+    let branches;
 
     if (branchContext.isSuperAdmin) {
       // Super admin sees all branches
       const { data, error } = await supabase
-        .from('branches')
-        .select('*')
-        .order('name')
+        .from("branches")
+        .select("*")
+        .order("name");
 
       if (error) {
-        console.error('Error fetching branches:', error)
-        return NextResponse.json({ error: 'Failed to fetch branches' }, { status: 500 })
+        logger.error("Error fetching branches", error);
+        return NextResponse.json(
+          { error: "Failed to fetch branches" },
+          { status: 500 },
+        );
       }
 
-      branches = data
+      branches = data;
     } else {
       // Regular admin sees only their accessible branches
       branches = branchContext.accessibleBranches.map((b) => ({
@@ -38,27 +48,29 @@ export async function GET(request: NextRequest) {
         code: b.code,
         role: b.role,
         is_primary: b.isPrimary,
-      }))
+      }));
 
       // Fetch full branch details
       if (branches.length > 0) {
-        const branchIds = branches.map((b) => b.id)
+        const branchIds = branches.map((b) => b.id);
         const { data: branchDetails, error } = await supabase
-          .from('branches')
-          .select('*')
-          .in('id', branchIds)
-          .order('name')
+          .from("branches")
+          .select("*")
+          .in("id", branchIds)
+          .order("name");
 
         if (!error && branchDetails) {
           // Merge with access info
           branches = branchDetails.map((bd) => {
-            const access = branchContext.accessibleBranches.find((a) => a.id === bd.id)
+            const access = branchContext.accessibleBranches.find(
+              (a) => a.id === bd.id,
+            );
             return {
               ...bd,
               role: access?.role,
               is_primary: access?.isPrimary,
-            }
-          })
+            };
+          });
         }
       }
     }
@@ -68,44 +80,47 @@ export async function GET(request: NextRequest) {
       currentBranch: branchContext.branchId,
       isGlobalView: branchContext.isGlobalView,
       isSuperAdmin: branchContext.isSuperAdmin,
-    })
+    });
   } catch (error: any) {
-    console.error('Error in GET /api/admin/branches:', error)
+    logger.error("Error in GET /api/admin/branches", error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+      { error: error.message || "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json()
+    const body = await request.json();
 
     // Handle branch selection (set_branch action)
-    if (body.action === 'set_branch') {
+    if (body.action === "set_branch") {
       // This is just a notification, no need to do anything server-side
       // The branch context is managed client-side via localStorage
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true });
     }
 
     // Check if user is super admin for branch creation
-    const { data: isSuperAdmin } = await supabase.rpc('is_super_admin', {
+    const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
       user_id: user.id,
-    })
+    });
 
     if (!isSuperAdmin) {
       return NextResponse.json(
-        { error: 'Only super admins can create branches' },
-        { status: 403 }
-      )
+        { error: "Only super admins can create branches" },
+        { status: 403 },
+      );
     }
 
     const {
@@ -120,33 +135,33 @@ export async function POST(request: NextRequest) {
       phone,
       email,
       settings,
-    } = body
+    } = body;
 
     // Validate required fields
     if (!name || !code) {
       return NextResponse.json(
-        { error: 'Name and code are required' },
-        { status: 400 }
-      )
+        { error: "Name and code are required" },
+        { status: 400 },
+      );
     }
 
     // Check if code already exists
     const { data: existingBranch } = await supabase
-      .from('branches')
-      .select('id')
-      .eq('code', code)
-      .single()
+      .from("branches")
+      .select("id")
+      .eq("code", code)
+      .single();
 
     if (existingBranch) {
       return NextResponse.json(
-        { error: 'Branch code already exists' },
-        { status: 400 }
-      )
+        { error: "Branch code already exists" },
+        { status: 400 },
+      );
     }
 
     // Create branch
     const { data: newBranch, error } = await supabase
-      .from('branches')
+      .from("branches")
       .insert({
         name,
         code,
@@ -162,22 +177,22 @@ export async function POST(request: NextRequest) {
         is_active: true,
       })
       .select()
-      .single()
+      .single();
 
     if (error) {
-      console.error('Error creating branch:', error)
+      logger.error("Error creating branch", error);
       return NextResponse.json(
-        { error: 'Failed to create branch' },
-        { status: 500 }
-      )
+        { error: "Failed to create branch" },
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({ branch: newBranch }, { status: 201 })
+    return NextResponse.json({ branch: newBranch }, { status: 201 });
   } catch (error: any) {
-    console.error('Error in POST /api/admin/branches:', error)
+    logger.error("Error in POST /api/admin/branches", error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+      { error: error.message || "Internal server error" },
+      { status: 500 },
+    );
   }
 }

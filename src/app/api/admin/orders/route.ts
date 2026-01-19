@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
+import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
+import { RateLimitError } from "@/lib/api/errors";
 
 export async function GET(request: NextRequest) {
   try {
@@ -134,79 +136,80 @@ export async function GET(request: NextRequest) {
 
 // Create manual order or get statistics
 export async function POST(request: NextRequest) {
-  try {
-    logger.info("Admin Orders API POST called");
-    const supabase = await createClient();
+  return withRateLimit(rateLimitConfigs.modification, async () => {
+    try {
+      logger.info("Admin Orders API POST called");
+      const supabase = await createClient();
 
-    // Check admin authorization
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
-      user_id: user.id,
-    });
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 },
-      );
-    }
-
-    const body = await request.json();
-    const { action } = body;
-
-    if (action === "get_stats") {
-      logger.info("Getting order statistics");
-
-      // Get order counts by status
-      const { data: allOrders, error: statusError } = await supabase
-        .from("orders")
-        .select("status");
-
-      if (statusError) {
-        logger.error("Error getting order stats", statusError);
-        throw statusError;
+      // Check admin authorization
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError || !user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      // Count by status manually
-      const statusCounts =
-        allOrders?.reduce(
-          (acc: Record<string, number>, order: { status: string }) => {
-            acc[order.status] = (acc[order.status] || 0) + 1;
-            return acc;
-          },
-          {} as Record<string, number>,
-        ) || {};
-
-      // Get total revenue for current month
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
-      const { data: revenueData, error: revenueError } = await supabase
-        .from("orders")
-        .select("total_amount")
-        .eq("payment_status", "paid")
-        .gte("created_at", startOfMonth.toISOString());
-
-      if (revenueError) {
-        logger.error("Error getting revenue stats", revenueError);
-        throw revenueError;
+      const { data: isAdmin } = await supabase.rpc("is_admin", {
+        user_id: user.id,
+      });
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: "Admin access required" },
+          { status: 403 },
+        );
       }
 
-      const totalRevenue =
-        revenueData?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
+      const body = await request.json();
+      const { action } = body;
 
-      // Get recent orders
-      const { data: recentOrders, error: recentError } = await supabase
-        .from("orders")
-        .select(
-          `
+      if (action === "get_stats") {
+        logger.info("Getting order statistics");
+
+        // Get order counts by status
+        const { data: allOrders, error: statusError } = await supabase
+          .from("orders")
+          .select("status");
+
+        if (statusError) {
+          logger.error("Error getting order stats", statusError);
+          throw statusError;
+        }
+
+        // Count by status manually
+        const statusCounts =
+          allOrders?.reduce(
+            (acc: Record<string, number>, order: { status: string }) => {
+              acc[order.status] = (acc[order.status] || 0) + 1;
+              return acc;
+            },
+            {} as Record<string, number>,
+          ) || {};
+
+        // Get total revenue for current month
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const { data: revenueData, error: revenueError } = await supabase
+          .from("orders")
+          .select("total_amount")
+          .eq("payment_status", "paid")
+          .gte("created_at", startOfMonth.toISOString());
+
+        if (revenueError) {
+          logger.error("Error getting revenue stats", revenueError);
+          throw revenueError;
+        }
+
+        const totalRevenue =
+          revenueData?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
+
+        // Get recent orders
+        const { data: recentOrders, error: recentError } = await supabase
+          .from("orders")
+          .select(
+            `
           id,
           order_number,
           email,
@@ -214,161 +217,168 @@ export async function POST(request: NextRequest) {
           total_amount,
           created_at
         `,
-        )
-        .order("created_at", { ascending: false })
-        .limit(10);
+          )
+          .order("created_at", { ascending: false })
+          .limit(10);
 
-      if (recentError) {
-        logger.error("Error getting recent orders", recentError);
-        throw recentError;
-      }
-
-      return NextResponse.json({
-        success: true,
-        stats: {
-          orderCounts: statusCounts || [],
-          totalRevenue,
-          recentOrders:
-            recentOrders?.map((order) => ({
-              id: order.id,
-              order_number: order.order_number,
-              customer_name: "Cliente", // Generic name for now
-              customer_email: order.email,
-              status: order.status,
-              total_amount: order.total_amount,
-              created_at: order.created_at,
-            })) || [],
-        },
-      });
-    }
-
-    if (action === "create_manual_order") {
-      logger.info("Creating manual order");
-      const { orderData } = body;
-
-      logger.debug("Order data received", { orderData });
-
-      // Validate required fields
-      if (!orderData.email) {
-        return NextResponse.json(
-          { error: "Email is required" },
-          { status: 400 },
-        );
-      }
-
-      if (!orderData.total_amount || orderData.total_amount <= 0) {
-        return NextResponse.json(
-          { error: "Total amount must be greater than 0" },
-          { status: 400 },
-        );
-      }
-
-      // Generate order number
-      const orderNumber = `DL-${Date.now()}`;
-
-      // Map status values (frontend uses 'completed', DB uses 'delivered')
-      let dbStatus = orderData.status || "pending";
-      if (dbStatus === "completed") {
-        dbStatus = "delivered";
-      }
-
-      // Create the order
-      const { data: newOrder, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          order_number: orderNumber,
-          email: orderData.email,
-          status: dbStatus,
-          payment_status: orderData.payment_status || "paid",
-          subtotal: orderData.subtotal || orderData.total_amount,
-          total_amount: orderData.total_amount,
-          currency: "ARS",
-          mp_payment_method: orderData.payment_method || "manual",
-          customer_notes: orderData.notes,
-          shipping_first_name: orderData.shipping?.first_name,
-          shipping_last_name: orderData.shipping?.last_name,
-          shipping_address_1: orderData.shipping?.address_1,
-          shipping_city: orderData.shipping?.city,
-          shipping_state: orderData.shipping?.state,
-          shipping_postal_code: orderData.shipping?.postal_code,
-          shipping_phone: orderData.shipping?.phone,
-        })
-        .select()
-        .single();
-
-      if (orderError) {
-        logger.error("Error creating manual order", orderError, {
-          order_number: orderNumber,
-          email: orderData.email,
-          status: dbStatus,
-          payment_status: orderData.payment_status || "paid",
-          subtotal: orderData.subtotal || orderData.total_amount,
-          total_amount: orderData.total_amount,
-        });
-        return NextResponse.json(
-          { error: "Failed to create order", details: orderError.message },
-          { status: 500 },
-        );
-      }
-
-      // Create order items if provided
-      if (orderData.items && orderData.items.length > 0) {
-        const orderItems = orderData.items.map(
-          (item: {
-            product_id: string;
-            quantity: number;
-            unit_price: number;
-            product_name: string;
-          }) => ({
-            order_id: newOrder.id,
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total_price: item.unit_price * item.quantity,
-            product_name: item.product_name,
-            variant_title: item.variant_title,
-          }),
-        );
-
-        const { error: itemsError } = await supabase
-          .from("order_items")
-          .insert(orderItems);
-
-        if (itemsError) {
-          logger.error("Error creating order items", itemsError);
-          // Don't fail the whole operation, just log the error
+        if (recentError) {
+          logger.error("Error getting recent orders", recentError);
+          throw recentError;
         }
+
+        return NextResponse.json({
+          success: true,
+          stats: {
+            orderCounts: statusCounts || [],
+            totalRevenue,
+            recentOrders:
+              recentOrders?.map((order) => ({
+                id: order.id,
+                order_number: order.order_number,
+                customer_name: "Cliente", // Generic name for now
+                customer_email: order.email,
+                status: order.status,
+                total_amount: order.total_amount,
+                created_at: order.created_at,
+              })) || [],
+          },
+        });
       }
 
-      logger.info("Manual order created successfully", {
-        orderId: newOrder.id,
-      });
+      if (action === "create_manual_order") {
+        logger.info("Creating manual order");
+        const { orderData } = body;
 
-      // Create notification for new sale (non-blocking)
-      const { NotificationService } = await import(
-        "@/lib/notifications/notification-service"
+        logger.debug("Order data received", { orderData });
+
+        // Validate required fields
+        if (!orderData.email) {
+          return NextResponse.json(
+            { error: "Email is required" },
+            { status: 400 },
+          );
+        }
+
+        if (!orderData.total_amount || orderData.total_amount <= 0) {
+          return NextResponse.json(
+            { error: "Total amount must be greater than 0" },
+            { status: 400 },
+          );
+        }
+
+        // Generate order number
+        const orderNumber = `DL-${Date.now()}`;
+
+        // Map status values (frontend uses 'completed', DB uses 'delivered')
+        let dbStatus = orderData.status || "pending";
+        if (dbStatus === "completed") {
+          dbStatus = "delivered";
+        }
+
+        // Create the order
+        const { data: newOrder, error: orderError } = await supabase
+          .from("orders")
+          .insert({
+            order_number: orderNumber,
+            email: orderData.email,
+            status: dbStatus,
+            payment_status: orderData.payment_status || "paid",
+            subtotal: orderData.subtotal || orderData.total_amount,
+            total_amount: orderData.total_amount,
+            currency: "ARS",
+            mp_payment_method: orderData.payment_method || "manual",
+            customer_notes: orderData.notes,
+            shipping_first_name: orderData.shipping?.first_name,
+            shipping_last_name: orderData.shipping?.last_name,
+            shipping_address_1: orderData.shipping?.address_1,
+            shipping_city: orderData.shipping?.city,
+            shipping_state: orderData.shipping?.state,
+            shipping_postal_code: orderData.shipping?.postal_code,
+            shipping_phone: orderData.shipping?.phone,
+          })
+          .select()
+          .single();
+
+        if (orderError) {
+          logger.error("Error creating manual order", orderError, {
+            order_number: orderNumber,
+            email: orderData.email,
+            status: dbStatus,
+            payment_status: orderData.payment_status || "paid",
+            subtotal: orderData.subtotal || orderData.total_amount,
+            total_amount: orderData.total_amount,
+          });
+          return NextResponse.json(
+            { error: "Failed to create order", details: orderError.message },
+            { status: 500 },
+          );
+        }
+
+        // Create order items if provided
+        if (orderData.items && orderData.items.length > 0) {
+          const orderItems = orderData.items.map(
+            (item: {
+              product_id: string;
+              quantity: number;
+              unit_price: number;
+              product_name: string;
+            }) => ({
+              order_id: newOrder.id,
+              product_id: item.product_id,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              total_price: item.unit_price * item.quantity,
+              product_name: item.product_name,
+              variant_title: item.variant_title,
+            }),
+          );
+
+          const { error: itemsError } = await supabase
+            .from("order_items")
+            .insert(orderItems);
+
+          if (itemsError) {
+            logger.error("Error creating order items", itemsError);
+            // Don't fail the whole operation, just log the error
+          }
+        }
+
+        logger.info("Manual order created successfully", {
+          orderId: newOrder.id,
+        });
+
+        // Create notification for new sale (non-blocking)
+        const { NotificationService } = await import(
+          "@/lib/notifications/notification-service"
+        );
+        NotificationService.notifyNewSale(
+          newOrder.id,
+          newOrder.order_number,
+          newOrder.email,
+          newOrder.total_amount,
+        ).catch((err) => logger.error("Error creating notification", err));
+
+        return NextResponse.json({
+          success: true,
+          order: newOrder,
+        });
+      }
+
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        logger.warn("Rate limit exceeded for order creation", {
+          error: error.message,
+        });
+        return NextResponse.json({ error: error.message }, { status: 429 });
+      }
+      logger.error("Admin orders POST error", error);
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 },
       );
-      NotificationService.notifyNewSale(
-        newOrder.id,
-        newOrder.order_number,
-        newOrder.email,
-        newOrder.total_amount,
-      ).catch((err) => logger.error("Error creating notification", err));
-
-      return NextResponse.json({
-        success: true,
-        order: newOrder,
-      });
     }
-
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error) {
-    logger.error("Admin orders POST error", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+  })(request);
 }
 
 // Delete all orders (for testing cleanup)

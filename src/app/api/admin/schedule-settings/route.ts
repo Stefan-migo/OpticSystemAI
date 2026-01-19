@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,9 +18,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -147,9 +148,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },

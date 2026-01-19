@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse config values
-    const configMap: Record<string, any> = {};
+    const configMap: Record<string, string | boolean> = {};
     configs?.forEach((config) => {
       try {
         configMap[config.config_key] = JSON.parse(config.config_value);

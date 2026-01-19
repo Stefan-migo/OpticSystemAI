@@ -83,13 +83,16 @@ export async function POST(
         success: true,
         message: `Email de prueba enviado a ${testEmail}`,
       });
-    } catch (emailError: any) {
+    } catch (emailError) {
       logger.error("Error sending test email", { error: emailError });
       return NextResponse.json(
         {
           success: false,
           error: "Error al enviar el email de prueba",
-          details: emailError?.message || "Error desconocido",
+          details:
+            emailError instanceof Error
+              ? emailError.message
+              : "Error desconocido",
         },
         { status: 500 },
       );

@@ -81,7 +81,14 @@ export async function PUT(
     }
 
     // Build update object
-    const updateData: any = {
+    const updateData: {
+      name?: string;
+      type?: string;
+      subject?: string;
+      content?: string;
+      variables?: Record<string, unknown>;
+      is_active?: boolean;
+    } = {
       updated_at: new Date().toISOString(),
     };
 

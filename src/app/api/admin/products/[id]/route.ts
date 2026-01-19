@@ -27,8 +27,8 @@ export async function GET(
     }
 
     return NextResponse.json({ product });
-  } catch (error: any) {
-    logger.error("API error in products GET", error);
+  } catch (error) {
+    logger.error("API error in products GET", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -112,7 +112,30 @@ export async function PUT(
       slug = `${slug}-${Date.now()}`;
     }
 
-    const productData: any = {
+    const productData: {
+      name?: string;
+      slug?: string;
+      short_description?: string;
+      description?: string;
+      price?: number;
+      compare_at_price?: number;
+      inventory_quantity?: number;
+      category_id?: string;
+      featured_image?: string;
+      gallery?: string[];
+      skin_type?: string[];
+      benefits?: string[];
+      certifications?: string[];
+      ingredients?: Array<{ name: string; percentage?: number }>;
+      usage_instructions?: string;
+      precautions?: string;
+      weight?: number;
+      dimensions?: string;
+      package_characteristics?: string;
+      is_featured?: boolean;
+      status?: "active" | "draft" | "archived";
+      updated_at: string;
+    } = {
       name: body.name.trim(),
       slug: slug,
       description: body.description || null,
@@ -259,7 +282,7 @@ export async function PUT(
     }
 
     return NextResponse.json({ product: data });
-  } catch (error: any) {
+  } catch (error) {
     logger.error("API error in products PUT", error);
     return NextResponse.json(
       { error: "Internal server error" },
@@ -322,7 +345,7 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error) {
     logger.error("API error in products DELETE", error);
     return NextResponse.json(
       { error: "Internal server error" },

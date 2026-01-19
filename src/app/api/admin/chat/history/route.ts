@@ -57,10 +57,12 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ sessions: sessions || [] });
     }
-  } catch (error: any) {
+  } catch (error) {
     logger.error("Chat history API error", { error });
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
       { status: 500 },
     );
   }

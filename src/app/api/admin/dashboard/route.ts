@@ -19,9 +19,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Build branch filter function
-    const applyBranchFilter = (query: any) => {
+    const applyBranchFilter = (query: ReturnType<typeof supabase.from>) => {
       return addBranchFilter(
         query,
         branchContext.branchId,
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
     // When a specific branch is selected, we only want products from that branch
     let filteredProducts = products;
     if (branchContext.branchId && !branchContext.isGlobalView) {
-      filteredProducts = products.filter((p: any) => {
+      filteredProducts = products.filter((p: { branch_id: string | null }) => {
         // Only include products that belong to the selected branch
         return p.branch_id === branchContext.branchId;
       });
@@ -104,7 +104,9 @@ export async function GET(request: NextRequest) {
         branchId: branchContext.branchId,
         before: products.length,
         after: filteredProducts.length,
-        productsWithoutBranch: products.filter((p: any) => !p.branch_id).length,
+        productsWithoutBranch: products.filter(
+          (p: { branch_id: string | null }) => !p.branch_id,
+        ).length,
       });
     }
 
@@ -113,11 +115,13 @@ export async function GET(request: NextRequest) {
       filtered: filteredProducts.length,
       branchId: branchContext.branchId,
       isGlobalView: branchContext.isGlobalView,
-      sampleProducts: filteredProducts.slice(0, 3).map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        branch_id: p.branch_id,
-      })),
+      sampleProducts: filteredProducts
+        .slice(0, 3)
+        .map((p: { id: string; name: string; branch_id: string | null }) => ({
+          id: p.id,
+          name: p.name,
+          branch_id: p.branch_id,
+        })),
     });
 
     // Calculate date ranges
@@ -283,7 +287,7 @@ export async function GET(request: NextRequest) {
     const customerIds = [
       ...new Set(
         (todayAppointmentsData || [])
-          .map((a: any) => a.customer_id)
+          .map((a: { customer_id: string | null }) => a.customer_id)
           .filter(Boolean),
       ),
     ];
@@ -296,9 +300,16 @@ export async function GET(request: NextRequest) {
         : { data: [] };
 
     const todayAppointmentsList = (todayAppointmentsData || []).map(
-      (apt: any) => {
+      (apt: {
+        id: string;
+        customer_id: string | null;
+        appointment_time: string;
+        appointment_type: string | null;
+        status: string;
+        duration_minutes: number | null;
+      }) => {
         const customer = customersData?.find(
-          (c: any) => c.id === apt.customer_id,
+          (c: { id: string }) => c.id === apt.customer_id,
         );
         return {
           id: apt.id,
@@ -369,16 +380,22 @@ export async function GET(request: NextRequest) {
     orders
       .filter((o) => o.status === "completed" || o.payment_status === "paid")
       .forEach((order) => {
-        order.order_items?.forEach((item: any) => {
-          const current = productRevenue.get(item.product_name) || {
-            revenue: 0,
-            quantity: 0,
-          };
-          productRevenue.set(item.product_name, {
-            revenue: current.revenue + (item.total_price || 0),
-            quantity: current.quantity + (item.quantity || 0),
-          });
-        });
+        order.order_items?.forEach(
+          (item: {
+            product_name: string;
+            total_price: number | null;
+            quantity: number | null;
+          }) => {
+            const current = productRevenue.get(item.product_name) || {
+              revenue: 0,
+              quantity: 0,
+            };
+            productRevenue.set(item.product_name, {
+              revenue: current.revenue + (item.total_price || 0),
+              quantity: current.quantity + (item.quantity || 0),
+            });
+          },
+        );
       });
 
     const topProducts = Array.from(productRevenue.entries())

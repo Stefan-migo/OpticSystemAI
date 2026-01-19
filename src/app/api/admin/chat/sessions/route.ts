@@ -54,7 +54,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const insertData: any = {
+    const insertData: {
+      user_id: string;
+      provider: string;
+      model: string;
+      title: string | null;
+      config?: string | null;
+    } = {
       user_id: user.id,
       provider: String(provider).trim(),
       model: modelString,
@@ -124,7 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ session });
-  } catch (error: any) {
+  } catch (error) {
     logger.error("Create session error", { error });
     return NextResponse.json(
       { error: error.message || "Internal server error" },
@@ -190,7 +196,7 @@ export async function GET(request: NextRequest) {
         { status: 400 },
       );
     }
-  } catch (error: any) {
+  } catch (error) {
     logger.error("Get session error", { error });
     return NextResponse.json(
       { error: error.message || "Internal server error" },
@@ -231,7 +237,10 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const updateData: any = {};
+    const updateData: {
+      title?: string;
+      config?: string | null;
+    } = {};
     if (title !== undefined) updateData.title = title;
     if (config !== undefined) updateData.config = config;
 
@@ -248,7 +257,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ session });
-  } catch (error: any) {
+  } catch (error) {
     logger.error("Update session error", { error });
     return NextResponse.json(
       { error: error.message || "Internal server error" },

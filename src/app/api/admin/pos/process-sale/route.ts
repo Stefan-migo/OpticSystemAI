@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,9 +18,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -170,14 +171,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order items and update inventory
-    const orderItems = items.map((item: any) => ({
-      order_id: newOrder.id,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      total_price: item.total_price || item.unit_price * item.quantity,
-      product_name: item.product_name,
-    }));
+    const orderItems = items.map(
+      (item: {
+        product_id: string;
+        quantity: number;
+        unit_price: number;
+        total_price?: number;
+        product_name: string;
+      }) => ({
+        order_id: newOrder.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price || item.unit_price * item.quantity,
+        product_name: item.product_name,
+      }),
+    );
 
     const { error: itemsError } = await supabase
       .from("order_items")
@@ -281,10 +290,13 @@ export async function POST(request: NextRequest) {
         sii_invoice_number: siiInvoiceNumber,
       },
     });
-  } catch (error: any) {
-    logger.error("POS process sale error", error);
+  } catch (error) {
+    logger.error("POS process sale error", { error });
     return NextResponse.json(
-      { error: "Internal server error", details: error.message },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 },
     );
   }

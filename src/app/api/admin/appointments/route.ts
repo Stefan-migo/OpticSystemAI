@@ -440,7 +440,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Create appointment
-    const appointmentData: any = {
+    const appointmentData: {
+      customer_id: string | null;
+      appointment_date: string;
+      appointment_time: string;
+      duration_minutes: number;
+      appointment_type: string;
+      status: string;
+      assigned_to: string | null;
+      notes: string | null;
+      reason: string | null;
+      prescription_id: string | null;
+      order_id: string | null;
+      follow_up_required: boolean;
+      follow_up_date: string | null;
+      created_by: string;
+      branch_id: string;
+      [key: string]: unknown;
+    } = {
       customer_id: customerId, // NULL for guest customers
       appointment_date: body.appointment_date,
       appointment_time: normalizedTime,

@@ -61,10 +61,12 @@ export async function GET(request: NextRequest) {
     );
 
     return NextResponse.json({ providers });
-  } catch (error: any) {
+  } catch (error) {
     logger.error("Providers API error", { error });
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
       { status: 500 },
     );
   }
@@ -117,19 +119,22 @@ export async function POST(request: NextRequest) {
           })),
         },
       });
-    } catch (error: any) {
+    } catch (error) {
       return NextResponse.json(
         {
           success: false,
-          error: error.message || "Provider test failed",
+          error:
+            error instanceof Error ? error.message : "Provider test failed",
         },
         { status: 400 },
       );
     }
-  } catch (error: any) {
+  } catch (error) {
     logger.error("Provider test error", { error });
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
       { status: 500 },
     );
   }

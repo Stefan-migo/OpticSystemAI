@@ -1,79 +1,98 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceRoleClient } from '@/utils/supabase/server';
-import { sendEmail } from '@/lib/email/client';
-import businessConfig from '@/config/business';
-import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
+import { sendEmail } from "@/lib/email/client";
+import businessConfig from "@/config/business";
+import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
+import { appLogger as logger } from "@/lib/logger";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const supabase = await createClient();
     const supabaseServiceRole = createServiceRoleClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     const { id } = await params;
-    
+
     // Get branch context
     const branchContext = await getBranchContext(request, user.id);
-    
+
     // Build branch filter function
     const applyBranchFilter = (query: any) => {
-      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+      return addBranchFilter(
+        query,
+        branchContext.branchId,
+        branchContext.isSuperAdmin,
+      );
     };
-    
+
     const body = await request.json();
     const { email } = body;
 
-    if (!email || !email.includes('@')) {
-      return NextResponse.json({ error: 'Email válido requerido' }, { status: 400 });
+    if (!email || !email.includes("@")) {
+      return NextResponse.json(
+        { error: "Email válido requerido" },
+        { status: 400 },
+      );
     }
 
     // Fetch quote with customer and prescription data (with branch access check)
     const { data: quote, error: quoteError } = await applyBranchFilter(
-      supabaseServiceRole
-        .from('quotes')
-        .select(`
+      supabaseServiceRole.from("quotes").select(`
           *,
           customer:customers!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
           prescription:prescriptions!quotes_prescription_id_fkey(*)
-        `)
+        `),
     )
-      .eq('id', id)
+      .eq("id", id)
       .single();
 
     if (quoteError || !quote) {
-      return NextResponse.json({ error: 'Presupuesto no encontrado o sin acceso' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Presupuesto no encontrado o sin acceso" },
+        { status: 404 },
+      );
     }
 
     // Format customer name
-    const customerName = quote.customer?.first_name && quote.customer?.last_name
-      ? `${quote.customer.first_name} ${quote.customer.last_name}`
-      : 'Cliente';
+    const customerName =
+      quote.customer?.first_name && quote.customer?.last_name
+        ? `${quote.customer.first_name} ${quote.customer.last_name}`
+        : "Cliente";
 
     // Format prices
-    const formatPrice = (amount: number) => 
-      new Intl.NumberFormat('es-CL', {
-        style: 'currency',
-        currency: quote.currency || 'CLP',
-        minimumFractionDigits: 0
+    const formatPrice = (amount: number) =>
+      new Intl.NumberFormat("es-CL", {
+        style: "currency",
+        currency: quote.currency || "CLP",
+        minimumFractionDigits: 0,
       }).format(amount);
 
     // Build treatments list
-    const treatmentsList = quote.lens_treatments && quote.lens_treatments.length > 0
-      ? quote.lens_treatments.map((t: string) => `• ${t}`).join('\n')
-      : 'Ninguno';
+    const treatmentsList =
+      quote.lens_treatments && quote.lens_treatments.length > 0
+        ? quote.lens_treatments.map((t: string) => `• ${t}`).join("\n")
+        : "Ninguno";
 
     // Build email HTML
     const emailHTML = `
@@ -169,24 +188,32 @@ export async function POST(
           <div class="container">
             <div class="header">
               <h1>PRESUPUESTO ${quote.quote_number}</h1>
-              <p><strong>Fecha:</strong> ${new Date(quote.quote_date).toLocaleDateString('es-CL', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+              <p><strong>Fecha:</strong> ${new Date(
+                quote.quote_date,
+              ).toLocaleDateString("es-CL", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
               })}</p>
-              ${quote.expiration_date ? `<p><strong>Válido hasta:</strong> ${new Date(quote.expiration_date).toLocaleDateString('es-CL', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}</p>` : ''}
+              ${
+                quote.expiration_date
+                  ? `<p><strong>Válido hasta:</strong> ${new Date(
+                      quote.expiration_date,
+                    ).toLocaleDateString("es-CL", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}</p>`
+                  : ""
+              }
             </div>
 
             <div class="quote-info">
               <div>
                 <h3 style="color: #8B5A3C; margin-top: 0;">Cliente</h3>
                 <p><strong>${customerName}</strong></p>
-                ${quote.customer?.email ? `<p>Email: ${quote.customer.email}</p>` : ''}
-                ${quote.customer?.phone ? `<p>Teléfono: ${quote.customer.phone}</p>` : ''}
+                ${quote.customer?.email ? `<p>Email: ${quote.customer.email}</p>` : ""}
+                ${quote.customer?.phone ? `<p>Teléfono: ${quote.customer.phone}</p>` : ""}
               </div>
               <div>
                 <h3 style="color: #8B5A3C; margin-top: 0;">Estado</h3>
@@ -198,11 +225,11 @@ export async function POST(
               <h2>Marco</h2>
               <div class="info-row">
                 <span>Nombre:</span>
-                <span>${quote.frame_name || '-'}</span>
+                <span>${quote.frame_name || "-"}</span>
               </div>
-              ${quote.frame_brand ? `<div class="info-row"><span>Marca:</span><span>${quote.frame_brand}</span></div>` : ''}
-              ${quote.frame_model ? `<div class="info-row"><span>Modelo:</span><span>${quote.frame_model}</span></div>` : ''}
-              ${quote.frame_color ? `<div class="info-row"><span>Color:</span><span>${quote.frame_color}</span></div>` : ''}
+              ${quote.frame_brand ? `<div class="info-row"><span>Marca:</span><span>${quote.frame_brand}</span></div>` : ""}
+              ${quote.frame_model ? `<div class="info-row"><span>Modelo:</span><span>${quote.frame_model}</span></div>` : ""}
+              ${quote.frame_color ? `<div class="info-row"><span>Color:</span><span>${quote.frame_color}</span></div>` : ""}
               <div class="info-row">
                 <span>Precio:</span>
                 <span><strong>${formatPrice(quote.frame_price)}</strong></span>
@@ -211,9 +238,9 @@ export async function POST(
 
             <div class="section">
               <h2>Lente</h2>
-              ${quote.lens_type ? `<div class="info-row"><span>Tipo:</span><span>${quote.lens_type}</span></div>` : ''}
-              ${quote.lens_material ? `<div class="info-row"><span>Material:</span><span>${quote.lens_material}</span></div>` : ''}
-              ${quote.lens_index ? `<div class="info-row"><span>Índice:</span><span>${quote.lens_index}</span></div>` : ''}
+              ${quote.lens_type ? `<div class="info-row"><span>Tipo:</span><span>${quote.lens_type}</span></div>` : ""}
+              ${quote.lens_material ? `<div class="info-row"><span>Material:</span><span>${quote.lens_material}</span></div>` : ""}
+              ${quote.lens_index ? `<div class="info-row"><span>Índice:</span><span>${quote.lens_index}</span></div>` : ""}
               <div class="info-row">
                 <span>Tratamientos:</span>
                 <span style="white-space: pre-line;">${treatmentsList}</span>
@@ -243,12 +270,16 @@ export async function POST(
                   <td><strong>Subtotal:</strong></td>
                   <td style="text-align: right;"><strong>${formatPrice(quote.subtotal)}</strong></td>
                 </tr>
-                ${quote.discount_amount > 0 ? `
+                ${
+                  quote.discount_amount > 0
+                    ? `
                 <tr>
                   <td>Descuento (${quote.discount_percentage}%):</td>
                   <td style="text-align: right; color: red;">-${formatPrice(quote.discount_amount)}</td>
                 </tr>
-                ` : ''}
+                `
+                    : ""
+                }
                 <tr>
                   <td>IVA (19%):</td>
                   <td style="text-align: right;">${formatPrice(quote.tax_amount)}</td>
@@ -260,27 +291,42 @@ export async function POST(
               </table>
             </div>
 
-            ${quote.customer_notes ? `
+            ${
+              quote.customer_notes
+                ? `
             <div class="highlight">
               <h3 style="margin-top: 0; color: #8B5A3C;">Notas para el Cliente</h3>
               <p style="white-space: pre-line; margin: 0;">${quote.customer_notes}</p>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
 
-            ${quote.terms_and_conditions ? `
+            ${
+              quote.terms_and_conditions
+                ? `
             <div class="section">
               <h2>Términos y Condiciones</h2>
               <p style="white-space: pre-line;">${quote.terms_and_conditions}</p>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
 
             <div class="footer">
-              <p><strong>${businessConfig.name || 'Óptica'}</strong></p>
-              <p>Este presupuesto es válido hasta ${quote.expiration_date ? new Date(quote.expiration_date).toLocaleDateString('es-CL', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              }) : 'fecha no especificada'}</p>
+              <p><strong>${businessConfig.name || "Óptica"}</strong></p>
+              <p>Este presupuesto es válido hasta ${
+                quote.expiration_date
+                  ? new Date(quote.expiration_date).toLocaleDateString(
+                      "es-CL",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      },
+                    )
+                  : "fecha no especificada"
+              }</p>
               <p>Para más información, contacte con nosotros.</p>
             </div>
           </div>
@@ -292,24 +338,24 @@ export async function POST(
     const emailText = `
 PRESUPUESTO ${quote.quote_number}
 
-Fecha: ${new Date(quote.quote_date).toLocaleDateString('es-CL')}
-${quote.expiration_date ? `Válido hasta: ${new Date(quote.expiration_date).toLocaleDateString('es-CL')}` : ''}
+Fecha: ${new Date(quote.quote_date).toLocaleDateString("es-CL")}
+${quote.expiration_date ? `Válido hasta: ${new Date(quote.expiration_date).toLocaleDateString("es-CL")}` : ""}
 
 Cliente: ${customerName}
-${quote.customer?.email ? `Email: ${quote.customer.email}` : ''}
-${quote.customer?.phone ? `Teléfono: ${quote.customer.phone}` : ''}
+${quote.customer?.email ? `Email: ${quote.customer.email}` : ""}
+${quote.customer?.phone ? `Teléfono: ${quote.customer.phone}` : ""}
 
 MARCO:
-Nombre: ${quote.frame_name || '-'}
-${quote.frame_brand ? `Marca: ${quote.frame_brand}` : ''}
-${quote.frame_model ? `Modelo: ${quote.frame_model}` : ''}
-${quote.frame_color ? `Color: ${quote.frame_color}` : ''}
+Nombre: ${quote.frame_name || "-"}
+${quote.frame_brand ? `Marca: ${quote.frame_brand}` : ""}
+${quote.frame_model ? `Modelo: ${quote.frame_model}` : ""}
+${quote.frame_color ? `Color: ${quote.frame_color}` : ""}
 Precio: ${formatPrice(quote.frame_price)}
 
 LENTE:
-${quote.lens_type ? `Tipo: ${quote.lens_type}` : ''}
-${quote.lens_material ? `Material: ${quote.lens_material}` : ''}
-${quote.lens_index ? `Índice: ${quote.lens_index}` : ''}
+${quote.lens_type ? `Tipo: ${quote.lens_type}` : ""}
+${quote.lens_material ? `Material: ${quote.lens_material}` : ""}
+${quote.lens_index ? `Índice: ${quote.lens_index}` : ""}
 Tratamientos:
 ${treatmentsList}
 
@@ -319,56 +365,61 @@ Costo de Lente: ${formatPrice(quote.lens_cost)}
 Costo de Tratamientos: ${formatPrice(quote.treatments_cost)}
 Costo de Mano de Obra: ${formatPrice(quote.labor_cost)}
 Subtotal: ${formatPrice(quote.subtotal)}
-${quote.discount_amount > 0 ? `Descuento (${quote.discount_percentage}%): -${formatPrice(quote.discount_amount)}` : ''}
+${quote.discount_amount > 0 ? `Descuento (${quote.discount_percentage}%): -${formatPrice(quote.discount_amount)}` : ""}
 IVA (19%): ${formatPrice(quote.tax_amount)}
 TOTAL: ${formatPrice(quote.total_amount)}
 
-${quote.customer_notes ? `\nNOTAS:\n${quote.customer_notes}\n` : ''}
-${quote.terms_and_conditions ? `\nTÉRMINOS Y CONDICIONES:\n${quote.terms_and_conditions}\n` : ''}
+${quote.customer_notes ? `\nNOTAS:\n${quote.customer_notes}\n` : ""}
+${quote.terms_and_conditions ? `\nTÉRMINOS Y CONDICIONES:\n${quote.terms_and_conditions}\n` : ""}
 
-Este presupuesto es válido hasta ${quote.expiration_date ? new Date(quote.expiration_date).toLocaleDateString('es-CL') : 'fecha no especificada'}.
+Este presupuesto es válido hasta ${quote.expiration_date ? new Date(quote.expiration_date).toLocaleDateString("es-CL") : "fecha no especificada"}.
     `.trim();
 
     // Send email
     const emailResult = await sendEmail({
       to: email,
-      subject: `Presupuesto ${quote.quote_number} - ${businessConfig.name || 'Óptica'}`,
+      subject: `Presupuesto ${quote.quote_number} - ${businessConfig.name || "Óptica"}`,
       html: emailHTML,
-      text: emailText
+      text: emailText,
     });
 
     if (!emailResult.success) {
-      return NextResponse.json({ 
-        error: 'Error al enviar email',
-        details: emailResult.error 
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: "Error al enviar email",
+          details: emailResult.error,
+        },
+        { status: 500 },
+      );
     }
 
     // Update quote status to 'sent'
     const { error: updateError } = await supabaseServiceRole
-      .from('quotes')
-      .update({ 
-        status: 'sent',
-        updated_at: new Date().toISOString()
+      .from("quotes")
+      .update({
+        status: "sent",
+        updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq("id", id);
 
     if (updateError) {
-      console.error('Error updating quote status:', updateError);
+      logger.warn("Error updating quote status", updateError);
       // Don't fail the request if status update fails
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      message: 'Presupuesto enviado exitosamente',
-      emailId: emailResult.id
+      message: "Presupuesto enviado exitosamente",
+      emailId: emailResult.id,
     });
-
   } catch (error: any) {
-    console.error('Error sending quote:', error);
-    return NextResponse.json({ 
-      error: 'Error interno del servidor',
-      details: error.message 
-    }, { status: 500 });
+    logger.error("Error sending quote", error);
+    return NextResponse.json(
+      {
+        error: "Error interno del servidor",
+        details: error.message,
+      },
+      { status: 500 },
+    );
   }
 }

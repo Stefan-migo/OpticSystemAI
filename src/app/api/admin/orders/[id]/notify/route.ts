@@ -1,30 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
-import { EmailNotificationService } from '@/lib/email/notifications';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { EmailNotificationService } from "@/lib/email/notifications";
+import { appLogger as logger } from "@/lib/logger";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
-    console.log('📧 Sending notification for order:', params.id);
+    logger.debug("Sending notification for order", { orderId: params.id });
     const supabase = await createClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     // Get order details
     const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select(`
+      .from("orders")
+      .select(
+        `
         *,
         order_items (
           id,
@@ -34,22 +44,21 @@ export async function POST(
           unit_price,
           total_price
         )
-      `)
-      .eq('id', params.id)
+      `,
+      )
+      .eq("id", params.id)
       .single();
 
     if (orderError || !order) {
-      console.error('❌ Error fetching order:', orderError);
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      logger.error("Error fetching order", orderError);
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     // Get customer name from order or use default
-    const customerName = order.shipping_first_name && order.shipping_last_name
-      ? `${order.shipping_first_name} ${order.shipping_last_name}`
-      : 'Cliente';
+    const customerName =
+      order.shipping_first_name && order.shipping_last_name
+        ? `${order.shipping_first_name} ${order.shipping_last_name}`
+        : "Cliente";
 
     // Prepare order data for email
     const emailOrder = {
@@ -57,41 +66,42 @@ export async function POST(
       order_number: order.order_number,
       user_email: order.email,
       customer_name: customerName,
-      items: order.order_items?.map((item: any) => ({
-        name: item.product_name,
-        quantity: item.quantity,
-        price: item.unit_price
-      })) || [],
+      items:
+        order.order_items?.map((item: any) => ({
+          name: item.product_name,
+          quantity: item.quantity,
+          price: item.unit_price,
+        })) || [],
       total_amount: order.total_amount,
-      payment_method: order.mp_payment_method || 'MercadoPago',
+      payment_method: order.mp_payment_method || "MercadoPago",
       created_at: order.created_at,
       payment_id: order.mp_payment_id,
-      status: order.status
+      status: order.status,
     };
 
     // Send email notification
-    const result = await EmailNotificationService.sendOrderConfirmation(emailOrder);
+    const result =
+      await EmailNotificationService.sendOrderConfirmation(emailOrder);
 
     if (!result.success) {
-      console.error('❌ Error sending email:', result.error);
+      logger.error("Error sending email", result.error);
       return NextResponse.json(
-        { error: 'Failed to send notification', details: result.error },
-        { status: 500 }
+        { error: "Failed to send notification", details: result.error },
+        { status: 500 },
       );
     }
 
-    console.log('✅ Notification sent successfully');
+    logger.info("Notification sent successfully", { orderId: params.id });
 
     return NextResponse.json({
       success: true,
-      message: 'Notification sent successfully'
+      message: "Notification sent successfully",
     });
-
   } catch (error) {
-    console.error('❌ Notification API error:', error);
+    logger.error("Notification API error", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }

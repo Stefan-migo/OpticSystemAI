@@ -1,24 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
-import { createServiceRoleClient } from '@/utils/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { createServiceRoleClient } from "@/utils/supabase/server";
+import { appLogger as logger } from "@/lib/logger";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; prescriptionId: string }> }
+  { params }: { params: Promise<{ id: string; prescriptionId: string }> },
 ) {
   try {
     const supabase = await createClient();
     const supabaseServiceRole = createServiceRoleClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     const { id: customerId, prescriptionId } = await params;
@@ -27,15 +36,15 @@ export async function PUT(
     // If setting as current, unset other current prescriptions
     if (body.is_current) {
       await supabaseServiceRole
-        .from('prescriptions')
+        .from("prescriptions")
         .update({ is_current: false })
-        .eq('customer_id', customerId)
-        .neq('id', prescriptionId);
+        .eq("customer_id", customerId)
+        .neq("id", prescriptionId);
     }
 
     // Update prescription
     const { data: updatedPrescription, error } = await supabaseServiceRole
-      .from('prescriptions')
+      .from("prescriptions")
       .update({
         prescription_date: body.prescription_date,
         expiration_date: body.expiration_date || null,
@@ -69,74 +78,91 @@ export async function PUT(
         recommendations: body.recommendations || null,
         is_active: body.is_active !== undefined ? body.is_active : true,
         is_current: body.is_current !== undefined ? body.is_current : false,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
-      .eq('id', prescriptionId)
-      .eq('customer_id', customerId)
+      .eq("id", prescriptionId)
+      .eq("customer_id", customerId)
       .select()
       .single();
 
     if (error) {
-      console.error('Error updating prescription:', error);
-      return NextResponse.json({ 
-        error: 'Failed to update prescription',
-        details: error.message 
-      }, { status: 500 });
+      logger.error("Error updating prescription", error);
+      return NextResponse.json(
+        {
+          error: "Failed to update prescription",
+          details: error.message,
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
       success: true,
-      prescription: updatedPrescription
+      prescription: updatedPrescription,
     });
-
   } catch (error) {
-    console.error('Error in prescription update API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error("Error in prescription update API", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; prescriptionId: string }> }
+  { params }: { params: Promise<{ id: string; prescriptionId: string }> },
 ) {
   try {
     const supabase = await createClient();
     const supabaseServiceRole = createServiceRoleClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     const { id: customerId, prescriptionId } = await params;
 
     const { error } = await supabaseServiceRole
-      .from('prescriptions')
+      .from("prescriptions")
       .delete()
-      .eq('id', prescriptionId)
-      .eq('customer_id', customerId);
+      .eq("id", prescriptionId)
+      .eq("customer_id", customerId);
 
     if (error) {
-      console.error('Error deleting prescription:', error);
-      return NextResponse.json({ 
-        error: 'Failed to delete prescription',
-        details: error.message 
-      }, { status: 500 });
+      logger.error("Error deleting prescription", error);
+      return NextResponse.json(
+        {
+          error: "Failed to delete prescription",
+          details: error.message,
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
-      success: true
+      success: true,
     });
-
   } catch (error) {
-    console.error('Error in prescription delete API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error("Error in prescription delete API", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
-

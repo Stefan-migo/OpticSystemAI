@@ -34,6 +34,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import CreatePrescriptionForm from '@/components/admin/CreatePrescriptionForm';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
+import { calculatePriceWithTax, calculateTotal as calculateTotalTax } from '@/lib/utils/tax';
+import { getTaxPercentage } from '@/lib/utils/tax-config';
 
 interface CreateQuoteFormProps {
   onSuccess: () => void;
@@ -48,8 +52,12 @@ export default function CreateQuoteForm({
   initialCustomerId,
   initialPrescriptionId
 }: CreateQuoteFormProps) {
+  // Branch context
+  const { currentBranchId } = useBranch();
+  
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [discountType, setDiscountType] = useState<'percentage' | 'amount'>('percentage');
   const [quoteSettings, setQuoteSettings] = useState<any>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   
@@ -70,6 +78,7 @@ export default function CreateQuoteForm({
   const [frameResults, setFrameResults] = useState<any[]>([]);
   const [selectedFrame, setSelectedFrame] = useState<any>(null);
   const [searchingFrames, setSearchingFrames] = useState(false);
+  const [taxPercentage, setTaxPercentage] = useState<number>(19.0);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -80,6 +89,7 @@ export default function CreateQuoteForm({
     frame_size: '',
     frame_sku: '',
     frame_price: 0,
+    frame_price_includes_tax: false,
     lens_type: '',
     lens_material: '',
     lens_index: null as number | null,
@@ -123,12 +133,17 @@ export default function CreateQuoteForm({
   // Fetch quote settings on mount
   useEffect(() => {
     fetchQuoteSettings();
-  }, []);
+    // Fetch tax percentage from system config
+    getTaxPercentage(19.0).then(setTaxPercentage);
+  }, [currentBranchId]);
 
   const fetchQuoteSettings = async () => {
     try {
       setLoadingSettings(true);
-      const response = await fetch('/api/admin/quote-settings');
+      const headers: HeadersInit = {
+        ...getBranchHeader(currentBranchId)
+      };
+      const response = await fetch('/api/admin/quote-settings', { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch quote settings');
       }
@@ -265,7 +280,13 @@ export default function CreateQuoteForm({
 
       setSearchingCustomers(true);
       try {
-        const response = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(customerSearch)}`);
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId)
+        };
+
+        const response = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(customerSearch)}`, {
+          headers
+        });
         if (response.ok) {
           const data = await response.json();
           setCustomerResults(data.customers || []);
@@ -279,7 +300,7 @@ export default function CreateQuoteForm({
 
     const debounce = setTimeout(searchCustomers, 300);
     return () => clearTimeout(debounce);
-  }, [customerSearch]);
+  }, [customerSearch, currentBranchId]);
 
   // Search frames
   useEffect(() => {
@@ -291,7 +312,13 @@ export default function CreateQuoteForm({
 
       setSearchingFrames(true);
       try {
-        const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(frameSearch)}&type=frame`);
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId)
+        };
+
+        const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(frameSearch)}&type=frame`, {
+          headers
+        });
         if (response.ok) {
           const data = await response.json();
           setFrameResults(data.products || []);
@@ -305,34 +332,112 @@ export default function CreateQuoteForm({
 
     const debounce = setTimeout(searchFrames, 300);
     return () => clearTimeout(debounce);
-  }, [frameSearch]);
+  }, [frameSearch, currentBranchId]);
 
   const calculateTotal = () => {
-    const frame = formData.frame_price || 0;
-    const lens = formData.lens_cost || 0;
-    const treatments = formData.treatments_cost || 0;
-    const labor = formData.labor_cost || 0;
+    // Use tax percentage from settings or system config, default to 19% (IVA Chile)
+    const effectiveTaxRate = quoteSettings?.default_tax_percentage || taxPercentage;
     
-    const subtotal = frame + lens + treatments + labor;
-    const discount = subtotal * (formData.discount_percentage / 100);
-    const afterDiscount = subtotal - discount;
+    // Get tax inclusion settings from quote settings (default to true - IVA incluido)
+    const lensIncludesTax = quoteSettings?.lens_cost_includes_tax ?? true;
+    const treatmentsIncludeTax = quoteSettings?.treatments_cost_includes_tax ?? true;
+    const laborIncludesTax = quoteSettings?.labor_cost_includes_tax ?? true;
     
-    // Use tax percentage from settings, default to 19% (IVA Chile)
-    const taxPercentage = quoteSettings?.default_tax_percentage || 19.0;
-    const tax = afterDiscount * (taxPercentage / 100);
+    // Calculate frame price with tax consideration
+    const framePriceBreakdown = calculatePriceWithTax(
+      formData.frame_price || 0,
+      formData.frame_price_includes_tax || false,
+      effectiveTaxRate
+    );
+    
+    // Calculate lens, treatments, and labor with tax consideration
+    const lensBreakdown = calculatePriceWithTax(
+      formData.lens_cost || 0,
+      lensIncludesTax,
+      effectiveTaxRate
+    );
+    
+    const treatmentsBreakdown = calculatePriceWithTax(
+      formData.treatments_cost || 0,
+      treatmentsIncludeTax,
+      effectiveTaxRate
+    );
+    
+    const laborBreakdown = calculatePriceWithTax(
+      formData.labor_cost || 0,
+      laborIncludesTax,
+      effectiveTaxRate
+    );
+    
+    // Subtotal is the sum of all base prices (without tax)
+    const subtotal = framePriceBreakdown.subtotal + 
+                     lensBreakdown.subtotal + 
+                     treatmentsBreakdown.subtotal + 
+                     laborBreakdown.subtotal;
+    
+    // Calculate total tax from all items
+    // For items with tax included: tax is already extracted
+    // For items without tax: tax needs to be calculated
+    const taxFromItemsWithTax = framePriceBreakdown.tax + 
+                               (lensIncludesTax ? lensBreakdown.tax : 0) +
+                               (treatmentsIncludeTax ? treatmentsBreakdown.tax : 0) +
+                               (laborIncludesTax ? laborBreakdown.tax : 0);
+    
+    // Calculate tax for items without tax
+    const itemsWithoutTax = (lensIncludesTax ? 0 : lensBreakdown.subtotal) +
+                           (treatmentsIncludeTax ? 0 : treatmentsBreakdown.subtotal) +
+                           (laborIncludesTax ? 0 : laborBreakdown.subtotal) +
+                           (formData.frame_price_includes_tax ? 0 : framePriceBreakdown.subtotal);
+    
+    const taxOnItemsWithoutTax = itemsWithoutTax * (effectiveTaxRate / 100);
+    
+    // Total tax is the sum of both
+    const totalTax = taxFromItemsWithTax + taxOnItemsWithoutTax;
+    
+    // Total with tax (before discount)
+    const totalWithTax = subtotal + totalTax;
+    
+    // Calculate discount based on type - apply to total with tax
+    let discount = 0;
+    let discountPercentage = 0;
+    
+    if (discountType === 'percentage') {
+      // Apply discount to total with tax
+      discount = totalWithTax * (formData.discount_percentage / 100);
+      discountPercentage = formData.discount_percentage;
+    } else {
+      // Discount by amount
+      discount = formData.discount_amount || 0;
+      // Calculate percentage for display (based on total with tax)
+      if (totalWithTax > 0) {
+        discountPercentage = (discount / totalWithTax) * 100;
+      }
+    }
+    
+    // Ensure discount doesn't exceed total with tax
+    if (discount > totalWithTax) {
+      discount = totalWithTax;
+      if (discountType === 'amount') {
+        discountPercentage = 100;
+      }
+    }
+    
+    // Total is: total with tax minus discount
+    const total = totalWithTax - discount;
     
     setFormData(prev => ({
       ...prev,
       subtotal,
       discount_amount: discount,
-      tax_amount: tax,
-      total_amount: afterDiscount + tax
+      discount_percentage: discountPercentage,
+      tax_amount: totalTax,
+      total_amount: total
     }));
   };
 
   useEffect(() => {
     calculateTotal();
-  }, [formData.frame_price, formData.lens_cost, formData.treatments_cost, formData.labor_cost, formData.discount_percentage, quoteSettings]);
+  }, [formData.frame_price, formData.frame_price_includes_tax, formData.lens_cost, formData.treatments_cost, formData.labor_cost, formData.discount_percentage, formData.discount_amount, discountType, quoteSettings, taxPercentage]);
 
   const handleTreatmentToggle = (treatment: typeof availableTreatments[0]) => {
     const isSelected = formData.lens_treatments.includes(treatment.value);
@@ -366,6 +471,7 @@ export default function CreateQuoteForm({
       frame_size: frame.frame_size || '',
       frame_sku: frame.sku || '',
       frame_price: frame.price || 0,
+      frame_price_includes_tax: frame.price_includes_tax || false,
       frame_cost: frame.price || 0
     }));
     setFrameSearch('');
@@ -395,9 +501,14 @@ export default function CreateQuoteForm({
       const expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + formData.expiration_days);
 
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+
       const response = await fetch('/api/admin/quotes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           customer_id: selectedCustomer.id,
           prescription_id: selectedPrescription.id,
@@ -465,7 +576,10 @@ export default function CreateQuoteForm({
         </CardHeader>
         <CardContent className="space-y-4">
           {selectedCustomer ? (
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary">
+            <div 
+              className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary"
+              style={{ backgroundColor: 'var(--admin-border-primary)' }}
+            >
               <div>
                 <div className="font-medium">
                   {selectedCustomer.first_name} {selectedCustomer.last_name}
@@ -514,7 +628,14 @@ export default function CreateQuoteForm({
                         <div className="font-medium">
                           {customer.first_name} {customer.last_name}
                         </div>
-                        <div className="text-sm text-tierra-media">{customer.email}</div>
+                        <div className="text-sm text-tierra-media space-y-1">
+                          {customer.email && (
+                            <div>{customer.email}</div>
+                          )}
+                          {customer.rut && (
+                            <div>RUT: {customer.rut}</div>
+                          )}
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -590,7 +711,10 @@ export default function CreateQuoteForm({
         </CardHeader>
         <CardContent className="space-y-4">
           {selectedFrame ? (
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary">
+            <div 
+              className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary"
+              style={{ backgroundColor: 'var(--admin-border-primary)' }}
+            >
               <div>
                 <div className="font-medium">{selectedFrame.name}</div>
                 <div className="text-sm text-tierra-media">
@@ -922,10 +1046,16 @@ export default function CreateQuoteForm({
               <span>Subtotal:</span>
               <span className="font-medium">{formatPrice(formData.subtotal)}</span>
             </div>
-            <div className="flex justify-between mb-2">
-              <span>Descuento ({formData.discount_percentage}%):</span>
-              <span className="font-medium text-red-500">-{formatPrice(formData.discount_amount)}</span>
-            </div>
+            {formData.discount_amount > 0 && (
+              <div className="flex justify-between mb-2">
+                <span>
+                  Descuento {discountType === 'percentage' 
+                    ? `(${formData.discount_percentage.toFixed(2)}%)` 
+                    : '(Valor fijo)'}:
+                </span>
+                <span className="font-medium text-red-500">-{formatPrice(formData.discount_amount)}</span>
+              </div>
+            )}
             <div className="flex justify-between mb-2">
               <span>IVA (19%):</span>
               <span className="font-medium">{formatPrice(formData.tax_amount)}</span>
@@ -938,29 +1068,68 @@ export default function CreateQuoteForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Descuento (%)</Label>
+              <Label>Tipo de Descuento</Label>
+              <Select
+                value={discountType}
+                onValueChange={(value: 'percentage' | 'amount') => {
+                  setDiscountType(value);
+                  // Clear the other discount field when switching types
+                  if (value === 'percentage') {
+                    setFormData(prev => ({ ...prev, discount_amount: 0 }));
+                  } else {
+                    setFormData(prev => ({ ...prev, discount_percentage: 0 }));
+                  }
+                  // Recalculate total after clearing
+                  setTimeout(() => calculateTotal(), 0);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percentage">Por Porcentaje (%)</SelectItem>
+                  <SelectItem value="amount">Por Valor ($)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>
+                {discountType === 'percentage' ? 'Descuento (%)' : 'Descuento ($)'}
+              </Label>
               <Input
                 type="number"
                 min="0"
-                max="100"
-                value={formData.discount_percentage || ''}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  discount_percentage: parseFloat(e.target.value) || 0 
-                }))}
+                max={discountType === 'percentage' ? '100' : undefined}
+                step={discountType === 'percentage' ? '0.01' : '1'}
+                value={
+                  discountType === 'percentage' 
+                    ? (formData.discount_percentage || '') 
+                    : (formData.discount_amount || '')
+                }
+                onChange={(e) => {
+                  const value = discountType === 'percentage' 
+                    ? parseFloat(e.target.value) || 0 
+                    : parseFloat(e.target.value) || 0;
+                  
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    [discountType === 'percentage' ? 'discount_percentage' : 'discount_amount']: value
+                  }));
+                }}
               />
             </div>
-            <div>
-              <Label>Validez del Presupuesto (días)</Label>
-              <Input
-                type="number"
-                value={formData.expiration_days}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  expiration_days: parseInt(e.target.value) || 30 
-                }))}
-              />
-            </div>
+          </div>
+          
+          <div>
+            <Label>Validez del Presupuesto (días)</Label>
+            <Input
+              type="number"
+              value={formData.expiration_days}
+              onChange={(e) => setFormData(prev => ({ 
+                ...prev, 
+                expiration_days: parseInt(e.target.value) || 30 
+              }))}
+            />
           </div>
         </CardContent>
       </Card>

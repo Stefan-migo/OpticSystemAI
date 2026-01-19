@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createServiceRoleClient } from '@/utils/supabase/server';
+import { getBranchContext } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,11 +18,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { data: settings, error } = await supabase
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
+    // Get schedule settings for current branch (or default if no branch selected)
+    let query = supabase
       .from('schedule_settings')
-      .select('*')
-      .limit(1)
-      .single();
+      .select('*');
+
+    if (branchContext.branchId) {
+      query = query.eq('branch_id', branchContext.branchId);
+    } else {
+      // If no branch selected or global view, get default settings (branch_id IS NULL)
+      query = query.is('branch_id', null);
+    }
+
+    const { data: settings, error } = await query.limit(1).maybeSingle();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
       console.error('Error fetching schedule settings:', error);
@@ -79,14 +91,24 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
+    // Cannot save settings in global view - must select a branch
+    if (!branchContext.branchId) {
+      return NextResponse.json({ 
+        error: 'Debes seleccionar una sucursal para guardar la configuración de horarios' 
+      }, { status: 400 });
+    }
+
     const body = await request.json();
 
-    // Check if settings exist
+    // Check if settings exist for this branch
     const { data: existingSettings } = await supabaseServiceRole
       .from('schedule_settings')
       .select('id')
-      .limit(1)
-      .single();
+      .eq('branch_id', branchContext.branchId)
+      .maybeSingle();
 
     const updateData: any = {
       updated_at: new Date().toISOString(),
@@ -122,18 +144,29 @@ export async function PUT(request: NextRequest) {
 
       result = data;
     } else {
-      // Insert new
+      // Insert new with branch_id
+      const insertData = {
+        ...updateData,
+        branch_id: branchContext.branchId
+      };
+      
+      console.log('Inserting schedule settings with data:', JSON.stringify(insertData, null, 2));
+      
       const { data, error } = await supabaseServiceRole
         .from('schedule_settings')
-        .insert(updateData)
+        .insert(insertData)
         .select()
         .single();
 
       if (error) {
         console.error('Error creating schedule settings:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        console.error('Insert data:', JSON.stringify(insertData, null, 2));
         return NextResponse.json({ 
           error: 'Failed to create schedule settings',
-          details: error.message 
+          details: error.message,
+          code: error.code,
+          hint: error.hint
         }, { status: 500 });
       }
 

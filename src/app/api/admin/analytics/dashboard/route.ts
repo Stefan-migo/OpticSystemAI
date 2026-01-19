@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,6 +22,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
     const supabaseServiceRole = createServiceRoleClient();
     const { searchParams } = new URL(request.url);
     const period = parseInt(searchParams.get('period') || '30');
@@ -36,162 +40,263 @@ export async function GET(request: NextRequest) {
       days: period 
     });
 
-    // ====================================
-    // FETCH REAL DATA IN PARALLEL
-    // ====================================
+    // Build queries with branch filtering
+    let productsQuery = supabaseServiceRole
+      .from('products')
+      .select('id, name, price, category_id, inventory_quantity, created_at')
+      .eq('status', 'active');
+    
+    let ordersQuery = supabaseServiceRole
+      .from('orders')
+      .select('*')
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString());
+    
+    let customersQuery = supabaseServiceRole
+      .from('customers')
+      .select('id, created_at');
+
+    let quotesQuery = supabaseServiceRole
+      .from('quotes')
+      .select('*')
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString());
+
+    let workOrdersQuery = supabaseServiceRole
+      .from('lab_work_orders')
+      .select('*')
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString());
+
+    let appointmentsQuery = supabaseServiceRole
+      .from('appointments')
+      .select('*')
+      .gte('appointment_date', startDate.toISOString().split('T')[0])
+      .lte('appointment_date', endDate.toISOString().split('T')[0]);
+
+    // Apply branch filters
+    if (branchContext.branchId) {
+      productsQuery = productsQuery.eq('branch_id', branchContext.branchId);
+      ordersQuery = ordersQuery.eq('branch_id', branchContext.branchId);
+      customersQuery = customersQuery.eq('branch_id', branchContext.branchId);
+      quotesQuery = quotesQuery.eq('branch_id', branchContext.branchId);
+      workOrdersQuery = workOrdersQuery.eq('branch_id', branchContext.branchId);
+      appointmentsQuery = appointmentsQuery.eq('branch_id', branchContext.branchId);
+    } else if (!branchContext.isSuperAdmin) {
+      // Regular admin without branch - return empty data
+      productsQuery = productsQuery.is('branch_id', null).limit(0);
+      ordersQuery = ordersQuery.is('branch_id', null).limit(0);
+      customersQuery = customersQuery.is('branch_id', null).limit(0);
+      quotesQuery = quotesQuery.is('branch_id', null).limit(0);
+      workOrdersQuery = workOrdersQuery.is('branch_id', null).limit(0);
+      appointmentsQuery = appointmentsQuery.is('branch_id', null).limit(0);
+    }
+
     const [
       productsResult,
       categoriesResult,
       ordersResult,
-      profilesResult,
+      customersResult,
+      quotesResult,
+      workOrdersResult,
+      appointmentsResult,
       orderItemsResult
     ] = await Promise.all([
-      // All active products
-      supabaseServiceRole
-        .from('products')
-        .select('id, name, price, category_id, created_at')
-        .eq('status', 'active'),
-      
-      // All categories
-      supabaseServiceRole
-        .from('categories')
-        .select('id, name, slug'),
-      
-      // Orders in the period
-      supabaseServiceRole
-        .from('orders')
-        .select('*')
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString()),
-      
-      // All profiles (customers)
-      supabaseServiceRole
-        .from('profiles')
-        .select('id, created_at, membership_tier, is_member'),
-      
-      // Order items for product analytics
+      productsQuery,
+      supabaseServiceRole.from('categories').select('id, name, slug'),
+      ordersQuery,
+      customersQuery,
+      quotesQuery,
+      workOrdersQuery,
+      appointmentsQuery,
       supabaseServiceRole
         .from('order_items')
-        .select(`
-          id,
-          order_id,
-          product_id,
-          product_name,
-          quantity,
-          unit_price,
-          total_price
-        `)
+        .select('id, order_id, product_id, product_name, quantity, unit_price, total_price')
     ]);
-
-    if (productsResult.error) console.error('❌ Products error:', productsResult.error);
-    if (categoriesResult.error) console.error('❌ Categories error:', categoriesResult.error);
-    if (ordersResult.error) console.error('❌ Orders error:', ordersResult.error);
-    if (profilesResult.error) console.error('❌ Profiles error:', profilesResult.error);
-    if (orderItemsResult.error) console.error('❌ Order items error:', orderItemsResult.error);
 
     const products = productsResult.data || [];
     const categories = categoriesResult.data || [];
     const ordersInPeriod = ordersResult.data || [];
-    const profiles = profilesResult.data || [];
+    const customers = customersResult.data || [];
+    const quotes = quotesResult.data || [];
+    const workOrders = workOrdersResult.data || [];
+    const appointments = appointmentsResult.data || [];
     const orderItems = orderItemsResult.data || [];
 
-    console.log('✅ Data fetched:', {
-      products: products.length,
-      categories: categories.length,
-      ordersInPeriod: ordersInPeriod.length,
-      profiles: profiles.length,
-      orderItems: orderItems.length
-    });
+    // Filter order items to only include items from orders in the filtered set
+    const orderIds = new Set(ordersInPeriod.map((o: any) => o.id));
+    const filteredOrderItems = orderItems.filter((item: any) => orderIds.has(item.order_id));
 
-    // ====================================
-    // CALCULATE PREVIOUS PERIOD FOR GROWTH
-    // ====================================
+    // Calculate previous period for growth comparison
     const prevPeriodStart = new Date(startDate);
     prevPeriodStart.setDate(prevPeriodStart.getDate() - period);
     
-    const { data: prevOrders } = await supabaseServiceRole
+    let prevOrdersQuery = supabaseServiceRole
       .from('orders')
       .select('total_amount, payment_status')
       .gte('created_at', prevPeriodStart.toISOString())
       .lt('created_at', startDate.toISOString());
+    
+    let prevWorkOrdersQuery = supabaseServiceRole
+      .from('lab_work_orders')
+      .select('total_amount, payment_status')
+      .gte('created_at', prevPeriodStart.toISOString())
+      .lt('created_at', startDate.toISOString());
+
+    if (branchContext.branchId) {
+      prevOrdersQuery = prevOrdersQuery.eq('branch_id', branchContext.branchId);
+      prevWorkOrdersQuery = prevWorkOrdersQuery.eq('branch_id', branchContext.branchId);
+    }
+
+    const [prevOrdersResult, prevWorkOrdersResult] = await Promise.all([
+      prevOrdersQuery,
+      prevWorkOrdersQuery
+    ]);
+
+    const prevOrders = prevOrdersResult.data || [];
+    const prevWorkOrders = prevWorkOrdersResult.data || [];
 
     // ====================================
-    // CALCULATE KPIs FROM REAL DATA
+    // REVENUE CALCULATIONS
     // ====================================
-    const totalRevenue = ordersInPeriod
-      .filter(o => o.payment_status === 'paid')
-      .reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    // POS Sales Revenue
+    const posRevenue = ordersInPeriod
+      .filter(o => o.is_pos_sale && (o.payment_status === 'paid' || o.status === 'delivered'))
+      .reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
 
-    const prevRevenue = (prevOrders || [])
-      .filter(o => o.payment_status === 'paid')
-      .reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    // Work Orders Revenue
+    const workOrdersRevenue = workOrders
+      .filter(wo => wo.payment_status === 'paid')
+      .reduce((sum, wo) => sum + Number(wo.total_amount || 0), 0);
 
-    const revenueGrowth = prevRevenue > 0 
-      ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 
+    const totalRevenue = posRevenue + workOrdersRevenue;
+
+    // Previous period revenue
+    const prevPosRevenue = prevOrders
+      .filter((o: any) => o.is_pos_sale && (o.payment_status === 'paid'))
+      .reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0);
+
+    const prevWorkOrdersRevenue = prevWorkOrders
+      .filter((wo: any) => wo.payment_status === 'paid')
+      .reduce((sum: number, wo: any) => sum + Number(wo.total_amount || 0), 0);
+
+    const prevTotalRevenue = prevPosRevenue + prevWorkOrdersRevenue;
+    const revenueGrowth = prevTotalRevenue > 0 
+      ? ((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 
       : 0;
 
-    const totalOrders = ordersInPeriod.length;
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    // ====================================
+    // WORK ORDERS METRICS
+    // ====================================
+    const workOrdersByStatus: Record<string, number> = {};
+    workOrders.forEach((wo: any) => {
+      const status = wo.status || 'quote';
+      workOrdersByStatus[status] = (workOrdersByStatus[status] || 0) + 1;
+    });
 
-    // Customer metrics
-    const customersInPeriod = profiles.filter(p => 
-      new Date(p.created_at) >= startDate && new Date(p.created_at) <= endDate
+    const pendingWorkOrders = workOrders.filter((wo: any) => 
+      ['quote', 'ordered', 'sent_to_lab', 'received_from_lab', 'mounted', 'quality_check'].includes(wo.status)
+    ).length;
+
+    const completedWorkOrders = workOrders.filter((wo: any) => wo.status === 'delivered').length;
+    const cancelledWorkOrders = workOrders.filter((wo: any) => wo.status === 'cancelled').length;
+
+    // Calculate average delivery time (from ordered to delivered)
+    const deliveredWorkOrders = workOrders.filter((wo: any) => 
+      wo.status === 'delivered' && wo.ordered_at && wo.delivered_at
     );
-    const totalCustomers = profiles.length;
-    const newCustomers = customersInPeriod.length;
-
-    // Calculate conversion rate (orders / customers in period)
-    const conversionRate = newCustomers > 0 
-      ? (totalOrders / newCustomers) * 100 
-      : 0;
-
-    // ====================================
-    // CALCULATE TRENDS (DAILY DATA)
-    // ====================================
-    const salesTrends = [];
-    const customerTrends = [];
-
-    for (let i = 0; i < period; i++) {
-      const currentDate = new Date(startDate);
-      currentDate.setDate(currentDate.getDate() + i);
-      const nextDate = new Date(currentDate);
-      nextDate.setDate(nextDate.getDate() + 1);
-
-      // Sales for this day
-      const dayOrders = ordersInPeriod.filter(order => {
-        const orderDate = new Date(order.created_at);
-        return orderDate >= currentDate && orderDate < nextDate;
-      });
-
-      const daySales = dayOrders
-        .filter(o => o.payment_status === 'paid')
-        .reduce((sum, order) => sum + (order.total_amount || 0), 0);
-
-      salesTrends.push({
-        date: currentDate.toISOString().split('T')[0],
-        value: daySales,
-        count: dayOrders.length
-      });
-
-      // New customers for this day
-      const dayCustomers = profiles.filter(profile => {
-        const profileDate = new Date(profile.created_at);
-        return profileDate >= currentDate && profileDate < nextDate;
-      });
-
-      customerTrends.push({
-        date: currentDate.toISOString().split('T')[0],
-        value: dayCustomers.length,
-        count: dayCustomers.length
-      });
+    
+    let avgDeliveryDays = 0;
+    if (deliveredWorkOrders.length > 0) {
+      const totalDays = deliveredWorkOrders.reduce((sum: number, wo: any) => {
+        const ordered = new Date(wo.ordered_at);
+        const delivered = new Date(wo.delivered_at);
+        const days = Math.ceil((delivered.getTime() - ordered.getTime()) / (1000 * 60 * 60 * 24));
+        return sum + days;
+      }, 0);
+      avgDeliveryDays = Math.round(totalDays / deliveredWorkOrders.length);
     }
 
     // ====================================
-    // TOP PRODUCTS (BY REVENUE)
+    // QUOTES METRICS
     // ====================================
-    const productStats: Record<string, any> = {};
+    const quotesByStatus: Record<string, number> = {};
+    quotes.forEach((q: any) => {
+      const status = q.status || 'draft';
+      quotesByStatus[status] = (quotesByStatus[status] || 0) + 1;
+    });
 
-    orderItems.forEach(item => {
+    const totalQuotes = quotes.length;
+    const acceptedQuotes = quotes.filter((q: any) => q.status === 'accepted').length;
+    const rejectedQuotes = quotes.filter((q: any) => q.status === 'rejected').length;
+    const expiredQuotes = quotes.filter((q: any) => q.status === 'expired').length;
+    const convertedQuotes = quotes.filter((q: any) => q.status === 'converted_to_work').length;
+    
+    const quoteConversionRate = totalQuotes > 0 
+      ? ((acceptedQuotes + convertedQuotes) / totalQuotes) * 100 
+      : 0;
+
+    const avgQuoteValue = totalQuotes > 0
+      ? quotes.reduce((sum: number, q: any) => sum + Number(q.total_amount || 0), 0) / totalQuotes
+      : 0;
+
+    // ====================================
+    // APPOINTMENTS METRICS
+    // ====================================
+    const appointmentsByStatus: Record<string, number> = {};
+    appointments.forEach((apt: any) => {
+      const status = apt.status || 'scheduled';
+      appointmentsByStatus[status] = (appointmentsByStatus[status] || 0) + 1;
+    });
+
+    const totalAppointments = appointments.length;
+    const completedAppointments = appointments.filter((apt: any) => apt.status === 'completed').length;
+    const cancelledAppointments = appointments.filter((apt: any) => apt.status === 'cancelled').length;
+    const noShowAppointments = appointments.filter((apt: any) => apt.status === 'no_show').length;
+    
+    const appointmentCompletionRate = totalAppointments > 0
+      ? (completedAppointments / totalAppointments) * 100
+      : 0;
+
+    // ====================================
+    // CUSTOMERS METRICS
+    // ====================================
+    const customersInPeriod = customers.filter(c => 
+      new Date(c.created_at) >= startDate && new Date(c.created_at) <= endDate
+    );
+    const totalCustomers = customers.length;
+    const newCustomers = customersInPeriod.length;
+
+    // Customers with multiple orders/work orders (recurring)
+    const customerOrderCounts: Record<string, number> = {};
+    ordersInPeriod.forEach((o: any) => {
+      if (o.customer_email) {
+        customerOrderCounts[o.customer_email] = (customerOrderCounts[o.customer_email] || 0) + 1;
+      }
+    });
+    workOrders.forEach((wo: any) => {
+      // Work orders have customer_id, we'd need to join to get email
+      // For now, count unique customer_ids
+      if (wo.customer_id) {
+        customerOrderCounts[wo.customer_id] = (customerOrderCounts[wo.customer_id] || 0) + 1;
+      }
+    });
+    const recurringCustomers = Object.values(customerOrderCounts).filter((count: number) => count > 1).length;
+
+    // ====================================
+    // PRODUCTS METRICS
+    // ====================================
+    const lowStockProducts = products.filter((p: any) => 
+      (p.inventory_quantity || 0) > 0 && (p.inventory_quantity || 0) <= (p.low_stock_threshold || 5)
+    ).length;
+
+    const outOfStockProducts = products.filter((p: any) => 
+      (p.inventory_quantity || 0) === 0
+    ).length;
+
+    // Top products by revenue
+    const productStats: Record<string, any> = {};
+    filteredOrderItems.forEach((item: any) => {
       const productId = item.product_id;
       if (!productStats[productId]) {
         productStats[productId] = {
@@ -202,8 +307,8 @@ export async function GET(request: NextRequest) {
           orders: new Set()
         };
       }
-      productStats[productId].revenue += item.total_price || 0;
-      productStats[productId].quantity += item.quantity || 0;
+      productStats[productId].revenue += Number(item.total_price || 0);
+      productStats[productId].quantity += Number(item.quantity || 0);
       productStats[productId].orders.add(item.order_id);
     });
 
@@ -211,7 +316,7 @@ export async function GET(request: NextRequest) {
       .map((stat: any) => ({
         id: stat.id,
         name: stat.name,
-        category: 'General', // We'll map this properly
+        category: 'General',
         revenue: stat.revenue,
         quantity: stat.quantity,
         orders: stat.orders.size
@@ -221,28 +326,21 @@ export async function GET(request: NextRequest) {
 
     // Map product categories
     topProducts.forEach(product => {
-      const prod = products.find(p => p.id === product.id);
+      const prod = products.find((p: any) => p.id === product.id);
       if (prod) {
-        const category = categories.find(c => c.id === prod.category_id);
+        const category = categories.find((c: any) => c.id === prod.category_id);
         product.category = category?.name || 'Sin Categoría';
       }
     });
 
-    // ====================================
-    // CATEGORY REVENUE
-    // ====================================
+    // Category revenue
     const categoryRevenue: Record<string, number> = {};
-
-    orderItems.forEach(item => {
-      const product = products.find(p => p.id === item.product_id);
+    filteredOrderItems.forEach((item: any) => {
+      const product = products.find((p: any) => p.id === item.product_id);
       if (product && product.category_id) {
-        const category = categories.find(c => c.id === product.category_id);
+        const category = categories.find((c: any) => c.id === product.category_id);
         const categoryName = category?.name || 'Sin Categoría';
-        
-        if (!categoryRevenue[categoryName]) {
-          categoryRevenue[categoryName] = 0;
-        }
-        categoryRevenue[categoryName] += item.total_price || 0;
+        categoryRevenue[categoryName] = (categoryRevenue[categoryName] || 0) + Number(item.total_price || 0);
       }
     });
 
@@ -252,21 +350,91 @@ export async function GET(request: NextRequest) {
       .slice(0, 8);
 
     // ====================================
-    // CUSTOMER SEGMENTATION
+    // PAYMENT METHODS BREAKDOWN
     // ====================================
-    const members = profiles.filter(p => p.is_member).length;
-    const nonMembers = profiles.length - members;
-    const premiumMembers = profiles.filter(p => p.membership_tier === 'premium').length;
-    const basicMembers = profiles.filter(p => p.membership_tier === 'basic').length;
+    const paymentMethods: Record<string, { count: number; revenue: number }> = {};
+    
+    ordersInPeriod.forEach((o: any) => {
+      if (o.is_pos_sale && o.payment_method_type) {
+        const method = o.payment_method_type;
+        if (!paymentMethods[method]) {
+          paymentMethods[method] = { count: 0, revenue: 0 };
+        }
+        paymentMethods[method].count += 1;
+        paymentMethods[method].revenue += Number(o.total_amount || 0);
+      }
+    });
 
     // ====================================
-    // ORDER STATUS DISTRIBUTION
+    // DAILY TRENDS
     // ====================================
-    const statusDistribution: Record<string, number> = {};
-    ordersInPeriod.forEach(order => {
-      const status = order.status || 'pending';
-      statusDistribution[status] = (statusDistribution[status] || 0) + 1;
-    });
+    const salesTrends = [];
+    const customerTrends = [];
+    const workOrderTrends = [];
+    const quoteTrends = [];
+
+    for (let i = 0; i < period; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(currentDate.getDate() + i);
+      const nextDate = new Date(currentDate);
+      nextDate.setDate(nextDate.getDate() + 1);
+
+      // Sales for this day
+      const dayOrders = ordersInPeriod.filter((order: any) => {
+        const orderDate = new Date(order.created_at);
+        return orderDate >= currentDate && orderDate < nextDate;
+      });
+
+      const daySales = dayOrders
+        .filter((o: any) => o.payment_status === 'paid' || o.status === 'delivered')
+        .reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0);
+
+      // Work orders revenue for this day
+      const dayWorkOrders = workOrders.filter((wo: any) => {
+        const woDate = new Date(wo.created_at);
+        return woDate >= currentDate && woDate < nextDate;
+      });
+      const dayWorkOrdersRevenue = dayWorkOrders
+        .filter((wo: any) => wo.payment_status === 'paid')
+        .reduce((sum: number, wo: any) => sum + Number(wo.total_amount || 0), 0);
+
+      salesTrends.push({
+        date: currentDate.toISOString().split('T')[0],
+        value: daySales + dayWorkOrdersRevenue,
+        count: dayOrders.length + dayWorkOrders.length
+      });
+
+      // New customers for this day
+      const dayCustomers = customers.filter((customer: any) => {
+        const customerDate = new Date(customer.created_at);
+        return customerDate >= currentDate && customerDate < nextDate;
+      });
+
+      customerTrends.push({
+        date: currentDate.toISOString().split('T')[0],
+        value: dayCustomers.length,
+        count: dayCustomers.length
+      });
+
+      // Work orders for this day
+      workOrderTrends.push({
+        date: currentDate.toISOString().split('T')[0],
+        value: dayWorkOrders.length,
+        count: dayWorkOrders.length
+      });
+
+      // Quotes for this day
+      const dayQuotes = quotes.filter((q: any) => {
+        const quoteDate = new Date(q.created_at);
+        return quoteDate >= currentDate && quoteDate < nextDate;
+      });
+
+      quoteTrends.push({
+        date: currentDate.toISOString().split('T')[0],
+        value: dayQuotes.length,
+        count: dayQuotes.length
+      });
+    }
 
     // ====================================
     // BUILD ANALYTICS RESPONSE
@@ -274,32 +442,64 @@ export async function GET(request: NextRequest) {
     const analytics = {
       kpis: {
         totalRevenue,
-        totalOrders,
-        totalCustomers,
-        totalProducts: products.length,
-        avgOrderValue,
+        posRevenue,
+        workOrdersRevenue,
         revenueGrowth,
-        conversionRate
+        totalOrders: ordersInPeriod.length,
+        totalWorkOrders: workOrders.length,
+        totalQuotes,
+        totalAppointments,
+        totalCustomers,
+        newCustomers,
+        recurringCustomers,
+        avgOrderValue: ordersInPeriod.length > 0 ? posRevenue / ordersInPeriod.length : 0,
+        avgWorkOrderValue: workOrders.length > 0 ? workOrdersRevenue / workOrders.length : 0,
+        avgQuoteValue,
+        quoteConversionRate,
+        appointmentCompletionRate,
+        avgDeliveryDays
       },
-      trends: {
-        sales: salesTrends,
-        customers: customerTrends
+      workOrders: {
+        total: workOrders.length,
+        pending: pendingWorkOrders,
+        completed: completedWorkOrders,
+        cancelled: cancelledWorkOrders,
+        byStatus: workOrdersByStatus
+      },
+      quotes: {
+        total: totalQuotes,
+        accepted: acceptedQuotes,
+        rejected: rejectedQuotes,
+        expired: expiredQuotes,
+        converted: convertedQuotes,
+        byStatus: quotesByStatus,
+        conversionRate: quoteConversionRate
+      },
+      appointments: {
+        total: totalAppointments,
+        completed: completedAppointments,
+        cancelled: cancelledAppointments,
+        noShow: noShowAppointments,
+        byStatus: appointmentsByStatus,
+        completionRate: appointmentCompletionRate
       },
       products: {
+        total: products.length,
+        lowStock: lowStockProducts,
+        outOfStock: outOfStockProducts,
         topProducts,
         categoryRevenue: categoryRevenueArray
       },
-      customers: {
-        segmentation: {
-          new: newCustomers,
-          basic: basicMembers,
-          premium: premiumMembers,
-          members,
-          nonMembers
-        }
-      },
-      orders: {
-        statusDistribution
+      paymentMethods: Object.entries(paymentMethods).map(([method, data]) => ({
+        method,
+        count: data.count,
+        revenue: data.revenue
+      })),
+      trends: {
+        sales: salesTrends,
+        customers: customerTrends,
+        workOrders: workOrderTrends,
+        quotes: quoteTrends
       },
       period: {
         from: startDate.toISOString().split('T')[0],

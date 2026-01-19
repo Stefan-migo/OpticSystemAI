@@ -64,6 +64,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useBranch } from '@/hooks/useBranch';
+import { BranchSelector } from '@/components/admin/BranchSelector';
 
 interface Product {
   id: string;
@@ -89,6 +91,9 @@ interface BulkOperationResult {
 
 
 export default function ProductsPage() {
+  // Branch context
+  const { currentBranchId, isSuperAdmin, branches } = useBranch();
+  const isGlobalView = !currentBranchId && isSuperAdmin;
   
   // View state
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -231,9 +236,14 @@ export default function ProductsPage() {
 
   useEffect(() => {
     console.log('🚀 ProductsPage component mounted');
-    fetchGlobalStats(); // Fetch global stats once on mount
+    fetchGlobalStats(); // Fetch stats on mount
     fetchCategories();
   }, []);
+
+  // Refetch stats when branch changes
+  useEffect(() => {
+    fetchGlobalStats();
+  }, [currentBranchId, isGlobalView]);
 
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when filters change
@@ -241,7 +251,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, [currentPage, itemsPerPage, categoryFilter, statusFilter]);
+  }, [currentPage, itemsPerPage, categoryFilter, statusFilter, currentBranchId]);
 
   const fetchProducts = async () => {
     try {
@@ -270,7 +280,19 @@ export default function ProductsPage() {
       }
 
       console.log('🔗 API URL:', `/api/admin/products?${params}`);
-      const response = await fetch(`/api/admin/products?${params}`);
+      
+      // Add branch header if branch is selected
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (currentBranchId) {
+        headers['x-branch-id'] = currentBranchId;
+      } else if (isGlobalView && isSuperAdmin) {
+        headers['x-branch-id'] = 'global';
+      }
+      
+      const response = await fetch(`/api/admin/products?${params}`, { headers });
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -311,22 +333,33 @@ export default function ProductsPage() {
 
   const fetchGlobalStats = async () => {
     try {
-      // Fetch ALL products without any filters to calculate global stats
+      // Fetch products to calculate stats - filter by branch if selected, or get all if global view
       const params = new URLSearchParams({
         limit: '10000', // Large limit to get all products
         include_archived: 'true', // Include all statuses
       });
 
-      const response = await fetch(`/api/admin/products?${params}`);
+      // Add branch header if branch is selected, or 'global' if in global view
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (currentBranchId) {
+        headers['x-branch-id'] = currentBranchId;
+      } else if (isGlobalView && isSuperAdmin) {
+        headers['x-branch-id'] = 'global';
+      }
+
+      const response = await fetch(`/api/admin/products?${params}`, { headers });
       if (!response.ok) {
-        console.error('Failed to fetch global stats');
+        console.error('Failed to fetch stats');
         return;
       }
 
       const data = await response.json();
       const allProducts = data.products || [];
       
-      // Calculate global stats
+      // Calculate stats (branch-specific or global depending on currentBranchId)
       const stats = {
         totalProducts: allProducts.length,
         activeProducts: allProducts.filter((p: Product) => p.status === 'active' || !p.status).length,
@@ -338,7 +371,7 @@ export default function ProductsPage() {
       
       setGlobalStats(stats);
     } catch (error) {
-      console.error('Error fetching global stats:', error);
+      console.error('Error fetching stats:', error);
     }
   };
 
@@ -954,6 +987,39 @@ export default function ProductsPage() {
         </div>
       </div>
 
+      {/* Branch Selector - Only show for super admins or when multiple branches available */}
+      {(isSuperAdmin || (branches && branches.length > 1)) && (
+        <Card className="bg-admin-bg-tertiary">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-medium">Sucursal de Trabajo</Label>
+                <p className="text-xs text-tierra-media mt-1">
+                  {isSuperAdmin 
+                    ? 'Selecciona la sucursal para ver y gestionar productos'
+                    : 'Selecciona la sucursal para gestionar productos'}
+                </p>
+              </div>
+              <BranchSelector />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Warning if no branch selected (for non-super admins) */}
+      {!currentBranchId && !isSuperAdmin && (
+        <Card className="bg-amber-50 border-amber-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <p className="text-sm text-amber-800">
+                Debes seleccionar una sucursal para ver y gestionar productos.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tabs for Products and Categories */}
       <Tabs value={categoriesTabActive ? 'categories' : 'products'} onValueChange={(value) => setCategoriesTabActive(value === 'categories')} className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -968,62 +1034,73 @@ export default function ProductsPage() {
         </TabsList>
 
         <TabsContent value="products" className="space-y-6 mt-6">
-          {/* Stats Cards - Always show global stats regardless of filters */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Package className="h-8 w-8 text-azul-profundo" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-tierra-media">Total Productos</p>
-                <p className="text-2xl font-bold text-azul-profundo">{globalStats.totalProducts}</p>
-                <p className="text-xs text-tierra-media mt-1">Todos los estados</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Stats Cards - Show branch-specific stats or global stats */}
+          {(() => {
+            const currentBranch = branches?.find(b => b.id === currentBranchId);
+            const statsLabel = isGlobalView 
+              ? 'Todas las sucursales' 
+              : currentBranch 
+                ? `Sucursal: ${currentBranch.name}` 
+                : 'Sucursal seleccionada';
+            
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <Package className="h-8 w-8 text-azul-profundo" />
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-tierra-media">Total Productos</p>
+                        <p className="text-2xl font-bold text-azul-profundo">{globalStats.totalProducts}</p>
+                        <p className="text-xs text-tierra-media mt-1">{statsLabel}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-verde-suave" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-tierra-media">Productos Activos</p>
-                <p className="text-2xl font-bold text-verde-suave">{globalStats.activeProducts}</p>
-                <p className="text-xs text-tierra-media mt-1">Estado activo</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <TrendingUp className="h-8 w-8 text-verde-suave" />
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-tierra-media">Productos Activos</p>
+                        <p className="text-2xl font-bold text-verde-suave">{globalStats.activeProducts}</p>
+                        <p className="text-xs text-tierra-media mt-1">{statsLabel}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <AlertTriangle className="h-8 w-8 text-red-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-tierra-media">Stock Bajo</p>
-                <p className="text-2xl font-bold text-red-500">{globalStats.lowStockCount}</p>
-                <p className="text-xs text-tierra-media mt-1">≤ 5 unidades</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <AlertTriangle className="h-8 w-8 text-red-500" />
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-tierra-media">Stock Bajo</p>
+                        <p className="text-2xl font-bold text-red-500">{globalStats.lowStockCount}</p>
+                        <p className="text-xs text-tierra-media mt-1">{statsLabel}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <BarChart3 className="h-8 w-8 text-dorado" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-tierra-media">Valor Total</p>
-                <p className="text-2xl font-bold text-dorado">
-                  {formatPrice(globalStats.totalValue)}
-                </p>
-                <p className="text-xs text-tierra-media mt-1">Inventario completo</p>
+                <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <BarChart3 className="h-8 w-8 text-dorado" />
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-tierra-media">Valor Total</p>
+                        <p className="text-2xl font-bold text-dorado">
+                          {formatPrice(globalStats.totalValue)}
+                        </p>
+                        <p className="text-xs text-tierra-media mt-1">{statsLabel}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            );
+          })()}
 
       {/* Search and Filters */}
       <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
@@ -1095,6 +1172,28 @@ export default function ProductsPage() {
                 {showLowStockOnly ? 'Ver Todos' : 'Ver'}
                 <AlertTriangle className="h-4 w-4 ml-2" />
                 Stock Bajo
+              </Button>
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="w-full sm:w-auto flex items-center gap-2 border rounded-md p-1 bg-background">
+              <Button
+                variant={viewMode === 'grid' ? "default" : "ghost"}
+                size="sm"
+                onClick={() => handleViewModeChange('grid')}
+                className="flex-1"
+                title="Vista de cartas"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? "default" : "ghost"}
+                size="sm"
+                onClick={() => handleViewModeChange('table')}
+                className="flex-1"
+                title="Vista de lista"
+              >
+                <List className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -1227,7 +1326,11 @@ export default function ProductsPage() {
         /* Grid View */
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProducts.map((product) => (
-          <Card key={product.id} className="transition-all duration-200 hover:shadow-md">
+          <Card 
+            key={product.id} 
+            className="transition-all duration-200 hover:shadow-md"
+            style={{ backgroundColor: 'var(--admin-bg-tertiary)' }}
+          >
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -1276,7 +1379,7 @@ export default function ProductsPage() {
 
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <Link href={`/productos/${product.slug}`} target="_blank">
+                  <Link href={`/admin/products/${product.slug}`}>
                     <Eye className="h-4 w-4 mr-2" />
                     Ver
                   </Link>
@@ -1393,7 +1496,7 @@ export default function ProductsPage() {
                     
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Link href={`/productos/${product.slug}`} target="_blank">
+                        <Link href={`/admin/products/${product.slug}`}>
                           <Button variant="outline" size="sm">
                             <Eye className="h-3 w-3" />
                           </Button>
@@ -1560,7 +1663,11 @@ export default function ProductsPage() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {categories.map((category) => (
-                    <Card key={category.id} className="bg-admin-bg-secondary">
+                    <Card 
+                      key={category.id} 
+                      className="bg-admin-bg-secondary"
+                      style={{ backgroundColor: 'var(--admin-border-primary)' }}
+                    >
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">

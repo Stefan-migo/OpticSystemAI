@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/utils/supabase/server';
+import { getBranchContext } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,11 +17,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { data: settings, error } = await supabase
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
+    // Get quote settings for current branch (or default if no branch selected)
+    let query = supabase
       .from('quote_settings')
-      .select('*')
-      .limit(1)
-      .single();
+      .select('*');
+
+    if (branchContext.branchId) {
+      query = query.eq('branch_id', branchContext.branchId);
+    } else {
+      // If no branch selected or global view, get default settings (branch_id IS NULL)
+      query = query.is('branch_id', null);
+    }
+
+    const { data: settings, error } = await query.limit(1).maybeSingle();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
       console.error('Error fetching quote settings:', error);
@@ -65,6 +77,9 @@ export async function GET(request: NextRequest) {
           default_tax_percentage: 19.0,
           default_expiration_days: 30,
           default_margin_percentage: 0,
+          labor_cost_includes_tax: true,
+          lens_cost_includes_tax: true,
+          treatments_cost_includes_tax: true,
           volume_discounts: [],
           currency: 'CLP',
           terms_and_conditions: null,
@@ -99,12 +114,21 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
-    // Check if settings exist
-    const { data: existingSettings } = await supabaseServiceRole
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
+    // Check if settings exist for this branch
+    let existingQuery = supabaseServiceRole
       .from('quote_settings')
-      .select('id')
-      .limit(1)
-      .single();
+      .select('id');
+
+    if (branchContext.branchId) {
+      existingQuery = existingQuery.eq('branch_id', branchContext.branchId);
+    } else {
+      existingQuery = existingQuery.is('branch_id', null);
+    }
+
+    const { data: existingSettings } = await existingQuery.limit(1).maybeSingle();
 
     const updateData: any = {
       updated_at: new Date().toISOString(),
@@ -118,6 +142,9 @@ export async function PUT(request: NextRequest) {
     if (body.default_tax_percentage !== undefined) updateData.default_tax_percentage = body.default_tax_percentage;
     if (body.default_expiration_days !== undefined) updateData.default_expiration_days = body.default_expiration_days;
     if (body.default_margin_percentage !== undefined) updateData.default_margin_percentage = body.default_margin_percentage;
+    if (body.labor_cost_includes_tax !== undefined) updateData.labor_cost_includes_tax = body.labor_cost_includes_tax;
+    if (body.lens_cost_includes_tax !== undefined) updateData.lens_cost_includes_tax = body.lens_cost_includes_tax;
+    if (body.treatments_cost_includes_tax !== undefined) updateData.treatments_cost_includes_tax = body.treatments_cost_includes_tax;
     if (body.volume_discounts !== undefined) updateData.volume_discounts = body.volume_discounts;
     if (body.currency !== undefined) updateData.currency = body.currency;
     if (body.terms_and_conditions !== undefined) updateData.terms_and_conditions = body.terms_and_conditions;
@@ -143,10 +170,15 @@ export async function PUT(request: NextRequest) {
 
       result = data;
     } else {
-      // Insert new
+      // Insert new with branch_id
+      const insertData = {
+        ...updateData,
+        branch_id: branchContext.branchId || null
+      };
+      
       const { data, error } = await supabaseServiceRole
         .from('quote_settings')
-        .insert(updateData)
+        .insert(insertData)
         .select()
         .single();
 

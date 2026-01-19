@@ -1,11 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/utils/supabase/server';
+import { getBranchContext } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    // TEMPORARY: Use service role to bypass RLS for debugging
-    // TODO: Revert to createClient() after fixing admin_users table
-    const supabase = createServiceRoleClient();
+    const supabase = await createClient();
+    
+    // Check authentication
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check admin status
+    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
     const { searchParams } = new URL(request.url);
 
     // Pagination - Accept both page and offset parameters
@@ -53,6 +68,31 @@ export async function GET(request: NextRequest) {
           is_default
         )
       `, { count: 'exact' });
+
+    // Filter by branch if not super admin or if specific branch is selected
+    if (branchContext.branchId) {
+      query = query.eq('branch_id', branchContext.branchId);
+    } else if (!branchContext.isSuperAdmin) {
+      // Regular admin without branch selected - show only their accessible branches
+      // This will be handled by RLS, but we can also filter explicitly
+      const accessibleBranchIds = branchContext.accessibleBranches.map(b => b.id);
+      if (accessibleBranchIds.length > 0) {
+        query = query.in('branch_id', accessibleBranchIds);
+      } else {
+        // No accessible branches - return empty
+        return NextResponse.json({
+          products: [],
+          pagination: {
+            page: 1,
+            limit: parseInt(searchParams.get('limit') || '12'),
+            total: 0,
+            totalPages: 0,
+            hasMore: false,
+          },
+        });
+      }
+    }
+    // Super admin in global view sees all products (no filter)
 
     // Apply filters
     if (category && category !== 'all') {
@@ -150,7 +190,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Get request body
     const body = await request.json();
+    
+    // Debug: Log branch context
+    console.log('🔍 Branch context:', {
+      body_branch_id: body.branch_id,
+      context_branch_id: branchContext.branchId,
+      is_super_admin: branchContext.isSuperAdmin,
+      accessible_branches: branchContext.accessibleBranches.map(b => b.id)
+    });
+    
+    // Use branch_id from body, or current branch context, or null for super admin
+    const productBranchId = body.branch_id || branchContext.branchId || null;
+    
+    // Validate branch_id is provided (required for product creation, except for super admins)
+    if (!productBranchId && !branchContext.isSuperAdmin) {
+      console.error('❌ Validation failed: No branch_id provided and user is not super admin');
+      return NextResponse.json(
+        { error: 'branch_id is required. Debes seleccionar una sucursal para crear productos.', field: 'branch_id' },
+        { status: 400 }
+      );
+    }
+    
+    // If not super admin, validate they have access to the branch
+    if (!branchContext.isSuperAdmin && productBranchId) {
+      const hasAccess = branchContext.accessibleBranches.some(b => b.id === productBranchId);
+      if (!hasAccess) {
+        return NextResponse.json(
+          { error: 'No tienes acceso a esta sucursal', field: 'branch_id' },
+          { status: 403 }
+        );
+      }
+    }
     
     console.log('📦 Creating product with data:', {
       name: body.name,
@@ -162,13 +237,25 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!body.name || !body.name.trim()) {
+      console.error('❌ Validation failed: Product name is required');
       return NextResponse.json(
         { error: 'Product name is required', field: 'name' },
         { status: 400 }
       );
     }
 
+    console.log('💰 Price validation:', {
+      price: body.price,
+      type: typeof body.price,
+      parsed: body.price !== undefined ? parseFloat(body.price) : 'undefined',
+      isNaN: body.price !== undefined ? isNaN(parseFloat(body.price)) : 'undefined'
+    });
+
     if (body.price === undefined || body.price === null || isNaN(parseFloat(body.price))) {
+      console.error('❌ Validation failed: Valid price is required', {
+        price: body.price,
+        type: typeof body.price
+      });
       return NextResponse.json(
         { error: 'Valid price is required', field: 'price' },
         { status: 400 }
@@ -210,8 +297,10 @@ export async function POST(request: NextRequest) {
       price: parseFloat(body.price),
       compare_at_price: body.compare_at_price ? parseFloat(body.compare_at_price) : null,
       cost_price: body.cost_price ? parseFloat(body.cost_price) : null,
+      price_includes_tax: body.price_includes_tax ?? false,
       category_id: body.category_id || null,
-      inventory_quantity: body.inventory_quantity ? parseInt(String(body.inventory_quantity)) : 0,
+      branch_id: productBranchId, // Associate product with branch
+      inventory_quantity: 0, // Will be managed in product_branch_stock
       status: body.status || 'draft',
       featured_image: body.featured_image || null,
       gallery: body.gallery || [],
@@ -356,7 +445,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ product: data[0] });
+    const createdProduct = data[0];
+
+    // Create stock entry in product_branch_stock if branch_id is provided
+    if (productBranchId && body.inventory_quantity !== undefined) {
+      const inventoryQty = parseInt(String(body.inventory_quantity)) || 0;
+      const serviceSupabase = createServiceRoleClient();
+      
+      const { error: stockError } = await serviceSupabase
+        .from('product_branch_stock')
+        .upsert({
+          product_id: createdProduct.id,
+          branch_id: productBranchId,
+          quantity: inventoryQty,
+          reserved_quantity: 0,
+          low_stock_threshold: 5
+        }, {
+          onConflict: 'product_id,branch_id'
+        });
+
+      if (stockError) {
+        console.error('Error creating product stock:', stockError);
+        // Don't fail the product creation, just log the error
+        // The stock can be added later
+      }
+    }
+
+    return NextResponse.json({ product: createdProduct });
   } catch (error: any) {
     console.error('API error creating product:', error);
     return NextResponse.json(

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createServiceRoleClient } from '@/utils/supabase/server';
 import { NotificationService } from '@/lib/notifications/notification-service';
+import { validateBranchAccess } from '@/lib/api/branch-middleware';
 
 export async function PUT(
   request: NextRequest,
@@ -30,15 +31,27 @@ export async function PUT(
       return NextResponse.json({ error: 'Status is required' }, { status: 400 });
     }
 
-    // Get old status before update
+    // Get old status and branch_id before update
     const { data: workOrderBeforeUpdate } = await supabaseServiceRole
       .from('lab_work_orders')
-      .select('status, work_order_number')
+      .select('status, work_order_number, branch_id')
       .eq('id', id)
       .single();
 
-    const oldStatus = workOrderBeforeUpdate?.status || 'quote';
-    const workOrderNumber = workOrderBeforeUpdate?.work_order_number || '';
+    if (!workOrderBeforeUpdate) {
+      return NextResponse.json({ error: 'Work order not found' }, { status: 404 });
+    }
+
+    // Validate branch access
+    const hasAccess = await validateBranchAccess(user.id, workOrderBeforeUpdate.branch_id);
+    if (!hasAccess) {
+      return NextResponse.json({ 
+        error: 'No tiene acceso a este trabajo' 
+      }, { status: 403 });
+    }
+
+    const oldStatus = workOrderBeforeUpdate.status || 'quote';
+    const workOrderNumber = workOrderBeforeUpdate.work_order_number || '';
 
     // Update work order status using the function
     const { error: statusError } = await supabaseServiceRole.rpc('update_work_order_status', {
@@ -90,7 +103,7 @@ export async function PUT(
       .from('lab_work_orders')
       .select(`
         *,
-        customer:profiles!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
+        customer:customers!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
         prescription:prescriptions!lab_work_orders_prescription_id_fkey(*)
       `)
       .eq('id', id)

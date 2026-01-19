@@ -22,6 +22,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
+import { BranchSelector } from '@/components/admin/BranchSelector';
 
 interface QuoteSettings {
   treatment_prices: {
@@ -55,6 +58,9 @@ interface QuoteSettings {
   default_tax_percentage: number;
   default_expiration_days: number;
   default_margin_percentage: number;
+  labor_cost_includes_tax?: boolean;
+  lens_cost_includes_tax?: boolean;
+  treatments_cost_includes_tax?: boolean;
   volume_discounts: Array<{ min_amount: number; discount_percentage: number }>;
   currency: string;
   terms_and_conditions?: string;
@@ -62,18 +68,25 @@ interface QuoteSettings {
 }
 
 export default function QuoteSettingsPage() {
+  const { currentBranchId, isSuperAdmin, branches, isLoading: branchLoading } = useBranch();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<QuoteSettings | null>(null);
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    if (!branchLoading) {
+      fetchSettings();
+    }
+  }, [currentBranchId, branchLoading]);
 
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/quote-settings');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+      const response = await fetch('/api/admin/quote-settings', { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch settings');
       }
@@ -92,9 +105,13 @@ export default function QuoteSettingsPage() {
 
     try {
       setSaving(true);
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
       const response = await fetch('/api/admin/quote-settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(settings)
       });
 
@@ -241,6 +258,12 @@ export default function QuoteSettingsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <BranchSelector 
+              branches={branches} 
+              currentBranchId={currentBranchId}
+            />
+          )}
           <Link href="/admin/quotes">
             <Button variant="outline" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -427,6 +450,47 @@ export default function QuoteSettingsPage() {
                 onChange={(e) => setSettings({ ...settings, default_margin_percentage: parseFloat(e.target.value) || 0 })}
                 className="mt-1"
               />
+            </div>
+          </div>
+          <div className="mt-6 pt-6 border-t">
+            <Label className="text-base font-semibold mb-4 block">Configuración de IVA</Label>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="labor_cost_includes_tax"
+                  checked={settings.labor_cost_includes_tax ?? true}
+                  onChange={(e) => setSettings({ ...settings, labor_cost_includes_tax: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300 text-azul-profundo focus:ring-azul-profundo"
+                />
+                <Label htmlFor="labor_cost_includes_tax" className="text-sm font-normal cursor-pointer">
+                  El costo de mano de obra incluye IVA
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="lens_cost_includes_tax"
+                  checked={settings.lens_cost_includes_tax ?? true}
+                  onChange={(e) => setSettings({ ...settings, lens_cost_includes_tax: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300 text-azul-profundo focus:ring-azul-profundo"
+                />
+                <Label htmlFor="lens_cost_includes_tax" className="text-sm font-normal cursor-pointer">
+                  El costo de lentes incluye IVA
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="treatments_cost_includes_tax"
+                  checked={settings.treatments_cost_includes_tax ?? true}
+                  onChange={(e) => setSettings({ ...settings, treatments_cost_includes_tax: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300 text-azul-profundo focus:ring-azul-profundo"
+                />
+                <Label htmlFor="treatments_cost_includes_tax" className="text-sm font-normal cursor-pointer">
+                  El costo de tratamientos incluye IVA
+                </Label>
+              </div>
             </div>
           </div>
         </CardContent>

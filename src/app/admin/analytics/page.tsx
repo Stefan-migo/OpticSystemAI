@@ -1,10 +1,9 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { 
   Select,
   SelectContent,
@@ -32,39 +31,77 @@ import {
   Package,
   Target,
   Download,
-  Filter,
   RefreshCw,
   AlertTriangle,
   Activity,
   ShoppingCart,
-  Crown,
   ArrowUpRight,
   ArrowDownRight,
   User,
-  LineChart as LineChartIcon
+  LineChart as LineChartIcon,
+  Receipt,
+  Wrench,
+  Eye,
+  Clock,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import { PieChart } from '@/components/admin/charts/PieChart';
 import { BarChart } from '@/components/admin/charts/BarChart';
 import { AreaChart } from '@/components/admin/charts/AreaChart';
 import { ColumnChart } from '@/components/admin/charts/ColumnChart';
-import { HelpDialog } from '@/components/admin/HelpDialog';
-import { ANALYTICS_HELP, EMPTY_STATE_MESSAGES } from '@/lib/analytics-help';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
+import { BranchSelector } from '@/components/admin/BranchSelector';
 
 interface AnalyticsData {
   kpis: {
     totalRevenue: number;
-    totalOrders: number;
-    totalCustomers: number;
-    totalProducts: number;
-    avgOrderValue: number;
+    posRevenue: number;
+    workOrdersRevenue: number;
     revenueGrowth: number;
+    totalOrders: number;
+    totalWorkOrders: number;
+    totalQuotes: number;
+    totalAppointments: number;
+    totalCustomers: number;
+    newCustomers: number;
+    recurringCustomers: number;
+    avgOrderValue: number;
+    avgWorkOrderValue: number;
+    avgQuoteValue: number;
+    quoteConversionRate: number;
+    appointmentCompletionRate: number;
+    avgDeliveryDays: number;
+  };
+  workOrders: {
+    total: number;
+    pending: number;
+    completed: number;
+    cancelled: number;
+    byStatus: Record<string, number>;
+  };
+  quotes: {
+    total: number;
+    accepted: number;
+    rejected: number;
+    expired: number;
+    converted: number;
+    byStatus: Record<string, number>;
     conversionRate: number;
   };
-  trends: {
-    sales: Array<{ date: string; value: number; count: number }>;
-    customers: Array<{ date: string; value: number; count: number }>;
+  appointments: {
+    total: number;
+    completed: number;
+    cancelled: number;
+    noShow: number;
+    byStatus: Record<string, number>;
+    completionRate: number;
   };
   products: {
+    total: number;
+    lowStock: number;
+    outOfStock: number;
     topProducts: Array<{
       id: string;
       name: string;
@@ -75,17 +112,16 @@ interface AnalyticsData {
     }>;
     categoryRevenue: Array<{ category: string; revenue: number }>;
   };
-  customers: {
-    segmentation: {
-      new: number;
-      basic: number;
-      premium: number;
-      members: number;
-      nonMembers: number;
-    };
-  };
-  orders: {
-    statusDistribution: Record<string, number>;
+  paymentMethods: Array<{
+    method: string;
+    count: number;
+    revenue: number;
+  }>;
+  trends: {
+    sales: Array<{ date: string; value: number; count: number }>;
+    customers: Array<{ date: string; value: number; count: number }>;
+    workOrders: Array<{ date: string; value: number; count: number }>;
+    quotes: Array<{ date: string; value: number; count: number }>;
   };
   period: {
     from: string;
@@ -95,6 +131,7 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsPage() {
+  const { currentBranchId, isSuperAdmin, branches, isLoading: branchLoading } = useBranch();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,21 +140,25 @@ export default function AnalyticsPage() {
   
   // Chart type selectors
   const [salesChartType, setSalesChartType] = useState<'area' | 'column'>('area');
-  const [customersChartType, setCustomersChartType] = useState<'area' | 'column'>('area');
-  const [statusChartType, setStatusChartType] = useState<'pie' | 'bar'>('pie');
-  const [categoryChartType, setCategoryChartType] = useState<'bar' | 'pie'>('bar');
-  const [segmentationChartType, setSegmentationChartType] = useState<'pie' | 'bar'>('pie');
+  const [workOrdersChartType, setWorkOrdersChartType] = useState<'area' | 'column'>('area');
+  const [quotesChartType, setQuotesChartType] = useState<'area' | 'column'>('area');
+
+  const isGlobalView = !currentBranchId && isSuperAdmin;
 
   useEffect(() => {
     fetchAnalytics();
-  }, [period]);
+  }, [period, currentBranchId]);
 
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
       setRefreshing(true);
       
-      const response = await fetch(`/api/admin/analytics/dashboard?period=${period}`);
+      const headers: HeadersInit = {
+        ...getBranchHeader(currentBranchId)
+      };
+      
+      const response = await fetch(`/api/admin/analytics/dashboard?period=${period}`, { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch analytics');
       }
@@ -154,6 +195,42 @@ export default function AnalyticsPage() {
     if (growth > 0) return 'text-green-600';
     if (growth < 0) return 'text-red-600';
     return 'text-gray-600';
+  };
+
+  const getPaymentMethodLabel = (method: string) => {
+    const labels: Record<string, string> = {
+      cash: 'Efectivo',
+      debit_card: 'Tarjeta Débito',
+      credit_card: 'Tarjeta Crédito',
+      installments: 'Cuotas',
+      transfer: 'Transferencia',
+      other: 'Otro'
+    };
+    return labels[method] || method;
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      draft: 'Borrador',
+      sent: 'Enviado',
+      accepted: 'Aceptado',
+      rejected: 'Rechazado',
+      expired: 'Expirado',
+      converted_to_work: 'Convertido',
+      quote: 'Presupuesto',
+      ordered: 'Ordenado',
+      sent_to_lab: 'Enviado al Lab',
+      received_from_lab: 'Recibido',
+      mounted: 'Montado',
+      quality_check: 'Control Calidad',
+      ready_for_pickup: 'Listo para Retiro',
+      delivered: 'Entregado',
+      cancelled: 'Cancelado',
+      scheduled: 'Agendada',
+      completed: 'Completada',
+      no_show: 'No Asistió'
+    };
+    return labels[status] || status;
   };
 
   if (loading && !analytics) {
@@ -207,11 +284,19 @@ export default function AnalyticsPage() {
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Analíticas y Reportes</h1>
           <p className="text-tierra-media">
-            Métricas y análisis de la óptica - Últimos {analytics.period.days} días
+            {isGlobalView 
+              ? `Métricas y análisis - Todas las sucursales - Últimos ${analytics.period.days} días`
+              : `Métricas y análisis - Últimos ${analytics.period.days} días`}
           </p>
         </div>
         
         <div className="flex gap-2">
+          {isSuperAdmin && (
+            <BranchSelector 
+              branches={branches} 
+              currentBranchId={currentBranchId}
+            />
+          )}
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Período" />
@@ -227,20 +312,15 @@ export default function AnalyticsPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Actualizar
           </Button>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* Main KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-tierra-media">Ingresos Totales</p>
-              <HelpDialog {...ANALYTICS_HELP.totalRevenue} />
             </div>
             <div className="flex items-center justify-between">
               <div>
@@ -252,7 +332,6 @@ export default function AnalyticsPage() {
                   <span className={`text-sm ml-1 ${getGrowthColor(analytics.kpis.revenueGrowth)}`}>
                     {formatPercentage(analytics.kpis.revenueGrowth)}
                   </span>
-                  <HelpDialog {...ANALYTICS_HELP.revenueGrowth} />
                 </div>
               </div>
               <DollarSign className="h-8 w-8 text-verde-suave" />
@@ -260,62 +339,130 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-tierra-media">Pedidos</p>
-              <HelpDialog {...ANALYTICS_HELP.totalOrders} />
+              <p className="text-sm text-tierra-media">Trabajos de Laboratorio</p>
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold text-azul-profundo">
-                  {analytics.kpis.totalOrders}
+                  {analytics.workOrders.total}
                 </p>
                 <p className="text-sm text-tierra-media mt-1">
-                  Promedio: {formatPrice(analytics.kpis.avgOrderValue)}
+                  {analytics.workOrders.completed} completados
                 </p>
               </div>
-              <ShoppingCart className="h-8 w-8 text-azul-profundo" />
+              <Wrench className="h-8 w-8 text-azul-profundo" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-tierra-media">Clientes</p>
-              <HelpDialog {...ANALYTICS_HELP.totalCustomers} />
+              <p className="text-sm text-tierra-media">Presupuestos</p>
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold text-dorado">
-                  {analytics.kpis.totalCustomers}
+                  {analytics.quotes.total}
                 </p>
-                <div className="flex items-center mt-1">
-                  <p className="text-sm text-tierra-media">
-                    Conv: {analytics.kpis.conversionRate.toFixed(1)}%
-                  </p>
-                  <HelpDialog {...ANALYTICS_HELP.conversionRate} />
-                </div>
+                <p className="text-sm text-tierra-media mt-1">
+                  {analytics.kpis.quoteConversionRate.toFixed(1)}% conversión
+                </p>
               </div>
-              <Users className="h-8 w-8 text-dorado" />
+              <Receipt className="h-8 w-8 text-dorado" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-tierra-media">Citas</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-2xl font-bold text-purple-600">
+                  {analytics.appointments.total}
+                </p>
+                <p className="text-sm text-tierra-media mt-1">
+                  {analytics.kpis.appointmentCompletionRate.toFixed(1)}% completadas
+                </p>
+              </div>
+              <Calendar className="h-8 w-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Secondary KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-tierra-media">Ventas POS</p>
+                <p className="text-xl font-bold text-verde-suave">
+                  {formatPrice(analytics.kpis.posRevenue)}
+                </p>
+                <p className="text-xs text-tierra-media mt-1">
+                  {analytics.kpis.totalOrders} transacciones
+                </p>
+              </div>
+              <ShoppingCart className="h-6 w-6 text-verde-suave" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-tierra-media">Ingresos Trabajos</p>
+                <p className="text-xl font-bold text-azul-profundo">
+                  {formatPrice(analytics.kpis.workOrdersRevenue)}
+                </p>
+                <p className="text-xs text-tierra-media mt-1">
+                  {analytics.kpis.avgDeliveryDays} días promedio
+                </p>
+              </div>
+              <Wrench className="h-6 w-6 text-azul-profundo" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-tierra-media">Clientes</p>
+                <p className="text-xl font-bold text-dorado">
+                  {analytics.kpis.totalCustomers}
+                </p>
+                <p className="text-xs text-tierra-media mt-1">
+                  {analytics.kpis.newCustomers} nuevos
+                </p>
+              </div>
+              <Users className="h-6 w-6 text-dorado" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-tierra-media">Productos</p>
-                <p className="text-2xl font-bold text-red-500">
-                  {analytics.kpis.totalProducts}
+                <p className="text-xl font-bold text-red-500">
+                  {analytics.products.total}
                 </p>
-                <p className="text-sm text-tierra-media mt-1">
-                  Activos
+                <p className="text-xs text-tierra-media mt-1">
+                  {analytics.products.lowStock} bajo stock
                 </p>
               </div>
-              <Package className="h-8 w-8 text-red-500" />
+              <Package className="h-6 w-6 text-red-500" />
             </div>
           </CardContent>
         </Card>
@@ -323,23 +470,23 @@ export default function AnalyticsPage() {
 
       {/* Analytics Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Resumen</TabsTrigger>
+          <TabsTrigger value="work-orders">Trabajos</TabsTrigger>
+          <TabsTrigger value="quotes">Presupuestos</TabsTrigger>
           <TabsTrigger value="sales">Ventas</TabsTrigger>
           <TabsTrigger value="products">Productos</TabsTrigger>
-          <TabsTrigger value="customers">Clientes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Sales Trend */}
+            {/* Revenue Trend */}
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-5 w-5" />
-                    <CardTitle>Tendencia de Ventas</CardTitle>
-                    <HelpDialog {...ANALYTICS_HELP.salesTrend} />
+                    <CardTitle>Tendencia de Ingresos</CardTitle>
                   </div>
                   <div className="flex gap-1">
                     <Button
@@ -347,7 +494,6 @@ export default function AnalyticsPage() {
                       size="sm"
                       onClick={() => setSalesChartType('area')}
                       className="h-7 px-3 text-xs"
-                      title="Vista de Área"
                     >
                       <Activity className="h-3 w-3 mr-1" />
                       Área
@@ -357,7 +503,6 @@ export default function AnalyticsPage() {
                       size="sm"
                       onClick={() => setSalesChartType('column')}
                       className="h-7 px-3 text-xs"
-                      title="Vista de Columnas"
                     >
                       <BarChart3 className="h-3 w-3 mr-1" />
                       Columnas
@@ -385,32 +530,29 @@ export default function AnalyticsPage() {
               </CardContent>
             </Card>
 
-            {/* Customer Acquisition */}
+            {/* Work Orders Trend */}
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    <CardTitle>Adquisición de Clientes</CardTitle>
-                    <HelpDialog {...ANALYTICS_HELP.customerAcquisition} />
+                    <Wrench className="h-5 w-5" />
+                    <CardTitle>Trabajos de Laboratorio</CardTitle>
                   </div>
                   <div className="flex gap-1">
                     <Button
-                      variant={customersChartType === 'area' ? 'default' : 'outline'}
+                      variant={workOrdersChartType === 'area' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setCustomersChartType('area')}
+                      onClick={() => setWorkOrdersChartType('area')}
                       className="h-7 px-3 text-xs"
-                      title="Vista de Área"
                     >
                       <Activity className="h-3 w-3 mr-1" />
                       Área
                     </Button>
                     <Button
-                      variant={customersChartType === 'column' ? 'default' : 'outline'}
+                      variant={workOrdersChartType === 'column' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setCustomersChartType('column')}
+                      onClick={() => setWorkOrdersChartType('column')}
                       className="h-7 px-3 text-xs"
-                      title="Vista de Columnas"
                     >
                       <BarChart3 className="h-3 w-3 mr-1" />
                       Columnas
@@ -419,130 +561,202 @@ export default function AnalyticsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {customersChartType === 'area' ? (
+                {workOrdersChartType === 'area' ? (
                   <AreaChart 
-                    data={analytics.trends.customers} 
-                    title="Crecimiento de Clientes"
-                    color="#D4A853"
+                    data={analytics.trends.workOrders} 
+                    title="Trabajos Creados"
+                    color="#1E3A8A"
                     showGrid={true}
                     formatValue={(val) => Math.round(val).toString()}
                   />
                 ) : (
                   <ColumnChart
-                    data={analytics.trends.customers}
-                    title="Nuevos Clientes por Período"
-                    color="#D4A853"
+                    data={analytics.trends.workOrders}
+                    title="Trabajos por Período"
+                    color="#1E3A8A"
                     formatValue={(val) => Math.round(val).toString()}
                   />
                 )}
               </CardContent>
             </Card>
 
-            {/* Order Status Distribution */}
+            {/* Work Orders Status Distribution */}
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <PieChartIcon className="h-5 w-5" />
-                    <CardTitle>Estados de Pedidos</CardTitle>
-                    <HelpDialog {...ANALYTICS_HELP.orderStatus} />
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant={statusChartType === 'pie' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setStatusChartType('pie')}
-                      className="h-7 px-2"
-                    >
-                      <PieChartIcon className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant={statusChartType === 'bar' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setStatusChartType('bar')}
-                      className="h-7 px-2"
-                    >
-                      <BarChart3 className="h-3 w-3" />
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <PieChartIcon className="h-5 w-5" />
+                  <CardTitle>Estados de Trabajos</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
-                {statusChartType === 'pie' ? (
+                {Object.keys(analytics.workOrders.byStatus).length > 0 ? (
                   <PieChart
-                    data={Object.entries(analytics.orders.statusDistribution).map(([status, count]) => ({
-                      label: status.charAt(0).toUpperCase() + status.slice(1),
+                    data={Object.entries(analytics.workOrders.byStatus).map(([status, count]) => ({
+                      label: getStatusLabel(status),
                       value: count as number
                     }))}
                     title="Distribución por Estado"
                     showLegend={true}
                   />
                 ) : (
-                  <BarChart
-                    data={Object.entries(analytics.orders.statusDistribution).map(([status, count]) => ({
-                      label: status.charAt(0).toUpperCase() + status.slice(1),
-                      value: count as number
-                    }))}
-                    color="#1E3A8A"
-                    horizontal={true}
-                  />
+                  <div className="text-center py-8 text-tierra-media">
+                    No hay trabajos en este período
+                  </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Customer Segmentation */}
+            {/* Quotes Status Distribution */}
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    <CardTitle>Segmentación de Clientes</CardTitle>
-                    <HelpDialog {...ANALYTICS_HELP.customerSegmentation} />
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant={segmentationChartType === 'pie' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setSegmentationChartType('pie')}
-                      className="h-7 px-2"
-                    >
-                      <PieChartIcon className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant={segmentationChartType === 'bar' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setSegmentationChartType('bar')}
-                      className="h-7 px-2"
-                    >
-                      <BarChart3 className="h-3 w-3" />
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <PieChartIcon className="h-5 w-5" />
+                  <CardTitle>Estados de Presupuestos</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
-                {segmentationChartType === 'pie' ? (
+                {Object.keys(analytics.quotes.byStatus).length > 0 ? (
                   <PieChart
-                    data={[
-                      { label: 'Miembros', value: analytics.customers.segmentation.members },
-                      { label: 'Premium', value: analytics.customers.segmentation.premium },
-                      { label: 'Básico', value: analytics.customers.segmentation.basic },
-                      { label: 'Sin Membresía', value: analytics.customers.segmentation.nonMembers }
-                    ]}
-                    title="Distribución de Clientes"
+                    data={Object.entries(analytics.quotes.byStatus).map(([status, count]) => ({
+                      label: getStatusLabel(status),
+                      value: count as number
+                    }))}
+                    title="Distribución por Estado"
                     showLegend={true}
                   />
                 ) : (
-                  <BarChart
-                    data={[
-                      { label: 'Miembros', value: analytics.customers.segmentation.members },
-                      { label: 'Premium', value: analytics.customers.segmentation.premium },
-                      { label: 'Básico', value: analytics.customers.segmentation.basic },
-                      { label: 'Sin Membresía', value: analytics.customers.segmentation.nonMembers }
-                    ]}
-                    color="#D4A853"
-                    horizontal={true}
-                  />
+                  <div className="text-center py-8 text-tierra-media">
+                    No hay presupuestos en este período
+                  </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="work-orders" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Work Orders Metrics */}
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Target className="h-5 w-5 mr-2" />
+                  Métricas de Trabajos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-azul-profundo/10 rounded-lg border border-azul-profundo/20">
+                    <p className="text-2xl font-bold text-azul-profundo">
+                      {analytics.workOrders.total}
+                    </p>
+                    <p className="text-sm text-tierra-media">Total Trabajos</p>
+                  </div>
+                  <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <p className="text-2xl font-bold text-orange-600">
+                      {analytics.workOrders.pending}
+                    </p>
+                    <p className="text-sm text-tierra-media">Pendientes</p>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                    <p className="text-2xl font-bold text-green-600">
+                      {analytics.workOrders.completed}
+                    </p>
+                    <p className="text-sm text-tierra-media">Completados</p>
+                  </div>
+                  <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {analytics.kpis.avgDeliveryDays}
+                    </p>
+                    <p className="text-sm text-tierra-media">Días Promedio</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Work Orders Trend */}
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <LineChartIcon className="h-5 w-5 mr-2" />
+                  Tendencia de Trabajos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AreaChart 
+                  data={analytics.trends.workOrders} 
+                  title="Trabajos Creados por Día"
+                  color="#1E3A8A"
+                  showGrid={true}
+                  formatValue={(val) => Math.round(val).toString()}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="quotes" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Quotes Metrics */}
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Target className="h-5 w-5 mr-2" />
+                  Métricas de Presupuestos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-dorado/10 rounded-lg border border-dorado/20">
+                    <p className="text-2xl font-bold text-dorado">
+                      {analytics.quotes.total}
+                    </p>
+                    <p className="text-sm text-tierra-media">Total</p>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                    <p className="text-2xl font-bold text-green-600">
+                      {analytics.quotes.accepted + analytics.quotes.converted}
+                    </p>
+                    <p className="text-sm text-tierra-media">Aceptados</p>
+                  </div>
+                  <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+                    <p className="text-2xl font-bold text-red-600">
+                      {analytics.quotes.rejected}
+                    </p>
+                    <p className="text-sm text-tierra-media">Rechazados</p>
+                  </div>
+                  <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {analytics.kpis.quoteConversionRate.toFixed(1)}%
+                    </p>
+                    <p className="text-sm text-tierra-media">Tasa Conversión</p>
+                  </div>
+                </div>
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-tierra-media mb-2">Valor Promedio</p>
+                  <p className="text-xl font-bold text-azul-profundo">
+                    {formatPrice(analytics.kpis.avgQuoteValue)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quotes Trend */}
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <LineChartIcon className="h-5 w-5 mr-2" />
+                  Tendencia de Presupuestos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AreaChart 
+                  data={analytics.trends.quotes} 
+                  title="Presupuestos Creados por Día"
+                  color="#D4A853"
+                  showGrid={true}
+                  formatValue={(val) => Math.round(val).toString()}
+                />
               </CardContent>
             </Card>
           </div>
@@ -553,69 +767,52 @@ export default function AnalyticsPage() {
             {/* Revenue by Category */}
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    <CardTitle>Ingresos por Categoría</CardTitle>
-                    <HelpDialog {...ANALYTICS_HELP.categoryRevenue} />
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant={categoryChartType === 'bar' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setCategoryChartType('bar')}
-                      className="h-7 px-2"
-                    >
-                      <BarChart3 className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant={categoryChartType === 'pie' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setCategoryChartType('pie')}
-                      className="h-7 px-2"
-                    >
-                      <PieChartIcon className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
+                <CardTitle className="flex items-center">
+                  <BarChart3 className="h-5 w-5 mr-2" />
+                  Ingresos por Categoría
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {analytics.products.categoryRevenue.length > 0 ? (
-                  categoryChartType === 'bar' ? (
-                    <BarChart 
-                      data={analytics.products.categoryRevenue.map(cat => ({
-                        label: cat.category,
-                        value: cat.revenue
-                      }))}
-                      title="Categorías Más Rentables"
-                      color="#9DC65D"
-                      horizontal={true}
-                      formatValue={formatPrice}
-                    />
-                  ) : (
-                    <PieChart
-                      data={analytics.products.categoryRevenue.map(cat => ({
-                        label: cat.category,
-                        value: cat.revenue
-                      }))}
-                      title="Distribución de Ingresos"
-                      showLegend={true}
-                    />
-                  )
+                  <BarChart 
+                    data={analytics.products.categoryRevenue.map(cat => ({
+                      label: cat.category,
+                      value: cat.revenue
+                    }))}
+                    title="Categorías Más Rentables"
+                    color="#9DC65D"
+                    horizontal={true}
+                    formatValue={formatPrice}
+                  />
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-64 text-center space-y-3 p-6">
-                    <Package className="h-16 w-16 text-tierra-media opacity-50" />
-                    <div>
-                      <h4 className="font-semibold text-lg text-azul-profundo mb-2">
-                        {EMPTY_STATE_MESSAGES.noCategories.title}
-                      </h4>
-                      <p className="text-sm text-tierra-media mb-2">
-                        {EMPTY_STATE_MESSAGES.noCategories.message}
-                      </p>
-                      <p className="text-xs text-verde-suave">
-                        💡 {EMPTY_STATE_MESSAGES.noCategories.suggestion}
-                      </p>
-                    </div>
+                  <div className="text-center py-8 text-tierra-media">
+                    No hay datos de categorías
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Payment Methods */}
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <PieChartIcon className="h-5 w-5 mr-2" />
+                  Métodos de Pago
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {analytics.paymentMethods.length > 0 ? (
+                  <PieChart
+                    data={analytics.paymentMethods.map(pm => ({
+                      label: getPaymentMethodLabel(pm.method),
+                      value: pm.revenue
+                    }))}
+                    title="Distribución de Pagos"
+                    showLegend={true}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-tierra-media">
+                    No hay datos de métodos de pago
                   </div>
                 )}
               </CardContent>
@@ -641,13 +838,13 @@ export default function AnalyticsPage() {
                     <p className="text-2xl font-bold text-azul-profundo">
                       {formatPrice(analytics.kpis.avgOrderValue)}
                     </p>
-                    <p className="text-sm text-tierra-media">Ticket Promedio</p>
+                    <p className="text-sm text-tierra-media">Ticket Promedio POS</p>
                   </div>
                   <div className="text-center p-4 bg-dorado/10 rounded-lg border border-dorado/20">
                     <p className="text-2xl font-bold text-dorado">
                       {analytics.kpis.totalOrders}
                     </p>
-                    <p className="text-sm text-tierra-media">Pedidos Totales</p>
+                    <p className="text-sm text-tierra-media">Ventas POS</p>
                   </div>
                   <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
                     <p className={`text-2xl font-bold ${analytics.kpis.revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -666,23 +863,28 @@ export default function AnalyticsPage() {
             {/* Top Products */}
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardHeader>
-                <div className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  <CardTitle>Productos Más Vendidos</CardTitle>
-                  <HelpDialog {...ANALYTICS_HELP.topProducts} />
-                </div>
+                  Productos Más Vendidos
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <BarChart 
-                  data={analytics.products.topProducts.slice(0, 8).map(prod => ({
-                    label: prod.name,
-                    value: prod.revenue
-                  }))}
-                  title="Por Ingresos"
-                  color="#D4A853"
-                  horizontal={true}
-                  formatValue={formatPrice}
-                />
+                {analytics.products.topProducts.length > 0 ? (
+                  <BarChart 
+                    data={analytics.products.topProducts.slice(0, 8).map(prod => ({
+                      label: prod.name,
+                      value: prod.revenue
+                    }))}
+                    title="Por Ingresos"
+                    color="#D4A853"
+                    horizontal={true}
+                    formatValue={formatPrice}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-tierra-media">
+                    No hay productos vendidos en este período
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -732,95 +934,28 @@ export default function AnalyticsPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
 
-        <TabsContent value="customers" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Customer Acquisition Trend */}
-            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    <CardTitle>Adquisición de Clientes</CardTitle>
-                    <HelpDialog {...ANALYTICS_HELP.customerAcquisition} />
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant={customersChartType === 'area' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setCustomersChartType('area')}
-                      className="h-7 px-3 text-xs"
-                    >
-                      <Activity className="h-3 w-3 mr-1" />
-                      Área
-                    </Button>
-                    <Button
-                      variant={customersChartType === 'column' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setCustomersChartType('column')}
-                      className="h-7 px-3 text-xs"
-                    >
-                      <BarChart3 className="h-3 w-3 mr-1" />
-                      Columnas
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {customersChartType === 'area' ? (
-                  <AreaChart 
-                    data={analytics.trends.customers} 
-                    title="Crecimiento de Clientes"
-                    color="#D4A853"
-                    showGrid={true}
-                    formatValue={(val) => Math.round(val).toString()}
-                  />
-                ) : (
-                  <ColumnChart
-                    data={analytics.trends.customers}
-                    title="Nuevos Clientes por Período"
-                    color="#D4A853"
-                    formatValue={(val) => Math.round(val).toString()}
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Customer Metrics */}
+            {/* Inventory Alerts */}
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Target className="h-5 w-5 mr-2" />
-                  Métricas de Clientes
+                  <AlertTriangle className="h-5 w-5 mr-2" />
+                  Alertas de Inventario
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-azul-profundo/10 rounded-lg border border-azul-profundo/20">
-                    <p className="text-2xl font-bold text-azul-profundo">
-                      {analytics.kpis.totalCustomers}
+                  <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <p className="text-2xl font-bold text-orange-600">
+                      {analytics.products.lowStock}
                     </p>
-                    <p className="text-sm text-tierra-media">Total Clientes</p>
+                    <p className="text-sm text-tierra-media">Bajo Stock</p>
                   </div>
-                  <div className="text-center p-4 bg-dorado/10 rounded-lg border border-dorado/20">
-                    <p className="text-2xl font-bold text-dorado">
-                      {analytics.customers.segmentation.members}
+                  <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+                    <p className="text-2xl font-bold text-red-600">
+                      {analytics.products.outOfStock}
                     </p>
-                    <p className="text-sm text-tierra-media">Miembros Activos</p>
-                  </div>
-                  <div className="text-center p-4 bg-verde-suave/10 rounded-lg border border-verde-suave/20">
-                    <p className="text-2xl font-bold text-verde-suave">
-                      {analytics.kpis.conversionRate.toFixed(1)}%
-                    </p>
-                    <p className="text-sm text-tierra-media">Tasa Conversión</p>
-                  </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <p className="text-2xl font-bold text-purple-600">
-                      {analytics.customers.segmentation.premium}
-                    </p>
-                    <p className="text-sm text-tierra-media">Miembros Premium</p>
+                    <p className="text-sm text-tierra-media">Sin Stock</p>
                   </div>
                 </div>
               </CardContent>

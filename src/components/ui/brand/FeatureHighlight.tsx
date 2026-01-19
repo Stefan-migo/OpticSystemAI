@@ -67,7 +67,10 @@ export default function FeatureHighlight({
     switch (category) {
       case 'natural':
         return (
-          <Badge className="bg-verde-suave text-white">
+          <Badge 
+            className="bg-verde-suave text-white"
+            style={{ color: 'var(--admin-accent-secondary)' }}
+          >
             <Leaf className="h-3 w-3 mr-1" />
             100% Natural
           </Badge>

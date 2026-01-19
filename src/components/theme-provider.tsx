@@ -64,27 +64,18 @@ function ThemeClassManager({ children }: { children: React.ReactNode }) {
     // Force a reflow to ensure styles are applied
     void root.offsetHeight
     
-    // Debug logging
-    console.log('🎨 Theme applied:', theme)
-    console.log('🎨 Classes on <html>:', root.className)
-    console.log('🎨 Has theme-blue?', root.classList.contains('theme-blue'))
-    console.log('🎨 Has theme-green?', root.classList.contains('theme-green'))
-    
-    // Verify CSS variables are actually applied
-    const bgSecondary = getComputedStyle(root).getPropertyValue('--admin-bg-secondary').trim()
-    const background = getComputedStyle(root).getPropertyValue('--background').trim()
-    
-    console.log('🎨 Current --admin-bg-secondary:', bgSecondary)
-    console.log('🎨 Current --background:', background)
-    
-    if (theme === 'blue') {
-      console.log('🔵 Expected --admin-bg-secondary: #1E40AF')
-      if (bgSecondary !== '#1E40AF') {
+    // Debug logging (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎨 Theme applied:', theme)
+      console.log('🎨 Classes on <html>:', root.className)
+      
+      // Verify CSS variables are actually applied
+      const bgSecondary = getComputedStyle(root).getPropertyValue('--admin-bg-secondary').trim()
+      const background = getComputedStyle(root).getPropertyValue('--background').trim()
+      
+      if (theme === 'blue' && bgSecondary !== '#1E40AF') {
         console.error('❌ Blue theme CSS variable not applied correctly!')
-      }
-    } else if (theme === 'green') {
-      console.log('🟢 Expected --admin-bg-secondary: #166534')
-      if (bgSecondary !== '#166534') {
+      } else if (theme === 'green' && bgSecondary !== '#166534') {
         console.error('❌ Green theme CSS variable not applied correctly!')
       }
     }

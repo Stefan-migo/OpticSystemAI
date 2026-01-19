@@ -34,6 +34,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import CreatePrescriptionForm from '@/components/admin/CreatePrescriptionForm';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
+import { calculatePriceWithTax } from '@/lib/utils/tax';
+import { getTaxPercentage, getQuoteTaxInclusionSettings } from '@/lib/utils/tax-config';
 
 interface CreateWorkOrderFormProps {
   onSuccess: () => void;
@@ -50,6 +54,7 @@ export default function CreateWorkOrderForm({
   initialCustomerId,
   initialPrescriptionId
 }: CreateWorkOrderFormProps) {
+  const { currentBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
@@ -91,6 +96,7 @@ export default function CreateWorkOrderForm({
     lab_order_number: '',
     lab_estimated_delivery_date: '',
     frame_cost: 0,
+    frame_price_includes_tax: false,
     lens_cost: 0,
     treatments_cost: 0,
     labor_cost: 0,
@@ -162,7 +168,10 @@ export default function CreateWorkOrderForm({
   const loadQuote = async (quoteId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/admin/quotes/${quoteId}`);
+      const headers: HeadersInit = {
+        ...getBranchHeader(currentBranchId)
+      };
+      const response = await fetch(`/api/admin/quotes/${quoteId}`, { headers });
       if (response.ok) {
         const data = await response.json();
         const quote = data.quote;
@@ -170,6 +179,23 @@ export default function CreateWorkOrderForm({
         // Load customer
         if (quote.customer_id) {
           await fetchCustomer(quote.customer_id);
+        }
+        
+        // If quote has frame_product_id, fetch the product to get price_includes_tax
+        let framePriceIncludesTax = false;
+        if (quote.frame_product_id) {
+          try {
+            const productHeaders: HeadersInit = {
+              ...getBranchHeader(currentBranchId)
+            };
+            const productResponse = await fetch(`/api/admin/products/${quote.frame_product_id}`, { headers: productHeaders });
+            if (productResponse.ok) {
+              const productData = await productResponse.json();
+              framePriceIncludesTax = productData.product?.price_includes_tax || false;
+            }
+          } catch (error) {
+            console.error('Error fetching product for price_includes_tax:', error);
+          }
         }
         
         // Set form data from quote
@@ -188,6 +214,7 @@ export default function CreateWorkOrderForm({
           lens_tint_color: quote.lens_tint_color || '',
           lens_tint_percentage: quote.lens_tint_percentage || 0,
           frame_cost: quote.frame_cost || 0,
+          frame_price_includes_tax: framePriceIncludesTax,
           lens_cost: quote.lens_cost || 0,
           treatments_cost: quote.treatments_cost || 0,
           labor_cost: quote.labor_cost || 0,
@@ -252,7 +279,10 @@ export default function CreateWorkOrderForm({
 
       setSearchingCustomers(true);
       try {
-        const response = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(customerSearch)}`);
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId)
+        };
+        const response = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(customerSearch)}`, { headers });
         if (response.ok) {
           const data = await response.json();
           setCustomerResults(data.customers || []);
@@ -266,7 +296,7 @@ export default function CreateWorkOrderForm({
 
     const debounce = setTimeout(searchCustomers, 300);
     return () => clearTimeout(debounce);
-  }, [customerSearch]);
+  }, [customerSearch, currentBranchId]);
 
   // Search frames
   useEffect(() => {
@@ -278,7 +308,10 @@ export default function CreateWorkOrderForm({
 
       setSearchingFrames(true);
       try {
-        const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(frameSearch)}&type=frame`);
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId)
+        };
+        const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(frameSearch)}&type=frame`, { headers });
         if (response.ok) {
           const data = await response.json();
           setFrameResults(data.products || []);
@@ -292,32 +325,114 @@ export default function CreateWorkOrderForm({
 
     const debounce = setTimeout(searchFrames, 300);
     return () => clearTimeout(debounce);
-  }, [frameSearch]);
+  }, [frameSearch, currentBranchId]);
 
+  const [taxPercentage, setTaxPercentage] = useState<number>(19.0);
+  const [quoteSettings, setQuoteSettings] = useState<any>(null);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+  
+  // Fetch tax percentage and quote settings on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setLoadingSettings(true);
+      try {
+        const tax = await getTaxPercentage();
+        setTaxPercentage(tax);
+        
+        // Fetch quote settings for tax inclusion settings
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId)
+        };
+        const response = await fetch('/api/admin/quote-settings', { headers });
+        if (response.ok) {
+          const data = await response.json();
+          setQuoteSettings(data.settings);
+        }
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+    fetchSettings();
+  }, [currentBranchId]);
+  
   const calculateTotal = () => {
-    const frame = formData.frame_cost || 0;
-    const lens = formData.lens_cost || 0;
-    const treatments = formData.treatments_cost || 0;
-    const labor = formData.labor_cost || 0;
-    const lab = formData.lab_cost || 0;
+    // Use tax percentage from settings or system config, default to 19% (IVA Chile)
+    const effectiveTaxRate = quoteSettings?.default_tax_percentage || taxPercentage;
     
-    const subtotal = frame + lens + treatments + labor + lab;
-    const discount = subtotal * (formData.discount_amount / (subtotal || 1));
-    const afterDiscount = subtotal - formData.discount_amount;
-    const tax = afterDiscount * 0.19; // 19% IVA Chile
+    // Get tax inclusion settings from quote settings (default to true - IVA incluido)
+    const lensIncludesTax = quoteSettings?.lens_cost_includes_tax ?? true;
+    const treatmentsIncludeTax = quoteSettings?.treatments_cost_includes_tax ?? true;
+    const laborIncludesTax = quoteSettings?.labor_cost_includes_tax ?? true;
+    // Lab cost typically doesn't include tax (it's an external service)
+    const labIncludesTax = false;
+    
+    // Calculate frame price with tax consideration
+    const framePriceBreakdown = calculatePriceWithTax(
+      formData.frame_cost || 0,
+      formData.frame_price_includes_tax || false,
+      effectiveTaxRate
+    );
+    
+    // Calculate lens, treatments, labor, and lab with tax consideration
+    const lensBreakdown = calculatePriceWithTax(
+      formData.lens_cost || 0,
+      lensIncludesTax,
+      effectiveTaxRate
+    );
+    
+    const treatmentsBreakdown = calculatePriceWithTax(
+      formData.treatments_cost || 0,
+      treatmentsIncludeTax,
+      effectiveTaxRate
+    );
+    
+    const laborBreakdown = calculatePriceWithTax(
+      formData.labor_cost || 0,
+      laborIncludesTax,
+      effectiveTaxRate
+    );
+    
+    const labBreakdown = calculatePriceWithTax(
+      formData.lab_cost || 0,
+      labIncludesTax,
+      effectiveTaxRate
+    );
+    
+    // Calculate subtotal (sum of all subtotals without tax)
+    const subtotal = framePriceBreakdown.subtotal + 
+                     lensBreakdown.subtotal + 
+                     treatmentsBreakdown.subtotal + 
+                     laborBreakdown.subtotal + 
+                     labBreakdown.subtotal;
+    
+    // Calculate total tax (sum of all taxes)
+    const totalTax = framePriceBreakdown.tax + 
+                     lensBreakdown.tax + 
+                     treatmentsBreakdown.tax + 
+                     laborBreakdown.tax + 
+                     labBreakdown.tax;
+    
+    // Total with tax (before discount)
+    const totalWithTax = subtotal + totalTax;
+    
+    // Apply discount to total with tax
+    const discount = formData.discount_amount || 0;
+    const afterDiscount = Math.max(0, totalWithTax - discount);
     
     setFormData(prev => ({
       ...prev,
       subtotal,
-      tax_amount: tax,
-      total_amount: afterDiscount + tax,
-      balance_amount: (afterDiscount + tax) - prev.deposit_amount
+      tax_amount: totalTax,
+      total_amount: afterDiscount,
+      balance_amount: afterDiscount - prev.deposit_amount
     }));
   };
 
   useEffect(() => {
     calculateTotal();
-  }, [formData.frame_cost, formData.lens_cost, formData.treatments_cost, formData.labor_cost, formData.lab_cost, formData.discount_amount, formData.deposit_amount]);
+  }, [formData.frame_cost, formData.frame_price_includes_tax, formData.lens_cost, formData.treatments_cost, formData.labor_cost, formData.lab_cost, formData.discount_amount, formData.deposit_amount, taxPercentage, quoteSettings]);
 
   const handleTreatmentToggle = (treatment: typeof availableTreatments[0]) => {
     const isSelected = formData.lens_treatments.includes(treatment.value);
@@ -350,7 +465,8 @@ export default function CreateWorkOrderForm({
       frame_color: frame.frame_color || '',
       frame_size: frame.frame_size || '',
       frame_sku: frame.sku || '',
-      frame_cost: frame.price || 0
+      frame_cost: frame.price || 0,
+      frame_price_includes_tax: frame.price_includes_tax || false
     }));
     setFrameSearch('');
     setFrameResults([]);
@@ -381,9 +497,13 @@ export default function CreateWorkOrderForm({
 
     setSaving(true);
     try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
       const response = await fetch('/api/admin/work-orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           customer_id: selectedCustomer.id,
           prescription_id: selectedPrescription.id,
@@ -467,7 +587,10 @@ export default function CreateWorkOrderForm({
         </CardHeader>
         <CardContent className="space-y-4">
           {selectedCustomer ? (
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary">
+            <div 
+              className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary"
+              style={{ backgroundColor: 'var(--admin-border-primary)' }}
+            >
               <div>
                 <div className="font-medium">
                   {selectedCustomer.first_name} {selectedCustomer.last_name}
@@ -602,7 +725,10 @@ export default function CreateWorkOrderForm({
         </CardHeader>
         <CardContent className="space-y-4">
           {selectedFrame ? (
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary">
+            <div 
+              className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary"
+              style={{ backgroundColor: 'var(--admin-border-primary)' }}
+            >
               <div>
                 <div className="font-medium">{selectedFrame.name}</div>
                 <div className="text-sm text-tierra-media">

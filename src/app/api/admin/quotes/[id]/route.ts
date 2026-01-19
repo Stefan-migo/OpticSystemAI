@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createServiceRoleClient } from '@/utils/supabase/server';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(
   request: NextRequest,
@@ -21,19 +22,30 @@ export async function GET(
     }
 
     const { id } = await params;
+    
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
+    
     const supabaseServiceRole = createServiceRoleClient();
 
     // Check and expire quotes before fetching (including this one)
     await supabaseServiceRole.rpc('check_and_expire_quotes');
 
-    const { data: quote, error } = await supabase
-      .from('quotes')
-      .select(`
-        *,
-        customer:profiles!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
-        prescription:prescriptions!quotes_prescription_id_fkey(*),
-        frame_product:products!quotes_frame_product_id_fkey(id, name, price, frame_brand, frame_model)
-      `)
+    const { data: quote, error } = await applyBranchFilter(
+      supabase
+        .from('quotes')
+        .select(`
+          *,
+          customer:customers!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
+          prescription:prescriptions!quotes_prescription_id_fkey(*),
+          frame_product:products!quotes_frame_product_id_fkey(id, name, price, frame_brand, frame_model)
+        `)
+    )
       .eq('id', id)
       .single();
 
@@ -69,6 +81,28 @@ export async function PUT(
     }
 
     const { id } = await params;
+    
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
+    
+    // First, verify the quote exists and user has access
+    const { data: existingQuote, error: fetchError } = await applyBranchFilter(
+      supabase
+        .from('quotes')
+        .select('id, branch_id')
+    )
+      .eq('id', id)
+      .single();
+    
+    if (fetchError || !existingQuote) {
+      return NextResponse.json({ error: 'Presupuesto no encontrado o sin acceso' }, { status: 404 });
+    }
+    
     const body = await request.json();
 
     const updateData: any = {
@@ -109,7 +143,7 @@ export async function PUT(
       .eq('id', id)
       .select(`
         *,
-        customer:profiles!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
+        customer:customers!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
         prescription:prescriptions!quotes_prescription_id_fkey(*)
       `)
       .single();

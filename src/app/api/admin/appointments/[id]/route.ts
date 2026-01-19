@@ -119,13 +119,21 @@ export async function PUT(
       const checkDuration = body.duration_minutes || currentAppointment?.duration_minutes || 30;
       const checkStaffId = body.assigned_to || currentAppointment?.assigned_to || null;
 
+      // Get current appointment to get branch_id
+      const { data: currentAppointmentForBranch } = await supabaseServiceRole
+        .from('appointments')
+        .select('branch_id')
+        .eq('id', id)
+        .single();
+
       const { data: isAvailable, error: availabilityError } = await supabaseServiceRole
         .rpc('check_appointment_availability', {
           p_date: checkDate,
           p_time: checkTime,
           p_duration_minutes: checkDuration,
           p_appointment_id: id, // Exclude current appointment
-          p_staff_id: checkStaffId
+          p_staff_id: checkStaffId,
+          p_branch_id: currentAppointmentForBranch?.branch_id || null
         });
 
       if (availabilityError) {

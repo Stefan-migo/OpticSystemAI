@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createServiceRoleClient } from '@/utils/supabase/server';
 import { NotificationService } from '@/lib/notifications/notification-service';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,14 +25,24 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
 
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
+
     // Check and expire quotes before fetching (use service role for proper permissions)
     const supabaseServiceRole = createServiceRoleClient();
     await supabaseServiceRole.rpc('check_and_expire_quotes');
 
-    // Build base query
-    let query = supabase
-      .from('quotes')
-      .select('*', { count: 'exact' })
+    // Build base query with branch filter
+    let query = applyBranchFilter(
+      supabase
+        .from('quotes')
+        .select('*', { count: 'exact' })
+    )
       .order('created_at', { ascending: false });
 
     if (status !== 'all') {
@@ -61,10 +72,10 @@ export async function GET(request: NextRequest) {
     if (quotesWithRelations.length > 0) {
       // Fetch customers
       const customerIds = [...new Set(quotesWithRelations.map(q => q.customer_id).filter(Boolean))];
-      const { data: customers } = await supabase
-        .from('profiles')
+      const { data: customers } = customerIds.length > 0 ? await supabase
+        .from('customers')
         .select('id, first_name, last_name, email, phone')
-        .in('id', customerIds);
+        .in('id', customerIds) : { data: [] };
 
       // Fetch prescriptions
       const prescriptionIds = [...new Set(quotesWithRelations.map(q => q.prescription_id).filter(Boolean))];
@@ -143,6 +154,42 @@ export async function POST(request: NextRequest) {
 
     const defaultExpirationDays = settings?.default_expiration_days || 30;
     
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Determine branch_id for the quote
+    // Priority: body.branch_id > branchContext.branchId > customer's branch
+    let quoteBranchId = body.branch_id || branchContext.branchId;
+    
+    // If no branch_id provided, try to get it from customer
+    if (!quoteBranchId && body.customer_id) {
+      const { data: customer } = await supabaseServiceRole
+        .from('customers')
+        .select('branch_id')
+        .eq('id', body.customer_id)
+        .single();
+      quoteBranchId = customer?.branch_id || null;
+    }
+    
+    // Validate branch access for non-super admins
+    if (!branchContext.isSuperAdmin && quoteBranchId) {
+      const hasAccess = branchContext.accessibleBranches.some(
+        b => b.id === quoteBranchId
+      );
+      if (!hasAccess) {
+        return NextResponse.json({ 
+          error: 'No tiene acceso a esta sucursal' 
+        }, { status: 403 });
+      }
+    }
+    
+    // For non-super admins, branch_id is required
+    if (!branchContext.isSuperAdmin && !quoteBranchId) {
+      return NextResponse.json({ 
+        error: 'Debe especificar una sucursal para el presupuesto' 
+      }, { status: 400 });
+    }
+
     // Calculate expiration date
     const expirationDate = body.expiration_date 
       ? new Date(body.expiration_date)
@@ -154,6 +201,7 @@ export async function POST(request: NextRequest) {
       .insert({
         quote_number: quoteNumber,
         customer_id: body.customer_id,
+        branch_id: quoteBranchId,
         prescription_id: body.prescription_id || null,
         frame_product_id: body.frame_product_id || null,
         frame_name: body.frame_name,
@@ -188,7 +236,7 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        customer:profiles!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
+        customer:customers!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
         prescription:prescriptions!quotes_prescription_id_fkey(*)
       `)
       .single();

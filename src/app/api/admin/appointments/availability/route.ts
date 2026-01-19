@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createServiceRoleClient } from '@/utils/supabase/server';
+import { getBranchContext } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +19,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
     const searchParams = request.nextUrl.searchParams;
     const date = searchParams.get('date');
     const duration = parseInt(searchParams.get('duration') || '30');
@@ -28,13 +32,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Get available time slots
-    console.log('🔍 Fetching availability for:', { date, duration, staffId });
+    console.log('🔍 Fetching availability for:', { date, duration, staffId, branchId: branchContext.branchId });
     
     const { data: slots, error } = await supabaseServiceRole
       .rpc('get_available_time_slots', {
         p_date: date,
         p_duration_minutes: duration,
-        p_staff_id: staffId || null
+        p_staff_id: staffId || null,
+        p_branch_id: branchContext.branchId || null
       });
 
     if (error) {

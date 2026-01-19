@@ -68,7 +68,10 @@ export default function ProgressIndicator({
     switch (status) {
       case 'completed':
         return (
-          <Badge className="bg-verde-suave text-white">
+          <Badge 
+            className="bg-verde-suave text-white"
+            style={{ color: 'var(--admin-accent-secondary)' }}
+          >
             Completado
           </Badge>
         );

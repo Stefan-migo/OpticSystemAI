@@ -26,9 +26,11 @@ import {
   Eye,
   Package,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  DollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import {
   Select,
   SelectContent,
@@ -45,11 +47,17 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { formatRUT } from '@/lib/utils/rut';
+import { calculateSubtotal, calculateTotalTax, calculateTotal } from '@/lib/utils/tax';
+import { getTaxPercentage } from '@/lib/utils/tax-config';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
+import { BranchSelector } from '@/components/admin/BranchSelector';
 
 interface Product {
   id: string;
   name: string;
   price: number;
+  price_includes_tax?: boolean;
   inventory_quantity: number;
   sku?: string;
   barcode?: string;
@@ -61,6 +69,7 @@ interface CartItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  priceIncludesTax: boolean;
 }
 
 interface Customer {
@@ -96,6 +105,7 @@ interface Quote {
 type PaymentMethod = 'cash' | 'debit_card' | 'credit_card' | 'installments';
 
 export default function POSPage() {
+  const { currentBranchId, isSuperAdmin, branches, isLoading: branchLoading } = useBranch();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -159,11 +169,23 @@ export default function POSPage() {
   });
 
 
-  // Calculate totals
-  const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-  const taxRate = 0.19; // 19% IVA for Chile
-  const taxAmount = subtotal * taxRate;
-  const total = subtotal + taxAmount;
+  // Tax percentage state
+  const [taxPercentage, setTaxPercentage] = useState<number>(19.0);
+  
+  // Fetch tax percentage on mount
+  useEffect(() => {
+    getTaxPercentage(19.0).then(setTaxPercentage);
+  }, []);
+  
+  // Calculate totals with tax consideration
+  const itemsForTaxCalculation = cart.map(item => ({
+    price: item.unitPrice * item.quantity, // Total price for the quantity
+    includesTax: item.priceIncludesTax
+  }));
+  
+  const subtotal = calculateSubtotal(itemsForTaxCalculation, taxPercentage);
+  const taxAmount = calculateTotalTax(itemsForTaxCalculation, taxPercentage);
+  const total = calculateTotal(itemsForTaxCalculation, taxPercentage);
   const change = cashReceived - total;
 
   // Focus search on mount
@@ -183,10 +205,13 @@ export default function POSPage() {
 
       setSearchingCustomers(true);
       try {
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId)
+        };
         const searchUrl = `/api/admin/customers/search?q=${encodeURIComponent(customerSearchTerm)}`;
         console.log('🔍 POS: Searching customers:', searchUrl);
         
-        const response = await fetch(searchUrl);
+        const response = await fetch(searchUrl, { headers });
         const data = await response.json();
         
         console.log('📦 POS: Search response:', { 
@@ -220,7 +245,7 @@ export default function POSPage() {
 
     const debounce = setTimeout(searchCustomers, 200);
     return () => clearTimeout(debounce);
-  }, [customerSearchTerm]);
+  }, [customerSearchTerm, currentBranchId]);
 
   // Fetch customer quotes when customer is selected
   const fetchCustomerQuotes = async (customerId: string) => {
@@ -361,7 +386,10 @@ export default function POSPage() {
 
       setSearching(true);
       try {
-        const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(searchTerm)}&limit=20`);
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId)
+        };
+        const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(searchTerm)}&limit=20`, { headers });
         if (response.ok) {
           const data = await response.json();
           setProducts(data.products || []);
@@ -377,7 +405,7 @@ export default function POSPage() {
 
     const debounce = setTimeout(searchProducts, 200); // Reduced debounce for faster response
     return () => clearTimeout(debounce);
-  }, [searchTerm]);
+  }, [searchTerm, currentBranchId]);
 
   // Handle keyboard navigation in search
   const handleSearchKeyPress = (e: React.KeyboardEvent) => {
@@ -433,7 +461,8 @@ export default function POSPage() {
         product,
         quantity: 1,
         unitPrice: product.price,
-        subtotal: product.price
+        subtotal: product.price,
+        priceIncludesTax: product.price_includes_tax || false
       }]);
     }
     
@@ -585,7 +614,10 @@ export default function POSPage() {
       }
       setSearchingFrames(true);
       try {
-        const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(frameSearch)}&type=frame&limit=10`);
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId)
+        };
+        const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(frameSearch)}&type=frame&limit=10`, { headers });
         if (response.ok) {
           const data = await response.json();
           setFrameResults(data.products || []);
@@ -598,7 +630,7 @@ export default function POSPage() {
     };
     const debounce = setTimeout(searchFrames, 300);
     return () => clearTimeout(debounce);
-  }, [frameSearch]);
+  }, [frameSearch, currentBranchId]);
 
   // Lens types and materials
   const lensTypes = [
@@ -1037,9 +1069,14 @@ export default function POSPage() {
         change_amount: paymentMethod === 'cash' ? change : 0
       };
 
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+      
       const response = await fetch('/api/admin/pos/process-sale', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(orderData)
       });
 
@@ -1083,9 +1120,25 @@ export default function POSPage() {
       <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Punto de Venta (POS)</h1>
-          <p className="text-sm text-gray-600">Sistema de ventas</p>
+          <p className="text-sm text-gray-600">
+            {!currentBranchId && isSuperAdmin 
+              ? 'Sistema de ventas - Todas las sucursales'
+              : 'Sistema de ventas'}
+          </p>
         </div>
         <div className="flex items-center gap-4">
+          {isSuperAdmin && (
+            <BranchSelector 
+              branches={branches} 
+              currentBranchId={currentBranchId}
+            />
+          )}
+          <Link href="/admin/cash-register">
+            <Button variant="outline">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Caja
+            </Button>
+          </Link>
           <Badge variant="outline" className="text-lg px-4 py-2">
             {formatCurrency(total)}
           </Badge>

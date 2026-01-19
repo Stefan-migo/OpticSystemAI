@@ -26,11 +26,16 @@ import {
   Tag,
   Receipt,
   FileText,
-  Calendar
+  Calendar,
+  Building2,
+  DollarSign
 } from 'lucide-react';
 import AdminNotificationDropdown from '@/components/admin/AdminNotificationDropdown';
 import Chatbot from '@/components/admin/Chatbot';
+import { BranchSelector } from '@/components/admin/BranchSelector';
 import { ThemeSelector } from '@/components/theme-selector';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
 import businessConfig from '@/config/business';
 
 interface AdminLayoutProps {
@@ -107,6 +112,13 @@ const createNavigationItems = (newWorkOrdersCount?: number) => [
     description: 'Gestión de usuarios admin'
   },
   {
+    href: '/admin/branches',
+    label: 'Sucursales',
+    icon: Building2,
+    description: 'Gestión de sucursales',
+    superAdminOnly: true
+  },
+  {
     href: '/admin/system',
     label: 'Sistema',
     icon: Server,
@@ -116,6 +128,7 @@ const createNavigationItems = (newWorkOrdersCount?: number) => [
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, profile, loading, signOut } = useAuthContext();
+  const { isSuperAdmin, currentBranchId } = useBranch();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -168,10 +181,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   // Fetch dashboard stats
   useEffect(() => {
     const fetchStats = async () => {
-      if (!adminState.isAdmin) return;
+      if (!adminState.isAdmin || !user || loading) return;
 
       try {
-        const response = await fetch('/api/admin/dashboard');
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId)
+        };
+
+        const response = await fetch('/api/admin/dashboard', { headers });
         if (response.ok) {
           const data = await response.json();
           // Extract optical shop specific data
@@ -192,7 +209,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           });
         }
       } catch (error) {
-        console.error('Error fetching stats:', error);
+        // Silently handle 401 errors during initial load
+        if (error instanceof Error && !error.message.includes('401')) {
+          console.error('Error fetching stats:', error);
+        }
       }
     };
 
@@ -200,22 +220,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     // Refresh stats every 30 seconds for real-time updates
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
-  }, [adminState.isAdmin]);
+  }, [adminState.isAdmin, user, loading, currentBranchId]);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
-      console.log('🔍 Admin layout useEffect triggered:', { loading, user: !!user, profile: !!profile });
-      
       // Don't check admin status if auth is still loading
       if (loading) {
-        console.log('⏳ Auth still loading, waiting...');
         // Don't set state here to avoid unnecessary re-renders
         return;
       }
 
       // Wait a bit longer after auth loads to ensure auth state is stable
       if (!user) {
-        console.log('🔍 No user found, setting admin state to false');
         setAdminState({
           isChecking: false,
           isAdmin: false,
@@ -227,7 +243,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       // Additional check: ensure we have a valid user with email
       if (!user.email) {
-        console.log('🔍 User found but no email, waiting...');
         setAdminState({
           isChecking: false,
           isAdmin: false,
@@ -240,13 +255,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       // 🚀 KEY FIX: Skip admin check if we already checked this exact user ID
       // This prevents re-checking during token refresh events
       if (adminState.hasChecked && adminState.checkedUserId === user.id && adminState.isAdmin) {
-        console.log('✅ Admin status already verified for user ID:', user.id, '- skipping re-check');
         return;
       }
 
       // Prevent multiple simultaneous admin checks
       if (isAdminCheckInProgress) {
-        console.log('🔄 Admin check already in progress, skipping...');
         return;
       }
 
@@ -255,19 +268,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       setAdminState(prev => ({ ...prev, isChecking: true, hasChecked: false }));
       
       try {
-        console.log('🔍 Checking admin status for user:', user.email);
-      
-      if (debugMode) {
-        console.log('🐛 DEBUG MODE: Bypassing admin check for debugging');
-        setAdminState({
-          isChecking: false,
-          isAdmin: true, // Force admin access in debug mode
-          hasChecked: true,
-          checkedUserId: user.id
-        });
-        setIsAdminCheckInProgress(false);
-        return;
-      }
+        if (debugMode) {
+          setAdminState({
+            isChecking: false,
+            isAdmin: true, // Force admin access in debug mode
+            hasChecked: true,
+            checkedUserId: user.id
+          });
+          setIsAdminCheckInProgress(false);
+          return;
+        }
         
         const { createClient } = await import('@/utils/supabase/client');
         const supabase = createClient();
@@ -283,14 +293,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         let isAdminResult = false;
         
         if (error) {
-          if (error.message === 'Admin check timeout') {
-            console.error('⏱️ Admin check timed out');
-          } else {
+          if (error.message !== 'Admin check timeout' && process.env.NODE_ENV === 'development') {
             console.error('❌ Error checking admin status:', error);
           }
           isAdminResult = false;
         } else {
-          console.log('✅ Admin check result:', !!data);
           isAdminResult = !!data;
         }
 
@@ -334,18 +341,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
     // Only redirect after both auth and admin checks are COMPLETELY finished
     if (!loading && adminState.hasChecked && !adminState.isChecking) {
-      console.log('🔄 Admin redirect check:', { 
-        user: !!user, 
-        userEmail: user?.email,
-        isAdmin: adminState.isAdmin, 
-        loading, 
-        isChecking: adminState.isChecking,
+      if (process.env.NODE_ENV === 'development' && debugMode) {
+        console.log('🔄 Admin redirect check:', { 
+          user: !!user, 
+          userEmail: user?.email,
+          isAdmin: adminState.isAdmin, 
+          loading, 
+          isChecking: adminState.isChecking,
         hasChecked: adminState.hasChecked
       });
       
+      }
+      
       // If user is admin, just mark as done and return early
       if (user && user.email && adminState.isAdmin) {
-        console.log('✅ Admin access confirmed immediately, showing dashboard');
         return;
       }
 
@@ -354,14 +363,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         redirectInProgress.current = true;
         setTimeout(() => {
           if (!user || !user.email) {
-            console.log('🚪 No user or email found after delay, redirecting to login');
             router.push('/login');
             return;
           }
 
           // Check admin access - only redirect if we've definitely checked and user is not admin
           if (!adminState.isAdmin) {
-            console.log('🚫 User not admin after delay, redirecting to login');
             router.push('/login');
             return;
           }
@@ -468,6 +475,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
           
           <div className="admin-header-actions">
+            <BranchSelector />
             <ThemeSelector />
             <AdminNotificationDropdown />
             <Button variant="ghost" size="icon" onClick={handleSignOut}>
@@ -502,6 +510,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </div>
               
               <div className="admin-header-actions">
+                <BranchSelector />
                 <ThemeSelector />
                 <AdminNotificationDropdown />
                 
@@ -566,6 +575,7 @@ function AdminSidebar({
     lowStock: number;
   };
 }) {
+  const { isSuperAdmin } = useBranch();
   return (
     <div className="admin-sidebar flex grow flex-col gap-y-5 overflow-y-auto" style={{background: 'var(--admin-bg-primary)'}}>
       {/* Logo */}
@@ -614,7 +624,15 @@ function AdminSidebar({
       {/* Navigation */}
       <nav className="admin-sidebar-nav bg-admin-bg-primary">
         <ul role="list" className="flex flex-1 flex-col gap-y-1">
-          {createNavigationItems(stats.newWorkOrders).map((item) => {
+          {createNavigationItems(stats.newWorkOrders)
+            .filter((item: any) => {
+              // Filter out super admin only items if user is not super admin
+              if (item.superAdminOnly && !isSuperAdmin) {
+                return false;
+              }
+              return true;
+            })
+            .map((item) => {
             const isActive = pathname === item.href || 
               (item.href !== '/admin' && pathname.startsWith(item.href));
             

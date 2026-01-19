@@ -211,7 +211,10 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
         <p className="text-tierra-media">Gestiona la configuración de pagos con MercadoPago</p>
       </div>
       {/* Credentials Section */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
@@ -521,7 +524,10 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
       </Card>
 
       {/* Payment Methods Section */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
@@ -586,7 +592,10 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
       </Card>
 
       {/* Checkout Settings */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
@@ -656,7 +665,10 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
       </Card>
 
       {/* Webhook Configuration */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Globe className="h-5 w-5" />

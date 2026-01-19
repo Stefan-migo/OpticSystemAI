@@ -34,6 +34,8 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import AppointmentCalendar from '@/components/admin/AppointmentCalendar';
 import CreateAppointmentForm from '@/components/admin/CreateAppointmentForm';
+import { useBranch } from '@/hooks/useBranch';
+import { Building2 } from 'lucide-react';
 import { 
   Dialog,
   DialogContent,
@@ -41,6 +43,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { getBranchHeader } from '@/lib/utils/branch';
 
 interface Appointment {
   id: string;
@@ -71,6 +75,7 @@ interface Appointment {
 }
 
 export default function AppointmentsPage() {
+  const { user, authLoading } = useAuthContext();
   const [view, setView] = useState<'week' | 'month'>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -81,12 +86,35 @@ export default function AppointmentsPage() {
   const [prefilledAppointmentData, setPrefilledAppointmentData] = useState<{date?: string; time?: string; lockDateTime?: boolean} | null>(null);
   const [scheduleSettings, setScheduleSettings] = useState<any>(null);
 
+  const { currentBranch, branches, isGlobalView, isSuperAdmin, setCurrentBranch, currentBranchId } = useBranch();
+  const [selectedBranchForView, setSelectedBranchForView] = useState<string | null>(null);
+
+  // Determine which branch to use for filtering
+  const branchIdForFilter = isGlobalView && selectedBranchForView 
+    ? selectedBranchForView 
+    : (currentBranch?.id || null);
+
+  // Initialize selectedBranchForView when in global view
   useEffect(() => {
-    fetchAppointments();
-    fetchScheduleSettings();
-  }, [currentDate, statusFilter]);
+    if (isGlobalView && isSuperAdmin && branches.length > 0 && !selectedBranchForView) {
+      // Default to first branch when entering global view
+      setSelectedBranchForView(branches[0]?.id || null);
+    } else if (!isGlobalView && selectedBranchForView) {
+      // Clear selection when not in global view
+      setSelectedBranchForView(null);
+    }
+  }, [isGlobalView, isSuperAdmin, branches.length]);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      fetchAppointments();
+      fetchScheduleSettings();
+    }
+  }, [currentDate, statusFilter, branchIdForFilter, authLoading, user]);
 
   const fetchAppointments = async () => {
+    if (!user || authLoading) return;
+    
     try {
       setLoading(true);
       const startDate = new Date(currentDate);
@@ -97,10 +125,15 @@ export default function AppointmentsPage() {
       const params = new URLSearchParams({
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
-        ...(statusFilter !== 'all' && { status: statusFilter })
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(branchIdForFilter && { branch_id: branchIdForFilter })
       });
 
-      const response = await fetch(`/api/admin/appointments?${params}`);
+      const headers: HeadersInit = {
+        ...getBranchHeader(branchIdForFilter || currentBranchId)
+      };
+
+      const response = await fetch(`/api/admin/appointments?${params}`, { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch appointments');
       }
@@ -116,8 +149,14 @@ export default function AppointmentsPage() {
   };
 
   const fetchScheduleSettings = async () => {
+    if (!user || authLoading) return;
+    
     try {
-      const response = await fetch('/api/admin/schedule-settings');
+      const headers: HeadersInit = {
+        ...getBranchHeader(branchIdForFilter || currentBranchId)
+      };
+
+      const response = await fetch('/api/admin/schedule-settings', { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch schedule settings');
       }
@@ -278,6 +317,25 @@ export default function AppointmentsPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {/* Branch selector for global view */}
+              {isGlobalView && isSuperAdmin && (
+                <Select 
+                  value={selectedBranchForView || ''} 
+                  onValueChange={(value) => setSelectedBranchForView(value)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <Building2 className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Seleccionar sucursal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Select value={view} onValueChange={(value: 'week' | 'month') => setView(value)}>
                 <SelectTrigger className="w-[120px]">
                   <SelectValue />

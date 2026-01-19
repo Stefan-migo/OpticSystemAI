@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext, validateBranchAccess } from '@/lib/api/branch-middleware';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ticketId = params.id;
+    const { id: ticketId } = await params;
 
     const supabase = await createClient();
     
@@ -58,16 +59,27 @@ export async function GET(
       }, { status: 404 });
     }
 
-    // Fetch customer profile separately if customer_id exists
+    // Validate branch access
+    const branchContext = await getBranchContext(request, user.id);
+    const hasAccess = await validateBranchAccess(user.id, ticket.branch_id);
+    
+    if (!hasAccess) {
+      return NextResponse.json({ 
+        error: 'No tiene acceso a este ticket de soporte' 
+      }, { status: 403 });
+    }
+
+    // Fetch customer separately if customer_id exists (use customers table)
     let customerProfile = null;
-    if (ticket.customer_id) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, phone, membership_tier, is_member')
+    if (ticket.customer_id && ticket.branch_id) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id, first_name, last_name, email, phone')
         .eq('id', ticket.customer_id)
-        .single();
+        .eq('branch_id', ticket.branch_id)
+        .maybeSingle();
       
-      customerProfile = profile;
+      customerProfile = customer;
     }
 
     // Attach customer data
@@ -129,10 +141,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ticketId = params.id;
+    const { id: ticketId } = await params;
     const body = await request.json();
     const {
       status,
@@ -154,6 +166,27 @@ export async function PUT(
     const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
     if (!isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
+    // Get existing ticket to validate branch access
+    const { data: existingTicket } = await supabase
+      .from('support_tickets')
+      .select('branch_id')
+      .eq('id', ticketId)
+      .single();
+
+    if (!existingTicket) {
+      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
+    }
+
+    // Validate branch access
+    const branchContext = await getBranchContext(request, user.id);
+    const hasAccess = await validateBranchAccess(user.id, existingTicket.branch_id);
+    
+    if (!hasAccess) {
+      return NextResponse.json({ 
+        error: 'No tiene acceso a este ticket de soporte' 
+      }, { status: 403 });
     }
 
     // Prepare update data
@@ -203,15 +236,16 @@ export async function PUT(
       }, { status: 500 });
     }
 
-    // Fetch customer profile separately if customer_id exists
-    if (updatedTicket.customer_id) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
+    // Fetch customer separately if customer_id exists (use customers table)
+    if (updatedTicket.customer_id && updatedTicket.branch_id) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id, first_name, last_name, email, phone')
         .eq('id', updatedTicket.customer_id)
-        .single();
+        .eq('branch_id', updatedTicket.branch_id)
+        .maybeSingle();
       
-      updatedTicket.customer = profile;
+      updatedTicket.customer = customer;
     }
 
     // Create a system message for status changes

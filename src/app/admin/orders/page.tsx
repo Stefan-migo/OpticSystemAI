@@ -350,7 +350,12 @@ export default function OrdersPage() {
     switch (status) {
       case 'delivered':
       case 'completed':
-        return <Badge className="bg-verde-suave text-white"><CheckCircle className="h-3 w-3 mr-1" />Completado</Badge>;
+        return <Badge 
+          className="bg-verde-suave text-white"
+          style={{ color: 'var(--admin-accent-secondary)' }}
+        >
+          <CheckCircle className="h-3 w-3 mr-1" />Completado
+        </Badge>;
       case 'pending':
         return <Badge className="bg-dorado text-azul-profundo"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>;
       case 'processing':

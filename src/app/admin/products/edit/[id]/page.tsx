@@ -178,6 +178,7 @@ export default function EditProductPage() {
     description: '',
     price: '',
     compare_at_price: '',
+    price_includes_tax: false,
     category_id: '',
     featured_image: '',
     gallery: [] as string[],
@@ -285,6 +286,7 @@ export default function EditProductPage() {
           description: product.description || '',
           price: product.price?.toString() || '',
           compare_at_price: product.compare_at_price?.toString() || '',
+          price_includes_tax: product.price_includes_tax || false,
           category_id: product.category_id || '',
           featured_image: product.featured_image || '',
           gallery: product.gallery || [],
@@ -460,6 +462,7 @@ export default function EditProductPage() {
         status: status || formData.status,
         price: parseFloat(formData.price),
         compare_at_price: formData.compare_at_price ? parseFloat(formData.compare_at_price) : null,
+        price_includes_tax: formData.price_includes_tax || false,
         inventory_quantity: parseInt(formData.inventory_quantity),
         // Optical fields
         frame_measurements: frameMeasurements,
@@ -658,6 +661,18 @@ export default function EditProductPage() {
                   className='border-black/20'
                 />
               </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="price_includes_tax"
+                checked={formData.price_includes_tax}
+                onChange={(e) => handleInputChange('price_includes_tax', e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-azul-profundo focus:ring-azul-profundo"
+              />
+              <Label htmlFor="price_includes_tax" className="text-sm font-normal cursor-pointer">
+                El precio ya incluye IVA
+              </Label>
             </div>
           </CardContent>
         </Card>
@@ -1320,6 +1335,7 @@ export default function EditProductPage() {
             disabled={saving}
             onClick={() => handleSubmit(undefined, 'draft')}
             className="flex items-center gap-2 text-white"
+            style={{ backgroundColor: 'var(--admin-accent-tertiary)' }}
           >
             <Save className="h-4 w-4" />
             {saving ? 'Guardando...' : 'Guardar como Borrador'}

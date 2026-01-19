@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 interface DayConfig {
   enabled: boolean;
@@ -45,20 +48,24 @@ interface ScheduleSettings {
 }
 
 export default function ScheduleSettingsPage() {
+  const { user, authLoading } = useAuthContext();
   const router = useRouter();
+  const { currentBranchId, isLoading: branchLoading } = useBranch();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<ScheduleSettings | null>(null);
   const [newBlockedDate, setNewBlockedDate] = useState('');
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
+    if (!user || authLoading) return;
+    
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/schedule-settings');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+      const response = await fetch('/api/admin/schedule-settings', { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch settings');
       }
@@ -71,7 +78,13 @@ export default function ScheduleSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentBranchId, user, authLoading]);
+
+  useEffect(() => {
+    if (!branchLoading && !authLoading && user) {
+      fetchSettings();
+    }
+  }, [branchLoading, authLoading, user, fetchSettings]);
 
   const updateDayConfig = (day: keyof ScheduleSettings['working_hours'], field: keyof DayConfig, value: any) => {
     if (!settings) return;
@@ -117,9 +130,13 @@ export default function ScheduleSettingsPage() {
 
     setSaving(true);
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
       const response = await fetch('/api/admin/schedule-settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(settings)
       });
 

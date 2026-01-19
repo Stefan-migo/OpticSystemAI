@@ -310,8 +310,8 @@ export default function AppointmentCalendar({
                 isToday(day) && "bg-azul-profundo text-white"
               )}
             >
-              <div className="text-xs">{day.toLocaleDateString('es-CL', { weekday: 'short' })}</div>
-              <div className="text-lg">{day.getDate()}</div>
+              <div className="text-xs" style={isToday(day) ? { color: 'var(--admin-warning)' } : undefined}>{day.toLocaleDateString('es-CL', { weekday: 'short' })}</div>
+              <div className="text-lg" style={isToday(day) ? { color: 'var(--admin-warning)' } : undefined}>{day.getDate()}</div>
             </div>
           ))}
         </div>

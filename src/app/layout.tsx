@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { BranchProvider } from '@/contexts/BranchContext'
 import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
@@ -37,7 +38,9 @@ export default function RootLayout({
           enableSystem={false}
         >
           <AuthProvider>
-            {children}
+            <BranchProvider>
+              {children}
+            </BranchProvider>
             <Toaster 
               position="bottom-right" 
               richColors

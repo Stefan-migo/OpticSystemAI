@@ -214,7 +214,10 @@ export default function EmailTemplatesManager() {
       </div>
 
       {/* Filters */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardContent className="p-4">
           <div className="flex gap-4 items-center">
             <Label>Filtrar por tipo:</Label>
@@ -240,7 +243,10 @@ export default function EmailTemplatesManager() {
       </Card>
 
       {/* Templates Table */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardContent className="p-0">
           {loading ? (
             <div className="p-8 text-center text-tierra-media">Cargando...</div>

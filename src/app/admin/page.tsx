@@ -40,6 +40,7 @@ import {
 } from 'recharts';
 import businessConfig from '@/config/business';
 import { DashboardSearch } from '@/components/admin/DashboardSearch';
+import { useBranch } from '@/hooks/useBranch';
 
 // Colors from the brand palette
 const COLORS = {
@@ -142,34 +143,48 @@ const defaultDashboardData: DashboardData = {
 };
 
 export default function AdminDashboard() {
+  const { currentBranchId, isSuperAdmin, branches } = useBranch();
+  const isGlobalView = !currentBranchId && isSuperAdmin;
+  
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState<DashboardData>(defaultDashboardData);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoading(true);
-        
-        const response = await fetch('/api/admin/dashboard');
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch dashboard data');
-        }
-
-        const result = await response.json();
-        setData(result);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError('Error al cargar los datos del dashboard');
-      } finally {
-        setIsLoading(false);
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Add branch header if branch is selected, or 'global' if in global view
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (currentBranchId) {
+        headers['x-branch-id'] = currentBranchId;
+      } else if (isGlobalView && isSuperAdmin) {
+        headers['x-branch-id'] = 'global';
       }
-    };
+      
+      const response = await fetch('/api/admin/dashboard', { headers });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
 
+      const result = await response.json();
+      setData(result);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError('Error al cargar los datos del dashboard');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [currentBranchId, isGlobalView]);
 
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('es-CL', {
@@ -314,120 +329,131 @@ export default function AdminDashboard() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {/* Revenue Card */}
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-          <CardContent className="p-4 md:p-6">
-            <div className="flex items-start gap-3">
-              <DollarSign className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Ingresos del Mes</p>
-                <p className="text-lg md:text-2xl font-bold text-azul-profundo break-words">
-                  {formatPrice(data.kpis.revenue.current)}
-                </p>
-                <div className={cn(
-                  "flex items-center text-xs mt-1 gap-1",
-                  data.kpis.revenue.change >= 0 ? "text-green-600" : "text-red-600"
-                )}>
-                  {data.kpis.revenue.change >= 0 ? (
-                    <>
+      {(() => {
+        const currentBranch = branches?.find(b => b.id === currentBranchId);
+        const statsLabel = isGlobalView 
+          ? 'Todas las sucursales' 
+          : currentBranch 
+            ? `Sucursal: ${currentBranch.name}` 
+            : 'Sucursal seleccionada';
+        
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {/* Revenue Card */}
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-start gap-3">
+                  <DollarSign className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Ingresos del Mes</p>
+                    <p className="text-lg md:text-2xl font-bold text-azul-profundo break-words">
+                      {formatPrice(data.kpis.revenue.current)}
+                    </p>
+                    <div className={cn(
+                      "flex items-center text-xs mt-1 gap-1",
+                      data.kpis.revenue.change >= 0 ? "text-green-600" : "text-red-600"
+                    )}>
+                      {data.kpis.revenue.change >= 0 ? (
+                        <>
+                          <TrendingUp className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">
+                            +{data.kpis.revenue.change.toFixed(1)}% vs anterior
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <TrendingDown className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">
+                            {data.kpis.revenue.change.toFixed(1)}% vs anterior
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 truncate">
+                      {statsLabel}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Appointments Card */}
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-start gap-3">
+                  <Calendar className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Citas Hoy</p>
+                    <p className="text-lg md:text-2xl font-bold text-azul-profundo">
+                      {data.kpis.appointments?.today || 0}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs mt-1">
+                      <span className="text-blue-600 truncate">{data.kpis.appointments?.scheduled || 0} programadas</span>
+                      <span className="text-green-600 truncate">{data.kpis.appointments?.confirmed || 0} confirmadas</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 truncate">
+                      {statsLabel}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Products Card - Only Active */}
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-start gap-3">
+                  <Package className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Productos Activos</p>
+                    <p className="text-lg md:text-2xl font-bold text-azul-profundo">
+                      {data.kpis.products.total}
+                    </p>
+                    <div className="flex items-center text-xs mt-1 gap-1">
+                      {data.kpis.products.lowStock > 0 ? (
+                        <>
+                          <AlertTriangle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                          <span className="text-red-500 truncate">{data.kpis.products.lowStock} stock bajo</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
+                          <span className="text-green-600 truncate">Stock saludable</span>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 truncate">
+                      {statsLabel}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Customers Card */}
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-start gap-3">
+                  <Users className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Clientes</p>
+                    <p className="text-lg md:text-2xl font-bold text-azul-profundo">
+                      {data.kpis.customers.total}
+                    </p>
+                    <div className="flex items-center text-xs text-green-600 mt-1 gap-1">
                       <TrendingUp className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">
-                        +{data.kpis.revenue.change.toFixed(1)}% vs anterior
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <TrendingDown className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">
-                        {data.kpis.revenue.change.toFixed(1)}% vs anterior
-                      </span>
-                    </>
-                  )}
+                      <span className="truncate">+{data.kpis.customers.new} nuevos</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 truncate">
+                      {statsLabel}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1 truncate">
-                  Solo completados/pagados
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Appointments Card */}
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-          <CardContent className="p-4 md:p-6">
-            <div className="flex items-start gap-3">
-              <Calendar className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Citas Hoy</p>
-                <p className="text-lg md:text-2xl font-bold text-azul-profundo">
-                  {data.kpis.appointments?.today || 0}
-                </p>
-                <div className="flex flex-wrap items-center gap-2 text-xs mt-1">
-                  <span className="text-blue-600 truncate">{data.kpis.appointments?.scheduled || 0} programadas</span>
-                  <span className="text-green-600 truncate">{data.kpis.appointments?.confirmed || 0} confirmadas</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1 truncate">
-                  {data.kpis.appointments?.pending || 0} pendientes
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Products Card - Only Active */}
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-          <CardContent className="p-4 md:p-6">
-            <div className="flex items-start gap-3">
-              <Package className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Productos Activos</p>
-                <p className="text-lg md:text-2xl font-bold text-azul-profundo">
-                  {data.kpis.products.total}
-                </p>
-                <div className="flex items-center text-xs mt-1 gap-1">
-                  {data.kpis.products.lowStock > 0 ? (
-                    <>
-                      <AlertTriangle className="h-3 w-3 text-red-500 flex-shrink-0" />
-                      <span className="text-red-500 truncate">{data.kpis.products.lowStock} stock bajo</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
-                      <span className="text-green-600 truncate">Stock saludable</span>
-                    </>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500 mt-1 truncate">
-                  {data.kpis.products.outOfStock} sin stock
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Customers Card */}
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-          <CardContent className="p-4 md:p-6">
-            <div className="flex items-start gap-3">
-              <Users className="h-6 w-6 md:h-8 md:w-8 text-azul-profundo flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs md:text-sm font-medium text-tierra-media truncate">Clientes</p>
-                <p className="text-lg md:text-2xl font-bold text-azul-profundo">
-                  {data.kpis.customers.total}
-                </p>
-                <div className="flex items-center text-xs text-green-600 mt-1 gap-1">
-                  <TrendingUp className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">+{data.kpis.customers.new} nuevos</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1 truncate">
-                  {data.kpis.customers.returning} recurrentes
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

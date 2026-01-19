@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext } from '@/lib/api/branch-middleware';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +16,16 @@ export async function POST(request: NextRequest) {
     const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
     if (!isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
+    // Validate branch access for non-super admins
+    if (!branchContext.isSuperAdmin && !branchContext.branchId) {
+      return NextResponse.json({ 
+        error: 'Debe seleccionar una sucursal para realizar ventas POS' 
+      }, { status: 400 });
     }
 
     const body = await request.json();
@@ -64,25 +75,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get or create active POS session
+    // Get or create active POS session for this branch
     let posSessionId = null;
-    const { data: activeSession } = await supabase
+    let query = supabase
       .from('pos_sessions')
       .select('id')
       .eq('cashier_id', user.id)
-      .eq('status', 'open')
+      .eq('status', 'open');
+
+    if (branchContext.branchId) {
+      query = query.eq('branch_id', branchContext.branchId);
+    } else {
+      query = query.is('branch_id', null);
+    }
+
+    const { data: activeSession } = await query
       .order('opening_time', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (activeSession) {
       posSessionId = activeSession.id;
     } else {
-      // Create new POS session
+      // Create new POS session with branch_id
       const { data: newSession, error: sessionError } = await supabase
         .from('pos_sessions')
         .insert({
           cashier_id: user.id,
+          branch_id: branchContext.branchId,
           opening_cash_amount: 0,
           status: 'open'
         })
@@ -96,11 +116,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create the order
+    // Create the order with branch_id
     const { data: newOrder, error: orderError } = await supabase
       .from('orders')
       .insert({
         order_number: orderNumber,
+        branch_id: branchContext.branchId,
         email: email || 'venta@pos.local',
         status: status || 'delivered',
         payment_status: payment_status || 'paid',

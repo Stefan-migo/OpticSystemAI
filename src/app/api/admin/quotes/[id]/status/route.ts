@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/utils/supabase/server';
 import { NotificationService } from '@/lib/notifications/notification-service';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function PUT(
   request: NextRequest,
@@ -26,6 +27,15 @@ export async function PUT(
     }
 
     const { id } = await params;
+    
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
+    
     const supabaseServiceRole = createServiceRoleClient();
     const body = await request.json();
 
@@ -33,12 +43,18 @@ export async function PUT(
       return NextResponse.json({ error: 'Status is required' }, { status: 400 });
     }
 
-    // Check if quote is already converted
-    const { data: existingQuote } = await supabaseServiceRole
-      .from('quotes')
-      .select('status, converted_to_work_order_id')
+    // Check if quote is already converted (with branch access check)
+    const { data: existingQuote, error: fetchError } = await applyBranchFilter(
+      supabaseServiceRole
+        .from('quotes')
+        .select('status, converted_to_work_order_id')
+    )
       .eq('id', id)
       .single();
+    
+    if (fetchError || !existingQuote) {
+      return NextResponse.json({ error: 'Presupuesto no encontrado o sin acceso' }, { status: 404 });
+    }
 
     if (existingQuote?.status === 'converted_to_work' || existingQuote?.converted_to_work_order_id) {
       return NextResponse.json({ 

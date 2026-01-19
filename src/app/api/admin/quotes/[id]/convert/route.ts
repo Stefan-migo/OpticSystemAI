@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createServiceRoleClient } from '@/utils/supabase/server';
 import { NotificationService } from '@/lib/notifications/notification-service';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function POST(
   request: NextRequest,
@@ -23,16 +24,26 @@ export async function POST(
     }
 
     const { id } = await params;
+    
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
 
-    // Fetch quote
-    const { data: quote, error: quoteError } = await supabaseServiceRole
-      .from('quotes')
-      .select('*')
+    // Fetch quote with branch access check
+    const { data: quote, error: quoteError } = await applyBranchFilter(
+      supabaseServiceRole
+        .from('quotes')
+        .select('*')
+    )
       .eq('id', id)
       .single();
 
     if (quoteError || !quote) {
-      return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Presupuesto no encontrado o sin acceso' }, { status: 404 });
     }
 
     // Generate work order number
@@ -66,6 +77,7 @@ export async function POST(
         customer_id: quote.customer_id,
         prescription_id: quote.prescription_id || null,
         quote_id: quote.id,
+        branch_id: quote.branch_id,
         frame_product_id: quote.frame_product_id || null,
         frame_name: quote.frame_name,
         frame_brand: quote.frame_brand,
@@ -99,7 +111,7 @@ export async function POST(
       })
       .select(`
         *,
-        customer:profiles!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
+        customer:customers!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
         prescription:prescriptions!lab_work_orders_prescription_id_fkey(*)
       `)
       .single();

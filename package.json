@@ -18,8 +18,10 @@
     "supabase:push": "npx supabase db push --local --include-all --yes",
     "supabase:push:remote": "npx supabase db push --include-all --yes",
     "admin:create": "node scripts/create-admin-via-api.js",
+    "admin:create-branch-users": "node scripts/create-branch-users.js",
     "migrate:chat": "node scripts/apply-chat-migrations.js",
-    "migrate:notifications": "node scripts/apply-notification-migrations.js"
+    "migrate:notifications": "node scripts/apply-notification-migrations.js",
+    "migrate:products-branch": "node scripts/apply-products-branch-migration.js"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.0",

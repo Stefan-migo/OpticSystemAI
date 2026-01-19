@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,6 +40,9 @@ export async function GET(request: NextRequest) {
     }
     console.log('✅ Admin access confirmed for:', user.email);
 
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
     // Build the base query
     console.log('🗄️ Fetching support tickets from database...');
     let query = supabase
@@ -58,6 +62,9 @@ export async function GET(request: NextRequest) {
           order_number
         )
       `, { count: 'exact' });
+
+    // Apply branch filter
+    query = addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
 
     // Apply filters
     if (status && status !== 'all') {
@@ -98,14 +105,35 @@ export async function GET(request: NextRequest) {
 
     // For each ticket, fetch customer profile and message stats
     const ticketsWithStats = await Promise.all((tickets || []).map(async (ticket) => {
-      // Get customer profile if customer_id exists
+      // Get customer if customer_id exists (try customers table first, then profiles as fallback)
       let customerProfile = null;
-      if (ticket.customer_id) {
+      if (ticket.customer_id && ticket.branch_id) {
+        // Try customers table first (new structure)
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('id, first_name, last_name, email')
+          .eq('id', ticket.customer_id)
+          .eq('branch_id', ticket.branch_id)
+          .maybeSingle();
+        
+        if (customer) {
+          customerProfile = customer;
+        } else {
+          // Fallback to profiles for legacy tickets
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('id', ticket.customer_id)
+            .maybeSingle();
+          customerProfile = profile;
+        }
+      } else if (ticket.customer_id) {
+        // Legacy tickets without branch_id - use profiles
         const { data: profile } = await supabase
           .from('profiles')
           .select('id, first_name, last_name, email')
           .eq('id', ticket.customer_id)
-          .single();
+          .maybeSingle();
         customerProfile = profile;
       }
 
@@ -185,6 +213,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
+    // Validate branch access for non-super admins
+    if (!branchContext.isSuperAdmin && !branchContext.branchId) {
+      return NextResponse.json({ 
+        error: 'Debe seleccionar una sucursal para crear tickets de soporte' 
+      }, { status: 400 });
+    }
+
     // Parse request body
     const body = await request.json();
     const {
@@ -226,16 +264,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Find customer by email (if exists)
+    // Find customer by email (if exists) - use customers table
     let customer_id = null;
-    const { data: customerProfile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', customer_email)
-      .single();
+    if (branchContext.branchId) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('email', customer_email)
+        .eq('branch_id', branchContext.branchId)
+        .maybeSingle();
 
-    if (customerProfile) {
-      customer_id = customerProfile.id;
+      if (customer) {
+        customer_id = customer.id;
+      }
     }
 
     // Create the ticket
@@ -245,6 +286,7 @@ export async function POST(request: NextRequest) {
       description,
       priority,
       status: 'open',
+      branch_id: branchContext.branchId,
       customer_id,
       customer_email,
       customer_name: customer_name || null,

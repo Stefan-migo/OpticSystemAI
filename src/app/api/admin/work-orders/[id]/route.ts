@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createServiceRoleClient } from '@/utils/supabase/server';
+import { getBranchContext, validateBranchAccess } from '@/lib/api/branch-middleware';
 
 export async function GET(
   request: NextRequest,
@@ -28,7 +29,7 @@ export async function GET(
       .from('lab_work_orders')
       .select(`
         *,
-        customer:profiles!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
+        customer:customers!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
         prescription:prescriptions!lab_work_orders_prescription_id_fkey(*),
         quote:quotes!lab_work_orders_quote_id_fkey(*),
         frame_product:products!lab_work_orders_frame_product_id_fkey(id, name, price, frame_brand, frame_model)
@@ -42,6 +43,16 @@ export async function GET(
         error: 'Work order not found',
         details: error?.message 
       }, { status: 404 });
+    }
+
+    // Validate branch access
+    const branchContext = await getBranchContext(request, user.id);
+    const hasAccess = await validateBranchAccess(user.id, workOrder.branch_id);
+    
+    if (!hasAccess) {
+      return NextResponse.json({ 
+        error: 'No tiene acceso a este trabajo' 
+      }, { status: 403 });
     }
 
     // Get status history using service role client
@@ -84,6 +95,28 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
+
+    // Get branch context and validate access
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // First, check if work order exists and get its branch_id
+    const { data: existingWorkOrder } = await supabaseServiceRole
+      .from('lab_work_orders')
+      .select('branch_id')
+      .eq('id', id)
+      .single();
+
+    if (!existingWorkOrder) {
+      return NextResponse.json({ error: 'Work order not found' }, { status: 404 });
+    }
+
+    // Validate branch access
+    const hasAccess = await validateBranchAccess(user.id, existingWorkOrder.branch_id);
+    if (!hasAccess) {
+      return NextResponse.json({ 
+        error: 'No tiene acceso a este trabajo' 
+      }, { status: 403 });
+    }
 
     const updateData: any = {
       updated_at: new Date().toISOString()
@@ -133,7 +166,7 @@ export async function PUT(
       .eq('id', id)
       .select(`
         *,
-        customer:profiles!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
+        customer:customers!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
         prescription:prescriptions!lab_work_orders_prescription_id_fkey(*)
       `)
       .single();
@@ -175,6 +208,9 @@ export async function DELETE(
 
     const { id } = await params;
     
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
     // Check if request body contains allowDelivered flag (for admin deletion from detail page)
     let allowDelivered = false;
     try {
@@ -187,12 +223,20 @@ export async function DELETE(
     // First, check if the work order exists and get quote_id if it exists
     const { data: workOrder, error: fetchError } = await supabaseServiceRole
       .from('lab_work_orders')
-      .select('id, status, payment_status, quote_id')
+      .select('id, status, payment_status, quote_id, branch_id')
       .eq('id', id)
       .single();
 
     if (fetchError || !workOrder) {
       return NextResponse.json({ error: 'Work order not found' }, { status: 404 });
+    }
+
+    // Validate branch access
+    const hasAccess = await validateBranchAccess(user.id, workOrder.branch_id);
+    if (!hasAccess) {
+      return NextResponse.json({ 
+        error: 'No tiene acceso a este trabajo' 
+      }, { status: 403 });
     }
 
     // Prevent deletion of delivered work orders unless allowDelivered is true (from detail page)

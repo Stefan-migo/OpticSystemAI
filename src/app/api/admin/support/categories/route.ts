@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,14 +28,27 @@ export async function GET(request: NextRequest) {
     }
     console.log('✅ Admin access confirmed for:', user.email);
 
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
     // Get all support categories from database
     console.log('🗄️ Fetching support categories from database...');
     
-    const { data: categories, error: fetchError } = await supabase
+    let query = supabase
       .from('support_categories')
       .select('*')
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
+
+    // Apply branch filter (include global categories - branch_id IS NULL)
+    if (branchContext.branchId) {
+      query = query.or(`branch_id.eq.${branchContext.branchId},branch_id.is.null`);
+    } else if (!branchContext.isSuperAdmin) {
+      // Regular admin without branch - only global categories
+      query = query.is('branch_id', null);
+    }
+
+    const { data: categories, error: fetchError } = await query;
 
     if (fetchError) {
       console.error('❌ Error fetching categories:', fetchError);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext } from '@/lib/api/branch-middleware';
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +22,7 @@ export async function GET(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    // Get admin user details
+    // Get admin user details with branch access
     const { data: adminUser, error: adminError } = await supabase
       .from('admin_users')
       .select(`
@@ -32,7 +33,18 @@ export async function GET(
         is_active,
         last_login,
         created_at,
-        updated_at
+        updated_at,
+        admin_branch_access (
+          id,
+          branch_id,
+          role,
+          is_primary,
+          branches (
+            id,
+            name,
+            code
+          )
+        )
       `)
       .eq('id', adminUserId)
       .single();
@@ -48,10 +60,24 @@ export async function GET(
       .eq('id', adminUserId)
       .single();
 
-    // Combine admin user with profile
+    // Process branch access
+    const branchAccess = adminUser.admin_branch_access || [];
+    const isSuperAdmin = branchAccess.some((access: any) => access.branch_id === null);
+    const branches = branchAccess
+      .filter((access: any) => access.branch_id !== null)
+      .map((access: any) => ({
+        id: access.branch_id,
+        name: access.branches?.name || 'N/A',
+        code: access.branches?.code || 'N/A',
+        is_primary: access.is_primary
+      }));
+
+    // Combine admin user with profile and branch info
     const adminUserWithProfile = {
       ...adminUser,
-      profiles: profile || null
+      profiles: profile || null,
+      is_super_admin: isSuperAdmin,
+      branches: branches
     };
 
     // Get activity history
@@ -142,6 +168,16 @@ export async function PUT(
     const { data: adminRole } = await supabase.rpc('get_admin_role', { user_id: user.id });
     if (adminRole !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
+    // Get branch context to check if requester is super admin
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Only super admins can activate/deactivate other admins
+    if (is_active !== undefined && !branchContext.isSuperAdmin) {
+      return NextResponse.json({ 
+        error: 'Solo los super administradores pueden activar o desactivar otros administradores' 
+      }, { status: 403 });
     }
 
     // Prevent self-demotion from admin

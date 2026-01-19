@@ -3,13 +3,13 @@ import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔔 Admin Notifications API GET called');
     const supabase = await createClient();
     
     // Check admin authorization
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      console.error('❌ Auth error in notifications:', userError);
+      // Silently return 401 - this is expected when user is not authenticated
+      // Don't log as error since this happens during initial page load
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import { createServiceRoleClient } from '@/utils/supabase/server';
 import { NotificationService } from '@/lib/notifications/notification-service';
 import { formatRUT } from '@/lib/utils/rut';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,12 +20,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
     const searchParams = request.nextUrl.searchParams;
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
     const status = searchParams.get('status');
     const customerId = searchParams.get('customer_id');
     const staffId = searchParams.get('staff_id');
+    const requestedBranchId = searchParams.get('branch_id'); // Allow explicit branch_id override
+
+    // Determine which branch to filter by
+    // If branch_id is explicitly requested (for global view), use it
+    // Otherwise use the branch context
+    const branchIdToFilter = requestedBranchId || branchContext.branchId;
 
     // First, fetch basic appointment data (including guest customer fields)
     let query = supabase
@@ -32,6 +42,14 @@ export async function GET(request: NextRequest) {
       .select('*, guest_first_name, guest_last_name, guest_rut, guest_email, guest_phone')
       .order('appointment_date', { ascending: true })
       .order('appointment_time', { ascending: true });
+
+    // Apply branch filter
+    // If branch_id is explicitly requested, use it even if in global view
+    if (requestedBranchId) {
+      query = query.eq('branch_id', requestedBranchId);
+    } else {
+      query = addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    }
 
     if (startDate) {
       query = query.gte('appointment_date', startDate);
@@ -142,7 +160,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
+    // Get branch context to assign branch_id to appointment
+    const branchContext = await getBranchContext(request, user.id);
+
+    console.log('🔍 Branch context for appointment creation:', {
+      branchId: branchContext.branchId,
+      isSuperAdmin: branchContext.isSuperAdmin,
+      isGlobalView: branchContext.isGlobalView
+    });
+
+    // Validate branch access for non-super admins
+    if (!branchContext.isSuperAdmin && !branchContext.branchId) {
+      console.error('❌ No branch selected for non-super admin');
+      return NextResponse.json({ 
+        error: 'Debe seleccionar una sucursal para crear citas' 
+      }, { status: 400 });
+    }
+
+    // For super admins in global view, we need to get branch_id from the request body if provided
     const body = await request.json();
+    
+    // If branch_id is provided in body, use it (for super admins)
+    const finalBranchId = body.branch_id || branchContext.branchId;
+    
+    // Final validation: ensure we have a branch_id (required by database)
+    if (!finalBranchId) {
+      console.error('❌ No branch_id available for appointment creation');
+      return NextResponse.json({ 
+        error: 'Debe especificar una sucursal para crear la cita' 
+      }, { status: 400 });
+    }
 
     // Normalize time format (ensure HH:MM:SS)
     let normalizedTime = body.appointment_time;
@@ -196,13 +243,20 @@ export async function POST(request: NextRequest) {
     let availabilityError = null;
     
     try {
-      const rpcResult = await supabaseServiceRole.rpc('check_appointment_availability', {
+      // Only check availability if branch_id is set (required for non-super admins)
+      // For super admins in global view, skip availability check or use a default branch
+      const rpcParams: any = {
         p_date: body.appointment_date,
         p_time: timeForRPC,
         p_duration_minutes: body.duration_minutes || 30,
         p_appointment_id: null,
         p_staff_id: body.assigned_to || null
-      });
+      };
+
+      // Always add branch_id (required for availability check)
+      rpcParams.p_branch_id = finalBranchId;
+
+      const rpcResult = await supabaseServiceRole.rpc('check_appointment_availability', rpcParams);
       
       // Supabase RPC returns { data, error } structure
       isAvailable = rpcResult.data;
@@ -318,7 +372,8 @@ export async function POST(request: NextRequest) {
       order_id: body.order_id || null,
       follow_up_required: body.follow_up_required || false,
       follow_up_date: body.follow_up_date || null,
-      created_by: user.id
+      created_by: user.id,
+      branch_id: finalBranchId // Always include branch_id (required by database)
     };
 
     // Add guest customer data if present
@@ -326,44 +381,67 @@ export async function POST(request: NextRequest) {
       Object.assign(appointmentData, guestData);
     }
 
+    console.log('📝 Inserting appointment with data:', JSON.stringify(appointmentData, null, 2));
+
+    // Insert appointment first without the customer relation (to avoid issues with NULL customer_id)
     const { data: appointment, error: appointmentError } = await supabaseServiceRole
       .from('appointments')
       .insert(appointmentData)
-      .select(`
-        *,
-        customer:profiles!appointments_customer_id_fkey(id, first_name, last_name, email, phone)
-      `)
+      .select('*')
       .single();
 
     if (appointmentError) {
-      console.error('Error creating appointment:', appointmentError);
+      console.error('❌ Error creating appointment:', appointmentError);
+      console.error('❌ Full error details:', JSON.stringify(appointmentError, null, 2));
+      console.error('❌ Appointment data:', JSON.stringify(appointmentData, null, 2));
       return NextResponse.json({ 
         error: 'Failed to create appointment',
-        details: appointmentError.message 
+        details: appointmentError.message,
+        code: appointmentError.code,
+        hint: appointmentError.hint
       }, { status: 500 });
     }
 
+    console.log('✅ Appointment created successfully:', appointment.id);
+
+    // Fetch customer separately if customer_id exists
+    let customer = null;
+    if (appointment.customer_id) {
+      const { data: customerData } = await supabaseServiceRole
+        .from('profiles')
+        .select('id, first_name, last_name, email, phone')
+        .eq('id', appointment.customer_id)
+        .maybeSingle();
+      customer = customerData;
+    }
+
+    // Add customer to appointment object
+    const appointmentWithCustomer = {
+      ...appointment,
+      customer
+    };
+
     // Create notification for new appointment (non-blocking)
-    if (appointment) {
+    if (appointmentWithCustomer) {
       // Get customer name from registered customer or guest data
       let customerName = 'Cliente';
-      if (appointment.customer) {
-        customerName = `${appointment.customer.first_name || ''} ${appointment.customer.last_name || ''}`.trim() || appointment.customer.email || 'Cliente';
-      } else if (appointment.guest_first_name && appointment.guest_last_name) {
-        customerName = `${appointment.guest_first_name} ${appointment.guest_last_name}`.trim();
+      if (appointmentWithCustomer.customer) {
+        customerName = `${appointmentWithCustomer.customer.first_name || ''} ${appointmentWithCustomer.customer.last_name || ''}`.trim() || appointmentWithCustomer.customer.email || 'Cliente';
+      } else if (appointmentWithCustomer.guest_first_name && appointmentWithCustomer.guest_last_name) {
+        customerName = `${appointmentWithCustomer.guest_first_name} ${appointmentWithCustomer.guest_last_name}`.trim();
       }
       
       NotificationService.notifyNewAppointment(
-        appointment.id,
+        appointmentWithCustomer.id,
         customerName,
-        appointment.appointment_date,
-        appointment.appointment_time
+        appointmentWithCustomer.appointment_date,
+        appointmentWithCustomer.appointment_time
       ).catch(err => console.error('Error creating notification:', err));
     }
 
     return NextResponse.json({
       success: true,
-      appointment
+      appointment: appointmentWithCustomer
     }, { status: 201 });
 
   } catch (error) {

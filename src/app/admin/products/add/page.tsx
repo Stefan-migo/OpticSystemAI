@@ -29,6 +29,7 @@ import {
 import { X, Plus, Save, ArrowLeft, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useProductOptions } from "@/hooks/useProductOptions";
+import { useBranch } from "@/hooks/useBranch";
 
 interface Category {
   id: string;
@@ -38,6 +39,7 @@ interface Category {
 
 export default function AddProductPage() {
   const router = useRouter();
+  const { currentBranchId, isSuperAdmin, branches } = useBranch();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showPublishAlert, setShowPublishAlert] = useState(false);
@@ -58,6 +60,7 @@ export default function AddProductPage() {
     short_description: '',
     price: '',
     compare_at_price: '',
+    price_includes_tax: false,
     category_id: '',
     featured_image: '',
     gallery: [] as string[],
@@ -360,35 +363,152 @@ export default function AddProductPage() {
         add_max: formData.prescription_range.add_max ? parseFloat(formData.prescription_range.add_max) : null,
       } : null;
 
-      const productData = {
-        ...formData,
+      // Validate branch selection
+      if (!currentBranchId && !isSuperAdmin) {
+        toast.error('Debes seleccionar una sucursal para crear productos');
+        return;
+      }
+
+      // Debug: Log formData.price before validation
+      console.log('🔍 Form data before validation:', {
+        price: formData.price,
+        priceType: typeof formData.price,
+        priceValue: formData.price,
+        allFormData: Object.keys(formData).reduce((acc, key) => {
+          if (key.includes('price') || key === 'name' || key === 'branch_id') {
+            acc[key] = formData[key as keyof typeof formData];
+          }
+          return acc;
+        }, {} as any)
+      });
+
+      // Validate and parse price
+      const priceStr = String(formData.price || '').trim();
+      const priceValue = priceStr ? parseFloat(priceStr) : NaN;
+      
+      console.log('💰 Price parsing:', {
+        priceStr,
+        priceValue,
+        isNaN: isNaN(priceValue),
+        isValid: priceStr && !isNaN(priceValue) && priceValue >= 0
+      });
+      
+      if (!priceStr || isNaN(priceValue) || priceValue < 0) {
+        console.error('❌ Price validation failed in frontend:', {
+          priceStr,
+          priceValue,
+          isNaN: isNaN(priceValue),
+          formDataPrice: formData.price
+        });
+        toast.error('El precio es requerido y debe ser un número válido mayor o igual a 0');
+        return;
+      }
+
+      // Build product data object, explicitly setting price to avoid null/undefined issues
+      const productData: any = {
+        name: formData.name,
+        slug: formData.slug,
+        description: formData.description || null,
+        short_description: formData.short_description || null,
+        price: priceValue, // Explicitly set as number
+        compare_at_price: formData.compare_at_price ? parseFloat(String(formData.compare_at_price)) : null,
+        cost_price: formData.cost_price ? parseFloat(String(formData.cost_price)) : null,
+        price_includes_tax: formData.price_includes_tax || false,
+        category_id: formData.category_id || null,
+        branch_id: currentBranchId, // Associate product with current branch
+        inventory_quantity: parseInt(String(formData.inventory_quantity)) || 0,
         status: status,
-        price: parseFloat(formData.price),
-        compare_at_price: formData.compare_at_price ? parseFloat(formData.compare_at_price) : null,
-        inventory_quantity: parseInt(formData.inventory_quantity),
+        featured_image: formData.featured_image || null,
+        gallery: formData.gallery || [],
+        tags: formData.tags || [],
+        is_featured: formData.is_featured || false,
         published_at: status === 'active' ? new Date().toISOString() : null,
-        // Optical fields
+        // Optical product fields
+        product_type: formData.product_type || 'frame',
+        optical_category: formData.optical_category || null,
+        sku: formData.sku || null,
+        barcode: formData.barcode || null,
+        brand: formData.brand || null,
+        manufacturer: formData.manufacturer || null,
+        model_number: formData.model_number || null,
+        // Frame fields
+        frame_type: formData.frame_type || null,
+        frame_material: formData.frame_material || null,
+        frame_shape: formData.frame_shape || null,
+        frame_color: formData.frame_color || null,
+        frame_colors: formData.frame_colors || [],
+        frame_brand: formData.frame_brand || null,
+        frame_model: formData.frame_model || null,
+        frame_sku: formData.frame_sku || null,
+        frame_gender: formData.frame_gender || null,
+        frame_age_group: formData.frame_age_group || null,
+        frame_size: formData.frame_size || null,
+        frame_features: formData.frame_features || [],
         frame_measurements: frameMeasurements,
+        // Lens fields
+        lens_type: formData.lens_type || null,
+        lens_material: formData.lens_material || null,
+        lens_index: formData.lens_index ? parseFloat(String(formData.lens_index)) : null,
+        lens_coatings: formData.lens_coatings || [],
+        lens_tint_options: formData.lens_tint_options || [],
+        uv_protection: formData.uv_protection || null,
+        blue_light_filter: formData.blue_light_filter || false,
+        blue_light_filter_percentage: formData.blue_light_filter_percentage ? parseInt(String(formData.blue_light_filter_percentage)) : null,
+        photochromic: formData.photochromic || false,
+        prescription_available: formData.prescription_available || false,
         prescription_range: prescriptionRange,
-        lens_index: formData.lens_index ? parseFloat(formData.lens_index) : null,
-        warranty_months: formData.warranty_months ? parseInt(formData.warranty_months) : null,
-        blue_light_filter_percentage: formData.blue_light_filter_percentage ? parseInt(formData.blue_light_filter_percentage) : null,
-        // Remove cosmetics fields that don't apply
-        skin_type: undefined,
-        benefits: undefined,
-        certifications: undefined,
-        ingredients: undefined,
-        usage_instructions: undefined,
-        precautions: undefined,
-        package_characteristics: undefined,
+        requires_prescription: formData.requires_prescription || false,
+        is_customizable: formData.is_customizable || false,
+        warranty_months: formData.warranty_months ? parseInt(String(formData.warranty_months)) : null,
+        warranty_details: formData.warranty_details || null,
       };
+
+      // Remove undefined and null string fields, but keep valid nulls for optional fields
+      Object.keys(productData).forEach(key => {
+        const value = productData[key];
+        // Remove undefined values
+        if (value === undefined) {
+          delete productData[key];
+        }
+        // Convert empty strings to null for optional fields (but not for required fields like price)
+        else if (typeof value === 'string' && value.trim() === '' && key !== 'price') {
+          productData[key] = null;
+        }
+      });
+
+      // Ensure price is always a valid number (should never be null or undefined at this point)
+      if (productData.price === null || productData.price === undefined || isNaN(productData.price)) {
+        console.error('❌ Price validation failed in final check:', {
+          price: productData.price,
+          type: typeof productData.price,
+          priceValue: priceValue,
+          priceStr: priceStr
+        });
+        toast.error('Error: El precio no es válido. Por favor, verifica el formulario.');
+        return;
+      }
+
+      // Debug: Log data being sent
+      const jsonBody = JSON.stringify(productData);
+      const parsedBody = JSON.parse(jsonBody); // Parse to verify serialization
+      
+      console.log('📤 Sending product data:', {
+        branch_id: productData.branch_id,
+        isSuperAdmin: isSuperAdmin,
+        price: productData.price,
+        priceType: typeof productData.price,
+        priceIsNaN: isNaN(productData.price),
+        name: productData.name,
+        priceAfterJSON: parsedBody.price,
+        priceTypeAfterJSON: typeof parsedBody.price
+      });
 
       const response = await fetch('/api/admin/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(productData),
+        body: jsonBody,
       });
 
       if (response.ok) {
@@ -396,8 +516,13 @@ export default function AddProductPage() {
         markAsSaved(); // 🚀 Mark as saved to allow navigation
         router.push('/admin/products');
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Error al crear el producto');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        toast.error(errorData.message || errorData.error || `Error al crear el producto (${response.status})`);
         markAsSaved(); // Reset saving state on error
       }
     } catch (error) {
@@ -526,6 +651,18 @@ export default function AddProductPage() {
                   className='border-black/20'
                 />
               </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="price_includes_tax"
+                checked={formData.price_includes_tax}
+                onChange={(e) => handleInputChange('price_includes_tax', e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-azul-profundo focus:ring-azul-profundo"
+              />
+              <Label htmlFor="price_includes_tax" className="text-sm font-normal cursor-pointer">
+                El precio ya incluye IVA
+              </Label>
             </div>
           </CardContent>
         </Card>
@@ -1184,7 +1321,7 @@ export default function AddProductPage() {
               <AlertTriangle className="h-5 w-5 text-amber-600" />
               Confirmar Publicación
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription asChild>
               <div className="space-y-3">
                 <p>
                   <strong>¿Estás seguro de que deseas publicar este producto?</strong>
@@ -1220,6 +1357,7 @@ export default function AddProductPage() {
               onClick={() => handleSubmit(undefined, 'draft')}
               disabled={loading}
               className='text-white'
+              style={{ backgroundColor: 'var(--admin-accent-tertiary)' }}
             >
               Guardar como Borrador
             </Button>

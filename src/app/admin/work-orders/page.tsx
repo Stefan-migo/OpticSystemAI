@@ -52,6 +52,9 @@ import {
 import { toast } from 'sonner';
 import Link from 'next/link';
 import CreateWorkOrderForm from '@/components/admin/CreateWorkOrderForm';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
+import { BranchSelector } from '@/components/admin/BranchSelector';
 
 interface WorkOrder {
   id: string;
@@ -81,6 +84,7 @@ interface WorkOrder {
 }
 
 export default function WorkOrdersPage() {
+  const { currentBranchId, isSuperAdmin, branches, isLoading: branchLoading } = useBranch();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -93,10 +97,16 @@ export default function WorkOrdersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [workOrderToDelete, setWorkOrderToDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editingPaymentStatus, setEditingPaymentStatus] = useState<string | null>(null);
+  const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState<string | null>(null);
+
+  const isGlobalView = !currentBranchId && isSuperAdmin;
 
   useEffect(() => {
-    fetchWorkOrders();
-  }, [currentPage, statusFilter]);
+    if (!branchLoading) {
+      fetchWorkOrders();
+    }
+  }, [currentPage, statusFilter, currentBranchId, branchLoading]);
 
   const fetchWorkOrders = async () => {
     try {
@@ -107,7 +117,11 @@ export default function WorkOrdersPage() {
         ...(statusFilter !== 'all' && { status: statusFilter })
       });
 
-      const response = await fetch(`/api/admin/work-orders?${params}`);
+      const headers: HeadersInit = {
+        ...getBranchHeader(currentBranchId)
+      };
+
+      const response = await fetch(`/api/admin/work-orders?${params}`, { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch work orders');
       }
@@ -136,8 +150,6 @@ export default function WorkOrdersPage() {
       quote: { variant: 'outline', label: 'Presupuesto', icon: FileText, color: 'text-gray-600' },
       ordered: { variant: 'secondary', label: 'Ordenado', icon: Package, color: 'text-blue-600' },
       sent_to_lab: { variant: 'default', label: 'Enviado al Lab', icon: Send, color: 'text-purple-600' },
-      in_progress_lab: { variant: 'default', label: 'En Lab', icon: Factory, color: 'text-orange-600' },
-      ready_at_lab: { variant: 'default', label: 'Listo en Lab', icon: CheckCircle, color: 'text-green-600' },
       received_from_lab: { variant: 'secondary', label: 'Recibido', icon: Truck, color: 'text-blue-600' },
       mounted: { variant: 'default', label: 'Montado', icon: Package, color: 'text-indigo-600' },
       quality_check: { variant: 'secondary', label: 'Control Calidad', icon: CheckCircle, color: 'text-yellow-600' },
@@ -221,18 +233,70 @@ export default function WorkOrdersPage() {
     }
   };
 
+  const handlePaymentStatusChange = async (workOrderId: string, newStatus: string) => {
+    setUpdatingPaymentStatus(workOrderId);
+    try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+      
+      const response = await fetch(`/api/admin/work-orders/${workOrderId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          payment_status: newStatus
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al actualizar estado de pago');
+      }
+
+      // Update local state optimistically
+      setWorkOrders(prev => prev.map(wo => 
+        wo.id === workOrderId 
+          ? { ...wo, payment_status: newStatus }
+          : wo
+      ));
+
+      toast.success('Estado de pago actualizado');
+      setEditingPaymentStatus(null);
+    } catch (error: any) {
+      console.error('Error updating payment status:', error);
+      toast.error(error.message || 'Error al actualizar estado de pago');
+      // Refresh to get correct state
+      fetchWorkOrders();
+    } finally {
+      setUpdatingPaymentStatus(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Trabajos</h1>
-          <p className="text-tierra-media">Gestión de trabajos de laboratorio</p>
+          <p className="text-tierra-media">
+            {isGlobalView 
+              ? 'Gestión de trabajos de laboratorio - Todas las sucursales'
+              : 'Gestión de trabajos de laboratorio'}
+          </p>
         </div>
-        <Button onClick={() => setShowCreateWorkOrder(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Trabajo
-        </Button>
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <BranchSelector 
+              branches={branches} 
+              currentBranchId={currentBranchId}
+            />
+          )}
+          <Button onClick={() => setShowCreateWorkOrder(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Trabajo
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -398,7 +462,50 @@ export default function WorkOrdersPage() {
                         )}
                       </TableCell>
                       <TableCell>{getStatusBadge(workOrder.status)}</TableCell>
-                      <TableCell>{getPaymentStatusBadge(workOrder.payment_status)}</TableCell>
+                      <TableCell>
+                        {editingPaymentStatus === workOrder.id ? (
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={workOrder.payment_status}
+                              onValueChange={(value) => {
+                                handlePaymentStatusChange(workOrder.id, value);
+                                setEditingPaymentStatus(null);
+                              }}
+                              disabled={updatingPaymentStatus === workOrder.id}
+                              open={true}
+                              onOpenChange={(open) => {
+                                if (!open) {
+                                  setEditingPaymentStatus(null);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-[140px] h-7">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pendiente</SelectItem>
+                                <SelectItem value="partial">Parcial</SelectItem>
+                                <SelectItem value="paid">Pagado</SelectItem>
+                                <SelectItem value="refunded">Reembolsado</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {updatingPaymentStatus === workOrder.id && (
+                              <RefreshCw className="h-4 w-4 animate-spin text-azul-profundo" />
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => setEditingPaymentStatus(workOrder.id)}
+                            className="cursor-pointer hover:opacity-80 transition-opacity inline-block group"
+                            title="Haz clic para editar el estado de pago"
+                          >
+                            <div className="flex items-center gap-1">
+                              {getPaymentStatusBadge(workOrder.payment_status)}
+                              <span className="opacity-0 group-hover:opacity-50 text-xs text-tierra-media">✎</span>
+                            </div>
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="font-semibold text-verde-suave">
                         {formatPrice(workOrder.total_amount)}
                       </TableCell>

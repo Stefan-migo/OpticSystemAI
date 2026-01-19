@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Dashboard API called');
     const supabase = await createClient();
     
     // Check admin authorization
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
+      // Silently return 401 - this is expected when user is not authenticated
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -17,33 +18,53 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    // Fetch all data in parallel
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
+    console.log('📊 Dashboard - Branch Context:', {
+      branchId: branchContext.branchId,
+      isGlobalView: branchContext.isGlobalView,
+      isSuperAdmin: branchContext.isSuperAdmin
+    });
+
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
+
+    // Fetch all data in parallel with branch filtering
     const [productsResult, ordersResult, customersResult] = await Promise.all([
-      // Products - only active ones
-      supabase
-        .from('products')
-        .select('*')
-        .eq('status', 'active'),
+      // Products - filter by branch if selected, or get all if global view
+      applyBranchFilter(
+        supabase
+          .from('products')
+          .select('*')
+          .eq('status', 'active')
+      ),
       
-      // Orders
-      supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            product_id,
-            quantity,
-            unit_price,
-            total_price,
-            product_name
-          )
-        `)
-        .order('created_at', { ascending: false }),
+      // Orders - filtered by branch
+      applyBranchFilter(
+        supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (
+              product_id,
+              quantity,
+              unit_price,
+              total_price,
+              product_name
+            )
+          `)
+          .order('created_at', { ascending: false })
+      ),
       
-      // Customers
-      supabase
-        .from('profiles')
-        .select('*')
+      // Customers - filter by branch if selected, or get all if global view
+      applyBranchFilter(
+        supabase
+          .from('customers')
+          .select('*')
+      )
     ]);
 
     if (productsResult.error) {
@@ -58,7 +79,36 @@ export async function GET(request: NextRequest) {
 
     const products = productsResult.data || [];
     const orders = ordersResult.data || [];
-    const customers = customersResult.data || [];
+    const customers = customersResult.data || []; // Now from customers table, not profiles
+
+    // Additional filtering: if branch is selected, exclude products without branch_id
+    // This is a safety check in case RLS policies allow legacy products (branch_id IS NULL)
+    // When a specific branch is selected, we only want products from that branch
+    let filteredProducts = products;
+    if (branchContext.branchId && !branchContext.isGlobalView) {
+      filteredProducts = products.filter((p: any) => {
+        // Only include products that belong to the selected branch
+        return p.branch_id === branchContext.branchId;
+      });
+      console.log('🔍 Filtering products by branch:', {
+        branchId: branchContext.branchId,
+        before: products.length,
+        after: filteredProducts.length,
+        productsWithoutBranch: products.filter((p: any) => !p.branch_id).length
+      });
+    }
+
+    console.log('📊 Dashboard - Products fetched:', {
+      total: products.length,
+      filtered: filteredProducts.length,
+      branchId: branchContext.branchId,
+      isGlobalView: branchContext.isGlobalView,
+      sampleProducts: filteredProducts.slice(0, 3).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        branch_id: p.branch_id
+      }))
+    });
 
     // Calculate date ranges
     const now = new Date();
@@ -68,7 +118,8 @@ export async function GET(request: NextRequest) {
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
     // === PRODUCTS METRICS ===
-    const activeProducts = products.filter(p => p.status === 'active');
+    // Use filteredProducts instead of products
+    const activeProducts = filteredProducts.filter(p => p.status === 'active');
     const lowStockProducts = activeProducts
       .filter(p => (p.inventory_quantity || 0) <= 5 && (p.inventory_quantity || 0) > 0)
       .map(p => ({
@@ -124,11 +175,13 @@ export async function GET(request: NextRequest) {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const { data: appointmentsData } = await supabase
-      .from('appointments')
-      .select('*')
-      .gte('appointment_date', today.toISOString().split('T')[0])
-      .lt('appointment_date', tomorrow.toISOString().split('T')[0]);
+    const { data: appointmentsData } = await applyBranchFilter(
+      supabase
+        .from('appointments')
+        .select('*')
+        .gte('appointment_date', today.toISOString().split('T')[0])
+        .lt('appointment_date', tomorrow.toISOString().split('T')[0])
+    );
 
     const appointments = appointmentsData || [];
     const todayAppointments = appointments.length;
@@ -137,9 +190,11 @@ export async function GET(request: NextRequest) {
     const pendingAppointments = appointments.filter(a => a.status === 'scheduled' || a.status === 'pending').length;
 
     // === WORK ORDERS METRICS (Optical Shop) ===
-    const { data: workOrdersData } = await supabase
-      .from('lab_work_orders')
-      .select('*');
+    const { data: workOrdersData } = await applyBranchFilter(
+      supabase
+        .from('lab_work_orders')
+        .select('*')
+    );
 
     const workOrders = workOrdersData || [];
     // Trabajos en progreso: enviados al lab, en lab, listos en lab, recibidos, montados, control calidad
@@ -156,9 +211,11 @@ export async function GET(request: NextRequest) {
     ).length;
 
     // === QUOTES METRICS (Optical Shop) ===
-    const { data: quotesData } = await supabase
-      .from('quotes')
-      .select('*');
+    const { data: quotesData } = await applyBranchFilter(
+      supabase
+        .from('quotes')
+        .select('*')
+    );
 
     const quotes = quotesData || [];
     // Presupuestos pendientes: borrador, enviado (esperando respuesta)
@@ -171,12 +228,14 @@ export async function GET(request: NextRequest) {
     ).length;
 
     // === TODAY'S APPOINTMENTS ===
-    const { data: todayAppointmentsData } = await supabase
-      .from('appointments')
-      .select('*')
-      .eq('appointment_date', today.toISOString().split('T')[0])
-      .order('appointment_time', { ascending: true })
-      .limit(10);
+    const { data: todayAppointmentsData } = await applyBranchFilter(
+      supabase
+        .from('appointments')
+        .select('*')
+        .eq('appointment_date', today.toISOString().split('T')[0])
+        .order('appointment_time', { ascending: true })
+        .limit(10)
+    );
 
     // Fetch customer data manually
     const customerIds = [...new Set((todayAppointmentsData || []).map((a: any) => a.customer_id).filter(Boolean))];
@@ -265,6 +324,11 @@ export async function GET(request: NextRequest) {
     console.log('✅ Dashboard data fetched successfully');
 
     return NextResponse.json({
+      branch: {
+        id: branchContext.branchId,
+        is_global: branchContext.isGlobalView,
+        is_super_admin: branchContext.isSuperAdmin,
+      },
       kpis: {
         products: {
           total: activeProducts.length,

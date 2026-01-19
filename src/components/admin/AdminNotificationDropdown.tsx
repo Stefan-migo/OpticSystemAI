@@ -16,6 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 interface AdminNotification {
   id: string;
@@ -53,6 +54,7 @@ const priorityColors: Record<string, string> = {
 
 export default function AdminNotificationDropdown() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuthContext();
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -60,30 +62,47 @@ export default function AdminNotificationDropdown() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchNotifications = async () => {
+    // Don't fetch if user is not authenticated
+    if (!user || authLoading) {
+      return;
+    }
+
     try {
       const response = await fetch('/api/admin/notifications?limit=10');
-      if (!response.ok) throw new Error('Failed to fetch notifications');
+      if (!response.ok) {
+        // Silently handle 401 (unauthorized) - user might not be logged in yet
+        if (response.status === 401) {
+          return;
+        }
+        throw new Error('Failed to fetch notifications');
+      }
       
       const data = await response.json();
       setNotifications(data.notifications || []);
       setUnreadCount(data.unreadCount || 0);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      // Only log non-401 errors
+      if (error instanceof Error && !error.message.includes('401')) {
+        console.error('Error fetching notifications:', error);
+      }
     }
   };
 
   useEffect(() => {
-    fetchNotifications();
-    
-    // Poll for new notifications every 30 seconds
-    intervalRef.current = setInterval(fetchNotifications, 30000);
+    // Only start fetching when user is authenticated
+    if (!authLoading && user) {
+      fetchNotifications();
+      
+      // Poll for new notifications every 30 seconds
+      intervalRef.current = setInterval(fetchNotifications, 30000);
+    }
     
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, []);
+  }, [user, authLoading]);
 
   const markAsRead = async (notificationId: string, actionUrl?: string) => {
     try {

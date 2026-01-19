@@ -43,6 +43,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
+import { BranchSelector } from '@/components/admin/BranchSelector';
 
 interface SupportTicket {
   id: string;
@@ -96,6 +99,7 @@ interface SupportStats {
 
 export default function SupportPage() {
   // Updated for optical shop context
+  const { currentBranchId, isSuperAdmin, branches, isLoading: branchLoading } = useBranch();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [stats, setStats] = useState<SupportStats | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
@@ -116,10 +120,12 @@ export default function SupportPage() {
   // Status update loading state
   const [updatingTickets, setUpdatingTickets] = useState<Set<string>>(new Set());
 
+  const isGlobalView = !currentBranchId && isSuperAdmin;
+
   useEffect(() => {
     fetchTickets();
     fetchCategories();
-  }, [currentPage, statusFilter, priorityFilter, categoryFilter, assignedFilter]);
+  }, [currentPage, statusFilter, priorityFilter, categoryFilter, assignedFilter, currentBranchId]);
 
   // Recalculate stats when tickets data changes
   useEffect(() => {
@@ -140,7 +146,11 @@ export default function SupportPage() {
         ...(assignedFilter !== 'all' && { assigned_to: assignedFilter })
       });
 
-      const response = await fetch(`/api/admin/support/tickets?${params}`);
+      const headers: HeadersInit = {
+        ...getBranchHeader(currentBranchId)
+      };
+      
+      const response = await fetch(`/api/admin/support/tickets?${params}`, { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch support tickets');
       }
@@ -159,7 +169,11 @@ export default function SupportPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/admin/support/categories');
+      const headers: HeadersInit = {
+        ...getBranchHeader(currentBranchId)
+      };
+      
+      const response = await fetch('/api/admin/support/categories', { headers });
       if (response.ok) {
         const data = await response.json();
         setCategories(data.categories || []);
@@ -258,11 +272,14 @@ export default function SupportPage() {
       // Add to updating set
       setUpdatingTickets(prev => new Set(prev).add(ticketId));
 
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+
       const response = await fetch(`/api/admin/support/tickets/${ticketId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           status: newStatus,
           previous_status: tickets.find(t => t.id === ticketId)?.status
@@ -314,11 +331,14 @@ export default function SupportPage() {
       // Add to updating set
       setUpdatingTickets(prev => new Set(prev).add(ticketId));
 
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+
       const response = await fetch(`/api/admin/support/tickets/${ticketId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           priority: newPriority
         }),
@@ -413,11 +433,19 @@ export default function SupportPage() {
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Soporte al Cliente</h1>
           <p className="text-tierra-media">
-            Gestiona tickets de soporte y comunicación con pacientes/clientes de la óptica
+            {isGlobalView 
+              ? 'Gestión de tickets de soporte - Todas las sucursales'
+              : 'Gestiona tickets de soporte y comunicación con pacientes/clientes de la óptica'}
           </p>
         </div>
         
         <div className="flex space-x-2">
+          {isSuperAdmin && (
+            <BranchSelector 
+              branches={branches} 
+              currentBranchId={currentBranchId}
+            />
+          )}
           <Link href="/admin/support/templates">
             <Button variant="outline">
               <FileText className="h-4 w-4 mr-2" />

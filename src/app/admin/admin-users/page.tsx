@@ -56,11 +56,14 @@ import {
   Mail,
   Phone,
   Check,
-  MoreVertical
+  MoreVertical,
+  Building2,
+  Globe
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import PermissionsEditor from '@/components/admin/PermissionsEditor';
+import { useBranch } from '@/hooks/useBranch';
 
 interface AdminUser {
   id: string;
@@ -71,6 +74,13 @@ interface AdminUser {
   last_login?: string;
   created_at: string;
   updated_at: string;
+  is_super_admin?: boolean;
+  branches?: Array<{
+    id: string;
+    name: string;
+    code: string;
+    is_primary: boolean;
+  }>;
   profiles?: {
     first_name?: string;
     last_name?: string;
@@ -92,6 +102,7 @@ interface SuggestedUser {
 }
 
 export default function AdminUsersPage() {
+  const { isSuperAdmin } = useBranch();
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,8 +122,13 @@ export default function AdminUsersPage() {
   const [newAdminData, setNewAdminData] = useState({
     email: '',
     role: 'admin',
-    is_active: true
+    is_active: true,
+    branch_ids: [] as string[],
+    is_super_admin: false
   });
+  
+  // Branches for selection
+  const [availableBranches, setAvailableBranches] = useState<Array<{id: string; name: string; code: string}>>([]);
   
   // Autocomplete state
   const [openUserSelect, setOpenUserSelect] = useState(false);
@@ -126,7 +142,20 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchAdminUsers();
+    fetchBranches();
   }, [roleFilter, statusFilter]);
+
+  const fetchBranches = async () => {
+    try {
+      const response = await fetch('/api/admin/branches');
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableBranches(data.branches || []);
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+    }
+  };
 
   // Fetch suggested users when search query changes
   useEffect(() => {
@@ -141,6 +170,14 @@ export default function AdminUsersPage() {
       fetchSuggestedUsers('');
       setUserSearchQuery('');
       setOpenUserSelect(false);
+      // Reset form
+      setNewAdminData({
+        email: '',
+        role: 'admin',
+        is_active: true,
+        branch_ids: [],
+        is_super_admin: false
+      });
     } else {
       // Clean up when dialog closes
       setUserSearchQuery('');
@@ -233,8 +270,14 @@ export default function AdminUsersPage() {
   };
 
   const handleCreateAdmin = async () => {
-    if (!newAdminData.email || !newAdminData.role) {
-      toast.error('Email y rol son requeridos');
+    if (!newAdminData.email) {
+      toast.error('Email es requerido');
+      return;
+    }
+
+    // Validate: if not super admin, must have at least one branch
+    if (!newAdminData.is_super_admin && (!newAdminData.branch_ids || newAdminData.branch_ids.length === 0)) {
+      toast.error('Debe asignar al menos una sucursal al administrador');
       return;
     }
 
@@ -246,7 +289,13 @@ export default function AdminUsersPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newAdminData),
+        body: JSON.stringify({
+          email: newAdminData.email,
+          role: 'admin',
+          is_active: newAdminData.is_active,
+          is_super_admin: newAdminData.is_super_admin,
+          branch_ids: newAdminData.is_super_admin ? [] : newAdminData.branch_ids
+        }),
       });
 
       if (!response.ok) {
@@ -256,7 +305,13 @@ export default function AdminUsersPage() {
 
       toast.success('Usuario administrador creado exitosamente');
       setShowCreateDialog(false);
-      setNewAdminData({ email: '', role: 'admin', is_active: true });
+      setNewAdminData({ 
+        email: '', 
+        role: 'admin', 
+        is_active: true, 
+        branch_ids: [],
+        is_super_admin: false 
+      });
       fetchAdminUsers();
 
     } catch (error) {
@@ -268,6 +323,15 @@ export default function AdminUsersPage() {
   };
 
   const handleToggleStatus = async (adminId: string, currentStatus: boolean) => {
+    if (!isSuperAdmin) {
+      toast.error('Solo los super administradores pueden activar o desactivar otros administradores');
+      return;
+    }
+
+    if (!confirm(`¿Estás seguro de que quieres ${!currentStatus ? 'activar' : 'desactivar'} a este administrador?`)) {
+      return;
+    }
+
     try {
       const response = await fetch(`/api/admin/admin-users/${adminId}`, {
         method: 'PUT',
@@ -315,8 +379,15 @@ export default function AdminUsersPage() {
     }
   };
 
-  const getRoleBadge = (role: string) => {
-    // Simplified: only 'admin' role
+  const getRoleBadge = (admin: AdminUser) => {
+    if (admin.is_super_admin) {
+      return (
+        <Badge variant="default" className="flex items-center gap-1 bg-dorado text-primary">
+          <Globe className="h-3 w-3" />
+          Super Administrador
+        </Badge>
+      );
+    }
     return (
       <Badge variant="default" className="flex items-center gap-1">
         <Crown className="h-3 w-3" />
@@ -479,18 +550,91 @@ export default function AdminUsersPage() {
                 </p>
               </div>
               
-              <div>
-                <Label htmlFor="role">Rol Administrativo</Label>
-                <div className="mt-2 p-3 bg-admin-bg-tertiary rounded-md">
-                  <div className="flex items-center gap-2">
-                    <Crown className="h-4 w-4 text-admin-accent-tertiary" />
-                    <span className="font-medium">Administrador</span>
+              {/* Super Admin Option - Only for super admins */}
+              {isSuperAdmin && (
+                <div>
+                  <Label>Tipo de Administrador</Label>
+                  <div className="mt-2 space-y-3">
+                    <label className="flex items-start gap-3 p-3 border rounded-md cursor-pointer hover:bg-admin-bg-tertiary transition-colors">
+                      <input
+                        type="radio"
+                        name="admin_type"
+                        checked={newAdminData.is_super_admin}
+                        onChange={() => setNewAdminData({...newAdminData, is_super_admin: true, branch_ids: []})}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-dorado" />
+                          <span className="font-medium">Super Administrador</span>
+                        </div>
+                        <p className="text-sm text-tierra-media mt-1">
+                          Acceso a todas las sucursales y funciones del sistema
+                        </p>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 p-3 border rounded-md cursor-pointer hover:bg-admin-bg-tertiary transition-colors">
+                      <input
+                        type="radio"
+                        name="admin_type"
+                        checked={!newAdminData.is_super_admin}
+                        onChange={() => setNewAdminData({...newAdminData, is_super_admin: false, branch_ids: []})}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-admin-accent-tertiary" />
+                          <span className="font-medium">Administrador de Sucursal</span>
+                        </div>
+                        <p className="text-sm text-tierra-media mt-1">
+                          Acceso limitado a sucursales específicas
+                        </p>
+                      </div>
+                    </label>
                   </div>
-                  <p className="text-sm text-tierra-media mt-1">
-                    Acceso completo a todas las funciones del sistema
-                  </p>
                 </div>
-              </div>
+              )}
+
+              {/* Branch Selection - Only for branch admins */}
+              {!newAdminData.is_super_admin && (
+                <div>
+                  <Label>Sucursales</Label>
+                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                    {availableBranches.length === 0 ? (
+                      <p className="text-sm text-tierra-media">No hay sucursales disponibles</p>
+                    ) : (
+                      availableBranches.map((branch) => (
+                        <label key={branch.id} className="flex items-center gap-2 cursor-pointer hover:bg-admin-bg-tertiary p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={newAdminData.branch_ids.includes(branch.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewAdminData({
+                                  ...newAdminData,
+                                  branch_ids: [...newAdminData.branch_ids, branch.id]
+                                });
+                              } else {
+                                setNewAdminData({
+                                  ...newAdminData,
+                                  branch_ids: newAdminData.branch_ids.filter(id => id !== branch.id)
+                                });
+                              }
+                            }}
+                            className="rounded"
+                          />
+                          <span className="text-sm">{branch.name} ({branch.code})</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {newAdminData.branch_ids.length > 0 && (
+                    <p className="text-xs text-tierra-media mt-1">
+                      {newAdminData.branch_ids.length} sucursal(es) seleccionada(s)
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             
             <DialogFooter>
@@ -522,11 +666,11 @@ export default function AdminUsersPage() {
         <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           <CardContent className="p-6">
             <div className="flex items-center">
-              <Crown className="h-8 w-8 text-dorado" />
+              <Globe className="h-8 w-8 text-dorado" />
               <div className="ml-4">
-                <p className="text-sm text-tierra-media">Administradores</p>
+                <p className="text-sm text-tierra-media">Super Administradores</p>
                 <p className="text-2xl font-bold text-dorado">
-                  {adminUsers.filter(admin => admin.role === 'admin').length}
+                  {adminUsers.filter(admin => admin.is_super_admin).length}
                 </p>
               </div>
             </div>
@@ -604,7 +748,12 @@ export default function AdminUsersPage() {
                               <span className="text-xs text-tierra-media truncate">{admin.email}</span>
                             </div>
                             {admin.is_active ? (
-                              <Badge className="bg-verde-suave text-primary text-xs">Activo</Badge>
+                              <Badge 
+                                className="bg-verde-suave text-primary text-xs" 
+                                style={{ backgroundColor: 'var(--accent)', color: 'var(--admin-bg-primary)' }}
+                              >
+                                Activo
+                              </Badge>
                             ) : (
                               <Badge variant="destructive" className="text-xs">Inactivo</Badge>
                             )}
@@ -656,6 +805,7 @@ export default function AdminUsersPage() {
               <TableRow>
                 <TableHead>Usuario</TableHead>
                 <TableHead>Rol</TableHead>
+                <TableHead>Acceso</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Última Actividad</TableHead>
                 <TableHead>Actividad (30d)</TableHead>
@@ -691,7 +841,33 @@ export default function AdminUsersPage() {
                   </TableCell>
                   
                   <TableCell>
-                    {getRoleBadge(admin.role)}
+                    {getRoleBadge(admin)}
+                  </TableCell>
+                  
+                  <TableCell>
+                    {admin.is_super_admin ? (
+                      <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                        <Globe className="h-3 w-3" />
+                        Todas las sucursales
+                      </Badge>
+                    ) : admin.branches && admin.branches.length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {admin.branches.slice(0, 2).map((branch) => (
+                          <Badge key={branch.id} variant="outline" className="flex items-center gap-1 w-fit text-xs">
+                            <Building2 className="h-3 w-3" />
+                            {branch.name}
+                            {branch.is_primary && <span className="text-dorado">★</span>}
+                          </Badge>
+                        ))}
+                        {admin.branches.length > 2 && (
+                          <span className="text-xs text-tierra-media">
+                            +{admin.branches.length - 2} más
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-tierra-media">Sin sucursales</span>
+                    )}
                   </TableCell>
                   
                   <TableCell>
@@ -752,22 +928,24 @@ export default function AdminUsersPage() {
                           Editar Permisos
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleToggleStatus(admin.id, admin.is_active)}
-                          className="flex items-center cursor-pointer"
-                        >
-                          {admin.is_active ? (
-                            <>
-                              <AlertTriangle className="mr-2 h-4 w-4 text-red-500" />
-                              Desactivar
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-                              Activar
-                            </>
-                          )}
-                        </DropdownMenuItem>
+                        {isSuperAdmin && (
+                          <DropdownMenuItem
+                            onClick={() => handleToggleStatus(admin.id, admin.is_active)}
+                            className="flex items-center cursor-pointer"
+                          >
+                            {admin.is_active ? (
+                              <>
+                                <AlertTriangle className="mr-2 h-4 w-4 text-red-500" />
+                                Desactivar
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                                Activar
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => handleDeleteAdmin(admin.id, admin.email)}

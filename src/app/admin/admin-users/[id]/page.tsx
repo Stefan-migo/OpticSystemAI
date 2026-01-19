@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Crown, Mail, Phone, Calendar, Activity, Clock, Shield } from 'lucide-react';
+import { ArrowLeft, Crown, Mail, Phone, Calendar, Activity, Clock, Shield, Globe, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useBranch } from '@/hooks/useBranch';
 
 interface AdminUser {
   id: string;
@@ -18,6 +19,13 @@ interface AdminUser {
   last_login?: string;
   created_at: string;
   updated_at: string;
+  is_super_admin?: boolean;
+  branches?: Array<{
+    id: string;
+    name: string;
+    code: string;
+    is_primary: boolean;
+  }>;
   profiles?: {
     first_name?: string;
     last_name?: string;
@@ -34,10 +42,12 @@ export default function AdminUserDetailPage() {
   const params = useParams();
   const router = useRouter();
   const adminId = params.id as string;
+  const { isSuperAdmin } = useBranch();
 
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [togglingStatus, setTogglingStatus] = useState(false);
 
   useEffect(() => {
     if (adminId) {
@@ -99,6 +109,41 @@ export default function AdminUserDetailPage() {
     );
   }
 
+  const handleToggleStatus = async () => {
+    if (!isSuperAdmin) {
+      toast.error('Solo los super administradores pueden activar o desactivar otros administradores');
+      return;
+    }
+
+    if (!confirm(`¿Estás seguro de que quieres ${adminUser.is_active ? 'desactivar' : 'activar'} a este administrador?`)) {
+      return;
+    }
+
+    try {
+      setTogglingStatus(true);
+      const response = await fetch(`/api/admin/admin-users/${adminId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: !adminUser.is_active }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al actualizar estado');
+      }
+
+      toast.success(`Administrador ${!adminUser.is_active ? 'activado' : 'desactivado'} exitosamente`);
+      fetchAdminUser();
+    } catch (error) {
+      console.error('Error toggling admin status:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar estado');
+    } finally {
+      setTogglingStatus(false);
+    }
+  };
+
   const fullName = adminUser.profiles 
     ? `${adminUser.profiles.first_name || ''} ${adminUser.profiles.last_name || ''}`.trim() || adminUser.email
     : adminUser.email;
@@ -149,22 +194,103 @@ export default function AdminUserDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm text-tierra-media">Estado</label>
-              <div className="mt-1">
+              <div className="mt-1 flex items-center gap-2">
                 {adminUser.is_active ? (
-                  <Badge className="bg-verde-suave text-primary">Activo</Badge>
+                  <Badge 
+                    className="bg-verde-suave text-primary" 
+                    style={{ backgroundColor: 'var(--accent)', color: 'var(--admin-bg-primary)' }}
+                  >
+                    Activo
+                  </Badge>
                 ) : (
                   <Badge variant="destructive">Inactivo</Badge>
                 )}
+                {isSuperAdmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleToggleStatus}
+                    disabled={togglingStatus}
+                  >
+                    {togglingStatus ? 'Actualizando...' : adminUser.is_active ? 'Desactivar' : 'Activar'}
+                  </Button>
+                )}
               </div>
+              {!isSuperAdmin && (
+                <p className="text-xs text-tierra-media mt-1">
+                  Solo los super administradores pueden cambiar el estado
+                </p>
+              )}
             </div>
             <div>
               <label className="text-sm text-tierra-media">Rol</label>
               <div className="mt-1">
-                <Badge variant="default" className="flex items-center gap-1 w-fit">
-                  <Crown className="h-3 w-3" />
-                  Administrador
-                </Badge>
+                {adminUser.is_super_admin ? (
+                  <Badge variant="default" className="flex items-center gap-1 w-fit bg-dorado text-primary">
+                    <Globe className="h-3 w-3" />
+                    Super Administrador
+                  </Badge>
+                ) : (
+                  <Badge variant="default" className="flex items-center gap-1 w-fit">
+                    <Crown className="h-3 w-3" />
+                    Administrador
+                  </Badge>
+                )}
               </div>
+            </div>
+          </div>
+
+          {/* Branch Access Information */}
+          <div>
+            <label className="text-sm text-tierra-media">Acceso a Sucursales</label>
+            <div className="mt-2">
+              {adminUser.is_super_admin ? (
+                <div className="p-4 bg-dorado/10 border border-dorado/30 rounded-md">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-dorado" />
+                    <div>
+                      <div className="font-medium text-dorado">Super Administrador</div>
+                      <div className="text-sm text-tierra-media">
+                        Puede administrar todas las sucursales disponibles
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : adminUser.branches && adminUser.branches.length > 0 ? (
+                <div className="space-y-2">
+                  {adminUser.branches.map((branch) => (
+                    <div
+                      key={branch.id}
+                      className="p-3 border rounded-md bg-admin-bg-secondary flex items-center justify-between"
+                      style={{ backgroundColor: 'var(--admin-border-secondary)' }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-admin-accent-tertiary" />
+                        <div>
+                          <div className="font-medium">
+                            {branch.name} ({branch.code})
+                          </div>
+                          {branch.is_primary && (
+                            <Badge variant="outline" className="text-xs mt-1">
+                              Sucursal Principal
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div 
+                  className="p-4 text-center text-tierra-media border rounded-md bg-admin-bg-secondary"
+                  style={{ 
+                    color: 'var(--admin-accent-secondary)', 
+                    backgroundColor: 'var(--admin-border-primary)' 
+                  }}
+                >
+                  No tiene sucursales asignadas
+                </div>
+              )}
             </div>
           </div>
 

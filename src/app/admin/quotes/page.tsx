@@ -50,6 +50,9 @@ import {
 import { toast } from 'sonner';
 import Link from 'next/link';
 import CreateQuoteForm from '@/components/admin/CreateQuoteForm';
+import { useBranch } from '@/hooks/useBranch';
+import { BranchSelector } from '@/components/admin/BranchSelector';
+import { getBranchHeader } from '@/lib/utils/branch';
 
 interface Quote {
   id: string;
@@ -74,6 +77,10 @@ interface Quote {
 }
 
 export default function QuotesPage() {
+  // Branch context
+  const { currentBranchId, isSuperAdmin, branches } = useBranch();
+  const isGlobalView = !currentBranchId && isSuperAdmin;
+  
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,7 +96,7 @@ export default function QuotesPage() {
 
   useEffect(() => {
     fetchQuotes();
-  }, [currentPage, statusFilter]);
+  }, [currentPage, statusFilter, currentBranchId, isGlobalView]);
 
   const fetchQuotes = async () => {
     try {
@@ -100,7 +107,16 @@ export default function QuotesPage() {
         ...(statusFilter !== 'all' && { status: statusFilter })
       });
 
-      const response = await fetch(`/api/admin/quotes?${params}`);
+      const headers: HeadersInit = {};
+      if (isGlobalView && isSuperAdmin) {
+        headers['x-branch-id'] = 'global';
+      } else if (currentBranchId) {
+        headers['x-branch-id'] = currentBranchId;
+      }
+
+      const response = await fetch(`/api/admin/quotes?${params}`, {
+        headers
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch quotes');
       }
@@ -204,9 +220,16 @@ export default function QuotesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Presupuestos</h1>
-          <p className="text-tierra-media">Gestiona presupuestos para trabajos de lentes</p>
+          <p className="text-tierra-media">
+            {isGlobalView 
+              ? 'Gestiona presupuestos de todas las sucursales' 
+              : 'Gestiona presupuestos para trabajos de lentes'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <BranchSelector />
+          )}
           <Link href="/admin/quotes/settings">
             <Button variant="outline">
               <Settings className="h-4 w-4 mr-2" />

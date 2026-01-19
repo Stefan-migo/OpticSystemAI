@@ -138,7 +138,10 @@ export default function SEOManager() {
 
         {/* General SEO Settings */}
         <TabsContent value="general" className="space-y-6">
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5" />
@@ -230,7 +233,10 @@ export default function SEOManager() {
           </Card>
 
           {/* Preview Card */}
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Eye className="h-5 w-5" />
@@ -256,7 +262,10 @@ export default function SEOManager() {
 
         {/* Social Media Settings */}
         <TabsContent value="social" className="space-y-6">
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Facebook className="h-5 w-5" />
@@ -330,7 +339,10 @@ export default function SEOManager() {
             </CardContent>
           </Card>
 
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Twitter className="h-5 w-5" />
@@ -368,7 +380,10 @@ export default function SEOManager() {
           </Card>
 
           {/* Social Preview */}
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Eye className="h-5 w-5" />
@@ -420,7 +435,10 @@ export default function SEOManager() {
 
         {/* Analytics Settings */}
         <TabsContent value="analytics" className="space-y-6">
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5" />
@@ -486,7 +504,10 @@ export default function SEOManager() {
 
         {/* Tools & Utilities */}
         <TabsContent value="tools" className="space-y-6">
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Globe className="h-5 w-5" />
@@ -535,7 +556,10 @@ export default function SEOManager() {
             </CardContent>
           </Card>
 
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5" />

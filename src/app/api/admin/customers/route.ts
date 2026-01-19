@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceRoleClient } from '@/utils/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 import { NotificationService } from '@/lib/notifications/notification-service';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,25 +38,52 @@ export async function GET(request: NextRequest) {
     }
     console.log('✅ Admin access confirmed for:', user.email);
 
-    // Build the query to get customers from profiles table
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
+
+    // Build the query to get customers from customers table (not profiles)
     console.log('🗄️ Building database query...');
-    let query = supabase
-      .from('profiles')
-      .select(`
-        *
-      `);
+    let query = applyBranchFilter(
+      supabase
+        .from('customers')
+        .select('*')
+    );
 
     // Apply filters
     if (search) {
-      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
+      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,rut.ilike.%${search}%`);
     }
     
+    if (status === 'active') {
+      query = query.eq('is_active', true);
+    } else if (status === 'inactive') {
+      query = query.eq('is_active', false);
+    }
 
     // Get total count for pagination
     console.log('📊 Getting customer count...');
-    const { count, error: countError } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true });
+    const countQuery = applyBranchFilter(
+      supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true })
+    );
+    
+    if (search) {
+      countQuery.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,rut.ilike.%${search}%`);
+    }
+    
+    if (status === 'active') {
+      countQuery.eq('is_active', true);
+    } else if (status === 'inactive') {
+      countQuery.eq('is_active', false);
+    }
+    
+    const { count, error: countError } = await countQuery;
 
     if (countError) {
       console.error('❌ Error getting customer count:', countError);
@@ -148,153 +176,140 @@ export async function POST(request: NextRequest) {
       console.log('🔍 Customers API POST called (create new customer)');
       console.log('📝 Create customer data received:', body);
 
+      // Get branch context
+      const branchContext = await getBranchContext(request, user.id);
+      
+      console.log('📊 Branch context for customer creation:', {
+        branchId: branchContext.branchId,
+        isGlobalView: branchContext.isGlobalView,
+        isSuperAdmin: branchContext.isSuperAdmin,
+        bodyBranchId: body.branch_id
+      });
+      
       // Validate required fields
       if (!body.first_name && !body.last_name) {
         return NextResponse.json({ error: 'At least first name or last name is required' }, { status: 400 });
       }
 
-      // Generate a temporary email if none provided (for customers without email)
-      const customerEmail = body.email?.trim() || `no-email-${crypto.randomUUID()}@temporal.local`;
-      const hasRealEmail = !!body.email?.trim();
-
-      // Check if profile already exists (only if email is provided)
-      if (hasRealEmail) {
-        const { data: existingProfile, error: checkProfileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', customerEmail)
-          .maybeSingle();
-
-        if (existingProfile) {
-          console.log('❌ Profile with this email already exists');
-          return NextResponse.json({ 
-            error: 'Ya existe un cliente con este email. Por favor, utiliza otro email o edita el cliente existente.' 
-          }, { status: 400 });
-        }
-      }
-
-      // Use service role client to create auth user
-      const supabaseServiceRole = await createServiceRoleClient();
-
-      // Generate a random password (customer will reset it later if they have email)
-      const randomPassword = crypto.randomUUID();
-
-      console.log('👤 Creating Supabase Auth user with service role...');
-      const { data: authData, error: authError } = await supabaseServiceRole.auth.admin.createUser({
-        email: customerEmail,
-        password: randomPassword,
-        email_confirm: true, // Auto-confirm email for admin-created users
-        user_metadata: {
-          first_name: body.first_name || '',
-          last_name: body.last_name || '',
-          created_by_admin: true,
-          admin_created_at: new Date().toISOString(),
-          has_real_email: hasRealEmail
-        }
-      });
-
-      if (authError) {
-        console.error('❌ Error creating auth user:', authError);
-        
-        // Check if it's a duplicate email error in auth
-        if (authError.message?.includes('already registered') || authError.message?.includes('User already registered')) {
-          return NextResponse.json({ 
-            error: 'Este email ya está registrado en el sistema de autenticación. El cliente puede iniciar sesión o recuperar su contraseña.' 
-          }, { status: 400 });
-        }
-        
+      // Determine customer branch_id
+      // Priority: 1) branchContext.branchId (from header - selected branch), 2) body.branch_id (explicit), 3) error
+      let customerBranchId: string | null = null;
+      
+      // First, try to use branch from context (header) - this is the selected branch
+      if (branchContext.branchId) {
+        customerBranchId = branchContext.branchId;
+        console.log('✅ Using branch_id from context (selected branch):', customerBranchId);
+      } else if (body.branch_id) {
+        // If no branch in context but provided in body (super admin in global view)
+        customerBranchId = body.branch_id;
+        console.log('✅ Using branch_id from request body:', customerBranchId);
+      } else if (branchContext.isGlobalView && branchContext.isSuperAdmin) {
+        // Super admin in global view must provide branch_id in body
         return NextResponse.json({ 
-          error: `Error al crear usuario: ${authError.message}` 
-        }, { status: 500 });
+          error: 'Como super administrador en vista global, debe especificar la sucursal para el cliente' 
+        }, { status: 400 });
+      } else {
+        // Regular admin must have a branch selected
+        return NextResponse.json({ 
+          error: 'Debe seleccionar una sucursal para crear un cliente' 
+        }, { status: 400 });
       }
 
-      console.log('✅ Auth user created:', authData.user?.email);
+      if (!customerBranchId) {
+        return NextResponse.json({ error: 'Debe especificar una sucursal para el cliente' }, { status: 400 });
+      }
 
-      // Now create/update the profile with additional data
-      const profileData = {
-        id: authData.user.id,
+      // Check if customer already exists in this branch (by email, phone, or RUT)
+      const existingCustomerQuery = supabase
+        .from('customers')
+        .select('id')
+        .eq('branch_id', customerBranchId);
+
+      if (body.email?.trim()) {
+        const { data: existingByEmail } = await existingCustomerQuery
+          .eq('email', body.email.trim())
+          .maybeSingle();
+        
+        if (existingByEmail) {
+          return NextResponse.json({ 
+            error: 'Ya existe un cliente con este email en esta sucursal.' 
+          }, { status: 400 });
+        }
+      }
+
+      if (body.rut?.trim()) {
+        const { data: existingByRut } = await existingCustomerQuery
+          .eq('rut', body.rut.trim())
+          .maybeSingle();
+        
+        if (existingByRut) {
+          return NextResponse.json({ 
+            error: 'Ya existe un cliente con este RUT en esta sucursal.' 
+          }, { status: 400 });
+        }
+      }
+
+      // Create customer data (NO auth user creation - customers don't need authentication)
+      const customerData = {
+        branch_id: customerBranchId,
         first_name: body.first_name || null,
         last_name: body.last_name || null,
-        email: hasRealEmail ? customerEmail : null, // Store null if no real email provided
-        phone: body.phone || null,
-        rut: body.rut || null,
+        email: body.email?.trim() || null,
+        phone: body.phone?.trim() || null,
+        rut: body.rut?.trim() || null,
+        date_of_birth: body.date_of_birth || null,
+        gender: body.gender || null,
         address_line_1: body.address_line_1 || null,
         address_line_2: body.address_line_2 || null,
         city: body.city || null,
         state: body.state || null,
         postal_code: body.postal_code || null,
         country: body.country || 'Chile',
-        updated_at: new Date().toISOString()
+        medical_conditions: body.medical_conditions || null,
+        allergies: body.allergies || null,
+        medications: body.medications || null,
+        medical_notes: body.medical_notes || null,
+        last_eye_exam_date: body.last_eye_exam_date || null,
+        next_eye_exam_due: body.next_eye_exam_due || null,
+        preferred_contact_method: body.preferred_contact_method || null,
+        emergency_contact_name: body.emergency_contact_name || null,
+        emergency_contact_phone: body.emergency_contact_phone || null,
+        insurance_provider: body.insurance_provider || null,
+        insurance_policy_number: body.insurance_policy_number || null,
+        notes: body.notes || null,
+        tags: body.tags || null,
+        is_active: body.is_active !== undefined ? body.is_active : true,
+        created_by: user.id
       };
 
-      console.log('🔄 Creating/updating customer profile...');
-      const { data: newCustomer, error: profileError } = await supabaseServiceRole
-        .from('profiles')
-        .upsert(profileData, { onConflict: 'id' })
+      console.log('🔄 Creating customer...');
+      const { data: newCustomer, error: customerError } = await supabase
+        .from('customers')
+        .insert(customerData)
         .select()
         .single();
 
-      if (profileError) {
-        console.error('❌ Error creating profile:', profileError);
-        
-        // Try to clean up the auth user if profile creation failed
-        try {
-          await supabaseServiceRole.auth.admin.deleteUser(authData.user.id);
-          console.log('🧹 Cleaned up orphaned auth user');
-        } catch (cleanupError) {
-          console.error('⚠️ Could not clean up auth user:', cleanupError);
-        }
-        
-        return NextResponse.json({ error: 'Failed to create customer profile' }, { status: 500 });
+      if (customerError) {
+        console.error('❌ Error creating customer:', customerError);
+        return NextResponse.json({ 
+          error: `Error al crear cliente: ${customerError.message}` 
+        }, { status: 500 });
       }
 
       if (!newCustomer) {
-        console.error('❌ Customer profile was not created');
-        return NextResponse.json({ error: 'Failed to create customer profile' }, { status: 500 });
+        console.error('❌ Customer was not created');
+        return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 });
       }
 
-      console.log('✅ Customer profile created successfully:', newCustomer.email || 'No email (temporal)');
+      console.log('✅ Customer created successfully:', newCustomer.id);
 
       // Create notification for new customer (non-blocking)
       const customerName = `${body.first_name || ''} ${body.last_name || ''}`.trim() || 'Cliente';
       NotificationService.notifyNewCustomer(
         newCustomer.id,
         customerName,
-        hasRealEmail ? customerEmail : undefined
+        body.email?.trim() || undefined
       ).catch(err => console.error('Error creating notification:', err));
-
-      // Send welcome email and password reset email (only if customer has real email)
-      if (hasRealEmail) {
-        try {
-          const { EmailNotificationService } = await import('@/lib/email/notifications');
-          
-          // Send welcome email
-          const customerName = `${body.first_name || ''} ${body.last_name || ''}`.trim() || 'Cliente';
-          await EmailNotificationService.sendAccountWelcome(customerName, customerEmail);
-          console.log('✅ Welcome email sent successfully');
-
-          // Send password reset email so customer can set their own password
-          console.log('📧 Sending password reset email to customer...');
-          const { error: resetError } = await supabaseServiceRole.auth.resetPasswordForEmail(
-            customerEmail,
-            {
-              redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/reset-password`
-            }
-          );
-
-          if (resetError) {
-            console.warn('⚠️ Could not send password reset email:', resetError.message);
-            // Don't fail the entire operation for email issues
-          } else {
-            console.log('✅ Password reset email sent successfully');
-          }
-        } catch (emailError) {
-          console.warn('⚠️ Email sending error (non-critical):', emailError);
-          // Continue - customer can use "forgot password" later
-        }
-      } else {
-        console.log('ℹ️ Skipping email notifications - customer has no email address');
-      }
 
       return NextResponse.json({
         success: true,
@@ -304,20 +319,34 @@ export async function POST(request: NextRequest) {
       // This is an analytics request
       console.log('🔍 Customers API POST called (analytics summary)');
 
-      // Get customer analytics summary
-      const { data: totalCustomers, count: totalCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+      // Get branch context
+      const branchContext = await getBranchContext(request, user.id);
+      
+      // Build branch filter function
+      const applyBranchFilter = (query: any) => {
+        return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+      };
 
-      const { data: activeCustomers, count: activeCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active_customer', true);
+      // Get customer analytics summary (filtered by branch)
+      const { count: totalCount } = await applyBranchFilter(
+        supabase
+          .from('customers')
+          .select('*', { count: 'exact', head: true })
+      );
 
-      const { data: recentCustomers, count: recentCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+      const { count: activeCount } = await applyBranchFilter(
+        supabase
+          .from('customers')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true)
+      );
+
+      const { count: recentCount } = await applyBranchFilter(
+        supabase
+          .from('customers')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      );
 
       return NextResponse.json({
         summary: {

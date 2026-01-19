@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, Crown, Save, X } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useBranch } from '@/hooks/useBranch';
+import BranchAccessManager from '@/components/admin/BranchAccessManager';
 
 interface AdminUser {
   id: string;
@@ -25,6 +27,7 @@ export default function EditAdminUserPage() {
   const params = useParams();
   const router = useRouter();
   const adminId = params.id as string;
+  const { isSuperAdmin } = useBranch();
 
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -200,7 +203,12 @@ export default function EditAdminUserPage() {
                 </span>
               </label>
               {formData.is_active ? (
-                <Badge className="bg-verde-suave text-primary">Activo</Badge>
+                <Badge 
+                  className="bg-verde-suave text-primary" 
+                  style={{ backgroundColor: 'var(--accent)', color: 'var(--admin-bg-primary)' }}
+                >
+                  Activo
+                </Badge>
               ) : (
                 <Badge variant="destructive">Inactivo</Badge>
               )}
@@ -236,6 +244,15 @@ export default function EditAdminUserPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Branch Access Manager - Only for super admins */}
+      {isSuperAdmin && (
+        <BranchAccessManager
+          adminUserId={adminId}
+          isSuperAdmin={false}
+          canEdit={isSuperAdmin}
+        />
+      )}
     </div>
   );
 }

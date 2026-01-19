@@ -19,9 +19,12 @@ import {
 } from 'lucide-react';
 import { formatRUT } from '@/lib/utils/rut';
 import { toast } from 'sonner';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
 
 export default function NewCustomerPage() {
   const router = useRouter();
+  const { currentBranchId, isSuperAdmin } = useBranch();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,12 +64,23 @@ export default function NewCustomerPage() {
         throw new Error('El RUT es requerido');
       }
       
+      // Add branch header
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+      
+      // If super admin in global view, they need to specify branch_id in body
+      // Otherwise, use the selected branch from header
+      const isGlobalView = !currentBranchId && isSuperAdmin;
+      const requestBody = isGlobalView && !formData.branch_id
+        ? { ...formData, branch_id: currentBranchId || undefined }
+        : formData;
+
       const response = await fetch('/api/admin/customers', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+        headers,
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -78,13 +92,13 @@ export default function NewCustomerPage() {
       
       console.log('📦 API Response:', result);
       
-      if (!result.customer || !result.customer.id) {
+      if (!result.success || !result.customer || !result.customer.id) {
         console.error('❌ Invalid response structure:', result);
         throw new Error('La respuesta del servidor no contiene información del cliente creado');
       }
       
       toast.success('Cliente creado exitosamente');
-      router.push(`/admin/customers/${result.customer.id}`);
+      router.push('/admin/customers');
     } catch (err) {
       console.error('Error creating customer:', err);
       const errorMessage = err instanceof Error ? err.message : 'Error al crear cliente';

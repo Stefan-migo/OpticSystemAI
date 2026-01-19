@@ -195,7 +195,10 @@ export default function WebhookMonitor() {
       {/* Webhook URLs */}
       {status?.urls && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4" />
@@ -242,7 +245,10 @@ export default function WebhookMonitor() {
             </CardContent>
           </Card>
 
-          <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <Card 
+            className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            style={{ backgroundColor: 'var(--admin-border-primary)' }}
+          >
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4" />
@@ -292,7 +298,10 @@ export default function WebhookMonitor() {
       )}
 
       {/* Filters */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardContent className="p-4">
           <div className="flex gap-4 items-center">
             <div>
@@ -327,7 +336,10 @@ export default function WebhookMonitor() {
       </Card>
 
       {/* Logs Table */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardHeader>
           <CardTitle>Registro de Webhooks</CardTitle>
           <CardDescription>Últimas entregas de webhooks (últimos 50 registros)</CardDescription>

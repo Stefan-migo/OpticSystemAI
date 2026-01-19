@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,14 @@ export async function GET(request: NextRequest) {
     if (!isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
+
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q') || '';
@@ -39,10 +48,12 @@ export async function GET(request: NextRequest) {
       searchConditions += `,sku.ilike.%${trimmedQuery}%,barcode.ilike.%${trimmedQuery}%`;
     }
 
-    // Build query
-    let productsQuery = supabase
-      .from('products')
-      .select('id, name, price, inventory_quantity, status, featured_image, sku, barcode, product_type, frame_brand, frame_model, frame_color, frame_size')
+    // Build query with branch filter
+    let productsQuery = applyBranchFilter(
+      supabase
+        .from('products')
+        .select('id, name, price, price_includes_tax, inventory_quantity, status, featured_image, sku, barcode, product_type, frame_brand, frame_model, frame_color, frame_size')
+    )
       .or(searchConditions)
       .eq('status', 'active');
 

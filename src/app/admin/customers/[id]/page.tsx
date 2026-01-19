@@ -51,6 +51,7 @@ import {
 } from '@/components/ui/dialog';
 import CreatePrescriptionForm from '@/components/admin/CreatePrescriptionForm';
 import CreateAppointmentForm from '@/components/admin/CreateAppointmentForm';
+import CreateQuoteForm from '@/components/admin/CreateQuoteForm';
 
 interface Customer {
   id: string;
@@ -64,7 +65,6 @@ interface Customer {
   state?: string;
   postal_code?: string;
   country?: string;
-  newsletter_subscribed: boolean;
   created_at: string;
   updated_at: string;
   // Optical shop fields
@@ -199,6 +199,7 @@ export default function CustomerDetailPage() {
   const [editingPrescription, setEditingPrescription] = useState<Prescription | null>(null);
   const [showCreateAppointment, setShowCreateAppointment] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [showCreateQuote, setShowCreateQuote] = useState(false);
 
   useEffect(() => {
     if (customerId) {
@@ -419,13 +420,12 @@ export default function CustomerDetailPage() {
 
       {/* Main Content */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Resumen</TabsTrigger>
           <TabsTrigger value="prescriptions">Recetas</TabsTrigger>
           <TabsTrigger value="appointments">Citas</TabsTrigger>
           <TabsTrigger value="quotes">Presupuestos</TabsTrigger>
-          <TabsTrigger value="lens-purchases">Lentes</TabsTrigger>
-          <TabsTrigger value="orders">Pedidos</TabsTrigger>
+          <TabsTrigger value="purchases">Compras</TabsTrigger>
           <TabsTrigger value="analytics">Analíticas</TabsTrigger>
         </TabsList>
 
@@ -524,13 +524,6 @@ export default function CustomerDetailPage() {
                     )}
                   </div>
                 )}
-
-                <div>
-                  <p className="text-sm text-tierra-media">Newsletter</p>
-                  <Badge variant={customer.newsletter_subscribed ? "default" : "outline"}>
-                    {customer.newsletter_subscribed ? "Suscrito" : "No suscrito"}
-                  </Badge>
-                </div>
 
                 <div>
                   <p className="text-sm text-tierra-media">Estado</p>
@@ -929,12 +922,10 @@ export default function CustomerDetailPage() {
               <FileText className="h-5 w-5 mr-2" />
               Presupuestos ({customer.quotes?.length || 0})
             </CardTitle>
-            <Link href={`/admin/quotes/new?customer_id=${customer.id}`}>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Presupuesto
-              </Button>
-            </Link>
+            <Button onClick={() => setShowCreateQuote(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Presupuesto
+            </Button>
           </div>
 
           {customer.quotes && customer.quotes.length > 0 ? (
@@ -1033,104 +1024,104 @@ export default function CustomerDetailPage() {
                 <FileText className="h-12 w-12 text-tierra-media mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin presupuestos</h3>
                 <p className="text-tierra-media mb-4">Este cliente aún no tiene presupuestos registrados.</p>
-                <Link href={`/admin/quotes/new?customer_id=${customer.id}`}>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear Primer Presupuesto
-                  </Button>
-                </Link>
+                <Button onClick={() => setShowCreateQuote(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Primer Presupuesto
+                </Button>
               </CardContent>
             </Card>
           )}
         </TabsContent>
 
-        <TabsContent value="lens-purchases" className="space-y-6">
-          <CardTitle className="flex items-center">
-            <ShoppingBag className="h-5 w-5 mr-2" />
-            Historial de Lentes y Armazones ({customer.lensPurchases?.length || 0})
-          </CardTitle>
+        <TabsContent value="purchases" className="space-y-6">
+          {/* Lens Purchases Section */}
+          <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <ShoppingBag className="h-5 w-5 mr-2" />
+                Lentes y Armazones ({customer.lensPurchases?.length || 0})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {customer.lensPurchases && customer.lensPurchases.length > 0 ? (
+                <div className="space-y-4">
+                  {customer.lensPurchases.map((purchase) => {
+                    const statusColors: Record<string, string> = {
+                      ordered: 'bg-blue-100 text-blue-800',
+                      in_progress: 'bg-yellow-100 text-yellow-800',
+                      ready: 'bg-green-100 text-green-800',
+                      delivered: 'bg-gray-100 text-gray-800',
+                      cancelled: 'bg-red-100 text-red-800'
+                    };
 
-          {customer.lensPurchases && customer.lensPurchases.length > 0 ? (
-            <div className="space-y-4">
-              {customer.lensPurchases.map((purchase) => {
-                const statusColors: Record<string, string> = {
-                  ordered: 'bg-blue-100 text-blue-800',
-                  in_progress: 'bg-yellow-100 text-yellow-800',
-                  ready: 'bg-green-100 text-green-800',
-                  delivered: 'bg-gray-100 text-gray-800',
-                  cancelled: 'bg-red-100 text-red-800'
-                };
-
-                return (
-                  <Card key={purchase.id} className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">{purchase.product_name}</CardTitle>
-                          <p className="text-sm text-tierra-media mt-1">
-                            Fecha de compra: {new Date(purchase.purchase_date).toLocaleDateString('es-CL')}
-                            {purchase.delivery_date && (
-                              <> • Entregado: {new Date(purchase.delivery_date).toLocaleDateString('es-CL')}</>
-                            )}
-                          </p>
-                        </div>
-                        <Badge className={statusColors[purchase.status] || 'bg-gray-100 text-gray-800'}>
-                          {purchase.status === 'ordered' && 'Ordenado'}
-                          {purchase.status === 'in_progress' && 'En Proceso'}
-                          {purchase.status === 'ready' && 'Listo'}
-                          {purchase.status === 'delivered' && 'Entregado'}
-                          {purchase.status === 'cancelled' && 'Cancelado'}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <p className="text-sm text-tierra-media mb-2">Detalles del Producto</p>
-                          <div className="space-y-1 text-sm">
-                            <p><span className="text-tierra-media">Tipo:</span> <span className="font-medium">{purchase.product_type}</span></p>
-                            <p><span className="text-tierra-media">Cantidad:</span> <span className="font-medium">{purchase.quantity}</span></p>
-                            {purchase.lens_type && (
-                              <p><span className="text-tierra-media">Tipo de lente:</span> <span className="font-medium">{purchase.lens_type}</span></p>
-                            )}
-                            {purchase.frame_brand && (
-                              <p><span className="text-tierra-media">Marca:</span> <span className="font-medium">{purchase.frame_brand}</span></p>
-                            )}
+                    return (
+                      <Card key={purchase.id} className="bg-white shadow-sm">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-lg">{purchase.product_name}</CardTitle>
+                              <p className="text-sm text-tierra-media mt-1">
+                                Fecha de compra: {new Date(purchase.purchase_date).toLocaleDateString('es-CL')}
+                                {purchase.delivery_date && (
+                                  <> • Entregado: {new Date(purchase.delivery_date).toLocaleDateString('es-CL')}</>
+                                )}
+                              </p>
+                            </div>
+                            <Badge className={statusColors[purchase.status] || 'bg-gray-100 text-gray-800'}>
+                              {purchase.status === 'ordered' && 'Ordenado'}
+                              {purchase.status === 'in_progress' && 'En Proceso'}
+                              {purchase.status === 'ready' && 'Listo'}
+                              {purchase.status === 'delivered' && 'Entregado'}
+                              {purchase.status === 'cancelled' && 'Cancelado'}
+                            </Badge>
                           </div>
-                        </div>
-                        <div>
-                          <p className="text-sm text-tierra-media mb-2">Información de Compra</p>
-                          <div className="space-y-1 text-sm">
-                            <p><span className="text-tierra-media">Precio unitario:</span> <span className="font-medium">{formatPrice(purchase.unit_price)}</span></p>
-                            <p><span className="text-tierra-media">Total:</span> <span className="font-medium text-verde-suave">{formatPrice(purchase.total_price)}</span></p>
-                            {purchase.prescription_id && (
-                              <p className="text-xs text-tierra-media">Con receta asociada</p>
-                            )}
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 gap-6">
+                            <div>
+                              <p className="text-sm text-tierra-media mb-2">Detalles del Producto</p>
+                              <div className="space-y-1 text-sm">
+                                <p><span className="text-tierra-media">Tipo:</span> <span className="font-medium">{purchase.product_type}</span></p>
+                                <p><span className="text-tierra-media">Cantidad:</span> <span className="font-medium">{purchase.quantity}</span></p>
+                                {purchase.lens_type && (
+                                  <p><span className="text-tierra-media">Tipo de lente:</span> <span className="font-medium">{purchase.lens_type}</span></p>
+                                )}
+                                {purchase.frame_brand && (
+                                  <p><span className="text-tierra-media">Marca:</span> <span className="font-medium">{purchase.frame_brand}</span></p>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-sm text-tierra-media mb-2">Información de Compra</p>
+                              <div className="space-y-1 text-sm">
+                                <p><span className="text-tierra-media">Precio unitario:</span> <span className="font-medium">{formatPrice(purchase.unit_price)}</span></p>
+                                <p><span className="text-tierra-media">Total:</span> <span className="font-medium text-verde-suave">{formatPrice(purchase.total_price)}</span></p>
+                                {purchase.prescription_id && (
+                                  <p className="text-xs text-tierra-media">Con receta asociada</p>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-              <CardContent className="text-center py-12">
-                <ShoppingBag className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin compras de lentes</h3>
-                <p className="text-tierra-media">Este cliente aún no ha comprado lentes o armazones.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <ShoppingBag className="h-10 w-10 text-tierra-media mx-auto mb-3 opacity-50" />
+                  <p className="text-sm text-tierra-media">Sin compras de lentes o armazones</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        <TabsContent value="orders" className="space-y-6">
+          {/* Orders Section */}
           <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Package className="h-5 w-5 mr-2" />
-                Historial de Pedidos ({customer.orders?.length || 0})
+                Pedidos ({customer.orders?.length || 0})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1249,10 +1240,9 @@ export default function CustomerDetailPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <div className="text-center py-12">
-                  <Package className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin pedidos</h3>
-                  <p className="text-tierra-media">Este cliente aún no ha realizado ningún pedido.</p>
+                <div className="text-center py-8">
+                  <Package className="h-10 w-10 text-tierra-media mx-auto mb-3 opacity-50" />
+                  <p className="text-sm text-tierra-media">Sin pedidos registrados</p>
                 </div>
               )}
             </CardContent>
@@ -1280,7 +1270,7 @@ export default function CustomerDetailPage() {
           )}
 
           {/* Customer Analytics Content */}
-          {customer.analytics?.orderCount && customer.analytics.orderCount > 0 && (
+          {(customer.analytics?.orderCount ?? 0) > 0 && (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Favorite Products */}
@@ -1469,6 +1459,26 @@ export default function CustomerDetailPage() {
               setShowCreateAppointment(false);
               setEditingAppointment(null);
             }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Quote Dialog */}
+      <Dialog open={showCreateQuote} onOpenChange={setShowCreateQuote}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nuevo Presupuesto</DialogTitle>
+            <DialogDescription>
+              Crea un presupuesto para este cliente
+            </DialogDescription>
+          </DialogHeader>
+          <CreateQuoteForm 
+            onSuccess={() => {
+              setShowCreateQuote(false);
+              fetchCustomer();
+            }}
+            onCancel={() => setShowCreateQuote(false)}
+            initialCustomerId={customerId}
           />
         </DialogContent>
       </Dialog>

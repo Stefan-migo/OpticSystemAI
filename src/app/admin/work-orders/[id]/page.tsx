@@ -290,23 +290,20 @@ export default function WorkOrderDetailPage() {
     );
   };
 
-  const getNextStatuses = (currentStatus: string): string[] => {
-    const statusFlow: Record<string, string[]> = {
-      quote: ['ordered'],
-      ordered: ['sent_to_lab', 'cancelled'],
-      sent_to_lab: ['in_progress_lab', 'cancelled'],
-      in_progress_lab: ['ready_at_lab', 'cancelled'],
-      ready_at_lab: ['received_from_lab', 'cancelled'],
-      received_from_lab: ['mounted', 'cancelled'],
-      mounted: ['quality_check', 'cancelled'],
-      quality_check: ['ready_for_pickup', 'returned'],
-      ready_for_pickup: ['delivered', 'cancelled'],
-      delivered: [],
-      cancelled: [],
-      returned: ['mounted', 'cancelled']
-    };
-
-    return statusFlow[currentStatus] || [];
+  // Get all available statuses (removed lab-specific statuses)
+  const getAllStatuses = (): Array<{ value: string; label: string }> => {
+    return [
+      { value: 'quote', label: 'Presupuesto' },
+      { value: 'ordered', label: 'Ordenado' },
+      { value: 'sent_to_lab', label: 'Enviado al Lab' },
+      { value: 'received_from_lab', label: 'Recibido del Lab' },
+      { value: 'mounted', label: 'Montado' },
+      { value: 'quality_check', label: 'Control de Calidad' },
+      { value: 'ready_for_pickup', label: 'Listo para Retiro' },
+      { value: 'delivered', label: 'Entregado' },
+      { value: 'cancelled', label: 'Cancelado' },
+      { value: 'returned', label: 'Devuelto' }
+    ];
   };
 
   const getStatusLabel = (status: string): string => {
@@ -314,8 +311,6 @@ export default function WorkOrderDetailPage() {
       quote: 'Presupuesto',
       ordered: 'Ordenado',
       sent_to_lab: 'Enviado al Lab',
-      in_progress_lab: 'En Laboratorio',
-      ready_at_lab: 'Listo en Lab',
       received_from_lab: 'Recibido del Lab',
       mounted: 'Montado',
       quality_check: 'Control de Calidad',
@@ -374,7 +369,8 @@ export default function WorkOrderDetailPage() {
     ? `${workOrder.customer.first_name} ${workOrder.customer.last_name}`
     : 'Sin nombre';
 
-  const nextStatuses = getNextStatuses(workOrder.status);
+  // Get all available statuses except the current one
+  const availableStatuses = getAllStatuses().filter(s => s.value !== workOrder.status);
 
   return (
     <div className="space-y-6">
@@ -397,8 +393,6 @@ export default function WorkOrderDetailPage() {
                   quote: { label: 'Presupuesto', icon: FileText },
                   ordered: { label: 'Ordenado', icon: Package },
                   sent_to_lab: { label: 'Enviado al Lab', icon: Send },
-                  in_progress_lab: { label: 'En Lab', icon: Factory },
-                  ready_at_lab: { label: 'Listo en Lab', icon: CheckCircle },
                   received_from_lab: { label: 'Recibido', icon: Truck },
                   mounted: { label: 'Montado', icon: Package },
                   quality_check: { label: 'Control Calidad', icon: CheckCircle },
@@ -421,7 +415,7 @@ export default function WorkOrderDetailPage() {
               })()}
             </Badge>
           </div>
-          {nextStatuses.length > 0 && (
+          {availableStatuses.length > 0 && (
             <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
               <DialogTrigger asChild>
                 <Button>
@@ -433,7 +427,7 @@ export default function WorkOrderDetailPage() {
                 <DialogHeader>
                   <DialogTitle>Cambiar Estado del Trabajo</DialogTitle>
                   <DialogDescription>
-                    Actualiza el estado del trabajo en el flujo de producción
+                    Selecciona el nuevo estado del trabajo. Puedes cambiar a cualquier estado disponible.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -444,9 +438,9 @@ export default function WorkOrderDetailPage() {
                         <SelectValue placeholder="Selecciona el nuevo estado" />
                       </SelectTrigger>
                       <SelectContent>
-                        {nextStatuses.map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {getStatusLabel(status)}
+                        {availableStatuses.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -546,17 +540,20 @@ export default function WorkOrderDetailPage() {
           <div className="flex items-center justify-between overflow-x-auto pb-4">
             {[
               { 
+                status: 'quote',
+                label: 'Presupuesto',
+                date: workOrder.status === 'quote' ? workOrder.work_order_date || workOrder.created_at : null
+              },
+              { 
                 status: 'ordered', 
                 label: 'Ordenado', 
                 date: workOrder.ordered_at || (workOrder.status === 'ordered' ? workOrder.work_order_date || workOrder.created_at : null)
               },
-              { status: 'sent_to_lab', label: 'Enviado', date: workOrder.sent_to_lab_at },
-              { status: 'in_progress_lab', label: 'En Lab', date: workOrder.lab_started_at },
-              { status: 'ready_at_lab', label: 'Listo', date: workOrder.lab_completed_at },
-              { status: 'received_from_lab', label: 'Recibido', date: workOrder.received_from_lab_at },
+              { status: 'sent_to_lab', label: 'Enviado al Lab', date: workOrder.sent_to_lab_at },
+              { status: 'received_from_lab', label: 'Recibido del Lab', date: workOrder.received_from_lab_at },
               { status: 'mounted', label: 'Montado', date: workOrder.mounted_at },
-              { status: 'quality_check', label: 'Calidad', date: workOrder.quality_checked_at },
-              { status: 'ready_for_pickup', label: 'Listo', date: workOrder.ready_at },
+              { status: 'quality_check', label: 'Control Calidad', date: workOrder.quality_checked_at },
+              { status: 'ready_for_pickup', label: 'Listo para Retiro', date: workOrder.ready_at },
               { status: 'delivered', label: 'Entregado', date: workOrder.delivered_at }
             ].map((step, idx, array) => {
               // Find the index of current status
@@ -844,51 +841,318 @@ export default function WorkOrderDetailPage() {
 
         {/* Details Tab */}
         <TabsContent value="details" className="space-y-6">
+          {/* Prescription Details - Critical for Lab */}
+          {workOrder.prescription && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Eye className="h-5 w-5 mr-2" />
+                  Detalles de la Receta (Para Laboratorio)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Right Eye (OD) */}
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-azul-profundo border-b pb-2">Ojo Derecho (OD)</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {workOrder.prescription.od_sphere !== null && workOrder.prescription.od_sphere !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">Esfera</p>
+                          <p className="font-medium">{workOrder.prescription.od_sphere > 0 ? '+' : ''}{workOrder.prescription.od_sphere} D</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.od_cylinder !== null && workOrder.prescription.od_cylinder !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">Cilindro</p>
+                          <p className="font-medium">{workOrder.prescription.od_cylinder > 0 ? '+' : ''}{workOrder.prescription.od_cylinder} D</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.od_axis !== null && workOrder.prescription.od_axis !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">Eje</p>
+                          <p className="font-medium">{workOrder.prescription.od_axis}°</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.od_add !== null && workOrder.prescription.od_add !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">Adición</p>
+                          <p className="font-medium">+{workOrder.prescription.od_add} D</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.od_pd !== null && workOrder.prescription.od_pd !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">DP Lejos</p>
+                          <p className="font-medium">{workOrder.prescription.od_pd} mm</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.od_near_pd !== null && workOrder.prescription.od_near_pd !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">DP Cerca</p>
+                          <p className="font-medium">{workOrder.prescription.od_near_pd} mm</p>
+                        </div>
+                      )}
+                    </div>
+                    {workOrder.prescription.prism_od && (
+                      <div className="mt-2">
+                        <p className="text-xs text-tierra-media">Prisma</p>
+                        <p className="font-medium">{workOrder.prescription.prism_od}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Left Eye (OS) */}
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-azul-profundo border-b pb-2">Ojo Izquierdo (OS)</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {workOrder.prescription.os_sphere !== null && workOrder.prescription.os_sphere !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">Esfera</p>
+                          <p className="font-medium">{workOrder.prescription.os_sphere > 0 ? '+' : ''}{workOrder.prescription.os_sphere} D</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.os_cylinder !== null && workOrder.prescription.os_cylinder !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">Cilindro</p>
+                          <p className="font-medium">{workOrder.prescription.os_cylinder > 0 ? '+' : ''}{workOrder.prescription.os_cylinder} D</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.os_axis !== null && workOrder.prescription.os_axis !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">Eje</p>
+                          <p className="font-medium">{workOrder.prescription.os_axis}°</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.os_add !== null && workOrder.prescription.os_add !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">Adición</p>
+                          <p className="font-medium">+{workOrder.prescription.os_add} D</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.os_pd !== null && workOrder.prescription.os_pd !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">DP Lejos</p>
+                          <p className="font-medium">{workOrder.prescription.os_pd} mm</p>
+                        </div>
+                      )}
+                      {workOrder.prescription.os_near_pd !== null && workOrder.prescription.os_near_pd !== undefined && (
+                        <div>
+                          <p className="text-xs text-tierra-media">DP Cerca</p>
+                          <p className="font-medium">{workOrder.prescription.os_near_pd} mm</p>
+                        </div>
+                      )}
+                    </div>
+                    {workOrder.prescription.prism_os && (
+                      <div className="mt-2">
+                        <p className="text-xs text-tierra-media">Prisma</p>
+                        <p className="font-medium">{workOrder.prescription.prism_os}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Additional Measurements */}
+                <div className="mt-6 pt-4 border-t grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {workOrder.prescription.frame_pd !== null && workOrder.prescription.frame_pd !== undefined && (
+                    <div>
+                      <p className="text-xs text-tierra-media">DP del Marco</p>
+                      <p className="font-medium">{workOrder.prescription.frame_pd} mm</p>
+                    </div>
+                  )}
+                  {workOrder.prescription.height_segmentation !== null && workOrder.prescription.height_segmentation !== undefined && (
+                    <div>
+                      <p className="text-xs text-tierra-media">Altura de Segmento</p>
+                      <p className="font-medium">{workOrder.prescription.height_segmentation} mm</p>
+                    </div>
+                  )}
+                  {workOrder.prescription.issued_by && (
+                    <div>
+                      <p className="text-xs text-tierra-media">Prescrito por</p>
+                      <p className="font-medium">{workOrder.prescription.issued_by}</p>
+                    </div>
+                  )}
+                </div>
+
+                {workOrder.prescription.notes && (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-xs text-tierra-media">Notas de la Receta</p>
+                    <p className="font-medium whitespace-pre-wrap text-sm">{workOrder.prescription.notes}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Frame Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Información Detallada</CardTitle>
+              <CardTitle className="flex items-center">
+                <Package className="h-5 w-5 mr-2" />
+                Detalles del Marco
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-tierra-media">Nombre</p>
+                  <p className="font-medium">{workOrder.frame_name}</p>
+                </div>
+                {workOrder.frame_brand && (
+                  <div>
+                    <p className="text-xs text-tierra-media">Marca</p>
+                    <p className="font-medium">{workOrder.frame_brand}</p>
+                  </div>
+                )}
+                {workOrder.frame_model && (
+                  <div>
+                    <p className="text-xs text-tierra-media">Modelo</p>
+                    <p className="font-medium">{workOrder.frame_model}</p>
+                  </div>
+                )}
+                {workOrder.frame_color && (
+                  <div>
+                    <p className="text-xs text-tierra-media">Color</p>
+                    <p className="font-medium">{workOrder.frame_color}</p>
+                  </div>
+                )}
+                {workOrder.frame_size && (
+                  <div>
+                    <p className="text-xs text-tierra-media">Tamaño</p>
+                    <p className="font-medium">{workOrder.frame_size}</p>
+                  </div>
+                )}
+                {workOrder.frame_sku && (
+                  <div>
+                    <p className="text-xs text-tierra-media">SKU</p>
+                    <p className="font-medium">{workOrder.frame_sku}</p>
+                  </div>
+                )}
+                {workOrder.frame_serial_number && (
+                  <div>
+                    <p className="text-xs text-tierra-media">Número de Serie</p>
+                    <p className="font-medium">{workOrder.frame_serial_number}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lens Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Eye className="h-5 w-5 mr-2" />
+                Detalles del Lente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-tierra-media">Tipo de Lente</p>
+                  <p className="font-medium">{workOrder.lens_type}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-tierra-media">Material</p>
+                  <p className="font-medium">{workOrder.lens_material}</p>
+                </div>
+                {workOrder.lens_index && (
+                  <div>
+                    <p className="text-xs text-tierra-media">Índice de Refracción</p>
+                    <p className="font-medium">{workOrder.lens_index}</p>
+                  </div>
+                )}
+                {workOrder.lens_treatments && workOrder.lens_treatments.length > 0 && (
+                  <div>
+                    <p className="text-xs text-tierra-media">Tratamientos</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {workOrder.lens_treatments.map((treatment: string, idx: number) => (
+                        <Badge key={idx} variant="outline">{treatment}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {workOrder.lens_tint_color && (
+                  <div>
+                    <p className="text-xs text-tierra-media">Color del Tinte</p>
+                    <p className="font-medium">{workOrder.lens_tint_color}</p>
+                  </div>
+                )}
+                {workOrder.lens_tint_percentage && (
+                  <div>
+                    <p className="text-xs text-tierra-media">Porcentaje de Tinte</p>
+                    <p className="font-medium">{workOrder.lens_tint_percentage}%</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lab Information */}
+          {workOrder.lab_name && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Factory className="h-5 w-5 mr-2" />
+                  Información del Laboratorio
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div>
+                  <p className="text-sm text-tierra-media">Nombre</p>
+                  <p className="font-medium">{workOrder.lab_name}</p>
+                </div>
+                {workOrder.lab_contact && (
+                  <div>
+                    <p className="text-sm text-tierra-media">Contacto</p>
+                    <p className="font-medium">{workOrder.lab_contact}</p>
+                  </div>
+                )}
+                {workOrder.lab_order_number && (
+                  <div>
+                    <p className="text-sm text-tierra-media">Número de Orden del Lab</p>
+                    <p className="font-medium">{workOrder.lab_order_number}</p>
+                  </div>
+                )}
+                {workOrder.lab_estimated_delivery_date && (
+                  <div>
+                    <p className="text-sm text-tierra-media">Fecha Estimada de Entrega</p>
+                    <p className="font-medium">
+                      {new Date(workOrder.lab_estimated_delivery_date).toLocaleDateString('es-CL')}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Notes */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Notas y Observaciones</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {workOrder.frame_sku && (
-                <div>
-                  <p className="text-sm text-tierra-media">SKU del Marco</p>
-                  <p className="font-medium">{workOrder.frame_sku}</p>
-                </div>
-              )}
-              {workOrder.lens_tint_color && (
-                <div>
-                  <p className="text-sm text-tierra-media">Color del Tinte</p>
-                  <p className="font-medium">{workOrder.lens_tint_color}</p>
-                </div>
-              )}
-              {workOrder.lens_tint_percentage && (
-                <div>
-                  <p className="text-sm text-tierra-media">Porcentaje de Tinte</p>
-                  <p className="font-medium">{workOrder.lens_tint_percentage}%</p>
-                </div>
-              )}
               {workOrder.internal_notes && (
                 <div>
-                  <p className="text-sm text-tierra-media">Notas Internas</p>
-                  <p className="font-medium whitespace-pre-wrap">{workOrder.internal_notes}</p>
+                  <p className="text-sm text-tierra-media mb-1">Notas Internas</p>
+                  <p className="font-medium whitespace-pre-wrap text-sm bg-admin-bg-secondary p-3 rounded">{workOrder.internal_notes}</p>
                 </div>
               )}
               {workOrder.customer_notes && (
                 <div>
-                  <p className="text-sm text-tierra-media">Notas para el Cliente</p>
-                  <p className="font-medium whitespace-pre-wrap">{workOrder.customer_notes}</p>
+                  <p className="text-sm text-tierra-media mb-1">Notas para el Cliente</p>
+                  <p className="font-medium whitespace-pre-wrap text-sm bg-admin-bg-secondary p-3 rounded">{workOrder.customer_notes}</p>
                 </div>
               )}
               {workOrder.lab_notes && (
                 <div>
-                  <p className="text-sm text-tierra-media">Notas del Laboratorio</p>
-                  <p className="font-medium whitespace-pre-wrap">{workOrder.lab_notes}</p>
+                  <p className="text-sm text-tierra-media mb-1">Notas del Laboratorio</p>
+                  <p className="font-medium whitespace-pre-wrap text-sm bg-admin-bg-secondary p-3 rounded">{workOrder.lab_notes}</p>
                 </div>
               )}
               {workOrder.quality_notes && (
                 <div>
-                  <p className="text-sm text-tierra-media">Notas de Control de Calidad</p>
-                  <p className="font-medium whitespace-pre-wrap">{workOrder.quality_notes}</p>
+                  <p className="text-sm text-tierra-media mb-1">Notas de Control de Calidad</p>
+                  <p className="font-medium whitespace-pre-wrap text-sm bg-admin-bg-secondary p-3 rounded">{workOrder.quality_notes}</p>
                 </div>
               )}
               {workOrder.assigned_staff && (

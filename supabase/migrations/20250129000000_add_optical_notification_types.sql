@@ -2,15 +2,46 @@
 -- This migration extends the notification system for optical shop specific events
 
 -- Add new notification types for optical shop
-ALTER TYPE public.admin_notification_type ADD VALUE IF NOT EXISTS 'quote_new';
-ALTER TYPE public.admin_notification_type ADD VALUE IF NOT EXISTS 'quote_status_change';
-ALTER TYPE public.admin_notification_type ADD VALUE IF NOT EXISTS 'quote_converted';
-ALTER TYPE public.admin_notification_type ADD VALUE IF NOT EXISTS 'work_order_new';
-ALTER TYPE public.admin_notification_type ADD VALUE IF NOT EXISTS 'work_order_status_change';
-ALTER TYPE public.admin_notification_type ADD VALUE IF NOT EXISTS 'work_order_completed';
-ALTER TYPE public.admin_notification_type ADD VALUE IF NOT EXISTS 'appointment_new';
-ALTER TYPE public.admin_notification_type ADD VALUE IF NOT EXISTS 'appointment_cancelled';
-ALTER TYPE public.admin_notification_type ADD VALUE IF NOT EXISTS 'sale_new';
+-- Note: Adding enum values must be done in separate statements
+DO $$
+BEGIN
+  -- Add new enum values if they don't exist
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'quote_new' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'admin_notification_type')) THEN
+    ALTER TYPE public.admin_notification_type ADD VALUE 'quote_new';
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'quote_status_change' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'admin_notification_type')) THEN
+    ALTER TYPE public.admin_notification_type ADD VALUE 'quote_status_change';
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'quote_converted' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'admin_notification_type')) THEN
+    ALTER TYPE public.admin_notification_type ADD VALUE 'quote_converted';
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'work_order_new' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'admin_notification_type')) THEN
+    ALTER TYPE public.admin_notification_type ADD VALUE 'work_order_new';
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'work_order_status_change' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'admin_notification_type')) THEN
+    ALTER TYPE public.admin_notification_type ADD VALUE 'work_order_status_change';
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'work_order_completed' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'admin_notification_type')) THEN
+    ALTER TYPE public.admin_notification_type ADD VALUE 'work_order_completed';
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'appointment_new' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'admin_notification_type')) THEN
+    ALTER TYPE public.admin_notification_type ADD VALUE 'appointment_new';
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'appointment_cancelled' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'admin_notification_type')) THEN
+    ALTER TYPE public.admin_notification_type ADD VALUE 'appointment_cancelled';
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'sale_new' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'admin_notification_type')) THEN
+    ALTER TYPE public.admin_notification_type ADD VALUE 'sale_new';
+  END IF;
+END $$;
 
 -- Create notification settings table
 CREATE TABLE IF NOT EXISTS public.notification_settings (
@@ -35,34 +66,25 @@ CREATE TABLE IF NOT EXISTS public.notification_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
--- Insert default settings for all notification types
+-- Insert default settings for existing notification types first
 INSERT INTO public.notification_settings (notification_type, enabled, notify_all_admins)
-VALUES
-  ('order_new', true, true),
-  ('order_status_change', true, true),
-  ('low_stock', true, true),
-  ('out_of_stock', true, true),
-  ('new_customer', true, true),
-  ('new_review', true, true),
-  ('review_pending', true, true),
-  ('support_ticket_new', true, true),
-  ('support_ticket_update', true, true),
-  ('payment_received', true, true),
-  ('payment_failed', true, true),
-  ('system_alert', true, true),
-  ('system_update', false, true),
-  ('security_alert', true, true),
-  ('custom', true, true),
-  -- Optical shop types
-  ('quote_new', true, true),
-  ('quote_status_change', true, true),
-  ('quote_converted', true, true),
-  ('work_order_new', true, true),
-  ('work_order_status_change', true, true),
-  ('work_order_completed', true, true),
-  ('appointment_new', true, true),
-  ('appointment_cancelled', true, true),
-  ('sale_new', true, true)
+SELECT unnest(ARRAY[
+  'order_new'::admin_notification_type,
+  'order_status_change'::admin_notification_type,
+  'low_stock'::admin_notification_type,
+  'out_of_stock'::admin_notification_type,
+  'new_customer'::admin_notification_type,
+  'new_review'::admin_notification_type,
+  'review_pending'::admin_notification_type,
+  'support_ticket_new'::admin_notification_type,
+  'support_ticket_update'::admin_notification_type,
+  'payment_received'::admin_notification_type,
+  'payment_failed'::admin_notification_type,
+  'system_alert'::admin_notification_type,
+  'system_update'::admin_notification_type,
+  'security_alert'::admin_notification_type,
+  'custom'::admin_notification_type
+]) AS notification_type, true, true
 ON CONFLICT (notification_type) DO NOTHING;
 
 -- Create index for faster lookups

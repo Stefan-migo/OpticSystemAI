@@ -42,13 +42,19 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useBranch } from '@/hooks/useBranch';
+import { BranchSelector } from '@/components/admin/BranchSelector';
+import { getBranchHeader } from '@/lib/utils/branch';
 
 interface Customer {
   id: string;
   first_name?: string;
   last_name?: string;
-  email: string;
-  phone?: string;
+  email?: string | null;
+  phone?: string | null;
+  rut?: string | null;
+  branch_id: string;
+  is_active?: boolean;
   created_at: string;
   orders?: any[];
   analytics?: {
@@ -69,6 +75,9 @@ interface CustomerStats {
 
 export default function CustomersPage() {
   const router = useRouter();
+  const { currentBranchId, isSuperAdmin, branches } = useBranch();
+  const isGlobalView = !currentBranchId && isSuperAdmin;
+  
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,7 +85,7 @@ export default function CustomersPage() {
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [segmentFilter, setSegmentFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -86,7 +95,7 @@ export default function CustomersPage() {
   useEffect(() => {
     fetchCustomers();
     fetchStats();
-  }, [currentPage, segmentFilter]);
+  }, [currentPage, statusFilter, currentBranchId, isGlobalView]);
 
   const fetchCustomers = async () => {
     try {
@@ -94,10 +103,17 @@ export default function CustomersPage() {
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: '20',
-        ...(segmentFilter !== 'all' && { segment: segmentFilter })
+        ...(searchTerm && { search: searchTerm }),
+        ...(statusFilter !== 'all' && { status: statusFilter })
       });
 
-      const response = await fetch(`/api/admin/customers?${params}`);
+      // Add branch header
+      const headers = getBranchHeader(currentBranchId);
+      if (isGlobalView && isSuperAdmin) {
+        headers['x-branch-id'] = 'global';
+      }
+
+      const response = await fetch(`/api/admin/customers?${params}`, { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch customers');
       }
@@ -116,11 +132,18 @@ export default function CustomersPage() {
 
   const fetchStats = async () => {
     try {
+      // Add branch header
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+      if (isGlobalView && isSuperAdmin) {
+        headers['x-branch-id'] = 'global';
+      }
+
       const response = await fetch('/api/admin/customers', { 
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({}) // Send empty object to trigger analytics
       });
       if (!response.ok) {
@@ -141,25 +164,6 @@ export default function CustomersPage() {
       minimumFractionDigits: 0
     }).format(amount);
 
-  const getSegmentBadge = (segment: string) => {
-    const variants: Record<string, { variant: any; label: string; icon: any }> = {
-      'new': { variant: 'secondary', label: 'Nuevo', icon: Star },
-      'first-time': { variant: 'outline', label: 'Primera Compra', icon: Package },
-      'regular': { variant: 'default', label: 'Regular', icon: CheckCircle },
-      'vip': { variant: 'secondary', label: 'VIP', icon: Crown },
-      'at-risk': { variant: 'destructive', label: 'En Riesgo', icon: AlertTriangle }
-    };
-
-    const config = variants[segment] || variants['new'];
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon className="h-3 w-3" />
-        {config.label}
-      </Badge>
-    );
-  };
 
 
   if (loading && customers.length === 0) {
@@ -209,60 +213,75 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Gestión de Clientes</h1>
           <p className="text-tierra-media">
-            Administra tu base de clientes y comunidad
+            Administra los clientes de tu sucursal
           </p>
         </div>
         
-        <Button onClick={() => router.push('/admin/customers/new')}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Nuevo Cliente
-        </Button>
+        <div className="flex gap-2">
+          <BranchSelector />
+          <Button onClick={() => router.push('/admin/customers/new')}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Nuevo Cliente
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Users className="h-8 w-8 text-azul-profundo" />
-                <div className="ml-4">
-                  <p className="text-sm text-tierra-media">Total Clientes</p>
-                  <p className="text-2xl font-bold text-azul-profundo">{stats.totalCustomers}</p>
+      {stats && (() => {
+        const currentBranch = branches?.find(b => b.id === currentBranchId);
+        const statsLabel = isGlobalView 
+          ? 'Todas las sucursales' 
+          : currentBranch 
+            ? `Sucursal: ${currentBranch.name}` 
+            : 'Sucursal seleccionada';
+        
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Users className="h-8 w-8 text-azul-profundo" />
+                  <div className="ml-4">
+                    <p className="text-sm text-tierra-media">Total Clientes</p>
+                    <p className="text-2xl font-bold text-azul-profundo">{stats.totalCustomers}</p>
+                    <p className="text-xs text-tierra-media mt-1">{statsLabel}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <CheckCircle className="h-8 w-8 text-verde-suave" />
-                <div className="ml-4">
-                  <p className="text-sm text-tierra-media">Clientes Activos</p>
-                  <p className="text-2xl font-bold text-verde-suave">{stats.activeCustomers || stats.totalCustomers}</p>
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <CheckCircle className="h-8 w-8 text-verde-suave" />
+                  <div className="ml-4">
+                    <p className="text-sm text-tierra-media">Clientes Activos</p>
+                    <p className="text-2xl font-bold text-verde-suave">{stats.activeCustomers || stats.totalCustomers}</p>
+                    <p className="text-xs text-tierra-media mt-1">{statsLabel}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <ArrowUpRight className="h-8 w-8 text-azul-profundo" />
-                <div className="ml-4">
-                  <p className="text-sm text-tierra-media">Nuevos Este Mes</p>
-                  <p className="text-2xl font-bold text-azul-profundo">{stats.newCustomersThisMonth}</p>
+            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <ArrowUpRight className="h-8 w-8 text-azul-profundo" />
+                  <div className="ml-4">
+                    <p className="text-sm text-tierra-media">Nuevos Este Mes</p>
+                    <p className="text-2xl font-bold text-azul-profundo">{stats.newCustomersThisMonth}</p>
+                    <p className="text-xs text-tierra-media mt-1">{statsLabel}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Filters */}
       <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
@@ -272,25 +291,30 @@ export default function CustomersPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-tierra-media h-4 w-4" />
                 <Input
-                  placeholder="Buscar por nombre o email..."
+                  placeholder="Buscar por nombre, email, teléfono o RUT..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1); // Reset to first page when searching
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      fetchCustomers();
+                    }
+                  }}
                   className="pl-10"
                 />
               </div>
             </div>
             
-            <Select value={segmentFilter} onValueChange={setSegmentFilter}>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Segmento" />
+                <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los segmentos</SelectItem>
-                <SelectItem value="new">Nuevos</SelectItem>
-                <SelectItem value="first-time">Primera compra</SelectItem>
-                <SelectItem value="regular">Regulares</SelectItem>
-                <SelectItem value="vip">VIP</SelectItem>
-                <SelectItem value="at-risk">En riesgo</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="active">Activos</SelectItem>
+                <SelectItem value="inactive">Inactivos</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -302,17 +326,7 @@ export default function CustomersPage() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Users className="h-5 w-5 mr-2" />
-            Lista de Clientes ({(() => {
-              // Client-side filtering for search
-              const filtered = customers.filter(customer => {
-                if (!searchTerm) return true;
-                const searchLower = searchTerm.toLowerCase();
-                const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
-                const email = customer.email.toLowerCase();
-                return fullName.includes(searchLower) || email.includes(searchLower);
-              });
-              return filtered.length;
-            })()})
+            Lista de Clientes ({customers.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -321,78 +335,82 @@ export default function CustomersPage() {
               <TableRow>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Contacto</TableHead>
-                <TableHead>Pedidos</TableHead>
-                <TableHead>Total Gastado</TableHead>
-                <TableHead>Segmento</TableHead>
+                <TableHead>RUT</TableHead>
+                <TableHead>Estado</TableHead>
                 <TableHead>Registro</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(() => {
-                // Client-side filtering for search
-                const filteredCustomers = customers.filter(customer => {
-                  if (!searchTerm) return true;
-                  const searchLower = searchTerm.toLowerCase();
-                  const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
-                  const email = customer.email.toLowerCase();
-                  return fullName.includes(searchLower) || email.includes(searchLower);
-                });
-                return filteredCustomers.map((customer) => (
+              {customers.length === 0 && !loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-12">
+                    <Users className="h-12 w-12 text-tierra-media mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-azul-profundo mb-2">No se encontraron clientes</h3>
+                    <p className="text-tierra-media">Ajusta los filtros o agrega nuevos clientes.</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                customers.map((customer) => (
                 <TableRow key={customer.id} className="hover:bg-[#AE000025] transition-colors">
                   <TableCell>
                     <div>
                       <div className="font-medium">
                         {customer.first_name && customer.last_name 
                           ? `${customer.first_name} ${customer.last_name}`
-                          : 'Sin nombre'
+                          : customer.first_name || customer.last_name || 'Sin nombre'
                         }
                       </div>
-                      <div className="text-sm text-tierra-media">{customer.email}</div>
+                      {customer.email && (
+                        <div className="text-sm text-tierra-media">{customer.email}</div>
+                      )}
                     </div>
                   </TableCell>
                   
                   <TableCell>
                     <div className="space-y-1">
-                      <div className="flex items-center text-sm">
-                        <Mail className="h-3 w-3 mr-1 text-tierra-media" />
-                        <span className="text-tierra-media">Email</span>
-                      </div>
+                      {customer.email && (
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-3 w-3 mr-1 text-tierra-media" />
+                          <span className="text-tierra-media">{customer.email}</span>
+                        </div>
+                      )}
                       {customer.phone && (
                         <div className="flex items-center text-sm">
                           <Phone className="h-3 w-3 mr-1 text-tierra-media" />
                           <span className="text-tierra-media">{customer.phone}</span>
                         </div>
                       )}
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="text-center">
-                      <div className="font-medium">{customer.analytics?.orderCount || 0}</div>
-                      {customer.analytics?.lastOrderDate && (
-                        <div className="text-xs text-tierra-media">
-                          Último: {new Date(customer.analytics.lastOrderDate).toLocaleDateString('es-AR')}
-                        </div>
+                      {!customer.email && !customer.phone && (
+                        <span className="text-xs text-tierra-media">Sin contacto</span>
                       )}
                     </div>
                   </TableCell>
                   
                   <TableCell>
-                    <div className="text-right">
-                      <div className="font-medium">
-                        {formatPrice(customer.analytics?.totalSpent || 0)}
-                      </div>
-                      {customer.analytics?.avgOrderValue && (
-                        <div className="text-xs text-tierra-media">
-                          Promedio: {formatPrice(customer.analytics.avgOrderValue)}
-                        </div>
-                      )}
-                    </div>
+                    {customer.rut ? (
+                      <span className="text-sm">{customer.rut}</span>
+                    ) : (
+                      <span className="text-xs text-tierra-media">-</span>
+                    )}
                   </TableCell>
                   
                   <TableCell>
-                    {customer.analytics?.segment && getSegmentBadge(customer.analytics.segment)}
+                    {customer.is_active !== false ? (
+                      <Badge 
+                        variant="default" 
+                        className="bg-verde-suave text-white"
+                        style={{ color: 'var(--admin-accent-secondary)' }}
+                      >
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Activo
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Inactivo
+                      </Badge>
+                    )}
                   </TableCell>
                   
                   <TableCell className="text-sm text-tierra-media">
@@ -414,18 +432,10 @@ export default function CustomersPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ));
-              })()}
+              ))
+              )}
             </TableBody>
           </Table>
-
-          {customers.length === 0 && !loading && (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-azul-profundo mb-2">No se encontraron clientes</h3>
-              <p className="text-tierra-media">Ajusta los filtros o agrega nuevos clientes.</p>
-            </div>
-          )}
 
           {/* Pagination */}
           {totalPages > 1 && (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/utils/supabase/server';
 import { sendEmail } from '@/lib/email/client';
 import businessConfig from '@/config/business';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function POST(
   request: NextRequest,
@@ -23,6 +24,15 @@ export async function POST(
     }
 
     const { id } = await params;
+    
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
+    
     const body = await request.json();
     const { email } = body;
 
@@ -30,19 +40,21 @@ export async function POST(
       return NextResponse.json({ error: 'Email válido requerido' }, { status: 400 });
     }
 
-    // Fetch quote with customer and prescription data
-    const { data: quote, error: quoteError } = await supabaseServiceRole
-      .from('quotes')
-      .select(`
-        *,
-        customer:profiles!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
-        prescription:prescriptions!quotes_prescription_id_fkey(*)
-      `)
+    // Fetch quote with customer and prescription data (with branch access check)
+    const { data: quote, error: quoteError } = await applyBranchFilter(
+      supabaseServiceRole
+        .from('quotes')
+        .select(`
+          *,
+          customer:customers!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
+          prescription:prescriptions!quotes_prescription_id_fkey(*)
+        `)
+    )
       .eq('id', id)
       .single();
 
     if (quoteError || !quote) {
-      return NextResponse.json({ error: 'Presupuesto no encontrado' }, { status: 404 });
+      return NextResponse.json({ error: 'Presupuesto no encontrado o sin acceso' }, { status: 404 });
     }
 
     // Format customer name

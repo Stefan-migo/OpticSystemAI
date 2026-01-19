@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext } from '@/lib/api/branch-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    // Build the query - simplified without profiles join for now
+    // Build the query - include branch access info
     let query = supabase
       .from('admin_users')
       .select(`
@@ -32,7 +33,18 @@ export async function GET(request: NextRequest) {
         is_active,
         last_login,
         created_at,
-        updated_at
+        updated_at,
+        admin_branch_access (
+          id,
+          branch_id,
+          role,
+          is_primary,
+          branches (
+            id,
+            name,
+            code
+          )
+        )
       `);
 
     // Apply filters
@@ -71,15 +83,52 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {}) || {};
 
-    // Enhance admin users with analytics
-    const adminUsersWithStats = adminUsers?.map(admin => ({
-      ...admin,
-      analytics: {
-        activityCount30Days: activityMap[admin.id] || 0,
-        lastActivity: admin.last_login,
-        fullName: null // TODO: Get from profiles table when needed
-      }
-    })) || [];
+    // Get profiles for full names
+    const adminIds = adminUsers?.map(admin => admin.id) || [];
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, phone')
+      .in('id', adminIds);
+
+    const profilesMap = profiles?.reduce((acc: any, profile) => {
+      acc[profile.id] = profile;
+      return acc;
+    }, {}) || {};
+
+    // Enhance admin users with analytics and branch info
+    const adminUsersWithStats = adminUsers?.map((admin: any) => {
+      const branchAccess = admin.admin_branch_access || [];
+      const isSuperAdmin = branchAccess.some((access: any) => access.branch_id === null);
+      const branches = branchAccess
+        .filter((access: any) => access.branch_id !== null)
+        .map((access: any) => ({
+          id: access.branch_id,
+          name: access.branches?.name || 'N/A',
+          code: access.branches?.code || 'N/A',
+          is_primary: access.is_primary
+        }));
+
+      const profile = profilesMap[admin.id];
+      const fullName = profile 
+        ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || null
+        : null;
+
+      return {
+        ...admin,
+        is_super_admin: isSuperAdmin,
+        branches: branches,
+        analytics: {
+          activityCount30Days: activityMap[admin.id] || 0,
+          lastActivity: admin.last_login,
+          fullName: fullName
+        },
+        profiles: profile ? {
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone: profile.phone
+        } : null
+      };
+    }) || [];
 
     return NextResponse.json({ adminUsers: adminUsersWithStats });
 
@@ -92,11 +141,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, role, permissions, is_active = true } = body;
+    const { email, role, permissions, is_active = true, is_super_admin = false, branch_ids = [] } = body;
 
     const supabase = await createClient();
     
-    // Check admin authorization (only super admin can create admin users)
+    // Check admin authorization
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -105,6 +154,23 @@ export async function POST(request: NextRequest) {
     const { data: adminRole } = await supabase.rpc('get_admin_role', { user_id: user.id });
     if (adminRole !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
+    // Get branch context to check if requester is super admin
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Only super admins can create super admins
+    if (is_super_admin && !branchContext.isSuperAdmin) {
+      return NextResponse.json({ 
+        error: 'Solo los super administradores pueden otorgar permisos de super administrador' 
+      }, { status: 403 });
+    }
+
+    // Validate: if not super admin, must have at least one branch
+    if (!is_super_admin && (!branch_ids || branch_ids.length === 0)) {
+      return NextResponse.json({ 
+        error: 'Debe asignar al menos una sucursal al administrador' 
+      }, { status: 400 });
     }
 
     // Validate input
@@ -186,6 +252,53 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // Assign branch access
+    if (is_super_admin) {
+      // Create super admin access (branch_id = null)
+      const { error: accessError } = await supabase
+        .from('admin_branch_access')
+        .insert({
+          admin_user_id: newAdmin.id,
+          branch_id: null,
+          role: 'manager',
+          is_primary: true,
+        });
+
+      if (accessError) {
+        console.error('Error assigning super admin access:', accessError);
+        // Rollback admin user creation
+        await supabase.from('admin_users').delete().eq('id', newAdmin.id);
+        return NextResponse.json({ 
+          error: 'Failed to assign super admin access',
+          details: accessError.message 
+        }, { status: 500 });
+      }
+    } else {
+      // Assign branch access for each branch
+      if (branch_ids && branch_ids.length > 0) {
+        const accessRecords = branch_ids.map((branchId: string, index: number) => ({
+          admin_user_id: newAdmin.id,
+          branch_id: branchId,
+          role: 'manager',
+          is_primary: index === 0, // First branch is primary
+        }));
+
+        const { error: accessError } = await supabase
+          .from('admin_branch_access')
+          .insert(accessRecords);
+
+        if (accessError) {
+          console.error('Error assigning branch access:', accessError);
+          // Rollback admin user creation
+          await supabase.from('admin_users').delete().eq('id', newAdmin.id);
+          return NextResponse.json({ 
+            error: 'Failed to assign branch access',
+            details: accessError.message 
+          }, { status: 500 });
+        }
+      }
+    }
+
     // Log admin activity (don't fail if logging fails)
     try {
       await supabase.rpc('log_admin_activity', {
@@ -195,6 +308,8 @@ export async function POST(request: NextRequest) {
         details: { 
           new_admin_email: email,
           role: 'admin',
+          is_super_admin,
+          branch_ids: is_super_admin ? null : branch_ids,
           created_by: user.email
         }
       });

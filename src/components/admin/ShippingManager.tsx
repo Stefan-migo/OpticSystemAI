@@ -495,7 +495,10 @@ export default function ShippingManager() {
       </div>
 
       {/* Zones Section */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -569,7 +572,10 @@ export default function ShippingManager() {
       </Card>
 
       {/* Rates Section */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -667,7 +673,10 @@ export default function ShippingManager() {
       </Card>
 
       {/* Carriers Section */}
-      <Card className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+      <Card 
+        className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+      >
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>

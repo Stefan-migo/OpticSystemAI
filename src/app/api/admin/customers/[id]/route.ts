@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getBranchContext, addBranchFilter } from '@/lib/api/branch-middleware';
 
 export async function GET(
   request: NextRequest,
@@ -31,13 +32,24 @@ export async function GET(
     }
     console.log('✅ Admin access confirmed for:', user.email);
 
-    // Get customer profile
-    console.log('🗄️ Fetching customer profile...');
-    const { data: customer, error: customerError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', params.id)
-      .single();
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
+
+    // Get customer from customers table (not profiles)
+    console.log('🗄️ Fetching customer from customers table...');
+    let customerQuery = applyBranchFilter(
+      supabase
+        .from('customers')
+        .select('*')
+        .eq('id', params.id)
+    );
+    
+    const { data: customer, error: customerError } = await customerQuery.single();
 
     if (customerError) {
       console.error('❌ Error fetching customer:', customerError);
@@ -52,22 +64,36 @@ export async function GET(
     console.log('✅ Customer found:', customer.email);
 
     // Get customer orders
+    // Note: orders table uses user_id (auth.users), not customer_id
+    // For now, we'll search by customer email if available
     console.log('📦 Fetching customer orders...');
-    const { data: orders, error: ordersError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (
+    let ordersQuery = applyBranchFilter(
+      supabase
+        .from('orders')
+        .select(`
           *,
-          products:product_id (
-            id,
-            name,
-            featured_image
+          order_items (
+            *,
+            products:product_id (
+              id,
+              name,
+              featured_image
+            )
           )
-        )
-      `)
-      .eq('user_id', params.id)
-      .order('created_at', { ascending: false });
+        `)
+    );
+    
+    // Try to find orders by customer email (since orders use user_id, not customer_id)
+    if (customer?.email) {
+      ordersQuery = ordersQuery.eq('email', customer.email);
+    } else {
+      // If no email, return empty orders array
+      ordersQuery = ordersQuery.eq('id', '00000000-0000-0000-0000-000000000000'); // Non-existent ID
+    }
+    
+    ordersQuery = ordersQuery.order('created_at', { ascending: false });
+    
+    const { data: orders, error: ordersError } = await ordersQuery;
 
     if (ordersError) {
       console.error('❌ Error fetching orders:', ordersError);
@@ -77,13 +103,15 @@ export async function GET(
     console.log('✅ Orders fetched:', orders?.length || 0);
 
 
-    // Get customer prescriptions (recetas)
+    // Get customer prescriptions (recetas) - filtered by branch
     console.log('👓 Fetching customer prescriptions...');
-    const { data: prescriptions, error: prescriptionsError } = await supabase
-      .from('prescriptions')
-      .select('*')
-      .eq('customer_id', params.id)
-      .order('prescription_date', { ascending: false });
+    const { data: prescriptions, error: prescriptionsError } = await applyBranchFilter(
+      supabase
+        .from('prescriptions')
+        .select('*')
+        .eq('customer_id', params.id)
+        .order('prescription_date', { ascending: false })
+    );
 
     if (prescriptionsError) {
       console.error('❌ Error fetching prescriptions:', prescriptionsError);
@@ -92,14 +120,16 @@ export async function GET(
 
     console.log('✅ Prescriptions fetched:', prescriptions?.length || 0);
 
-    // Get customer appointments (citas)
+    // Get customer appointments (citas) - filtered by branch
     console.log('📅 Fetching customer appointments...');
-    const { data: appointments, error: appointmentsError } = await supabase
-      .from('appointments')
-      .select('*')
-      .eq('customer_id', params.id)
-      .order('appointment_date', { ascending: false })
-      .order('appointment_time', { ascending: false });
+    const { data: appointments, error: appointmentsError } = await applyBranchFilter(
+      supabase
+        .from('appointments')
+        .select('*')
+        .eq('customer_id', params.id)
+        .order('appointment_date', { ascending: false })
+        .order('appointment_time', { ascending: false })
+    );
 
     if (appointmentsError) {
       console.error('❌ Error fetching appointments:', appointmentsError);
@@ -108,7 +138,7 @@ export async function GET(
 
     console.log('✅ Appointments fetched:', appointments?.length || 0);
 
-    // Get customer lens purchases
+    // Get customer lens purchases - filtered by branch (via customer)
     console.log('🛍️ Fetching customer lens purchases...');
     const { data: lensPurchases, error: lensPurchasesError } = await supabase
       .from('customer_lens_purchases')
@@ -123,13 +153,15 @@ export async function GET(
 
     console.log('✅ Lens purchases fetched:', lensPurchases?.length || 0);
 
-    // Get customer quotes (presupuestos)
+    // Get customer quotes (presupuestos) - filtered by branch
     console.log('📋 Fetching customer quotes...');
-    const { data: quotes, error: quotesError } = await supabase
-      .from('quotes')
-      .select('*')
-      .eq('customer_id', params.id)
-      .order('created_at', { ascending: false });
+    const { data: quotes, error: quotesError } = await applyBranchFilter(
+      supabase
+        .from('quotes')
+        .select('*')
+        .eq('customer_id', params.id)
+        .order('created_at', { ascending: false })
+    );
 
     if (quotesError) {
       console.error('❌ Error fetching quotes:', quotesError);
@@ -285,25 +317,66 @@ export async function PUT(
     const body = await request.json();
     console.log('📝 Update data received:', body);
 
-    // Prepare update data
-    const updateData = {
+    // Prepare update data for customers table
+    const updateData: any = {
       first_name: body.first_name || null,
       last_name: body.last_name || null,
+      email: body.email || null,
       phone: body.phone || null,
+      rut: body.rut || null,
+      date_of_birth: body.date_of_birth || null,
+      gender: body.gender || null,
       address_line_1: body.address_line_1 || null,
       address_line_2: body.address_line_2 || null,
       city: body.city || null,
       state: body.state || null,
       postal_code: body.postal_code || null,
       country: body.country || 'Chile',
-      newsletter_subscribed: body.newsletter_subscribed || false,
+      medical_conditions: body.medical_conditions || null,
+      allergies: body.allergies || null,
+      medications: body.medications || null,
+      medical_notes: body.medical_notes || null,
+      last_eye_exam_date: body.last_eye_exam_date || null,
+      next_eye_exam_due: body.next_eye_exam_due || null,
+      preferred_contact_method: body.preferred_contact_method || null,
+      emergency_contact_name: body.emergency_contact_name || null,
+      emergency_contact_phone: body.emergency_contact_phone || null,
+      insurance_provider: body.insurance_provider || null,
+      insurance_policy_number: body.insurance_policy_number || null,
+      notes: body.notes || null,
+      tags: body.tags || null,
+      is_active: body.is_active !== undefined ? body.is_active : true,
       updated_at: new Date().toISOString()
     };
 
-    console.log('🔄 Updating customer profile...');
+    // Get branch context for update
+    const branchContext = await getBranchContext(request, user.id);
+    
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      return addBranchFilter(query, branchContext.branchId, branchContext.isSuperAdmin);
+    };
+
+    console.log('🔄 Updating customer in customers table...');
+    // First verify customer exists and user has access
+    const { data: existingCustomer } = await applyBranchFilter(
+      supabase
+        .from('customers')
+        .select('id, branch_id')
+        .eq('id', params.id)
+    ).single();
+
+    if (!existingCustomer) {
+      return NextResponse.json({ error: 'Customer not found or access denied' }, { status: 404 });
+    }
+
+    // Update customer
     const { data: updatedCustomer, error: updateError } = await supabase
-      .from('profiles')
-      .update(updateData)
+      .from('customers')
+      .update({
+        ...updateData,
+        updated_by: user.id
+      })
       .eq('id', params.id)
       .select()
       .single();

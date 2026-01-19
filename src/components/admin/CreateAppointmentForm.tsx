@@ -32,6 +32,9 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatRUT } from '@/lib/utils/rut';
+import { useBranch } from '@/hooks/useBranch';
+import { getBranchHeader } from '@/lib/utils/branch';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 interface CreateAppointmentFormProps {
   onSuccess: () => void;
@@ -48,6 +51,8 @@ export default function CreateAppointmentForm({
   initialCustomerId,
   lockDateTime = false
 }: CreateAppointmentFormProps) {
+  const { user, authLoading } = useAuthContext();
+  const { currentBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
@@ -104,8 +109,10 @@ export default function CreateAppointmentForm({
 
   // Load schedule settings
   useEffect(() => {
-    fetchScheduleSettings();
-  }, []);
+    if (!authLoading && user) {
+      fetchScheduleSettings();
+    }
+  }, [currentBranchId, authLoading, user]);
 
   // Load customer if initialCustomerId provided
   useEffect(() => {
@@ -161,8 +168,15 @@ export default function CreateAppointmentForm({
   }, [initialData, scheduleSettings]);
 
   const fetchScheduleSettings = async () => {
+    if (!user || authLoading) return;
+    
     try {
-      const response = await fetch('/api/admin/schedule-settings');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+      
+      const response = await fetch('/api/admin/schedule-settings', { headers });
       if (response.ok) {
         const data = await response.json();
         setScheduleSettings(data.settings);
@@ -228,7 +242,12 @@ export default function CreateAppointmentForm({
         duration: formData.duration_minutes.toString()
       });
 
-      const response = await fetch(`/api/admin/appointments/availability?${params}`);
+      const headers = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+      
+      const response = await fetch(`/api/admin/appointments/availability?${params}`, { headers });
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Available slots response:', data);
@@ -383,9 +402,14 @@ export default function CreateAppointmentForm({
         requestBody.customer_id = selectedCustomer.id;
       }
 
+      const headers = {
+        'Content-Type': 'application/json',
+        ...getBranchHeader(currentBranchId)
+      };
+      
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(requestBody)
       });
 
@@ -539,7 +563,10 @@ export default function CreateAppointmentForm({
             </div>
           ) : selectedCustomer ? (
             // Registered customer selected
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary">
+            <div 
+              className="flex items-center justify-between p-4 border rounded-lg bg-admin-bg-secondary"
+              style={{ backgroundColor: 'var(--admin-border-primary)' }}
+            >
               <div>
                 <div className="font-medium">
                   {selectedCustomer.first_name} {selectedCustomer.last_name}
@@ -748,7 +775,7 @@ export default function CreateAppointmentForm({
                           disabled={lockDateTime && !isSelected}
                           className={cn(
                             "text-sm",
-                            isSelected && "bg-azul-profundo text-white hover:bg-azul-profundo/90",
+                            isSelected && "bg-azul-profundo text-[var(--admin-accent-secondary)] hover:bg-azul-profundo/90",
                             !isSelected && !lockDateTime && "cursor-pointer",
                             lockDateTime && !isSelected && "opacity-50 cursor-not-allowed"
                           )}

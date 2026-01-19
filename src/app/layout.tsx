@@ -1,33 +1,34 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { ThemeProvider } from '@/components/theme-provider'
-import { AuthProvider } from '@/contexts/AuthContext'
-import { BranchProvider } from '@/contexts/BranchContext'
-import { Toaster } from '@/components/ui/toaster'
-import './globals.css'
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { BranchProvider } from "@/contexts/BranchContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Toaster } from "@/components/ui/toaster";
+import "./globals.css";
 
-const inter = Inter({ 
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
-    default: 'Business Management System - Admin Panel',
-    template: '%s | Business Management System'
+    default: "Business Management System - Admin Panel",
+    template: "%s | Business Management System",
   },
-  description: 'Business management system admin panel',
+  description: "Business management system admin panel",
   robots: {
     index: false,
     follow: false,
   },
-}
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -37,28 +38,27 @@ export default function RootLayout({
           defaultTheme="light"
           enableSystem={false}
         >
-          <AuthProvider>
-            <BranchProvider>
-              {children}
-            </BranchProvider>
-            <Toaster 
-              position="bottom-right" 
-              richColors
-              closeButton
-              expand={true}
-              duration={4000}
-              toastOptions={{
-                style: {
-                  background: 'var(--background)',
-                  color: 'var(--foreground)',
-                  border: '1px solid var(--border)',
-                },
-              }}
-            />
-          </AuthProvider>
+          <ErrorBoundary>
+            <AuthProvider>
+              <BranchProvider>{children}</BranchProvider>
+              <Toaster
+                position="bottom-right"
+                richColors
+                closeButton
+                expand={true}
+                duration={4000}
+                toastOptions={{
+                  style: {
+                    background: "var(--background)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--border)",
+                  },
+                }}
+              />
+            </AuthProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }
-

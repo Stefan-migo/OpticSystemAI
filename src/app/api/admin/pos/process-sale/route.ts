@@ -1,21 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
-import { getBranchContext } from '@/lib/api/branch-middleware';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { getBranchContext } from "@/lib/api/branch-middleware";
+import { appLogger as logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('💰 POS Process Sale API called');
+    logger.info("POS Process Sale API called");
     const supabase = await createClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     // Get branch context
@@ -23,9 +32,12 @@ export async function POST(request: NextRequest) {
 
     // Validate branch access for non-super admins
     if (!branchContext.isSuperAdmin && !branchContext.branchId) {
-      return NextResponse.json({ 
-        error: 'Debe seleccionar una sucursal para realizar ventas POS' 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "Debe seleccionar una sucursal para realizar ventas POS",
+        },
+        { status: 400 },
+      );
     }
 
     const body = await request.json();
@@ -44,16 +56,22 @@ export async function POST(request: NextRequest) {
       sii_business_name,
       items,
       cash_received,
-      change_amount
+      change_amount,
     } = body;
 
     // Validate required fields
     if (!items || items.length === 0) {
-      return NextResponse.json({ error: 'Items are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Items are required" },
+        { status: 400 },
+      );
     }
 
     if (!total_amount || total_amount <= 0) {
-      return NextResponse.json({ error: 'Total amount must be greater than 0' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Total amount must be greater than 0" },
+        { status: 400 },
+      );
     }
 
     // Generate order number
@@ -61,14 +79,14 @@ export async function POST(request: NextRequest) {
 
     // Generate SII invoice number if needed
     let siiInvoiceNumber = null;
-    if (sii_invoice_type && sii_invoice_type !== 'none') {
+    if (sii_invoice_type && sii_invoice_type !== "none") {
       const { data: invoiceNum, error: invoiceError } = await supabase.rpc(
-        'generate_sii_invoice_number',
-        { invoice_type: sii_invoice_type }
+        "generate_sii_invoice_number",
+        { invoice_type: sii_invoice_type },
       );
-      
+
       if (invoiceError) {
-        console.error('Error generating invoice number:', invoiceError);
+        logger.error("Error generating invoice number", invoiceError);
         // Continue without invoice number for now
       } else {
         siiInvoiceNumber = invoiceNum;
@@ -78,19 +96,19 @@ export async function POST(request: NextRequest) {
     // Get or create active POS session for this branch
     let posSessionId = null;
     let query = supabase
-      .from('pos_sessions')
-      .select('id')
-      .eq('cashier_id', user.id)
-      .eq('status', 'open');
+      .from("pos_sessions")
+      .select("id")
+      .eq("cashier_id", user.id)
+      .eq("status", "open");
 
     if (branchContext.branchId) {
-      query = query.eq('branch_id', branchContext.branchId);
+      query = query.eq("branch_id", branchContext.branchId);
     } else {
-      query = query.is('branch_id', null);
+      query = query.is("branch_id", null);
     }
 
     const { data: activeSession } = await query
-      .order('opening_time', { ascending: false })
+      .order("opening_time", { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -99,18 +117,18 @@ export async function POST(request: NextRequest) {
     } else {
       // Create new POS session with branch_id
       const { data: newSession, error: sessionError } = await supabase
-        .from('pos_sessions')
+        .from("pos_sessions")
         .insert({
           cashier_id: user.id,
           branch_id: branchContext.branchId,
           opening_cash_amount: 0,
-          status: 'open'
+          status: "open",
         })
         .select()
         .single();
 
       if (sessionError) {
-        console.error('Error creating POS session:', sessionError);
+        logger.error("Error creating POS session", sessionError);
       } else {
         posSessionId = newSession.id;
       }
@@ -118,35 +136,36 @@ export async function POST(request: NextRequest) {
 
     // Create the order with branch_id
     const { data: newOrder, error: orderError } = await supabase
-      .from('orders')
+      .from("orders")
       .insert({
         order_number: orderNumber,
         branch_id: branchContext.branchId,
-        email: email || 'venta@pos.local',
-        status: status || 'delivered',
-        payment_status: payment_status || 'paid',
+        email: email || "venta@pos.local",
+        status: status || "delivered",
+        payment_status: payment_status || "paid",
         subtotal: subtotal,
         tax_amount: tax_amount || 0,
         total_amount: total_amount,
-        currency: currency || 'CLP',
+        currency: currency || "CLP",
         is_pos_sale: true,
         pos_cashier_id: user.id,
         payment_method_type: payment_method_type,
         installments_count: installments_count || 1,
-        sii_invoice_type: sii_invoice_type || 'none',
+        sii_invoice_type: sii_invoice_type || "none",
         sii_rut: sii_rut || null,
         sii_business_name: sii_business_name || null,
         sii_invoice_number: siiInvoiceNumber,
-        sii_status: sii_invoice_type && sii_invoice_type !== 'none' ? 'pending' : null
+        sii_status:
+          sii_invoice_type && sii_invoice_type !== "none" ? "pending" : null,
       })
       .select()
       .single();
 
     if (orderError) {
-      console.error('Error creating POS order:', orderError);
+      logger.error("Error creating POS order", orderError);
       return NextResponse.json(
-        { error: 'Failed to create order', details: orderError.message },
-        { status: 500 }
+        { error: "Failed to create order", details: orderError.message },
+        { status: 500 },
       );
     }
 
@@ -156,53 +175,59 @@ export async function POST(request: NextRequest) {
       product_id: item.product_id,
       quantity: item.quantity,
       unit_price: item.unit_price,
-      total_price: item.total_price || (item.unit_price * item.quantity),
-      product_name: item.product_name
+      total_price: item.total_price || item.unit_price * item.quantity,
+      product_name: item.product_name,
     }));
 
     const { error: itemsError } = await supabase
-      .from('order_items')
+      .from("order_items")
       .insert(orderItems);
 
     if (itemsError) {
-      console.error('Error creating order items:', itemsError);
+      logger.error("Error creating order items", itemsError);
       // Don't fail, but log the error
     }
 
     // Update product inventory
     for (const item of items) {
       if (item.product_id) {
-        const { error: inventoryError } = await supabase.rpc('decrement_inventory', {
-          product_id: item.product_id,
-          quantity: item.quantity
-        });
+        const { error: inventoryError } = await supabase.rpc(
+          "decrement_inventory",
+          {
+            product_id: item.product_id,
+            quantity: item.quantity,
+          },
+        );
 
         if (inventoryError) {
-          console.error(`Error updating inventory for product ${item.product_id}:`, inventoryError);
+          logger.error(
+            `Error updating inventory for product ${item.product_id}`,
+            inventoryError,
+          );
         }
       }
     }
 
     // Create POS transaction record
     const { error: transactionError } = await supabase
-      .from('pos_transactions')
+      .from("pos_transactions")
       .insert({
         order_id: newOrder.id,
         pos_session_id: posSessionId,
-        transaction_type: 'sale',
+        transaction_type: "sale",
         payment_method: payment_method_type,
         amount: total_amount,
         change_amount: change_amount || 0,
-        receipt_printed: false
+        receipt_printed: false,
       });
 
     if (transactionError) {
-      console.error('Error creating POS transaction:', transactionError);
+      logger.error("Error creating POS transaction", transactionError);
       // Don't fail the operation
     }
 
     // Create installments if payment method is installments
-    if (payment_method_type === 'installments' && installments_count > 1) {
+    if (payment_method_type === "installments" && installments_count > 1) {
       const installmentAmount = total_amount / installments_count;
       const installments = [];
       const today = new Date();
@@ -210,55 +235,57 @@ export async function POST(request: NextRequest) {
       for (let i = 1; i <= installments_count; i++) {
         const dueDate = new Date(today);
         dueDate.setMonth(dueDate.getMonth() + i);
-        
+
         installments.push({
           order_id: newOrder.id,
           installment_number: i,
           due_date: dueDate.toISOString(),
-          amount: i === installments_count 
-            ? total_amount - (installmentAmount * (installments_count - 1)) // Last installment gets remainder
-            : installmentAmount,
-          payment_status: i === 1 ? 'paid' : 'pending' // First installment is paid
+          amount:
+            i === installments_count
+              ? total_amount - installmentAmount * (installments_count - 1) // Last installment gets remainder
+              : installmentAmount,
+          payment_status: i === 1 ? "paid" : "pending", // First installment is paid
         });
       }
 
       const { error: installmentsError } = await supabase
-        .from('payment_installments')
+        .from("payment_installments")
         .insert(installments);
 
       if (installmentsError) {
-        console.error('Error creating installments:', installmentsError);
+        logger.error("Error creating installments", installmentsError);
       }
     }
 
     // Update POS session cash amount if cash payment
-    if (payment_method_type === 'cash' && posSessionId) {
-      const { error: cashError } = await supabase.rpc('update_pos_session_cash', {
-        session_id: posSessionId,
-        cash_amount: cash_received || total_amount
-      });
+    if (payment_method_type === "cash" && posSessionId) {
+      const { error: cashError } = await supabase.rpc(
+        "update_pos_session_cash",
+        {
+          session_id: posSessionId,
+          cash_amount: cash_received || total_amount,
+        },
+      );
 
       if (cashError) {
-        console.error('Error updating POS session cash:', cashError);
+        logger.error("Error updating POS session cash", cashError);
       }
     }
 
-    console.log('✅ POS sale processed successfully:', newOrder.id);
+    logger.info("POS sale processed successfully", { orderId: newOrder.id });
 
     return NextResponse.json({
       success: true,
       order: {
         ...newOrder,
-        sii_invoice_number: siiInvoiceNumber
-      }
+        sii_invoice_number: siiInvoiceNumber,
+      },
     });
-
   } catch (error: any) {
-    console.error('❌ POS process sale error:', error);
+    logger.error("POS process sale error", error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
+      { error: "Internal server error", details: error.message },
+      { status: 500 },
     );
   }
 }
-

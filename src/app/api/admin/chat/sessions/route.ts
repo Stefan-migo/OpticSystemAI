@@ -100,8 +100,10 @@ export async function POST(request: NextRequest) {
     if (
       error &&
       (error.code === "42501" ||
-        error.message?.includes("permission") ||
-        error.message?.includes("policy"))
+        (error.message &&
+          typeof error.message === "string" &&
+          (error.message.includes("permission") ||
+            error.message.includes("policy"))))
     ) {
       logger.warn("RLS error detected, trying with service role client", {
         error: error.code,
@@ -121,9 +123,20 @@ export async function POST(request: NextRequest) {
       logger.error("Database error creating session", { error, insertData });
       return NextResponse.json(
         {
-          error: error.message || "Failed to create session",
-          details: error.code || error.hint || "Unknown database error",
-          errorCode: error.code,
+          error:
+            error.message && typeof error.message === "string"
+              ? error.message
+              : "Failed to create session",
+          details:
+            error.code && typeof error.code === "string"
+              ? error.code
+              : error.hint && typeof error.hint === "string"
+                ? error.hint
+                : "Unknown database error",
+          errorCode:
+            error.code && typeof error.code === "string"
+              ? error.code
+              : undefined,
         },
         { status: 500 },
       );
@@ -133,7 +146,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error("Create session error", { error });
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
       { status: 500 },
     );
   }
@@ -173,7 +188,15 @@ export async function GET(request: NextRequest) {
         .single();
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json(
+          {
+            error:
+              error.message && typeof error.message === "string"
+                ? error.message
+                : "Database error",
+          },
+          { status: 500 },
+        );
       }
 
       const { data: messages, error: messagesError } = await supabase
@@ -199,7 +222,9 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error("Get session error", { error });
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
       { status: 500 },
     );
   }
@@ -253,14 +278,24 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        {
+          error:
+            error.message && typeof error.message === "string"
+              ? error.message
+              : "Database error",
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ session });
   } catch (error) {
     logger.error("Update session error", { error });
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
       { status: 500 },
     );
   }

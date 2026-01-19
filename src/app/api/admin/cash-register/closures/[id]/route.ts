@@ -1,6 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceRoleClient } from '@/utils/supabase/server';
-import { getBranchContext, validateBranchAccess } from '@/lib/api/branch-middleware';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
+import {
+  getBranchContext,
+  validateBranchAccess,
+} from "@/lib/api/branch-middleware";
+import { appLogger as logger } from "@/lib/logger";
 
 /**
  * GET /api/admin/cash-register/closures/[id]
@@ -8,95 +12,118 @@ import { getBranchContext, validateBranchAccess } from '@/lib/api/branch-middlew
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const supabase = await createClient();
     const supabaseServiceRole = createServiceRoleClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     const { id } = await params;
 
     // Get closure
     const { data: closure, error } = await supabaseServiceRole
-      .from('cash_register_closures')
-      .select(`
+      .from("cash_register_closures")
+      .select(
+        `
         *,
         branch:branches(id, name, code)
-      `)
-      .eq('id', id)
+      `,
+      )
+      .eq("id", id)
       .single();
 
     if (error || !closure) {
-      return NextResponse.json({ 
-        error: 'Cierre de caja no encontrado' 
-      }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: "Cierre de caja no encontrado",
+        },
+        { status: 404 },
+      );
     }
 
     // Fetch user profile separately
     let closedByUser = null;
     if (closure.closed_by) {
       const { data: profile } = await supabaseServiceRole
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('id', closure.closed_by)
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .eq("id", closure.closed_by)
         .single();
-      
+
       closedByUser = profile;
     }
 
     const closureWithUser = {
       ...closure,
-      closed_by_user: closedByUser
+      closed_by_user: closedByUser,
     };
 
     // Validate branch access
     const branchContext = await getBranchContext(request, user.id);
     const hasAccess = await validateBranchAccess(user.id, closure.branch_id);
-    
+
     if (!hasAccess) {
-      return NextResponse.json({ 
-        error: 'No tiene acceso a este cierre de caja' 
-      }, { status: 403 });
+      return NextResponse.json(
+        {
+          error: "No tiene acceso a este cierre de caja",
+        },
+        { status: 403 },
+      );
     }
 
     // Get orders for this closure date
     const dateStr = closure.closure_date;
     let ordersQuery = supabaseServiceRole
-      .from('orders')
-      .select(`
+      .from("orders")
+      .select(
+        `
         *,
         order_items(*)
-      `)
-      .eq('is_pos_sale', true)
-      .eq('branch_id', closure.branch_id)
-      .gte('created_at', `${dateStr}T00:00:00`)
-      .lt('created_at', `${dateStr}T23:59:59`)
-      .order('created_at', { ascending: false });
+      `,
+      )
+      .eq("is_pos_sale", true)
+      .eq("branch_id", closure.branch_id)
+      .gte("created_at", `${dateStr}T00:00:00`)
+      .lt("created_at", `${dateStr}T23:59:59`)
+      .order("created_at", { ascending: false });
 
     const { data: orders } = await ordersQuery;
 
     return NextResponse.json({
       closure: closureWithUser,
-      orders: orders || []
+      orders: orders || [],
     });
-
   } catch (error: any) {
-    console.error('Error fetching cash register closure:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error.message 
-    }, { status: 500 });
+    logger.error("Error fetching cash register closure:", {
+      error,
+      closureId: id,
+    });
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error.message,
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -106,21 +133,29 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const supabase = await createClient();
     const supabaseServiceRole = createServiceRoleClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     const { id } = await params;
@@ -128,109 +163,153 @@ export async function PUT(
 
     // Get existing closure
     const { data: existingClosure } = await supabaseServiceRole
-      .from('cash_register_closures')
-      .select('branch_id, status')
-      .eq('id', id)
+      .from("cash_register_closures")
+      .select("branch_id, status")
+      .eq("id", id)
       .single();
 
     if (!existingClosure) {
-      return NextResponse.json({ error: 'Cierre de caja no encontrado' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Cierre de caja no encontrado" },
+        { status: 404 },
+      );
     }
 
     // Validate branch access
     const branchContext = await getBranchContext(request, user.id);
-    const hasAccess = await validateBranchAccess(user.id, existingClosure.branch_id);
-    
+    const hasAccess = await validateBranchAccess(
+      user.id,
+      existingClosure.branch_id,
+    );
+
     if (!hasAccess) {
-      return NextResponse.json({ 
-        error: 'No tiene acceso a este cierre de caja' 
-      }, { status: 403 });
+      return NextResponse.json(
+        {
+          error: "No tiene acceso a este cierre de caja",
+        },
+        { status: 403 },
+      );
     }
 
     // Prepare update data
     const updateData: any = {
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
 
-    if (body.actual_cash !== undefined) updateData.actual_cash = Number(body.actual_cash);
-    if (body.card_machine_debit_total !== undefined) updateData.card_machine_debit_total = Number(body.card_machine_debit_total);
-    if (body.card_machine_credit_total !== undefined) updateData.card_machine_credit_total = Number(body.card_machine_credit_total);
+    if (body.actual_cash !== undefined)
+      updateData.actual_cash = Number(body.actual_cash);
+    if (body.card_machine_debit_total !== undefined)
+      updateData.card_machine_debit_total = Number(
+        body.card_machine_debit_total,
+      );
+    if (body.card_machine_credit_total !== undefined)
+      updateData.card_machine_credit_total = Number(
+        body.card_machine_credit_total,
+      );
     if (body.notes !== undefined) updateData.notes = body.notes;
-    if (body.discrepancies !== undefined) updateData.discrepancies = body.discrepancies;
+    if (body.discrepancies !== undefined)
+      updateData.discrepancies = body.discrepancies;
     if (body.status !== undefined) {
       updateData.status = body.status;
-      if (body.status === 'confirmed') {
+      if (body.status === "confirmed") {
         updateData.confirmed_at = new Date().toISOString();
       }
     }
 
     // Recalculate differences if cash amounts changed
-    if (body.actual_cash !== undefined || body.card_machine_debit_total !== undefined || body.card_machine_credit_total !== undefined) {
-      const expectedCash = Number(existingClosure.opening_cash_amount) + Number(existingClosure.cash_sales);
+    if (
+      body.actual_cash !== undefined ||
+      body.card_machine_debit_total !== undefined ||
+      body.card_machine_credit_total !== undefined
+    ) {
+      const expectedCash =
+        Number(existingClosure.opening_cash_amount) +
+        Number(existingClosure.cash_sales);
       if (updateData.actual_cash !== undefined) {
-        updateData.cash_difference = Number(updateData.actual_cash) - expectedCash;
+        updateData.cash_difference =
+          Number(updateData.actual_cash) - expectedCash;
         updateData.closing_cash_amount = Number(updateData.actual_cash);
       }
-      
-      if (updateData.card_machine_debit_total !== undefined || updateData.card_machine_credit_total !== undefined) {
-        const debitTotal = updateData.card_machine_debit_total !== undefined 
-          ? Number(updateData.card_machine_debit_total) 
-          : Number(existingClosure.card_machine_debit_total) || 0;
-        const creditTotal = updateData.card_machine_credit_total !== undefined 
-          ? Number(updateData.card_machine_credit_total) 
-          : Number(existingClosure.card_machine_credit_total) || 0;
+
+      if (
+        updateData.card_machine_debit_total !== undefined ||
+        updateData.card_machine_credit_total !== undefined
+      ) {
+        const debitTotal =
+          updateData.card_machine_debit_total !== undefined
+            ? Number(updateData.card_machine_debit_total)
+            : Number(existingClosure.card_machine_debit_total) || 0;
+        const creditTotal =
+          updateData.card_machine_credit_total !== undefined
+            ? Number(updateData.card_machine_credit_total)
+            : Number(existingClosure.card_machine_credit_total) || 0;
         const expectedDebit = Number(existingClosure.debit_card_sales) || 0;
         const expectedCredit = Number(existingClosure.credit_card_sales) || 0;
-        updateData.card_machine_difference = (debitTotal - expectedDebit) + (creditTotal - expectedCredit);
+        updateData.card_machine_difference =
+          debitTotal - expectedDebit + (creditTotal - expectedCredit);
       }
     }
 
     // Update closure
-    const { data: updatedClosure, error: updateError } = await supabaseServiceRole
-      .from('cash_register_closures')
-      .update(updateData)
-      .eq('id', id)
-      .select(`
+    const { data: updatedClosure, error: updateError } =
+      await supabaseServiceRole
+        .from("cash_register_closures")
+        .update(updateData)
+        .eq("id", id)
+        .select(
+          `
         *,
         branch:branches(id, name, code)
-      `)
-      .single();
+      `,
+        )
+        .single();
 
     if (updateError) {
-      console.error('Error updating closure:', updateError);
-      return NextResponse.json({ 
-        error: 'Error al actualizar el cierre de caja',
-        details: updateError.message 
-      }, { status: 500 });
+      logger.error("Error updating closure:", {
+        error: updateError,
+        closureId: id,
+      });
+      return NextResponse.json(
+        {
+          error: "Error al actualizar el cierre de caja",
+          details: updateError.message,
+        },
+        { status: 500 },
+      );
     }
 
     // Fetch user profile separately
     let closedByUser = null;
     if (updatedClosure.closed_by) {
       const { data: profile } = await supabaseServiceRole
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('id', updatedClosure.closed_by)
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .eq("id", updatedClosure.closed_by)
         .single();
-      
+
       closedByUser = profile;
     }
 
     const closureWithUser = {
       ...updatedClosure,
-      closed_by_user: closedByUser
+      closed_by_user: closedByUser,
     };
 
     return NextResponse.json({
       success: true,
-      closure: closureWithUser
+      closure: closureWithUser,
     });
-
   } catch (error: any) {
-    console.error('Error updating cash register closure:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error.message 
-    }, { status: 500 });
+    logger.error("Error updating cash register closure:", {
+      error,
+      closureId: id,
+    });
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error.message,
+      },
+      { status: 500 },
+    );
   }
 }

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { appLogger as logger } from "@/lib/logger";
 
 interface ProductImport {
   name: string;
@@ -16,42 +17,56 @@ interface ProductImport {
   skin_type?: string[];
   benefits?: string[];
   certifications?: string[];
-  ingredients?: Array<{name: string, percentage?: number}>;
+  ingredients?: Array<{ name: string; percentage?: number }>;
   usage_instructions?: string;
   precautions?: string;
   weight?: number;
   dimensions?: string;
   package_characteristics?: string;
   is_featured?: boolean;
-  status?: 'active' | 'draft' | 'archived';
+  status?: "active" | "draft" | "archived";
 }
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     // Parse JSON from request body
     const body = await request.json();
     const products: ProductImport[] = body.products || body;
-    const mode = body.mode || 'create';
-    
+    const mode = body.mode || "create";
+
     if (!Array.isArray(products)) {
-      return NextResponse.json({ error: 'Expected an array of products' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Expected an array of products" },
+        { status: 400 },
+      );
     }
 
     if (products.length === 0) {
-      return NextResponse.json({ error: 'No products provided' }, { status: 400 });
+      return NextResponse.json(
+        { error: "No products provided" },
+        { status: 400 },
+      );
     }
 
     const results = [];
@@ -59,14 +74,14 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
-      
+
       try {
         // Validate required fields
         if (!product.name || !product.price) {
           errors.push({
             index: i,
-            product: product.name || 'Unknown',
-            error: 'Missing required fields: name or price'
+            product: product.name || "Unknown",
+            error: "Missing required fields: name or price",
           });
           continue;
         }
@@ -75,30 +90,33 @@ export async function POST(request: NextRequest) {
         let categoryId = product.category_id;
         if (!categoryId && product.category) {
           // Try to find category by name
-          const categoryName = typeof product.category === 'string' 
-            ? product.category 
-            : product.category.name;
-          if (typeof categoryName === 'string') {
+          const categoryName =
+            typeof product.category === "string"
+              ? product.category
+              : product.category.name;
+          if (typeof categoryName === "string") {
             // Get categories to find the ID
             const { data: categories } = await supabase
-              .from('categories')
-              .select('id, name, slug')
+              .from("categories")
+              .select("id, name, slug")
               .limit(100);
-            
-            const matchingCategory = categories?.find(cat => 
-              cat.name.toLowerCase() === categoryName.toLowerCase() ||
-              cat.slug.toLowerCase() === categoryName.toLowerCase().replace(/\s+/g, '-') ||
-              cat.name.toLowerCase().includes(categoryName.toLowerCase()) ||
-              categoryName.toLowerCase().includes(cat.name.toLowerCase())
+
+            const matchingCategory = categories?.find(
+              (cat) =>
+                cat.name.toLowerCase() === categoryName.toLowerCase() ||
+                cat.slug.toLowerCase() ===
+                  categoryName.toLowerCase().replace(/\s+/g, "-") ||
+                cat.name.toLowerCase().includes(categoryName.toLowerCase()) ||
+                categoryName.toLowerCase().includes(cat.name.toLowerCase()),
             );
-            
+
             if (matchingCategory) {
               categoryId = matchingCategory.id;
             } else {
               errors.push({
                 index: i,
                 product: product.name,
-                error: `Category not found: ${categoryName}`
+                error: `Category not found: ${categoryName}`,
               });
               continue;
             }
@@ -109,7 +127,7 @@ export async function POST(request: NextRequest) {
           errors.push({
             index: i,
             product: product.name,
-            error: 'Missing category_id or valid category name'
+            error: "Missing category_id or valid category name",
           });
           continue;
         }
@@ -119,18 +137,18 @@ export async function POST(request: NextRequest) {
         if (!slug) {
           slug = product.name
             .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '') // Remove accents
-            .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-            .replace(/\s+/g, '-') // Replace spaces with hyphens
-            .replace(/-+/g, '-') // Replace multiple hyphens with single
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "") // Remove accents
+            .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
+            .replace(/\s+/g, "-") // Replace spaces with hyphens
+            .replace(/-+/g, "-") // Replace multiple hyphens with single
             .trim();
         }
 
         // Check if product already exists (by slug or name)
         const { data: existingProduct } = await supabase
-          .from('products')
-          .select('id, name, slug')
+          .from("products")
+          .select("id, name, slug")
           .or(`slug.eq.${slug},name.eq.${product.name}`)
           .single();
 
@@ -156,36 +174,36 @@ export async function POST(request: NextRequest) {
           dimensions: product.dimensions || null,
           package_characteristics: product.package_characteristics || null,
           is_featured: product.is_featured || false,
-          status: product.status || 'active',
+          status: product.status || "active",
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         };
 
         // Handle different import modes
-        let operation = '';
+        let operation = "";
         let newProduct = null;
         let error = null;
 
         if (existingProduct) {
           // Product exists - handle based on mode
-          if (mode === 'create') {
+          if (mode === "create") {
             // Skip existing products in create mode
             results.push({
               index: i,
               product: product.name,
-              action: 'skipped',
-              reason: 'Product already exists'
+              action: "skipped",
+              reason: "Product already exists",
             });
             continue;
-          } else if (mode === 'update' || mode === 'upsert') {
+          } else if (mode === "update" || mode === "upsert") {
             // Update existing product
             const { data: updatedProduct, error: updateError } = await supabase
-              .from('products')
+              .from("products")
               .update({
                 ...productData,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
               })
-              .eq('id', existingProduct.id)
+              .eq("id", existingProduct.id)
               .select()
               .single();
 
@@ -193,33 +211,37 @@ export async function POST(request: NextRequest) {
               error = updateError;
             } else {
               newProduct = updatedProduct;
-              operation = 'updated';
+              operation = "updated";
             }
-          } else if (mode === 'skip_duplicates') {
+          } else if (mode === "skip_duplicates") {
             // Skip duplicates
             results.push({
               index: i,
               product: product.name,
-              action: 'skipped',
-              reason: 'Duplicate product skipped'
+              action: "skipped",
+              reason: "Duplicate product skipped",
             });
             continue;
           }
         } else {
           // Product doesn't exist - handle based on mode
-          if (mode === 'update') {
+          if (mode === "update") {
             // Skip non-existing products in update mode
             results.push({
               index: i,
               product: product.name,
-              action: 'skipped',
-              reason: 'Product does not exist'
+              action: "skipped",
+              reason: "Product does not exist",
             });
             continue;
-          } else if (mode === 'create' || mode === 'upsert' || mode === 'skip_duplicates') {
+          } else if (
+            mode === "create" ||
+            mode === "upsert" ||
+            mode === "skip_duplicates"
+          ) {
             // Create new product
             const { data: createdProduct, error: insertError } = await supabase
-              .from('products')
+              .from("products")
               .insert(productData)
               .select()
               .single();
@@ -228,7 +250,7 @@ export async function POST(request: NextRequest) {
               error = insertError;
             } else {
               newProduct = createdProduct;
-              operation = 'created';
+              operation = "created";
             }
           }
         }
@@ -237,7 +259,7 @@ export async function POST(request: NextRequest) {
           errors.push({
             index: i,
             product: product.name,
-            error: error.message
+            error: error.message,
           });
           continue;
         }
@@ -248,23 +270,22 @@ export async function POST(request: NextRequest) {
             product: product.name,
             id: newProduct.id,
             slug: newProduct.slug,
-            action: operation
+            action: operation,
           });
         }
-
       } catch (error) {
         errors.push({
           index: i,
-          product: product.name || 'Unknown',
-          error: error instanceof Error ? error.message : 'Unknown error'
+          product: product.name || "Unknown",
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     }
 
     // Calculate summary statistics
-    const created = results.filter(r => r.action === 'created').length;
-    const updated = results.filter(r => r.action === 'updated').length;
-    const skipped = results.filter(r => r.action === 'skipped').length;
+    const created = results.filter((r) => r.action === "created").length;
+    const updated = results.filter((r) => r.action === "updated").length;
+    const skipped = results.filter((r) => r.action === "skipped").length;
 
     return NextResponse.json({
       success: true,
@@ -275,17 +296,19 @@ export async function POST(request: NextRequest) {
         created,
         updated,
         skipped,
-        total_processed: products.length
+        total_processed: products.length,
       },
       results,
-      errors
+      errors,
     });
-
   } catch (error) {
-    console.error('JSON import error:', error);
-    return NextResponse.json({ 
-      error: 'Failed to import products',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    logger.error("JSON import error", { error });
+    return NextResponse.json(
+      {
+        error: "Failed to import products",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }

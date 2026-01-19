@@ -1,100 +1,113 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { appLogger as logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const mode = formData.get('mode') as string || 'create'; // 'create', 'update', 'upsert'
+    const file = formData.get("file") as File;
+    const mode = (formData.get("mode") as string) || "create"; // 'create', 'update', 'upsert'
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
     const supabase = await createClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     // Read and parse CSV file
     const text = await file.text();
-    const lines = text.split('\n').filter(line => line.trim());
-    
+    const lines = text.split("\n").filter((line) => line.trim());
+
     if (lines.length < 2) {
-      return NextResponse.json({ error: 'CSV file must contain headers and at least one data row' }, { status: 400 });
+      return NextResponse.json(
+        { error: "CSV file must contain headers and at least one data row" },
+        { status: 400 },
+      );
     }
 
     // Parse headers
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-    
+    const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""));
+
     // Define expected columns and their mappings
     const columnMappings: Record<string, string> = {
-      'nombre': 'name',
-      'name': 'name',
-      'slug': 'slug',
-      'descripcion': 'description',
-      'description': 'description',
-      'precio': 'price',
-      'price': 'price',
-      'precio_comparacion': 'compare_at_price',
-      'compare_at_price': 'compare_at_price',
-      'stock': 'inventory_quantity',
-      'inventory_quantity': 'inventory_quantity',
-      'estado': 'status',
-      'status': 'status',
-      'destacado': 'is_featured',
-      'is_featured': 'is_featured',
-      'sku': 'sku',
-      'peso': 'weight',
-      'weight': 'weight',
-      'tipos_piel': 'skin_type',
-      'skin_type': 'skin_type',
-      'beneficios': 'benefits',
-      'benefits': 'benefits',
-      'certificaciones': 'certifications',
-      'certifications': 'certifications',
-      'instrucciones': 'usage_instructions',
-      'usage_instructions': 'usage_instructions',
-      'ingredientes': 'ingredients',
-      'ingredients': 'ingredients',
-      'precauciones': 'precautions',
-      'precautions': 'precautions',
-      'dimensiones': 'dimensions',
-      'dimensions': 'dimensions',
-      'caracteristicas_paquete': 'package_characteristics',
-      'package_characteristics': 'package_characteristics',
-      'imagen_principal': 'featured_image',
-      'featured_image': 'featured_image',
-      'galeria_1': 'gallery_1',
-      'gallery_1': 'gallery_1',
-      'galeria_2': 'gallery_2',
-      'gallery_2': 'gallery_2',
-      'galeria_3': 'gallery_3',
-      'gallery_3': 'gallery_3',
-      'galeria_4': 'gallery_4',
-      'gallery_4': 'gallery_4',
-      'categoria': 'category_name',
-      'category': 'category_name'
+      nombre: "name",
+      name: "name",
+      slug: "slug",
+      descripcion: "description",
+      description: "description",
+      precio: "price",
+      price: "price",
+      precio_comparacion: "compare_at_price",
+      compare_at_price: "compare_at_price",
+      stock: "inventory_quantity",
+      inventory_quantity: "inventory_quantity",
+      estado: "status",
+      status: "status",
+      destacado: "is_featured",
+      is_featured: "is_featured",
+      sku: "sku",
+      peso: "weight",
+      weight: "weight",
+      tipos_piel: "skin_type",
+      skin_type: "skin_type",
+      beneficios: "benefits",
+      benefits: "benefits",
+      certificaciones: "certifications",
+      certifications: "certifications",
+      instrucciones: "usage_instructions",
+      usage_instructions: "usage_instructions",
+      ingredientes: "ingredients",
+      ingredients: "ingredients",
+      precauciones: "precautions",
+      precautions: "precautions",
+      dimensiones: "dimensions",
+      dimensions: "dimensions",
+      caracteristicas_paquete: "package_characteristics",
+      package_characteristics: "package_characteristics",
+      imagen_principal: "featured_image",
+      featured_image: "featured_image",
+      galeria_1: "gallery_1",
+      gallery_1: "gallery_1",
+      galeria_2: "gallery_2",
+      gallery_2: "gallery_2",
+      galeria_3: "gallery_3",
+      gallery_3: "gallery_3",
+      galeria_4: "gallery_4",
+      gallery_4: "gallery_4",
+      categoria: "category_name",
+      category: "category_name",
     };
 
     // Get categories for mapping
     const { data: categories } = await supabase
-      .from('categories')
-      .select('id, name, slug');
+      .from("categories")
+      .select("id, name, slug");
 
-    const categoryMap = categories?.reduce((acc: any, cat) => {
-      acc[cat.name.toLowerCase()] = cat.id;
-      acc[cat.slug.toLowerCase()] = cat.id;
-      return acc;
-    }, {}) || {};
+    const categoryMap =
+      categories?.reduce((acc: any, cat) => {
+        acc[cat.name.toLowerCase()] = cat.id;
+        acc[cat.slug.toLowerCase()] = cat.id;
+        return acc;
+      }, {}) || {};
 
     // Parse data rows
     const products = [];
@@ -120,13 +133,15 @@ export async function POST(request: NextRequest) {
         // Process and validate product data
         const product: any = {
           name: rowData.name?.trim(),
-          slug: rowData.slug?.trim() || generateSlug(rowData.name || ''),
+          slug: rowData.slug?.trim() || generateSlug(rowData.name || ""),
           short_description: rowData.short_description?.trim(),
           description: rowData.description?.trim(),
           price: parseFloat(rowData.price) || 0,
-          compare_at_price: rowData.compare_at_price ? parseFloat(rowData.compare_at_price) : null,
+          compare_at_price: rowData.compare_at_price
+            ? parseFloat(rowData.compare_at_price)
+            : null,
           inventory_quantity: parseInt(rowData.inventory_quantity) || 0,
-          status: rowData.status?.toLowerCase() || 'draft',
+          status: rowData.status?.toLowerCase() || "draft",
           is_featured: parseBoolean(rowData.is_featured),
           sku: rowData.sku?.trim(),
           weight: rowData.weight ? parseFloat(rowData.weight) : null,
@@ -143,11 +158,11 @@ export async function POST(request: NextRequest) {
             rowData.gallery_1?.trim(),
             rowData.gallery_2?.trim(),
             rowData.gallery_3?.trim(),
-            rowData.gallery_4?.trim()
+            rowData.gallery_4?.trim(),
           ].filter(Boolean),
           track_inventory: true,
-          vendor: 'ALKIMYA DA LUZ',
-          currency: 'ARS'
+          vendor: "ALKIMYA DA LUZ",
+          currency: "ARS",
         };
 
         // Handle category
@@ -156,7 +171,9 @@ export async function POST(request: NextRequest) {
           if (categoryId) {
             product.category_id = categoryId;
           } else {
-            warnings.push(`Línea ${i + 1}: Categoría '${rowData.category_name}' no encontrada`);
+            warnings.push(
+              `Línea ${i + 1}: Categoría '${rowData.category_name}' no encontrada`,
+            );
           }
         }
 
@@ -171,28 +188,32 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        if (!['draft', 'active', 'archived'].includes(product.status)) {
-          warnings.push(`Línea ${i + 1}: Estado '${product.status}' inválido, usando 'draft'`);
-          product.status = 'draft';
+        if (!["draft", "active", "archived"].includes(product.status)) {
+          warnings.push(
+            `Línea ${i + 1}: Estado '${product.status}' inválido, usando 'draft'`,
+          );
+          product.status = "draft";
         }
 
         products.push({
           ...product,
           line_number: i + 1,
-          original_data: rowData
+          original_data: rowData,
         });
-
       } catch (error) {
         errors.push(`Línea ${i + 1}: Error de formato - ${error}`);
       }
     }
 
     if (errors.length > 0 && products.length === 0) {
-      return NextResponse.json({ 
-        error: 'No se pudieron procesar los productos',
-        errors,
-        warnings
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "No se pudieron procesar los productos",
+          errors,
+          warnings,
+        },
+        { status: 400 },
+      );
     }
 
     // Process products based on mode
@@ -202,145 +223,157 @@ export async function POST(request: NextRequest) {
       skipped: 0,
       errors: [...errors],
       warnings: [...warnings],
-      details: [] as any[]
+      details: [] as any[],
     };
 
     for (const product of products) {
       try {
-        if (mode === 'create') {
+        if (mode === "create") {
           // Always create new products
           const { data, error } = await supabase
-            .from('products')
+            .from("products")
             .insert({
               ...product,
               line_number: undefined,
               original_data: undefined,
               created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             })
-            .select('id, name, slug')
+            .select("id, name, slug")
             .single();
 
           if (error) {
-            if (error.code === '23505') { // Unique constraint violation
-              results.errors.push(`Línea ${product.line_number}: Producto con slug '${product.slug}' ya existe`);
+            if (error.code === "23505") {
+              // Unique constraint violation
+              results.errors.push(
+                `Línea ${product.line_number}: Producto con slug '${product.slug}' ya existe`,
+              );
               results.skipped++;
             } else {
-              results.errors.push(`Línea ${product.line_number}: ${error.message}`);
+              results.errors.push(
+                `Línea ${product.line_number}: ${error.message}`,
+              );
               results.skipped++;
             }
           } else {
             results.created++;
-            results.details.push({ action: 'created', product: data });
+            results.details.push({ action: "created", product: data });
           }
-
-        } else if (mode === 'update') {
+        } else if (mode === "update") {
           // Update existing products by SKU or slug
           const identifier = product.sku || product.slug;
           const { data: existing } = await supabase
-            .from('products')
-            .select('id')
+            .from("products")
+            .select("id")
             .or(`sku.eq.${identifier},slug.eq.${identifier}`)
             .single();
 
           if (existing) {
             const { data, error } = await supabase
-              .from('products')
+              .from("products")
               .update({
                 ...product,
                 line_number: undefined,
                 original_data: undefined,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
               })
-              .eq('id', existing.id)
-              .select('id, name, slug')
+              .eq("id", existing.id)
+              .select("id, name, slug")
               .single();
 
             if (error) {
-              results.errors.push(`Línea ${product.line_number}: ${error.message}`);
+              results.errors.push(
+                `Línea ${product.line_number}: ${error.message}`,
+              );
               results.skipped++;
             } else {
               results.updated++;
-              results.details.push({ action: 'updated', product: data });
+              results.details.push({ action: "updated", product: data });
             }
           } else {
-            results.warnings.push(`Línea ${product.line_number}: Producto no encontrado para actualizar`);
+            results.warnings.push(
+              `Línea ${product.line_number}: Producto no encontrado para actualizar`,
+            );
             results.skipped++;
           }
-
-        } else if (mode === 'upsert') {
+        } else if (mode === "upsert") {
           // Update if exists, create if not
           const identifier = product.sku || product.slug;
           const { data: existing } = await supabase
-            .from('products')
-            .select('id')
+            .from("products")
+            .select("id")
             .or(`sku.eq.${identifier},slug.eq.${identifier}`)
             .single();
 
           if (existing) {
             // Update existing
             const { data, error } = await supabase
-              .from('products')
+              .from("products")
               .update({
                 ...product,
                 line_number: undefined,
                 original_data: undefined,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
               })
-              .eq('id', existing.id)
-              .select('id, name, slug')
+              .eq("id", existing.id)
+              .select("id, name, slug")
               .single();
 
             if (error) {
-              results.errors.push(`Línea ${product.line_number}: ${error.message}`);
+              results.errors.push(
+                `Línea ${product.line_number}: ${error.message}`,
+              );
               results.skipped++;
             } else {
               results.updated++;
-              results.details.push({ action: 'updated', product: data });
+              results.details.push({ action: "updated", product: data });
             }
           } else {
             // Create new
             const { data, error } = await supabase
-              .from('products')
+              .from("products")
               .insert({
                 ...product,
                 line_number: undefined,
                 original_data: undefined,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
               })
-              .select('id, name, slug')
+              .select("id, name, slug")
               .single();
 
             if (error) {
-              results.errors.push(`Línea ${product.line_number}: ${error.message}`);
+              results.errors.push(
+                `Línea ${product.line_number}: ${error.message}`,
+              );
               results.skipped++;
             } else {
               results.created++;
-              results.details.push({ action: 'created', product: data });
+              results.details.push({ action: "created", product: data });
             }
           }
         }
-
       } catch (error) {
-        results.errors.push(`Línea ${product.line_number}: Error inesperado - ${error}`);
+        results.errors.push(
+          `Línea ${product.line_number}: Error inesperado - ${error}`,
+        );
         results.skipped++;
       }
     }
 
     // Log admin activity
-    await supabase.rpc('log_admin_activity', {
-      action: 'import_products',
-      resource_type: 'product',
-      resource_id: 'bulk_import',
-      details: { 
+    await supabase.rpc("log_admin_activity", {
+      action: "import_products",
+      resource_type: "product",
+      resource_id: "bulk_import",
+      details: {
         mode,
         total_rows: products.length,
         created: results.created,
         updated: results.updated,
         skipped: results.skipped,
-        errors_count: results.errors.length
-      }
+        errors_count: results.errors.length,
+      },
     });
 
     return NextResponse.json({
@@ -351,26 +384,28 @@ export async function POST(request: NextRequest) {
         updated: results.updated,
         skipped: results.skipped,
         errors_count: results.errors.length,
-        warnings_count: results.warnings.length
+        warnings_count: results.warnings.length,
       },
-      results
+      results,
     });
-
   } catch (error) {
-    console.error('Error in import products API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error("Error in import products API", { error });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 // Helper functions
 function parseCSVLine(line: string): string[] {
   const result = [];
-  let current = '';
+  let current = "";
   let inQuotes = false;
-  
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
-    
+
     if (char === '"') {
       if (inQuotes && line[i + 1] === '"') {
         current += '"';
@@ -378,14 +413,14 @@ function parseCSVLine(line: string): string[] {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (char === ',' && !inQuotes) {
+    } else if (char === "," && !inQuotes) {
       result.push(current.trim());
-      current = '';
+      current = "";
     } else {
       current += char;
     }
   }
-  
+
   result.push(current.trim());
   return result;
 }
@@ -393,62 +428,72 @@ function parseCSVLine(line: string): string[] {
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
     .trim();
 }
 
 function parseBoolean(value: string): boolean {
   if (!value) return false;
   const lowerValue = value.toLowerCase().trim();
-  return ['true', '1', 'yes', 'sí', 'si', 'y'].includes(lowerValue);
+  return ["true", "1", "yes", "sí", "si", "y"].includes(lowerValue);
 }
 
 function parseArray(value: string): string[] {
   if (!value) return [];
-  
+
   // Try to parse as JSON first (for complex data like ingredients)
-  if (value.trim().startsWith('[') && value.trim().endsWith(']')) {
+  if (value.trim().startsWith("[") && value.trim().endsWith("]")) {
     try {
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed)) {
-        return parsed.map(item => typeof item === 'string' ? item : JSON.stringify(item));
+        return parsed.map((item) =>
+          typeof item === "string" ? item : JSON.stringify(item),
+        );
       }
     } catch (e) {
       // If JSON parsing fails, fall back to semicolon splitting
     }
   }
-  
+
   // Fall back to semicolon-separated values
-  return value.split(';').map(item => item.trim()).filter(item => item.length > 0);
+  return value
+    .split(";")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
-function parseIngredients(value: string): Array<{name: string, percentage?: number}> {
+function parseIngredients(
+  value: string,
+): Array<{ name: string; percentage?: number }> {
   if (!value) return [];
-  
+
   // Try to parse as JSON array of objects
-  if (value.trim().startsWith('[') && value.trim().endsWith(']')) {
+  if (value.trim().startsWith("[") && value.trim().endsWith("]")) {
     try {
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed)) {
-        return parsed.map(item => {
-          if (typeof item === 'object' && item.name) {
+        return parsed.map((item) => {
+          if (typeof item === "object" && item.name) {
             return {
               name: item.name,
-              percentage: item.percentage || undefined
+              percentage: item.percentage || undefined,
             };
           }
           return { name: String(item) };
         });
       }
     } catch (e) {
-      console.warn('Failed to parse ingredients JSON:', e);
+      logger.warn("Failed to parse ingredients JSON", { error: e });
     }
   }
-  
+
   // Fall back to semicolon-separated values
-  return value.split(';').map(item => ({ name: item.trim() })).filter(item => item.name.length > 0);
+  return value
+    .split(";")
+    .map((item) => ({ name: item.trim() }))
+    .filter((item) => item.name.length > 0);
 }

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createAgent } from "@/lib/ai/agent/core";
 import { LLMFactory } from "@/lib/ai/factory";
-import type { LLMProvider } from "@/lib/ai/types";
+import type { LLMProvider, ToolCall } from "@/lib/ai/types";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,9 +18,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     let assistantContent = "";
-    const toolCalls: any[] = [];
+    const toolCalls: ToolCall[] = [];
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
           modelToTry: string | undefined,
         ) => {
           let providerContent = "";
-          let providerToolCalls: any[] = [];
+          let providerToolCalls: ToolCall[] = [];
 
           try {
             const fallbackAgent = await createAgent({
@@ -179,7 +180,7 @@ export async function POST(request: NextRequest) {
               }
             }
             return true;
-          } catch (error: any) {
+          } catch (error) {
             logger.error("Error with provider", {
               provider: providerToTry,
               error,
@@ -266,7 +267,7 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
             controller.close();
           }
-        } catch (error: any) {
+        } catch (error) {
           logger.error("Stream error", { error });
           const errorMessage = error.message || "An error occurred";
           const isRateLimit =
@@ -292,7 +293,7 @@ export async function POST(request: NextRequest) {
         Connection: "keep-alive",
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     logger.error("Chat API error", { error });
     return NextResponse.json(
       { error: error.message || "Internal server error" },
@@ -313,9 +314,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -333,7 +334,7 @@ export async function GET(request: NextRequest) {
         enabled: factory.isProviderEnabled(provider),
       })),
     });
-  } catch (error: any) {
+  } catch (error) {
     logger.error("Providers API error", { error });
     return NextResponse.json(
       { error: error.message || "Internal server error" },

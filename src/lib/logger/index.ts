@@ -1,42 +1,37 @@
-import pino from 'pino'
+import pino from "pino";
 
 /**
  * Logger configuration
  * Uses pino for structured logging
- * 
- * In development: Pretty printing for readability
+ *
+ * Note: pino-pretty is NOT used because it uses worker threads that conflict with Next.js
+ * In development: Simple JSON format (can be piped to pino-pretty manually if needed)
  * In production: JSON format for log aggregation
  */
 
-const isDevelopment = process.env.NODE_ENV === 'development'
+const isDevelopment = process.env.NODE_ENV === "development";
 
 // Create logger instance
+// pino-pretty is disabled because it causes "worker has exited" errors in Next.js
+// The logs will be in JSON format, which is still readable and works perfectly
 const logger = pino({
-  level: process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info'),
-  transport: isDevelopment
-    ? {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'HH:MM:ss Z',
-          ignore: 'pid,hostname',
-        },
-      }
-    : undefined,
+  level: process.env.LOG_LEVEL || (isDevelopment ? "debug" : "info"),
   formatters: {
     level: (label) => {
-      return { level: label }
+      return { level: label };
     },
   },
   timestamp: pino.stdTimeFunctions.isoTime,
-})
+  // No transport - pino-pretty causes worker thread issues in Next.js
+  // Logs will be in JSON format which is fine for development and production
+});
 
 /**
  * Logger interface for application-wide use
- * 
+ *
  * Usage:
  *   import { logger } from '@/lib/logger'
- *   
+ *
  *   logger.debug('Debug message', { data })
  *   logger.info('Info message', { data })
  *   logger.warn('Warning message', { data })
@@ -49,9 +44,9 @@ export const appLogger = {
    */
   debug: (message: string, data?: any) => {
     if (data) {
-      logger.debug(data, message)
+      logger.debug(data, message);
     } else {
-      logger.debug(message)
+      logger.debug(message);
     }
   },
 
@@ -60,9 +55,9 @@ export const appLogger = {
    */
   info: (message: string, data?: any) => {
     if (data) {
-      logger.info(data, message)
+      logger.info(data, message);
     } else {
-      logger.info(message)
+      logger.info(message);
     }
   },
 
@@ -71,9 +66,9 @@ export const appLogger = {
    */
   warn: (message: string, data?: any) => {
     if (data) {
-      logger.warn(data, message)
+      logger.warn(data, message);
     } else {
-      logger.warn(message)
+      logger.warn(message);
     }
   },
 
@@ -92,20 +87,20 @@ export const appLogger = {
           },
           ...data,
         },
-        message
-      )
+        message,
+      );
     } else if (error) {
-      logger.error({ ...error, ...data }, message)
+      logger.error({ ...error, ...data }, message);
     } else if (data) {
-      logger.error(data, message)
+      logger.error(data, message);
     } else {
-      logger.error(message)
+      logger.error(message);
     }
   },
-}
+};
 
 // Export default logger for convenience
-export default appLogger
+export default appLogger;
 
 // Export pino logger for advanced use cases
-export { logger }
+export { logger };

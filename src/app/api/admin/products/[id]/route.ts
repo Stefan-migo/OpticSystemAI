@@ -115,14 +115,22 @@ export async function PUT(
     const productData: {
       name?: string;
       slug?: string;
-      short_description?: string;
-      description?: string;
+      short_description?: string | null;
+      description?: string | null;
       price?: number;
-      compare_at_price?: number;
+      compare_at_price?: number | null;
+      cost_price?: number | null;
       inventory_quantity?: number;
-      category_id?: string;
-      featured_image?: string;
+      category_id?: string | null;
+      featured_image?: string | null;
       gallery?: string[];
+      tags?: string[];
+      product_type?: string;
+      optical_category?: string | null;
+      sku?: string | null;
+      barcode?: string | null;
+      brand?: string | null;
+      manufacturer?: string | null;
       skin_type?: string[];
       benefits?: string[];
       certifications?: string[];
@@ -135,6 +143,7 @@ export async function PUT(
       is_featured?: boolean;
       status?: "active" | "draft" | "archived";
       updated_at: string;
+      [key: string]: unknown;
     } = {
       name: body.name.trim(),
       slug: slug,

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     if (logError) {
       logger.error("Error logging test webhook:", {
         error: logError,
-        webhookType,
+        webhook_type,
       });
     }
 

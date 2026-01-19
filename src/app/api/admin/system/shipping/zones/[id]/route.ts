@@ -49,7 +49,16 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const updateData: any = {
+    const updateData: {
+      updated_at: string;
+      name?: string;
+      description?: string;
+      countries?: string[];
+      states?: string[];
+      cities?: string[];
+      is_active?: boolean;
+      sort_order?: number;
+    } = {
       updated_at: new Date().toISOString(),
     };
 

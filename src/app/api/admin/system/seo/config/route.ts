@@ -18,7 +18,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const seoConfig: Record<string, any> = {};
+    const seoConfig: Record<
+      string,
+      string | number | boolean | Record<string, unknown>
+    > = {};
     configs?.forEach((config) => {
       try {
         seoConfig[config.config_key] = JSON.parse(config.config_value);

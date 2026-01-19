@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type {
+  GetAdminRoleParams,
+  GetAdminRoleResult,
+} from "@/types/supabase-rpc";
 
 export async function GET(
   request: NextRequest,
@@ -21,9 +25,12 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: adminRole } = await supabase.rpc("get_admin_role", {
+    const { data: adminRole } = (await supabase.rpc("get_admin_role", {
       user_id: user.id,
-    });
+    } as GetAdminRoleParams)) as {
+      data: GetAdminRoleResult | null;
+      error: Error | null;
+    };
     if (adminRole !== "admin") {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -193,9 +200,12 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: adminRole } = await supabase.rpc("get_admin_role", {
+    const { data: adminRole } = (await supabase.rpc("get_admin_role", {
       user_id: user.id,
-    });
+    } as GetAdminRoleParams)) as {
+      data: GetAdminRoleResult | null;
+      error: Error | null;
+    };
     if (adminRole !== "admin") {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -337,9 +347,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: adminRole } = await supabase.rpc("get_admin_role", {
+    const { data: adminRole } = (await supabase.rpc("get_admin_role", {
       user_id: user.id,
-    });
+    } as GetAdminRoleParams)) as {
+      data: GetAdminRoleResult | null;
+      error: Error | null;
+    };
     if (adminRole !== "admin") {
       return NextResponse.json(
         { error: "Admin access required" },

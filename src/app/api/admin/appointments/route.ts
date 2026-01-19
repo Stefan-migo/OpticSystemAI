@@ -5,6 +5,12 @@ import { NotificationService } from "@/lib/notifications/notification-service";
 import { formatRUT } from "@/lib/utils/rut";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type {
+  IsAdminParams,
+  IsAdminResult,
+  CheckAppointmentAvailabilityParams,
+  CheckAppointmentAvailabilityResult,
+} from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,9 +25,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -194,9 +200,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -304,21 +310,22 @@ export async function POST(request: NextRequest) {
     try {
       // Only check availability if branch_id is set (required for non-super admins)
       // For super admins in global view, skip availability check or use a default branch
-      const rpcParams: any = {
+      const rpcParams: CheckAppointmentAvailabilityParams = {
         p_date: body.appointment_date,
         p_time: timeForRPC,
         p_duration_minutes: body.duration_minutes || 30,
         p_appointment_id: null,
         p_staff_id: body.assigned_to || null,
+        p_branch_id: finalBranchId,
       };
 
-      // Always add branch_id (required for availability check)
-      rpcParams.p_branch_id = finalBranchId;
-
-      const rpcResult = await supabaseServiceRole.rpc(
+      const rpcResult = (await supabaseServiceRole.rpc(
         "check_appointment_availability",
         rpcParams,
-      );
+      )) as {
+        data: CheckAppointmentAvailabilityResult | null;
+        error: Error | null;
+      };
 
       // Supabase RPC returns { data, error } structure
       isAvailable = rpcResult.data;
@@ -330,9 +337,9 @@ export async function POST(request: NextRequest) {
         error: rpcResult.error,
         hasData: rpcResult.data !== null && rpcResult.data !== undefined,
       });
-    } catch (err: any) {
-      logger.error("Exception calling RPC", err);
-      availabilityError = err;
+    } catch (err) {
+      logger.error("Exception calling RPC", { error: err });
+      availabilityError = err instanceof Error ? err : new Error(String(err));
     }
 
     if (availabilityError) {

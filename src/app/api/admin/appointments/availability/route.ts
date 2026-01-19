@@ -3,6 +3,13 @@ import { createClient } from "@/utils/supabase/server";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type {
+  IsAdminParams,
+  IsAdminResult,
+  GetAvailableTimeSlotsParams,
+  GetAvailableTimeSlotsResult,
+  TimeSlot,
+} from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,9 +25,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -51,15 +58,15 @@ export async function GET(request: NextRequest) {
       branchId: branchContext.branchId,
     });
 
-    const { data: slots, error } = await supabaseServiceRole.rpc(
+    const { data: slots, error } = (await supabaseServiceRole.rpc(
       "get_available_time_slots",
       {
         p_date: date,
         p_duration_minutes: duration,
         p_staff_id: staffId || null,
         p_branch_id: branchContext.branchId || null,
-      },
-    );
+      } as GetAvailableTimeSlotsParams,
+    )) as { data: GetAvailableTimeSlotsResult; error: Error | null };
 
     if (error) {
       logger.error("Error fetching available slots:", {
@@ -100,7 +107,7 @@ export async function GET(request: NextRequest) {
 
     // Ensure slots are properly formatted
     const formattedSlots = (slots || [])
-      .map((slot: any) => {
+      .map((slot: TimeSlot) => {
         let timeSlot = "";
 
         // Handle different TIME formats from PostgreSQL

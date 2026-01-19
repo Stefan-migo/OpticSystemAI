@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
+import type {
+  IsAdminParams,
+  IsAdminResult,
+  GetAdminRoleParams,
+  GetAdminRoleResult,
+} from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,20 +26,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin
-    const { data: isAdmin, error: adminError } = await supabase.rpc(
+    const { data: isAdmin, error: adminError } = (await supabase.rpc(
       "is_admin",
       {
         user_id: user.id,
-      },
-    );
+      } as IsAdminParams,
+    )) as { data: IsAdminResult | null; error: Error | null };
 
     // Get admin role
-    const { data: adminRole, error: roleError } = await supabase.rpc(
+    const { data: adminRole, error: roleError } = (await supabase.rpc(
       "get_admin_role",
       {
         user_id: user.id,
-      },
-    );
+      } as GetAdminRoleParams,
+    )) as { data: GetAdminRoleResult | null; error: Error | null };
 
     // Check admin_users table directly
     const { data: adminRecord, error: adminRecordError } = await supabase

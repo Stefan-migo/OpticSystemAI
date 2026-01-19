@@ -13,37 +13,35 @@ export async function GET(
     const supabase = await createClient();
 
     // Check admin authorization
-    console.log("🔐 Checking user authentication...");
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
     if (userError || !user) {
-      console.error("❌ User authentication failed:", userError);
+      logger.error("User authentication failed", userError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.log("✅ User authenticated:", user.email);
+    logger.debug("User authenticated", { email: user.email });
 
-    console.log("🔒 Checking admin privileges...");
     const { data: isAdmin, error: adminError } = await supabase.rpc(
       "is_admin",
       { user_id: user.id },
     );
     if (adminError) {
-      console.error("❌ Admin check error:", adminError);
+      logger.error("Admin check error", adminError);
       return NextResponse.json(
         { error: "Admin verification failed" },
         { status: 500 },
       );
     }
     if (!isAdmin) {
-      console.log("❌ User is not admin:", user.email);
+      logger.warn("User is not admin", { email: user.email });
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },
       );
     }
-    console.log("✅ Admin access confirmed for:", user.email);
+    logger.debug("Admin access confirmed", { email: user.email });
 
     // Get branch context
     const branchContext = await getBranchContext(request, user.id);

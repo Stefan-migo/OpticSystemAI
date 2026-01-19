@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
+import type {
+  IsAdminParams,
+  IsAdminResult,
+  LogAdminActivityParams,
+} from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,9 +24,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -90,9 +95,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -130,12 +135,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Log admin activity
-    await supabase.rpc("log_admin_activity", {
-      action: "create_support_template",
-      resource_type: "support_template",
-      resource_id: template.id,
-      details: { template_name: name },
-    });
+    const logParams: LogAdminActivityParams = {
+      p_action: "create_support_template",
+      p_resource_type: "support_template",
+      p_resource_id: template.id,
+      p_details: JSON.stringify({ template_name: name }),
+    };
+    await supabase.rpc("log_admin_activity", logParams);
 
     return NextResponse.json({ template });
   } catch (error) {
@@ -164,9 +170,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },

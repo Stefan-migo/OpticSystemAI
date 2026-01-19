@@ -370,16 +370,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Log admin activity
-    await supabase.rpc("log_admin_activity", {
-      action: `bulk_${operation}`,
-      resource_type: "product",
-      resource_id: product_ids.join(","),
-      details: {
+    const logParams: LogAdminActivityParams = {
+      p_action: `bulk_${operation}`,
+      p_resource_type: "product",
+      p_resource_id: product_ids.join(","),
+      p_details: JSON.stringify({
         operation,
         product_count: product_ids.length,
         updates,
-      },
-    });
+      }),
+    };
+    await supabase.rpc("log_admin_activity", logParams);
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
+import type {
+  IsAdminParams,
+  IsAdminResult,
+  LogAdminActivityParams,
+} from "@/types/supabase-rpc";
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,9 +28,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -362,19 +367,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Log admin activity
-    await supabase.rpc("log_admin_activity", {
-      action: "import_products",
-      resource_type: "product",
-      resource_id: "bulk_import",
-      details: {
+    const logParams: LogAdminActivityParams = {
+      p_action: "import_products",
+      p_resource_type: "product",
+      p_resource_id: "bulk_import",
+      p_details: JSON.stringify({
         mode,
         total_rows: products.length,
         created: results.created,
         updated: results.updated,
         skipped: results.skipped,
         errors_count: results.errors.length,
-      },
-    });
+      }),
+    };
+    await supabase.rpc("log_admin_activity", logParams);
 
     return NextResponse.json({
       success: true,

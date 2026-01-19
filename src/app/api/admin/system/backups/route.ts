@@ -698,7 +698,10 @@ export async function POST(request: NextRequest) {
         // Only count insertion errors, not deletion errors (since UPSERT handles existing records)
         if (hasInsertErrors) totalErrors++;
       } catch (error) {
-        console.error(`Error restoring table ${tableName}:`, error);
+        logger.error(`Error restoring table ${tableName}:`, {
+          error,
+          tableName,
+        });
         restoreResults[tableName] = {
           status: "error",
           error: error instanceof Error ? error.message : "Unknown error",

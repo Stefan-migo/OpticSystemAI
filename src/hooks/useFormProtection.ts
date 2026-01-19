@@ -54,29 +54,21 @@ export function useFormProtection(
     };
 
     // Override router methods to add confirmation
-    router.push = (
-      url: string,
-      ...args: Parameters<typeof router.push> extends [string, ...infer Rest]
-        ? Rest
-        : never[]
-    ) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    router.push = ((url: string, ...args: any[]) => {
       if (preventNavigation(url)) {
         return originalPush.current.call(router, url, ...args);
       }
-      return Promise.resolve(false) as ReturnType<typeof router.push>;
-    };
+      return Promise.resolve(false);
+    }) as typeof router.push;
 
-    router.replace = (
-      url: string,
-      ...args: Parameters<typeof router.replace> extends [string, ...infer Rest]
-        ? Rest
-        : never[]
-    ) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    router.replace = ((url: string, ...args: any[]) => {
       if (preventNavigation(url)) {
         return originalReplace.current.call(router, url, ...args);
       }
-      return Promise.resolve(false) as ReturnType<typeof router.replace>;
-    };
+      return Promise.resolve(false);
+    }) as typeof router.replace;
 
     // Add event listener for browser navigation
     window.addEventListener("beforeunload", handleBeforeUnload);

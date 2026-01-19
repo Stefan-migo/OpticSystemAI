@@ -1,62 +1,85 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceRoleClient } from '@/utils/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
+import { appLogger as logger } from "@/lib/logger";
 
 // GET - Get all prescriptions for a customer
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const supabase = await createClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     const { data: prescriptions, error } = await supabase
-      .from('prescriptions')
-      .select('*')
-      .eq('customer_id', id)
-      .order('prescription_date', { ascending: false });
+      .from("prescriptions")
+      .select("*")
+      .eq("customer_id", id)
+      .order("prescription_date", { ascending: false });
 
     if (error) {
-      console.error('Error fetching prescriptions:', error);
-      return NextResponse.json({ error: 'Failed to fetch prescriptions' }, { status: 500 });
+      logger.error("Error fetching prescriptions", error);
+      return NextResponse.json(
+        { error: "Failed to fetch prescriptions" },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ prescriptions: prescriptions || [] });
   } catch (error) {
-    console.error('Error in prescriptions API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error("Error in prescriptions API GET", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 // POST - Create a new prescription
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const supabase = await createClient();
-    
+
     // Check admin authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
     const body = await request.json();
@@ -66,17 +89,18 @@ export async function POST(
     // If this is marked as current, unset other current prescriptions
     if (body.is_current) {
       await supabaseServiceRole
-        .from('prescriptions')
+        .from("prescriptions")
         .update({ is_current: false })
-        .eq('customer_id', id)
-        .eq('is_current', true);
+        .eq("customer_id", id)
+        .eq("is_current", true);
     }
 
     const { data: prescription, error } = await supabaseServiceRole
-      .from('prescriptions')
+      .from("prescriptions")
       .insert({
         customer_id: id,
-        prescription_date: body.prescription_date || new Date().toISOString().split('T')[0],
+        prescription_date:
+          body.prescription_date || new Date().toISOString().split("T")[0],
         expiration_date: body.expiration_date || null,
         prescription_number: body.prescription_number || null,
         issued_by: body.issued_by || null,
@@ -108,20 +132,25 @@ export async function POST(
         recommendations: body.recommendations || null,
         is_active: body.is_active !== undefined ? body.is_active : true,
         is_current: body.is_current || false,
-        created_by: user.id
+        created_by: user.id,
       })
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating prescription:', error);
-      return NextResponse.json({ error: 'Failed to create prescription' }, { status: 500 });
+      logger.error("Error creating prescription", error);
+      return NextResponse.json(
+        { error: "Failed to create prescription" },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ prescription }, { status: 201 });
   } catch (error) {
-    console.error('Error in create prescription API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error("Error in create prescription API", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
-

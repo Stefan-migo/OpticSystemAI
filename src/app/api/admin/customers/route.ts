@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { NotificationService } from "@/lib/notifications/notification-service";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,10 +30,10 @@ export async function GET(request: NextRequest) {
     }
     logger.debug("User authenticated", { email: user.email });
 
-    const { data: isAdmin, error: adminError } = await supabase.rpc(
+    const { data: isAdmin, error: adminError } = (await supabase.rpc(
       "is_admin",
-      { user_id: user.id },
-    );
+      { user_id: user.id } as IsAdminParams,
+    )) as { data: IsAdminResult | null; error: Error | null };
     if (adminError) {
       logger.error("Admin check error", adminError);
       return NextResponse.json(
@@ -174,10 +175,10 @@ export async function POST(request: NextRequest) {
     }
     logger.debug("User authenticated", { email: user.email });
 
-    const { data: isAdmin, error: adminError } = await supabase.rpc(
+    const { data: isAdmin, error: adminError } = (await supabase.rpc(
       "is_admin",
-      { user_id: user.id },
-    );
+      { user_id: user.id } as IsAdminParams,
+    )) as { data: IsAdminResult | null; error: Error | null };
     if (adminError) {
       logger.error("Admin check error", adminError);
       return NextResponse.json(

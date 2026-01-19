@@ -158,7 +158,38 @@ export async function PUT(
       );
     }
 
-    const updateData: any = {
+    const updateData: {
+      updated_at: string;
+      frame_name?: string;
+      frame_brand?: string;
+      frame_model?: string;
+      frame_color?: string;
+      frame_size?: string;
+      frame_sku?: string;
+      frame_serial_number?: string;
+      lens_type?: string;
+      lens_material?: string;
+      lens_index?: string;
+      lens_treatments?: string[];
+      lens_tint_color?: string;
+      lens_tint_percentage?: number;
+      lab_name?: string;
+      lab_contact?: string;
+      lab_order_number?: string;
+      lab_estimated_delivery_date?: string;
+      frame_cost?: number;
+      lens_cost?: number;
+      treatments_cost?: number;
+      labor_cost?: number;
+      lab_cost?: number;
+      subtotal?: number;
+      tax_amount?: number;
+      discount_amount?: number;
+      total_amount?: number;
+      payment_status?: string;
+      payment_method?: string;
+      [key: string]: unknown;
+    } = {
       updated_at: new Date().toISOString(),
     };
 

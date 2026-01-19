@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,10 +19,10 @@ export async function GET(request: NextRequest) {
     }
     logger.debug("User authenticated", { email: user.email });
 
-    const { data: isAdmin, error: adminError } = await supabase.rpc(
+    const { data: isAdmin, error: adminError } = (await supabase.rpc(
       "is_admin",
-      { user_id: user.id },
-    );
+      { user_id: user.id } as IsAdminParams,
+    )) as { data: IsAdminResult | null; error: Error | null };
     if (adminError) {
       logger.error("Admin check error", adminError);
       return NextResponse.json(
@@ -174,10 +175,13 @@ export async function POST(request: NextRequest) {
 
       // Count by status manually
       const statusCounts =
-        allOrders?.reduce((acc: any, order: any) => {
-          acc[order.status] = (acc[order.status] || 0) + 1;
-          return acc;
-        }, {}) || {};
+        allOrders?.reduce(
+          (acc: Record<string, number>, order: { status: string }) => {
+            acc[order.status] = (acc[order.status] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ) || {};
 
       // Get total revenue for current month
       const startOfMonth = new Date();
@@ -309,15 +313,22 @@ export async function POST(request: NextRequest) {
 
       // Create order items if provided
       if (orderData.items && orderData.items.length > 0) {
-        const orderItems = orderData.items.map((item: any) => ({
-          order_id: newOrder.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total_price: item.unit_price * item.quantity,
-          product_name: item.product_name,
-          variant_title: item.variant_title,
-        }));
+        const orderItems = orderData.items.map(
+          (item: {
+            product_id: string;
+            quantity: number;
+            unit_price: number;
+            product_name: string;
+          }) => ({
+            order_id: newOrder.id,
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.unit_price * item.quantity,
+            product_name: item.product_name,
+            variant_title: item.variant_title,
+          }),
+        );
 
         const { error: itemsError } = await supabase
           .from("order_items")
@@ -377,10 +388,10 @@ export async function DELETE(request: NextRequest) {
     }
     logger.debug("User authenticated", { email: user.email });
 
-    const { data: isAdmin, error: adminError } = await supabase.rpc(
+    const { data: isAdmin, error: adminError } = (await supabase.rpc(
       "is_admin",
-      { user_id: user.id },
-    );
+      { user_id: user.id } as IsAdminParams,
+    )) as { data: IsAdminResult | null; error: Error | null };
     if (adminError) {
       logger.error("Admin check error", adminError);
       return NextResponse.json(

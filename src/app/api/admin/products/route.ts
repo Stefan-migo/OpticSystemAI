@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
   try {
@@ -330,7 +331,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare product data with defaults
-    const productData: any = {
+    const productData: Record<string, unknown> = {
       name: body.name.trim(),
       slug: slug,
       description: body.description || null,
@@ -570,10 +571,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ product: createdProduct });
-  } catch (error: any) {
-    logger.error("API error creating product", error);
+  } catch (error) {
+    logger.error("API error creating product", { error });
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
       { status: 500 },
     );
   }

@@ -1,205 +1,257 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
-import { createServiceRoleClient } from '@/utils/supabase/server'
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { createServiceRoleClient } from "@/utils/supabase/server";
+import { appLogger as logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      console.error('Auth error:', userError)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      logger.error("Auth error", { error: userError });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id })
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      console.error('User is not admin:', user.id)
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+      logger.error("User is not admin", { userId: user.id });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
-    const body = await request.json()
-    const { provider, model, title, config } = body
+    const body = await request.json();
+    const { provider, model, title, config } = body;
 
-    console.log('Creating session with:', { provider, model, title, config, userId: user.id })
+    logger.debug("Creating session", {
+      provider,
+      model,
+      title,
+      userId: user.id,
+    });
 
     if (!provider || !model) {
       return NextResponse.json(
-        { error: 'Provider and model are required' },
-        { status: 400 }
-      )
+        { error: "Provider and model are required" },
+        { status: 400 },
+      );
     }
 
     // Ensure model is a string and not empty
-    const modelString = String(model).trim()
+    const modelString = String(model).trim();
     if (!modelString) {
       return NextResponse.json(
-        { error: 'Model cannot be empty' },
-        { status: 400 }
-      )
+        { error: "Model cannot be empty" },
+        { status: 400 },
+      );
     }
 
     const insertData: any = {
       user_id: user.id,
       provider: String(provider).trim(),
       model: modelString,
-      title: title ? String(title).trim() : null
-    }
+      title: title ? String(title).trim() : null,
+    };
 
     // Only include config if it's a valid object
-    if (config && typeof config === 'object') {
+    if (config && typeof config === "object") {
       try {
         // Validate that config can be serialized to JSON
-        const configString = JSON.stringify(config)
+        const configString = JSON.stringify(config);
         // Only include if it's not empty
-        if (configString !== '{}') {
-          insertData.config = JSON.parse(configString) // Re-parse to ensure it's clean
+        if (configString !== "{}") {
+          insertData.config = JSON.parse(configString); // Re-parse to ensure it's clean
         }
       } catch (e) {
-        console.error('Invalid config object:', e)
+        logger.error("Invalid config object", { error: e });
         // Continue without config if it's invalid
       }
     }
 
-    console.log('Inserting session data:', { ...insertData, config: insertData.config ? '[object]' : null })
+    logger.debug("Inserting session data", {
+      insertData: {
+        ...insertData,
+        config: insertData.config ? "[object]" : null,
+      },
+    });
 
     // Try with regular client first, fallback to service role if RLS fails
     let { data: session, error } = await supabase
-      .from('chat_sessions')
+      .from("chat_sessions")
       .insert(insertData)
       .select()
-      .single()
+      .single();
 
     // If RLS fails, try with service role client
-    if (error && (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy'))) {
-      console.log('RLS error detected, trying with service role client')
-      const serviceSupabase = createServiceRoleClient()
+    if (
+      error &&
+      (error.code === "42501" ||
+        error.message?.includes("permission") ||
+        error.message?.includes("policy"))
+    ) {
+      logger.warn("RLS error detected, trying with service role client", {
+        error: error.code,
+      });
+      const serviceSupabase = createServiceRoleClient();
       const serviceResult = await serviceSupabase
-        .from('chat_sessions')
+        .from("chat_sessions")
         .insert(insertData)
         .select()
-        .single()
-      
-      session = serviceResult.data
-      error = serviceResult.error
+        .single();
+
+      session = serviceResult.data;
+      error = serviceResult.error;
     }
 
     if (error) {
-      console.error('Database error creating session:', error)
-      console.error('Error details:', JSON.stringify(error, null, 2))
-      console.error('Insert data was:', JSON.stringify(insertData, null, 2))
-      return NextResponse.json({ 
-        error: error.message || 'Failed to create session',
-        details: error.code || error.hint || 'Unknown database error',
-        errorCode: error.code
-      }, { status: 500 })
+      logger.error("Database error creating session", { error, insertData });
+      return NextResponse.json(
+        {
+          error: error.message || "Failed to create session",
+          details: error.code || error.hint || "Unknown database error",
+          errorCode: error.code,
+        },
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({ session })
+    return NextResponse.json({ session });
   } catch (error: any) {
-    console.error('Create session error:', error)
+    logger.error("Create session error", { error });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+      { error: error.message || "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id })
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
-    const { searchParams } = new URL(request.url)
-    const sessionId = searchParams.get('sessionId')
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get("sessionId");
 
     if (sessionId) {
       const { data: session, error } = await supabase
-        .from('chat_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .eq('user_id', user.id)
-        .single()
+        .from("chat_sessions")
+        .select("*")
+        .eq("id", sessionId)
+        .eq("user_id", user.id)
+        .single();
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
       const { data: messages, error: messagesError } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true })
+        .from("chat_messages")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
 
       if (messagesError) {
-        return NextResponse.json({ error: messagesError.message }, { status: 500 })
+        return NextResponse.json(
+          { error: messagesError.message },
+          { status: 500 },
+        );
       }
 
-      return NextResponse.json({ session, messages: messages || [] })
+      return NextResponse.json({ session, messages: messages || [] });
     } else {
-      return NextResponse.json({ error: 'Session ID is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: "Session ID is required" },
+        { status: 400 },
+      );
     }
   } catch (error: any) {
-    console.error('Get session error:', error)
+    logger.error("Get session error", { error });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+      { error: error.message || "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id })
+    const { data: isAdmin } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
     }
 
-    const body = await request.json()
-    const { sessionId, title, config } = body
+    const body = await request.json();
+    const { sessionId, title, config } = body;
 
     if (!sessionId) {
-      return NextResponse.json({ error: 'Session ID is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: "Session ID is required" },
+        { status: 400 },
+      );
     }
 
-    const updateData: any = {}
-    if (title !== undefined) updateData.title = title
-    if (config !== undefined) updateData.config = config
+    const updateData: any = {};
+    if (title !== undefined) updateData.title = title;
+    if (config !== undefined) updateData.config = config;
 
     const { data: session, error } = await supabase
-      .from('chat_sessions')
+      .from("chat_sessions")
       .update(updateData)
-      .eq('id', sessionId)
-      .eq('user_id', user.id)
+      .eq("id", sessionId)
+      .eq("user_id", user.id)
       .select()
-      .single()
+      .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ session })
+    return NextResponse.json({ session });
   } catch (error: any) {
-    console.error('Update session error:', error)
+    logger.error("Update session error", { error });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+      { error: error.message || "Internal server error" },
+      { status: 500 },
+    );
   }
 }

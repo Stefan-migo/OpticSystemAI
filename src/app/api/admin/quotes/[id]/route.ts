@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function GET(
   request: NextRequest,
@@ -20,9 +21,9 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -36,7 +37,7 @@ export async function GET(
     const branchContext = await getBranchContext(request, user.id);
 
     // Build branch filter function
-    const applyBranchFilter = (query: any) => {
+    const applyBranchFilter = (query: ReturnType<typeof supabase.from>) => {
       return addBranchFilter(
         query,
         branchContext.branchId,
@@ -91,9 +92,9 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -107,7 +108,7 @@ export async function PUT(
     const branchContext = await getBranchContext(request, user.id);
 
     // Build branch filter function
-    const applyBranchFilter = (query: any) => {
+    const applyBranchFilter = (query: ReturnType<typeof supabase.from>) => {
       return addBranchFilter(
         query,
         branchContext.branchId,
@@ -131,7 +132,23 @@ export async function PUT(
 
     const body = await request.json();
 
-    const updateData: any = {
+    const updateData: {
+      updated_at: string;
+      frame_name?: string;
+      frame_brand?: string;
+      frame_model?: string;
+      frame_color?: string;
+      frame_size?: string;
+      frame_sku?: string;
+      frame_price?: number;
+      lens_type?: string;
+      lens_material?: string;
+      lens_index?: string;
+      lens_treatments?: string[];
+      lens_tint_color?: string;
+      lens_tint_percentage?: number;
+      [key: string]: unknown;
+    } = {
       updated_at: new Date().toISOString(),
     };
 
@@ -228,9 +245,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },

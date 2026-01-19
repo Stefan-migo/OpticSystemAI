@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function GET(
   request: NextRequest,
@@ -19,9 +20,9 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -114,9 +115,9 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -191,7 +192,23 @@ export async function PUT(
     }
 
     // Update appointment
-    const updateData: any = {
+    const updateData: {
+      updated_at: string;
+      appointment_date?: string;
+      appointment_time?: string;
+      duration_minutes?: number;
+      appointment_type?: string;
+      status?: string;
+      completed_at?: string;
+      cancelled_at?: string;
+      cancellation_reason?: string;
+      assigned_to?: string | null;
+      notes?: string | null;
+      reason?: string | null;
+      outcome?: string | null;
+      follow_up_required?: boolean;
+      [key: string]: unknown;
+    } = {
       updated_at: new Date().toISOString(),
     };
 
@@ -300,9 +317,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },

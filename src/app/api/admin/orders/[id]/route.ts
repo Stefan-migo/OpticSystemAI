@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
 import { EmailNotificationService } from "@/lib/email/notifications";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function PATCH(
   request: NextRequest,
@@ -20,9 +21,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -48,7 +49,16 @@ export async function PATCH(
       .single();
 
     // Build update object dynamically to only update provided fields
-    const updateData: any = {
+    const updateData: {
+      updated_at: string;
+      status?: string;
+      shipped_at?: string;
+      delivered_at?: string;
+      payment_status?: string;
+      tracking_number?: string | null;
+      carrier?: string | null;
+      [key: string]: unknown;
+    } = {
       updated_at: new Date().toISOString(),
     };
 
@@ -146,13 +156,22 @@ export async function PATCH(
                 ? `${fullOrder.shipping_first_name} ${fullOrder.shipping_last_name}`
                 : fullOrder.profiles?.full_name || "Cliente",
             items:
-              fullOrder.order_items?.map((item: any) => ({
-                id: item.id,
-                name: item.product_name,
-                quantity: item.quantity,
-                price: item.unit_price,
-                variant_title: item.variant_title,
-              })) || [],
+              fullOrder.order_items?.map(
+                (item: {
+                  id: string;
+                  product_name: string;
+                  variant_title?: string | null;
+                  quantity: number;
+                  unit_price: number;
+                  total_price: number;
+                }) => ({
+                  id: item.id,
+                  name: item.product_name,
+                  quantity: item.quantity,
+                  price: item.unit_price,
+                  variant_title: item.variant_title,
+                }),
+              ) || [],
             total_amount: fullOrder.total_amount,
             payment_method: fullOrder.mp_payment_method || "MercadoPago",
             status: fullOrder.status,
@@ -217,9 +236,9 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
@@ -284,9 +303,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = await supabase.rpc("is_admin", {
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
       user_id: user.id,
-    });
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },

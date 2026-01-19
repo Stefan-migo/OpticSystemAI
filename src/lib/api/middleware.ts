@@ -51,6 +51,24 @@ export const rateLimitConfigs = {
     windowMs: 5 * 60 * 1000, // 5 minutes
     maxRequests: 10,
   },
+
+  // Search endpoints (prevent abuse)
+  search: {
+    windowMs: 60 * 1000, // 1 minute
+    maxRequests: 30,
+  },
+
+  // Modification endpoints (POST/PUT/DELETE)
+  modification: {
+    windowMs: 60 * 1000, // 1 minute
+    maxRequests: 50,
+  },
+
+  // POS endpoints (sales processing)
+  pos: {
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    maxRequests: 20,
+  },
 };
 
 // Rate limiting middleware
@@ -122,9 +140,7 @@ function getClientIdentifier(request: NextRequest): string {
 }
 
 // Authentication middleware
-export async function requireAuth(
-  request: NextRequest,
-): Promise<{
+export async function requireAuth(request: NextRequest): Promise<{
   userId: string;
   user: { id: string; email?: string; [key: string]: unknown };
 }> {

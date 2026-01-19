@@ -5,6 +5,7 @@ import {
   validateBranchAccess,
 } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 /**
  * GET /api/admin/cash-register/close

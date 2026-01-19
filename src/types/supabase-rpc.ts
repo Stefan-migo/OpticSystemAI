@@ -36,6 +36,20 @@ export interface GetAdminRoleParams {
 export type GetAdminRoleResult = string | null;
 
 /**
+ * RPC function: is_super_admin
+ *
+ * Checks if a user has super admin privileges.
+ *
+ * @param user_id - The UUID of the user to check
+ * @returns boolean - true if user is a super admin, false otherwise
+ */
+export interface IsSuperAdminParams {
+  user_id: string;
+}
+
+export type IsSuperAdminResult = boolean;
+
+/**
  * RPC function: log_admin_activity
  *
  * Logs an admin activity for audit purposes.
@@ -117,6 +131,10 @@ export type RPCFunctionMap = {
   get_admin_role: {
     params: GetAdminRoleParams;
     result: GetAdminRoleResult;
+  };
+  is_super_admin: {
+    params: IsSuperAdminParams;
+    result: IsSuperAdminResult;
   };
   log_admin_activity: {
     params: LogAdminActivityParams;

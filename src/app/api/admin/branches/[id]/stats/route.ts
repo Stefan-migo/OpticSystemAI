@@ -5,6 +5,10 @@ import {
   addBranchFilter,
 } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type {
+  IsSuperAdminParams,
+  IsSuperAdminResult,
+} from "@/types/supabase-rpc";
 
 export async function GET(
   request: NextRequest,
@@ -23,9 +27,12 @@ export async function GET(
     }
 
     // Check if user is super admin
-    const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
+    const { data: isSuperAdmin } = (await supabase.rpc("is_super_admin", {
       user_id: user.id,
-    });
+    } as IsSuperAdminParams)) as {
+      data: IsSuperAdminResult | null;
+      error: Error | null;
+    };
 
     // Check access
     const branchId = id === "global" ? null : id;

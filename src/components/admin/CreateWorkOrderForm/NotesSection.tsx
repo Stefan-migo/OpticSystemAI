@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +12,7 @@ interface NotesSectionProps {
   onCustomerNotesChange: (notes: string) => void;
 }
 
-export default function NotesSection({
+function NotesSectionComponent({
   internalNotes,
   customerNotes,
   onInternalNotesChange,
@@ -45,3 +46,6 @@ export default function NotesSection({
     </Card>
   );
 }
+
+// Memoize NotesSection to prevent unnecessary re-renders
+export default memo(NotesSectionComponent);

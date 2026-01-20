@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -71,7 +72,7 @@ const formatPrice = (amount: number) =>
     minimumFractionDigits: 0,
   }).format(amount);
 
-export default function LensConfiguration({
+function LensConfigurationComponent({
   lensType,
   lensMaterial,
   lensIndex,
@@ -253,3 +254,6 @@ export default function LensConfiguration({
     </Card>
   );
 }
+
+// Memoize LensConfiguration to prevent unnecessary re-renders
+export default memo(LensConfigurationComponent);

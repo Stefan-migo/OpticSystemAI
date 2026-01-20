@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   Select,
   SelectContent,
@@ -14,7 +15,7 @@ interface StatusSectionProps {
   onStatusChange: (status: string) => void;
 }
 
-export default function StatusSection({
+function StatusSectionComponent({
   status,
   onStatusChange,
 }: StatusSectionProps) {
@@ -38,3 +39,6 @@ export default function StatusSection({
     </Card>
   );
 }
+
+// Memoize StatusSection to prevent unnecessary re-renders
+export default memo(StatusSectionComponent);

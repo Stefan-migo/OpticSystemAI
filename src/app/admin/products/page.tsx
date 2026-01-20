@@ -384,15 +384,17 @@ export default function ProductsPage() {
     switch (bulkOperation) {
       case "update_status":
         return (
-          <div className="space-y-4">
+          <div className="space-y-2">
             <div>
-              <Label htmlFor="status">Nuevo Estado</Label>
+              <Label htmlFor="status" className="text-xs">
+                Nuevo Estado
+              </Label>
               <Select
                 onValueChange={(value) =>
                   setBulkUpdates({ ...bulkUpdates, status: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9 mt-1">
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
                 <SelectContent>
@@ -407,15 +409,17 @@ export default function ProductsPage() {
 
       case "update_category":
         return (
-          <div className="space-y-4">
+          <div className="space-y-2">
             <div>
-              <Label htmlFor="category">Nueva Categoría</Label>
+              <Label htmlFor="category" className="text-xs">
+                Nueva Categoría
+              </Label>
               <Select
                 onValueChange={(value) =>
                   setBulkUpdates({ ...bulkUpdates, category_id: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9 mt-1">
                   <SelectValue placeholder="Seleccionar categoría" />
                 </SelectTrigger>
                 <SelectContent>
@@ -432,16 +436,18 @@ export default function ProductsPage() {
 
       case "update_pricing":
         return (
-          <div className="space-y-4">
+          <div className="space-y-2">
             <div>
-              <Label htmlFor="adjustment_type">Tipo de Ajuste</Label>
+              <Label htmlFor="adjustment_type" className="text-xs">
+                Tipo de Ajuste
+              </Label>
               <Select
                 value={bulkUpdates.adjustment_type || ""}
                 onValueChange={(value) =>
                   setBulkUpdates({ ...bulkUpdates, adjustment_type: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9 mt-1">
                   <SelectValue placeholder="Tipo de ajuste" />
                 </SelectTrigger>
                 <SelectContent>
@@ -451,13 +457,14 @@ export default function ProductsPage() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="price_adjustment">
+              <Label htmlFor="price_adjustment" className="text-xs">
                 Ajuste{" "}
                 {bulkUpdates.adjustment_type === "percentage" ? "(%)" : "($)"}
               </Label>
               <Input
                 type="number"
                 step="0.01"
+                className="h-9 mt-1"
                 placeholder={
                   bulkUpdates.adjustment_type === "percentage"
                     ? "ej: 10 para +10%"
@@ -476,16 +483,18 @@ export default function ProductsPage() {
 
       case "update_inventory":
         return (
-          <div className="space-y-4">
+          <div className="space-y-2">
             <div>
-              <Label htmlFor="inventory_adjustment_type">Tipo de Ajuste</Label>
+              <Label htmlFor="inventory_adjustment_type" className="text-xs">
+                Tipo de Ajuste
+              </Label>
               <Select
                 value={bulkUpdates.adjustment_type || ""}
                 onValueChange={(value) =>
                   setBulkUpdates({ ...bulkUpdates, adjustment_type: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9 mt-1">
                   <SelectValue placeholder="Tipo de ajuste" />
                 </SelectTrigger>
                 <SelectContent>
@@ -495,13 +504,14 @@ export default function ProductsPage() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="inventory_adjustment">
+              <Label htmlFor="inventory_adjustment" className="text-xs">
                 {bulkUpdates.adjustment_type === "set"
                   ? "Nueva Cantidad"
                   : "Ajuste (+/-)"}
               </Label>
               <Input
                 type="number"
+                className="h-9 mt-1"
                 placeholder={
                   bulkUpdates.adjustment_type === "set"
                     ? "ej: 50"
@@ -520,17 +530,16 @@ export default function ProductsPage() {
 
       case "delete":
         return (
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
+          <div className="space-y-2">
+            <div className="flex items-start space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium text-red-800">
+                <p className="font-medium text-red-800 text-sm">
                   Confirmar eliminación suave
                 </p>
-                <p className="text-sm text-red-600">
-                  Los {selectedProducts.length} productos seleccionados serán
-                  archivados (eliminación suave). Esta acción se puede deshacer
-                  cambiando el estado a &quot;Activo&quot;.
+                <p className="text-xs text-red-600 mt-0.5">
+                  Los {selectedProducts.length} productos serán archivados. Esta
+                  acción se puede deshacer.
                 </p>
               </div>
             </div>
@@ -539,45 +548,43 @@ export default function ProductsPage() {
 
       case "hard_delete":
         return (
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2 p-4 bg-red-100 border border-red-300 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-red-700" />
+          <div className="space-y-2">
+            <div className="flex items-start space-x-2 p-3 bg-red-100 border border-red-300 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-red-700 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium text-red-900">
+                <p className="font-medium text-red-900 text-sm">
                   ⚠️ ELIMINACIÓN PERMANENTE
                 </p>
-                <p className="text-sm text-red-700 font-medium">
-                  Los {selectedProducts.length} productos seleccionados serán
-                  ELIMINADOS PERMANENTEMENTE de la base de datos.
+                <p className="text-xs text-red-700 font-medium mt-0.5">
+                  Los {selectedProducts.length} productos serán ELIMINADOS
+                  PERMANENTEMENTE.
                 </p>
-                <p className="text-sm text-red-600 mt-2">
-                  ⚠️ Esta acción NO se puede deshacer. Todos los datos del
-                  producto se perderán para siempre.
+                <p className="text-xs text-red-600 mt-1">
+                  ⚠️ Esta acción NO se puede deshacer.
                 </p>
               </div>
             </div>
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">
+            <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-xs text-yellow-800">
                 <strong>Recomendación:</strong> Considera usar &quot;Eliminación
-                suave&quot; (archivar) en su lugar, que permite recuperar los
-                productos si es necesario.
+                suave&quot; (archivar) en su lugar.
               </p>
             </div>
-            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <div className="flex items-start space-x-3">
+            <div className="p-2.5 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-start space-x-2">
                 <input
                   type="checkbox"
                   id="force-delete"
                   checked={forceDelete}
                   onChange={(e) => setForceDelete(e.target.checked)}
-                  className="mt-1"
+                  className="mt-0.5"
                 />
                 <label
                   htmlFor="force-delete"
-                  className="text-sm text-orange-900 font-medium cursor-pointer"
+                  className="text-xs text-orange-900 font-medium cursor-pointer leading-tight"
                 >
                   Confirmo que entiendo que esta acción es irreversible y deseo
-                  continuar con la eliminación permanente.
+                  continuar.
                 </label>
               </div>
             </div>
@@ -851,17 +858,17 @@ export default function ProductsPage() {
               className="w-full bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2 border-blue-200 dark:border-blue-800 shadow-lg animate-in slide-in-from-top-2 duration-300"
               style={{ position: "relative", zIndex: 1 }}
             >
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-2 pt-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                      <Edit className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <Edit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg text-blue-900 dark:text-blue-100">
+                      <CardTitle className="text-base text-blue-900 dark:text-blue-100">
                         Operaciones Masivas
                       </CardTitle>
-                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
                         {selectedProducts.length} producto
                         {selectedProducts.length > 1 ? "s" : ""} seleccionado
                         {selectedProducts.length > 1 ? "s" : ""}
@@ -878,18 +885,18 @@ export default function ProductsPage() {
                       setForceDelete(false);
                       setSelectedProducts([]);
                     }}
-                    className="h-8 w-8 p-0"
+                    className="h-7 w-7 p-0"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 pb-4">
                 {!isDeleteDialog && (
                   <div>
                     <Label
                       htmlFor="operation"
-                      className="text-sm font-semibold"
+                      className="text-xs font-semibold"
                     >
                       Seleccionar Operación
                     </Label>
@@ -897,7 +904,7 @@ export default function ProductsPage() {
                       value={bulkOperation}
                       onValueChange={setBulkOperation}
                     >
-                      <SelectTrigger className="mt-2">
+                      <SelectTrigger className="mt-1.5 h-9">
                         <SelectValue placeholder="Seleccionar operación" />
                       </SelectTrigger>
                       <SelectContent>
@@ -936,7 +943,7 @@ export default function ProductsPage() {
                   </div>
                 )}
 
-                <div className="flex items-center justify-end space-x-3 pt-2 border-t border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-end space-x-2 pt-2 border-t border-blue-200 dark:border-blue-800">
                   <Button
                     variant="outline"
                     onClick={() => {

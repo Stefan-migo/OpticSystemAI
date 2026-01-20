@@ -244,7 +244,11 @@
 - **Tiempo Estimado:** 1 semana
 - **Líneas Iniciales:** 2,110
 - **Líneas Objetivo:** < 400 (página principal)
-- **Progreso:** 7/8 pasos
+- **Progreso:** 8/8 pasos
+- **Líneas Actuales:** 1,252 (vs 2,110 originales)
+- **Reducción:** 41% (de 2,110 a 1,252 líneas)
+- **Componentes Extraídos:** 5 componentes principales
+- **Hooks Creados:** 3 hooks con React Query
 - **Notas:**
   - [x] Análisis y planificación
   - [x] Crear hooks de datos (useSystemConfig, useSystemHealth, useBackups)
@@ -252,7 +256,7 @@
   - [x] Extraer SystemConfig component
   - [x] Extraer SystemHealth component
   - [x] Extraer SystemMaintenance y BackupManager components
-  - [ ] Refactorizar página principal (en progreso - componentes creados, falta integrar)
+  - [x] Refactorizar página principal (integrado con componentes y hooks)
   - [ ] Verificación final
 
 ---

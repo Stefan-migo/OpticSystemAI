@@ -51,11 +51,11 @@ export async function GET(request: NextRequest) {
       .select(
         `
         *,
-        customer:customers!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
-        prescription:prescriptions!lab_work_orders_prescription_id_fkey(*),
-        quote:quotes!lab_work_orders_quote_id_fkey(*),
-        frame_product:products!lab_work_orders_frame_product_id_fkey(id, name, price, frame_brand, frame_model),
-        assigned_staff:profiles!lab_work_orders_assigned_to_fkey(id, first_name, last_name)
+        customer:customers(id, first_name, last_name, email, phone),
+        prescription:prescriptions(*),
+        quote:quotes(*),
+        frame_product:products(id, name, price, frame_brand, frame_model),
+        assigned_staff:profiles(id, first_name, last_name)
       `,
         { count: "exact" },
       )

@@ -70,10 +70,10 @@ export async function GET(request: NextRequest) {
         guest_rut,
         guest_email,
         guest_phone,
-        customer:profiles!appointments_customer_id_fkey(id, first_name, last_name, email, phone),
-        assigned_staff:profiles!appointments_assigned_to_fkey(id, first_name, last_name),
-        prescription:prescriptions!appointments_prescription_id_fkey(id, prescription_date, prescription_type),
-        order:orders!appointments_order_id_fkey(id, order_number)
+        customer:customers(id, first_name, last_name, email, phone),
+        assigned_staff:profiles(id, first_name, last_name),
+        prescription:prescriptions(id, prescription_date, prescription_type),
+        order:orders(id, order_number)
       `,
       )
       .order("appointment_date", { ascending: true })

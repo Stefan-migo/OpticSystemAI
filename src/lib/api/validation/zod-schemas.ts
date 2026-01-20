@@ -467,45 +467,60 @@ export const searchProductSchema = searchSchema.extend({
 // ============================================================================
 
 /**
- * Schema para item de venta
+ * Schema para item de venta POS
  */
-const saleItemSchema = z.object({
+const posSaleItemSchema = z.object({
   product_id: uuidSchema,
   quantity: quantitySchema,
-  price: priceSchema,
-  discount: z.number().min(0).max(100).default(0).optional(),
-  tax_rate: z.number().min(0).max(100).default(0).optional(),
+  unit_price: priceSchema,
+  total_price: priceOptionalSchema.nullable(),
+  product_name: z.string().min(1).max(255).trim(),
 });
 
 /**
- * Schema para procesar una venta
+ * Schema para procesar una venta POS
  */
 export const processSaleSchema = z
   .object({
+    email: emailSchema.optional().nullable(),
     customer_id: uuidOptionalSchema,
-    customer_email: emailSchema.optional(),
     customer_name: z.string().max(200).trim().optional(),
-    items: z.array(saleItemSchema).min(1, "Debe incluir al menos un item"),
-    payment_method: z.enum(["cash", "card", "credit", "transfer", "check"]),
-    payment_method_type: z.enum(["cash", "card", "credit"]),
+    payment_method_type: z.enum(["cash", "card", "credit", "installments"]),
+    payment_status: z
+      .enum(["paid", "pending", "failed", "refunded"])
+      .default("paid")
+      .optional(),
+    status: z
+      .enum(["pending", "processing", "delivered", "cancelled"])
+      .default("delivered")
+      .optional(),
     subtotal: priceSchema,
-    tax: priceSchema,
-    discount: z.number().min(0).max(100).default(0).optional(),
-    total: priceSchema,
-    notes: z.string().max(1000).trim().optional().nullable(),
+    tax_amount: priceSchema.default(0).optional(),
+    total_amount: priceSchema,
+    currency: z.string().max(10).default("CLP").optional(),
+    installments_count: z.number().int().positive().default(1).optional(),
+    sii_invoice_type: z
+      .enum(["none", "invoice", "credit_note", "debit_note"])
+      .default("none")
+      .optional(),
+    sii_rut: rutOptionalSchema,
+    sii_business_name: z.string().max(200).trim().optional().nullable(),
+    items: z.array(posSaleItemSchema).min(1, "Debe incluir al menos un item"),
+    cash_received: priceOptionalSchema,
+    change_amount: priceOptionalSchema,
     branch_id: uuidOptionalSchema,
+    notes: z.string().max(1000).trim().optional().nullable(),
   })
   .refine(
     (data) => {
-      // Validar que el total sea consistente
-      const calculatedTotal =
-        data.subtotal + data.tax - (data.subtotal * (data.discount || 0)) / 100;
-      return Math.abs(calculatedTotal - data.total) < 0.01; // Permitir pequeña diferencia por redondeo
+      // Validar que el total sea consistente (permitir pequeña diferencia por redondeo)
+      const calculatedTotal = (data.subtotal || 0) + (data.tax_amount || 0);
+      return Math.abs(calculatedTotal - data.total_amount) < 0.01;
     },
     {
       message:
-        "El total no coincide con el cálculo (subtotal + tax - discount)",
-      path: ["total"],
+        "El total_amount no coincide con el cálculo (subtotal + tax_amount)",
+      path: ["total_amount"],
     },
   );
 

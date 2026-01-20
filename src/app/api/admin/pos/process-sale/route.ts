@@ -4,7 +4,12 @@ import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
-import { RateLimitError } from "@/lib/api/errors";
+import { RateLimitError, ValidationError } from "@/lib/api/errors";
+import { processSaleSchema } from "@/lib/api/validation/zod-schemas";
+import {
+  parseAndValidateBody,
+  validationErrorResponse,
+} from "@/lib/api/validation/zod-helpers";
 
 export async function POST(request: NextRequest) {
   return (withRateLimit(rateLimitConfigs.pos) as any)(request, async () => {
@@ -47,7 +52,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const body = await request.json();
+      // Validate request body with Zod
+      let validatedBody;
+      try {
+        validatedBody = await parseAndValidateBody(request, processSaleSchema);
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          return validationErrorResponse(error);
+        }
+        throw error;
+      }
+
+      // Destructure validated data
       const {
         email,
         payment_method_type,
@@ -64,22 +80,7 @@ export async function POST(request: NextRequest) {
         items,
         cash_received,
         change_amount,
-      } = body;
-
-      // Validate required fields
-      if (!items || items.length === 0) {
-        return NextResponse.json(
-          { error: "Items are required" },
-          { status: 400 },
-        );
-      }
-
-      if (!total_amount || total_amount <= 0) {
-        return NextResponse.json(
-          { error: "Total amount must be greater than 0" },
-          { status: 400 },
-        );
-      }
+      } = validatedBody;
 
       // Generate order number
       const orderNumber = `POS-${Date.now()}`;
@@ -177,22 +178,14 @@ export async function POST(request: NextRequest) {
       }
 
       // Create order items and update inventory
-      const orderItems = items.map(
-        (item: {
-          product_id: string;
-          quantity: number;
-          unit_price: number;
-          total_price?: number;
-          product_name: string;
-        }) => ({
-          order_id: newOrder.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total_price: item.total_price || item.unit_price * item.quantity,
-          product_name: item.product_name,
-        }),
-      );
+      const orderItems = items.map((item) => ({
+        order_id: newOrder.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price ?? item.unit_price * item.quantity,
+        product_name: item.product_name,
+      }));
 
       const { error: itemsError } = await supabase
         .from("order_items")
@@ -242,7 +235,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Create installments if payment method is installments
-      if (payment_method_type === "installments" && installments_count > 1) {
+      if (
+        payment_method_type === "installments" &&
+        installments_count &&
+        installments_count > 1
+      ) {
         const installmentAmount = total_amount / installments_count;
         const installments = [];
         const today = new Date();

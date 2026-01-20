@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, memo } from "react";
 
 interface PieChartProps {
   data: Array<{ label: string; value: number; color?: string }>;
@@ -10,39 +10,44 @@ interface PieChartProps {
 }
 
 const DEFAULT_COLORS = [
-  '#9DC65D', // verde-suave
-  '#1E3A8A', // azul-profundo
-  '#D4A853', // dorado
-  '#8B4513', // tierra-media
-  '#AE0000', // rojo DA LUZ
-  '#4A7C59', // verde oscuro
-  '#F6FBD6', // verde claro
-  '#E5E7EB', // gris
+  "#9DC65D", // verde-suave
+  "#1E3A8A", // azul-profundo
+  "#D4A853", // dorado
+  "#8B4513", // tierra-media
+  "#AE0000", // rojo DA LUZ
+  "#4A7C59", // verde oscuro
+  "#F6FBD6", // verde claro
+  "#E5E7EB", // gris
 ];
 
-export function PieChart({ data, title, showLegend = true, showPercentage = true }: PieChartProps) {
-  const total = useMemo(() => 
-    data.reduce((sum, item) => sum + item.value, 0), 
-    [data]
+function PieChartComponent({
+  data,
+  title,
+  showLegend = true,
+  showPercentage = true,
+}: PieChartProps) {
+  const total = useMemo(
+    () => data.reduce((sum, item) => sum + item.value, 0),
+    [data],
   );
 
   const chartData = useMemo(() => {
     let currentAngle = -90; // Start from top
-    
+
     return data.map((item, index) => {
       const percentage = total > 0 ? (item.value / total) * 100 : 0;
       const angle = (percentage / 100) * 360;
       const startAngle = currentAngle;
       const endAngle = currentAngle + angle;
-      
+
       currentAngle = endAngle;
-      
+
       return {
         ...item,
         percentage,
         startAngle,
         endAngle,
-        color: item.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length]
+        color: item.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length],
       };
     });
   }, [data, total]);
@@ -50,21 +55,37 @@ export function PieChart({ data, title, showLegend = true, showPercentage = true
   const createArc = (startAngle: number, endAngle: number, radius: number) => {
     const start = polarToCartesian(50, 50, radius, endAngle);
     const end = polarToCartesian(50, 50, radius, startAngle);
-    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
-    
+    const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+
     return [
-      'M', 50, 50,
-      'L', start.x, start.y,
-      'A', radius, radius, 0, largeArcFlag, 0, end.x, end.y,
-      'Z'
-    ].join(' ');
+      "M",
+      50,
+      50,
+      "L",
+      start.x,
+      start.y,
+      "A",
+      radius,
+      radius,
+      0,
+      largeArcFlag,
+      0,
+      end.x,
+      end.y,
+      "Z",
+    ].join(" ");
   };
 
-  const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
+  const polarToCartesian = (
+    centerX: number,
+    centerY: number,
+    radius: number,
+    angleInDegrees: number,
+  ) => {
     const angleInRadians = (angleInDegrees * Math.PI) / 180.0;
     return {
       x: centerX + radius * Math.cos(angleInRadians),
-      y: centerY + radius * Math.sin(angleInRadians)
+      y: centerY + radius * Math.sin(angleInRadians),
     };
   };
 
@@ -78,28 +99,35 @@ export function PieChart({ data, title, showLegend = true, showPercentage = true
 
   return (
     <div className="space-y-4">
-      {title && <h4 className="font-medium text-azul-profundo text-center">{title}</h4>}
-      
+      {title && (
+        <h4 className="font-medium text-azul-profundo text-center">{title}</h4>
+      )}
+
       <div className="flex flex-col lg:flex-row items-center gap-6">
         {/* Pie Chart SVG */}
         <div className="relative w-64 h-64">
-          <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+          <svg
+            viewBox="0 0 100 100"
+            className="w-full h-full transform -rotate-90"
+          >
             {chartData.map((item, index) => (
               <path
                 key={index}
                 d={createArc(item.startAngle, item.endAngle, 45)}
                 fill={item.color}
                 className="transition-all hover:opacity-80 cursor-pointer"
-                style={{ transformOrigin: '50% 50%' }}
+                style={{ transformOrigin: "50% 50%" }}
               />
             ))}
             {/* Center circle for donut effect */}
             <circle cx="50" cy="50" r="25" fill="white" />
           </svg>
-          
+
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-2xl font-bold text-azul-profundo">{total}</span>
+            <span className="text-2xl font-bold text-azul-profundo">
+              {total}
+            </span>
             <span className="text-xs text-tierra-media">Total</span>
           </div>
         </div>
@@ -108,16 +136,23 @@ export function PieChart({ data, title, showLegend = true, showPercentage = true
         {showLegend && (
           <div className="flex-1 space-y-2">
             {chartData.map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded transition-colors">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded transition-colors"
+              >
                 <div className="flex items-center space-x-3">
-                  <div 
-                    className="w-4 h-4 rounded-full flex-shrink-0" 
+                  <div
+                    className="w-4 h-4 rounded-full flex-shrink-0"
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className="text-sm font-medium truncate">{item.label}</span>
+                  <span className="text-sm font-medium truncate">
+                    {item.label}
+                  </span>
                 </div>
                 <div className="flex items-center space-x-2 ml-4">
-                  <span className="text-sm font-bold text-azul-profundo">{item.value}</span>
+                  <span className="text-sm font-bold text-azul-profundo">
+                    {item.value}
+                  </span>
                   {showPercentage && (
                     <span className="text-xs text-tierra-media">
                       ({item.percentage.toFixed(1)}%)
@@ -132,4 +167,3 @@ export function PieChart({ data, title, showLegend = true, showPercentage = true
     </div>
   );
 }
-

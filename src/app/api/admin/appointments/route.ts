@@ -58,23 +58,11 @@ export async function GET(request: NextRequest) {
     // Otherwise use the branch context
     const branchIdToFilter = requestedBranchId || branchContext.branchId;
 
-    // Fetch appointment data with relations using Supabase nested selects
-    // This avoids N+1 queries by fetching related data in a single query
+    // Fetch appointment data
     let query = supabase
       .from("appointments")
       .select(
-        `
-        *,
-        guest_first_name,
-        guest_last_name,
-        guest_rut,
-        guest_email,
-        guest_phone,
-        customer:customers(id, first_name, last_name, email, phone),
-        assigned_staff:profiles(id, first_name, last_name),
-        prescription:prescriptions(id, prescription_date, prescription_type),
-        order:orders(id, order_number)
-      `,
+        "*, guest_first_name, guest_last_name, guest_rut, guest_email, guest_phone",
       )
       .order("appointment_date", { ascending: true })
       .order("appointment_time", { ascending: true });
@@ -114,11 +102,18 @@ export async function GET(request: NextRequest) {
     const { data: appointments, error } = await query;
 
     if (error) {
-      logger.error("Error fetching appointments", error);
+      logger.error("Error fetching appointments", error, {
+        errorDetails: JSON.stringify(error, null, 2),
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorHint: error.hint,
+      });
       return NextResponse.json(
         {
           error: "Failed to fetch appointments",
           details: error.message,
+          code: error.code,
+          hint: error.hint,
         },
         { status: 500 },
       );
@@ -130,9 +125,68 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Relations are now included in the query above, so no need for separate queries
-    // This eliminates N+1 queries by fetching all related data in a single query
-    const appointmentsWithRelations = appointments;
+    // Fetch related data using batch queries to avoid N+1
+    const customerIds = [
+      ...new Set(appointments.map((a) => a.customer_id).filter(Boolean)),
+    ];
+    const staffIds = [
+      ...new Set(appointments.map((a) => a.assigned_to).filter(Boolean)),
+    ];
+    const prescriptionIds = [
+      ...new Set(appointments.map((a) => a.prescription_id).filter(Boolean)),
+    ];
+    const orderIds = [
+      ...new Set(appointments.map((a) => a.order_id).filter(Boolean)),
+    ];
+
+    // Fetch customers
+    const { data: customers } =
+      customerIds.length > 0
+        ? await supabase
+            .from("customers")
+            .select("id, first_name, last_name, email, phone")
+            .in("id", customerIds)
+        : { data: [] };
+
+    // Fetch staff
+    const { data: staff } =
+      staffIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("id, first_name, last_name")
+            .in("id", staffIds)
+        : { data: [] };
+
+    // Fetch prescriptions
+    const { data: prescriptions } =
+      prescriptionIds.length > 0
+        ? await supabase
+            .from("prescriptions")
+            .select("id, prescription_date, prescription_type")
+            .in("id", prescriptionIds)
+        : { data: [] };
+
+    // Fetch orders
+    const { data: orders } =
+      orderIds.length > 0
+        ? await supabase
+            .from("orders")
+            .select("id, order_number")
+            .in("id", orderIds)
+        : { data: [] };
+
+    // Map appointments with related data
+    const appointmentsWithRelations = appointments.map((appointment) => ({
+      ...appointment,
+      customer:
+        customers?.find((c) => c.id === appointment.customer_id) || null,
+      assigned_staff:
+        staff?.find((s) => s.id === appointment.assigned_to) || null,
+      prescription:
+        prescriptions?.find((p) => p.id === appointment.prescription_id) ||
+        null,
+      order: orders?.find((o) => o.id === appointment.order_id) || null,
+    }));
 
     return NextResponse.json({
       appointments: appointmentsWithRelations,

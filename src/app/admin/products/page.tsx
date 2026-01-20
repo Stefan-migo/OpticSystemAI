@@ -25,7 +25,15 @@ import {
   Trash2,
   X,
   CheckCircle,
+  RefreshCw,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { useBranch } from "@/hooks/useBranch";
 import { BranchSelector } from "@/components/admin/BranchSelector";
@@ -371,10 +379,214 @@ export default function ProductsPage() {
     return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
   };
 
-  // Bulk operation form renderer (simplified - will be extracted later)
+  // Bulk operation form renderer
   const renderBulkOperationForm = () => {
-    // This will be extracted to BulkOperationsDialog component
-    return null;
+    switch (bulkOperation) {
+      case "update_status":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="status">Nuevo Estado</Label>
+              <Select
+                onValueChange={(value) =>
+                  setBulkUpdates({ ...bulkUpdates, status: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Activo</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="archived">Archivado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+
+      case "update_category":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="category">Nueva Categoría</Label>
+              <Select
+                onValueChange={(value) =>
+                  setBulkUpdates({ ...bulkUpdates, category_id: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+
+      case "update_pricing":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="adjustment_type">Tipo de Ajuste</Label>
+              <Select
+                value={bulkUpdates.adjustment_type || ""}
+                onValueChange={(value) =>
+                  setBulkUpdates({ ...bulkUpdates, adjustment_type: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de ajuste" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percentage">Porcentaje</SelectItem>
+                  <SelectItem value="fixed">Monto Fijo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="price_adjustment">
+                Ajuste{" "}
+                {bulkUpdates.adjustment_type === "percentage" ? "(%)" : "($)"}
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder={
+                  bulkUpdates.adjustment_type === "percentage"
+                    ? "ej: 10 para +10%"
+                    : "ej: 500 para +$500"
+                }
+                onChange={(e) =>
+                  setBulkUpdates({
+                    ...bulkUpdates,
+                    price_adjustment: parseFloat(e.target.value),
+                  })
+                }
+              />
+            </div>
+          </div>
+        );
+
+      case "update_inventory":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="inventory_adjustment_type">Tipo de Ajuste</Label>
+              <Select
+                value={bulkUpdates.adjustment_type || ""}
+                onValueChange={(value) =>
+                  setBulkUpdates({ ...bulkUpdates, adjustment_type: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de ajuste" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="set">Establecer cantidad</SelectItem>
+                  <SelectItem value="add">Agregar/Quitar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="inventory_adjustment">
+                {bulkUpdates.adjustment_type === "set"
+                  ? "Nueva Cantidad"
+                  : "Ajuste (+/-)"}
+              </Label>
+              <Input
+                type="number"
+                placeholder={
+                  bulkUpdates.adjustment_type === "set"
+                    ? "ej: 50"
+                    : "ej: -10 o +20"
+                }
+                onChange={(e) =>
+                  setBulkUpdates({
+                    ...bulkUpdates,
+                    inventory_adjustment: parseInt(e.target.value),
+                  })
+                }
+              />
+            </div>
+          </div>
+        );
+
+      case "delete":
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div>
+                <p className="font-medium text-red-800">
+                  Confirmar eliminación suave
+                </p>
+                <p className="text-sm text-red-600">
+                  Los {selectedProducts.length} productos seleccionados serán
+                  archivados (eliminación suave). Esta acción se puede deshacer
+                  cambiando el estado a &quot;Activo&quot;.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "hard_delete":
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 p-4 bg-red-100 border border-red-300 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-red-700" />
+              <div>
+                <p className="font-medium text-red-900">
+                  ⚠️ ELIMINACIÓN PERMANENTE
+                </p>
+                <p className="text-sm text-red-700 font-medium">
+                  Los {selectedProducts.length} productos seleccionados serán
+                  ELIMINADOS PERMANENTEMENTE de la base de datos.
+                </p>
+                <p className="text-sm text-red-600 mt-2">
+                  ⚠️ Esta acción NO se puede deshacer. Todos los datos del
+                  producto se perderán para siempre.
+                </p>
+              </div>
+            </div>
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>Recomendación:</strong> Considera usar &quot;Eliminación
+                suave&quot; (archivar) en su lugar, que permite recuperar los
+                productos si es necesario.
+              </p>
+            </div>
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="force-delete"
+                  checked={forceDelete}
+                  onChange={(e) => setForceDelete(e.target.checked)}
+                  className="mt-1"
+                />
+                <label
+                  htmlFor="force-delete"
+                  className="text-sm text-orange-900 font-medium cursor-pointer"
+                >
+                  Confirmo que entiendo que esta acción es irreversible y deseo
+                  continuar con la eliminación permanente.
+                </label>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
   };
 
   // Category management functions
@@ -841,9 +1053,121 @@ export default function ProductsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Delete Product Dialog - TODO: Extract to component */}
-      {/* Bulk Operations Dialog - TODO: Extract to BulkOperationsDialog component */}
-      {/* Import/Export Dialog - TODO: Extract to ImportExportDialog component */}
+      {/* Bulk Operations Dialog */}
+      {selectedProducts.length > 0 && (
+        <Dialog
+          open={showBulkDialog}
+          onOpenChange={(open) => {
+            setShowBulkDialog(open);
+            if (!open) {
+              setIsDeleteDialog(false);
+              setBulkOperation("");
+              setBulkUpdates({});
+              setForceDelete(false);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>
+                {bulkOperation === "delete"
+                  ? "Archivar Productos"
+                  : bulkOperation === "hard_delete"
+                    ? "⚠️ Eliminar Permanentemente"
+                    : "Operación Masiva"}
+              </DialogTitle>
+              <DialogDescription>
+                {bulkOperation === "delete"
+                  ? `Archivar ${selectedProducts.length} productos seleccionados`
+                  : bulkOperation === "hard_delete"
+                    ? `ELIMINAR PERMANENTEMENTE ${selectedProducts.length} productos seleccionados`
+                    : `Aplicar cambios a ${selectedProducts.length} productos seleccionados`}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {!isDeleteDialog && (
+                <div>
+                  <Label htmlFor="operation">Operación</Label>
+                  <Select
+                    value={bulkOperation}
+                    onValueChange={setBulkOperation}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar operación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="update_status">
+                        Cambiar Estado
+                      </SelectItem>
+                      <SelectItem value="update_category">
+                        Cambiar Categoría
+                      </SelectItem>
+                      <SelectItem value="update_pricing">
+                        Ajustar Precios
+                      </SelectItem>
+                      <SelectItem value="update_inventory">
+                        Ajustar Inventario
+                      </SelectItem>
+                      <SelectItem value="duplicate">
+                        Duplicar Productos
+                      </SelectItem>
+                      <SelectItem value="delete">
+                        Archivar Productos (Eliminación Suave)
+                      </SelectItem>
+                      <SelectItem
+                        value="hard_delete"
+                        className="text-red-600 font-medium"
+                      >
+                        ⚠️ Eliminar Permanentemente
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {bulkOperation && renderBulkOperationForm()}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowBulkDialog(false);
+                  setIsDeleteDialog(false);
+                  setBulkOperation("");
+                  setBulkUpdates({});
+                  setForceDelete(false);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleBulkOperation}
+                disabled={
+                  processing ||
+                  !bulkOperation ||
+                  (bulkOperation === "hard_delete" && !forceDelete)
+                }
+                variant={
+                  bulkOperation === "delete" || bulkOperation === "hard_delete"
+                    ? "destructive"
+                    : "default"
+                }
+              >
+                {processing && (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                {bulkOperation === "delete"
+                  ? "Archivar Productos"
+                  : bulkOperation === "hard_delete"
+                    ? "⚠️ ELIMINAR PERMANENTEMENTE"
+                    : "Aplicar Cambios"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

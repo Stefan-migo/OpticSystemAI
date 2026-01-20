@@ -1,35 +1,35 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { 
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { 
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { 
+} from "@/components/ui/table";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { 
-  Search, 
+} from "@/components/ui/dialog";
+import {
+  Search,
   Plus,
   Eye,
   Package,
@@ -47,14 +47,14 @@ import {
   AlertCircle,
   XCircle,
   FileText,
-  Trash2
-} from 'lucide-react';
-import { toast } from 'sonner';
-import Link from 'next/link';
-import CreateWorkOrderForm from '@/components/admin/CreateWorkOrderForm';
-import { useBranch } from '@/hooks/useBranch';
-import { getBranchHeader } from '@/lib/utils/branch';
-import { BranchSelector } from '@/components/admin/BranchSelector';
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
+import CreateWorkOrderForm from "@/components/admin/CreateWorkOrderForm";
+import { useBranch } from "@/hooks/useBranch";
+import { getBranchHeader } from "@/lib/utils/branch";
+import { BranchSelector } from "@/components/admin/BranchSelector";
 
 interface WorkOrder {
   id: string;
@@ -84,21 +84,32 @@ interface WorkOrder {
 }
 
 export default function WorkOrdersPage() {
-  const { currentBranchId, isSuperAdmin, branches, isLoading: branchLoading } = useBranch();
+  const {
+    currentBranchId,
+    isSuperAdmin,
+    branches,
+    isLoading: branchLoading,
+  } = useBranch();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalWorkOrders, setTotalWorkOrders] = useState(0);
   const workOrdersPerPage = 20;
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [workOrderToDelete, setWorkOrderToDelete] = useState<string | null>(null);
+  const [workOrderToDelete, setWorkOrderToDelete] = useState<string | null>(
+    null,
+  );
   const [deleting, setDeleting] = useState(false);
-  const [editingPaymentStatus, setEditingPaymentStatus] = useState<string | null>(null);
-  const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState<string | null>(null);
+  const [editingPaymentStatus, setEditingPaymentStatus] = useState<
+    string | null
+  >(null);
+  const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState<
+    string | null
+  >(null);
 
   const isGlobalView = !currentBranchId && isSuperAdmin;
 
@@ -114,16 +125,18 @@ export default function WorkOrdersPage() {
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: workOrdersPerPage.toString(),
-        ...(statusFilter !== 'all' && { status: statusFilter })
+        ...(statusFilter !== "all" && { status: statusFilter }),
       });
 
       const headers: HeadersInit = {
-        ...getBranchHeader(currentBranchId)
+        ...getBranchHeader(currentBranchId),
       };
 
-      const response = await fetch(`/api/admin/work-orders?${params}`, { headers });
+      const response = await fetch(`/api/admin/work-orders?${params}`, {
+        headers,
+      });
       if (!response.ok) {
-        throw new Error('Failed to fetch work orders');
+        throw new Error("Failed to fetch work orders");
       }
 
       const data = await response.json();
@@ -131,35 +144,93 @@ export default function WorkOrdersPage() {
       setTotalPages(data.pagination?.totalPages || 1);
       setTotalWorkOrders(data.pagination?.total || 0);
     } catch (error) {
-      console.error('Error fetching work orders:', error);
-      toast.error('Error al cargar trabajos');
+      console.error("Error fetching work orders:", error);
+      toast.error("Error al cargar trabajos");
     } finally {
       setLoading(false);
     }
   };
 
-  const formatPrice = (amount: number) => 
-    new Intl.NumberFormat('es-CL', { 
-      style: 'currency', 
-      currency: 'CLP',
-      minimumFractionDigits: 0
+  const formatPrice = (amount: number) =>
+    new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      minimumFractionDigits: 0,
     }).format(amount);
 
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: any; label: string; icon: any; color: string }> = {
-      quote: { variant: 'outline', label: 'Presupuesto', icon: FileText, color: 'text-gray-600' },
-      ordered: { variant: 'secondary', label: 'Ordenado', icon: Package, color: 'text-blue-600' },
-      sent_to_lab: { variant: 'default', label: 'Enviado al Lab', icon: Send, color: 'text-purple-600' },
-      received_from_lab: { variant: 'secondary', label: 'Recibido', icon: Truck, color: 'text-blue-600' },
-      mounted: { variant: 'default', label: 'Montado', icon: Package, color: 'text-indigo-600' },
-      quality_check: { variant: 'secondary', label: 'Control Calidad', icon: CheckCircle, color: 'text-yellow-600' },
-      ready_for_pickup: { variant: 'default', label: 'Listo para Retiro', icon: CheckCircle, color: 'text-green-600' },
-      delivered: { variant: 'default', label: 'Entregado', icon: CheckCircle, color: 'text-green-600' },
-      cancelled: { variant: 'destructive', label: 'Cancelado', icon: XCircle, color: 'text-red-600' },
-      returned: { variant: 'destructive', label: 'Devuelto', icon: AlertCircle, color: 'text-red-600' }
+    const config: Record<
+      string,
+      { variant: any; label: string; icon: any; color: string }
+    > = {
+      quote: {
+        variant: "outline",
+        label: "Presupuesto",
+        icon: FileText,
+        color: "text-gray-600",
+      },
+      ordered: {
+        variant: "secondary",
+        label: "Ordenado",
+        icon: Package,
+        color: "text-blue-600",
+      },
+      sent_to_lab: {
+        variant: "default",
+        label: "Enviado al Lab",
+        icon: Send,
+        color: "text-purple-600",
+      },
+      received_from_lab: {
+        variant: "secondary",
+        label: "Recibido",
+        icon: Truck,
+        color: "text-blue-600",
+      },
+      mounted: {
+        variant: "default",
+        label: "Montado",
+        icon: Package,
+        color: "text-indigo-600",
+      },
+      quality_check: {
+        variant: "secondary",
+        label: "Control Calidad",
+        icon: CheckCircle,
+        color: "text-yellow-600",
+      },
+      ready_for_pickup: {
+        variant: "default",
+        label: "Listo para Retiro",
+        icon: CheckCircle,
+        color: "text-green-600",
+      },
+      delivered: {
+        variant: "default",
+        label: "Entregado",
+        icon: CheckCircle,
+        color: "text-green-600",
+      },
+      cancelled: {
+        variant: "destructive",
+        label: "Cancelado",
+        icon: XCircle,
+        color: "text-red-600",
+      },
+      returned: {
+        variant: "destructive",
+        label: "Devuelto",
+        icon: AlertCircle,
+        color: "text-red-600",
+      },
     };
 
-    const statusConfig = config[status] || { variant: 'outline', label: status, icon: Package, color: 'text-gray-600' };
+    const statusConfig = config[status] || {
+      variant: "outline",
+      label: status,
+      icon: Package,
+      color: "text-gray-600",
+    };
     const Icon = statusConfig.icon;
 
     return (
@@ -172,23 +243,28 @@ export default function WorkOrdersPage() {
 
   const getPaymentStatusBadge = (status: string) => {
     const config: Record<string, { variant: any; label: string }> = {
-      pending: { variant: 'outline', label: 'Pendiente' },
-      partial: { variant: 'secondary', label: 'Parcial' },
-      paid: { variant: 'default', label: 'Pagado' },
-      refunded: { variant: 'destructive', label: 'Reembolsado' }
+      pending: { variant: "outline", label: "Pendiente" },
+      partial: { variant: "secondary", label: "Parcial" },
+      paid: { variant: "default", label: "Pagado" },
+      refunded: { variant: "destructive", label: "Reembolsado" },
     };
 
-    const statusConfig = config[status] || { variant: 'outline', label: status };
+    const statusConfig = config[status] || {
+      variant: "outline",
+      label: status,
+    };
     return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
   };
 
-  const filteredWorkOrders = workOrders.filter(workOrder => {
+  const filteredWorkOrders = workOrders.filter((workOrder) => {
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       return (
         workOrder.work_order_number.toLowerCase().includes(searchLower) ||
         workOrder.customer?.email?.toLowerCase().includes(searchLower) ||
-        `${workOrder.customer?.first_name || ''} ${workOrder.customer?.last_name || ''}`.toLowerCase().includes(searchLower) ||
+        `${workOrder.customer?.first_name || ""} ${workOrder.customer?.last_name || ""}`
+          .toLowerCase()
+          .includes(searchLower) ||
         workOrder.frame_name?.toLowerCase().includes(searchLower) ||
         workOrder.lab_name?.toLowerCase().includes(searchLower)
       );
@@ -211,61 +287,67 @@ export default function WorkOrdersPage() {
 
     setDeleting(true);
     try {
-      const response = await fetch(`/api/admin/work-orders/${workOrderToDelete}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
+      const response = await fetch(
+        `/api/admin/work-orders/${workOrderToDelete}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        },
+      );
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Error al eliminar trabajo');
+        throw new Error(error.error || "Error al eliminar trabajo");
       }
 
-      toast.success('Trabajo eliminado exitosamente');
+      toast.success("Trabajo eliminado exitosamente");
       setDeleteDialogOpen(false);
       setWorkOrderToDelete(null);
       fetchWorkOrders();
     } catch (error: any) {
-      console.error('Error deleting work order:', error);
-      toast.error(error.message || 'Error al eliminar trabajo');
+      console.error("Error deleting work order:", error);
+      toast.error(error.message || "Error al eliminar trabajo");
     } finally {
       setDeleting(false);
     }
   };
 
-  const handlePaymentStatusChange = async (workOrderId: string, newStatus: string) => {
+  const handlePaymentStatusChange = async (
+    workOrderId: string,
+    newStatus: string,
+  ) => {
     setUpdatingPaymentStatus(workOrderId);
     try {
       const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...getBranchHeader(currentBranchId)
+        "Content-Type": "application/json",
+        ...getBranchHeader(currentBranchId),
       };
-      
+
       const response = await fetch(`/api/admin/work-orders/${workOrderId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers,
         body: JSON.stringify({
-          payment_status: newStatus
-        })
+          payment_status: newStatus,
+        }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Error al actualizar estado de pago');
+        throw new Error(error.error || "Error al actualizar estado de pago");
       }
 
       // Update local state optimistically
-      setWorkOrders(prev => prev.map(wo => 
-        wo.id === workOrderId 
-          ? { ...wo, payment_status: newStatus }
-          : wo
-      ));
+      setWorkOrders((prev) =>
+        prev.map((wo) =>
+          wo.id === workOrderId ? { ...wo, payment_status: newStatus } : wo,
+        ),
+      );
 
-      toast.success('Estado de pago actualizado');
+      toast.success("Estado de pago actualizado");
       setEditingPaymentStatus(null);
     } catch (error: any) {
-      console.error('Error updating payment status:', error);
-      toast.error(error.message || 'Error al actualizar estado de pago');
+      console.error("Error updating payment status:", error);
+      toast.error(error.message || "Error al actualizar estado de pago");
       // Refresh to get correct state
       fetchWorkOrders();
     } finally {
@@ -280,18 +362,13 @@ export default function WorkOrdersPage() {
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">Trabajos</h1>
           <p className="text-tierra-media">
-            {isGlobalView 
-              ? 'Gestión de trabajos de laboratorio - Todas las sucursales'
-              : 'Gestión de trabajos de laboratorio'}
+            {isGlobalView
+              ? "Gestión de trabajos de laboratorio - Todas las sucursales"
+              : "Gestión de trabajos de laboratorio"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isSuperAdmin && (
-            <BranchSelector 
-              branches={branches} 
-              currentBranchId={currentBranchId}
-            />
-          )}
+          {isSuperAdmin && <BranchSelector />}
           <Button onClick={() => setShowCreateWorkOrder(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Trabajo
@@ -306,7 +383,9 @@ export default function WorkOrdersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-tierra-media">Total Trabajos</p>
-                <p className="text-2xl font-bold text-azul-profundo">{totalWorkOrders}</p>
+                <p className="text-2xl font-bold text-azul-profundo">
+                  {totalWorkOrders}
+                </p>
               </div>
               <Package className="h-8 w-8 text-azul-profundo" />
             </div>
@@ -318,7 +397,15 @@ export default function WorkOrdersPage() {
               <div>
                 <p className="text-sm text-tierra-media">En Laboratorio</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  {workOrders.filter(w => ['sent_to_lab', 'in_progress_lab', 'ready_at_lab'].includes(w.status)).length}
+                  {
+                    workOrders.filter((w) =>
+                      [
+                        "sent_to_lab",
+                        "in_progress_lab",
+                        "ready_at_lab",
+                      ].includes(w.status),
+                    ).length
+                  }
                 </p>
               </div>
               <Factory className="h-8 w-8 text-orange-600" />
@@ -331,7 +418,10 @@ export default function WorkOrdersPage() {
               <div>
                 <p className="text-sm text-tierra-media">Listos para Retiro</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {workOrders.filter(w => w.status === 'ready_for_pickup').length}
+                  {
+                    workOrders.filter((w) => w.status === "ready_for_pickup")
+                      .length
+                  }
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -344,7 +434,7 @@ export default function WorkOrdersPage() {
               <div>
                 <p className="text-sm text-tierra-media">Entregados</p>
                 <p className="text-2xl font-bold text-verde-suave">
-                  {workOrders.filter(w => w.status === 'delivered').length}
+                  {workOrders.filter((w) => w.status === "delivered").length}
                 </p>
               </div>
               <Truck className="h-8 w-8 text-verde-suave" />
@@ -382,7 +472,9 @@ export default function WorkOrdersPage() {
                 <SelectItem value="received_from_lab">Recibido</SelectItem>
                 <SelectItem value="mounted">Montado</SelectItem>
                 <SelectItem value="quality_check">Control Calidad</SelectItem>
-                <SelectItem value="ready_for_pickup">Listo para Retiro</SelectItem>
+                <SelectItem value="ready_for_pickup">
+                  Listo para Retiro
+                </SelectItem>
                 <SelectItem value="delivered">Entregado</SelectItem>
                 <SelectItem value="cancelled">Cancelado</SelectItem>
               </SelectContent>
@@ -405,9 +497,13 @@ export default function WorkOrdersPage() {
           ) : filteredWorkOrders.length === 0 ? (
             <div className="text-center py-12">
               <Package className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-azul-profundo mb-2">No hay trabajos</h3>
+              <h3 className="text-lg font-semibold text-azul-profundo mb-2">
+                No hay trabajos
+              </h3>
               <p className="text-tierra-media mb-4">
-                {searchTerm ? 'No se encontraron trabajos que coincidan con la búsqueda' : 'Comienza creando tu primer trabajo'}
+                {searchTerm
+                  ? "No se encontraron trabajos que coincidan con la búsqueda"
+                  : "Comienza creando tu primer trabajo"}
               </p>
               {!searchTerm && (
                 <Button onClick={() => setShowCreateWorkOrder(true)}>
@@ -435,30 +531,41 @@ export default function WorkOrdersPage() {
                 <TableBody>
                   {filteredWorkOrders.map((workOrder) => (
                     <TableRow key={workOrder.id}>
-                      <TableCell className="font-medium">{workOrder.work_order_number}</TableCell>
+                      <TableCell className="font-medium">
+                        {workOrder.work_order_number}
+                      </TableCell>
                       <TableCell>
                         <div>
                           <div className="font-medium">
-                            {workOrder.customer?.first_name || ''} {workOrder.customer?.last_name || ''}
+                            {workOrder.customer?.first_name || ""}{" "}
+                            {workOrder.customer?.last_name || ""}
                           </div>
-                          <div className="text-sm text-tierra-media">{workOrder.customer?.email}</div>
+                          <div className="text-sm text-tierra-media">
+                            {workOrder.customer?.email}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell>{workOrder.frame_name || '-'}</TableCell>
+                      <TableCell>{workOrder.frame_name || "-"}</TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{workOrder.lens_type || '-'}</div>
-                          <div className="text-sm text-tierra-media">{workOrder.lens_material || ''}</div>
+                          <div className="font-medium">
+                            {workOrder.lens_type || "-"}
+                          </div>
+                          <div className="text-sm text-tierra-media">
+                            {workOrder.lens_material || ""}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         {workOrder.lab_name ? (
                           <div className="flex items-center gap-1">
                             <Factory className="h-3 w-3" />
-                            <span className="text-sm">{workOrder.lab_name}</span>
+                            <span className="text-sm">
+                              {workOrder.lab_name}
+                            </span>
                           </div>
                         ) : (
-                          '-'
+                          "-"
                         )}
                       </TableCell>
                       <TableCell>{getStatusBadge(workOrder.status)}</TableCell>
@@ -483,10 +590,14 @@ export default function WorkOrdersPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="pending">Pendiente</SelectItem>
+                                <SelectItem value="pending">
+                                  Pendiente
+                                </SelectItem>
                                 <SelectItem value="partial">Parcial</SelectItem>
                                 <SelectItem value="paid">Pagado</SelectItem>
-                                <SelectItem value="refunded">Reembolsado</SelectItem>
+                                <SelectItem value="refunded">
+                                  Reembolsado
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                             {updatingPaymentStatus === workOrder.id && (
@@ -495,13 +606,17 @@ export default function WorkOrdersPage() {
                           </div>
                         ) : (
                           <div
-                            onClick={() => setEditingPaymentStatus(workOrder.id)}
+                            onClick={() =>
+                              setEditingPaymentStatus(workOrder.id)
+                            }
                             className="cursor-pointer hover:opacity-80 transition-opacity inline-block group"
                             title="Haz clic para editar el estado de pago"
                           >
                             <div className="flex items-center gap-1">
                               {getPaymentStatusBadge(workOrder.payment_status)}
-                              <span className="opacity-0 group-hover:opacity-50 text-xs text-tierra-media">✎</span>
+                              <span className="opacity-0 group-hover:opacity-50 text-xs text-tierra-media">
+                                ✎
+                              </span>
                             </div>
                           </div>
                         )}
@@ -517,11 +632,15 @@ export default function WorkOrdersPage() {
                               Ver
                             </Button>
                           </Link>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => handleDeleteClick(workOrder.id)}
-                            disabled={workOrder.status === 'delivered' || workOrder.payment_status === 'paid' || workOrder.payment_status === 'partial'}
+                            disabled={
+                              workOrder.status === "delivered" ||
+                              workOrder.payment_status === "paid" ||
+                              workOrder.payment_status === "partial"
+                            }
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -543,7 +662,7 @@ export default function WorkOrdersPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -551,7 +670,9 @@ export default function WorkOrdersPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
                       disabled={currentPage === totalPages}
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -573,7 +694,7 @@ export default function WorkOrdersPage() {
               Crea un nuevo trabajo de laboratorio
             </DialogDescription>
           </DialogHeader>
-          <CreateWorkOrderForm 
+          <CreateWorkOrderForm
             onSuccess={handleWorkOrderCreated}
             onCancel={() => setShowCreateWorkOrder(false)}
           />
@@ -586,12 +707,13 @@ export default function WorkOrdersPage() {
           <DialogHeader>
             <DialogTitle>¿Eliminar trabajo?</DialogTitle>
             <DialogDescription>
-              Esta acción no se puede deshacer. El trabajo será eliminado permanentemente.
+              Esta acción no se puede deshacer. El trabajo será eliminado
+              permanentemente.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setDeleteDialogOpen(false);
                 setWorkOrderToDelete(null);
@@ -600,8 +722,8 @@ export default function WorkOrdersPage() {
             >
               Cancelar
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={deleting}
             >
@@ -623,4 +745,3 @@ export default function WorkOrdersPage() {
     </div>
   );
 }
-

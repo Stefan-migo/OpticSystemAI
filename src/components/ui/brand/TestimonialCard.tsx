@@ -5,13 +5,13 @@ import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  Star, 
-  Quote, 
-  Heart, 
+import {
+  Star,
+  Quote,
+  Heart,
   Award,
   ChevronLeft,
-  ChevronRight 
+  ChevronRight,
 } from "lucide-react";
 
 interface TestimonialCardProps {
@@ -22,7 +22,7 @@ interface TestimonialCardProps {
   rating: number;
   testimonial: string;
   productOrService?: string;
-  category: 'producto' | 'servicio' | 'membresia';
+  category: "producto" | "servicio" | "membresia";
   date: string;
   isVerified?: boolean;
   images?: string[];
@@ -46,10 +46,10 @@ export default function TestimonialCard({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-AR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    return new Date(dateString).toLocaleDateString("es-AR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
@@ -59,8 +59,8 @@ export default function TestimonialCard({
         key={index}
         className={`h-4 w-4 ${
           index < Math.floor(rating)
-            ? 'fill-dorado text-dorado'
-            : 'text-gray-300'
+            ? "fill-dorado text-dorado"
+            : "text-gray-300"
         }`}
       />
     ));
@@ -68,21 +68,30 @@ export default function TestimonialCard({
 
   const getCategoryBadge = () => {
     switch (category) {
-      case 'producto':
+      case "producto":
         return (
-          <Badge variant="secondary" className="bg-verde-suave/20 text-verde-suave">
+          <Badge
+            variant="secondary"
+            className="bg-verde-suave/20 text-verde-suave"
+          >
             Producto
           </Badge>
         );
-      case 'servicio':
+      case "servicio":
         return (
-          <Badge variant="secondary" className="bg-turquesa-claro/20 text-turquesa-claro">
+          <Badge
+            variant="secondary"
+            className="bg-turquesa-claro/20 text-turquesa-claro"
+          >
             Servicio
           </Badge>
         );
-      case 'membresia':
+      case "membresia":
         return (
-          <Badge variant="secondary" className="bg-dorado/20 text-azul-profundo">
+          <Badge
+            variant="secondary"
+            className="bg-dorado/20 text-azul-profundo"
+          >
             Membresía
           </Badge>
         );
@@ -98,7 +107,9 @@ export default function TestimonialCard({
   };
 
   return (
-    <Card className={`relative overflow-hidden transition-all duration-300 hover:shadow-lg ${className}`}>
+    <Card
+      className={`relative overflow-hidden transition-all duration-300 hover:shadow-lg ${className}`}
+    >
       <CardContent className="p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
@@ -132,7 +143,10 @@ export default function TestimonialCard({
               <div className="flex items-center gap-2">
                 <h4 className="font-semibold text-azul-profundo">{name}</h4>
                 {isVerified && (
-                  <Badge variant="secondary" className="text-xs bg-verde-suave/20 text-verde-suave">
+                  <Badge
+                    variant="secondary"
+                    className="text-xs bg-verde-suave/20 text-verde-suave"
+                  >
                     Verificado
                   </Badge>
                 )}
@@ -149,9 +163,7 @@ export default function TestimonialCard({
 
         {/* Rating */}
         <div className="flex items-center gap-2 mb-4">
-          <div className="flex items-center">
-            {renderStars(rating)}
-          </div>
+          <div className="flex items-center">{renderStars(rating)}</div>
           <span className="text-sm font-medium text-azul-profundo">
             {rating}/5
           </span>
@@ -164,7 +176,7 @@ export default function TestimonialCard({
 
         {/* Testimonial Text */}
         <blockquote className="text-tierra-media mb-4 leading-relaxed">
-          "{testimonial}"
+          &quot;{testimonial}&quot;
         </blockquote>
 
         {/* Product/Service Reference */}
@@ -186,7 +198,7 @@ export default function TestimonialCard({
                 fill
                 className="object-cover"
               />
-              
+
               {images.length > 1 && (
                 <>
                   <Button
@@ -213,8 +225,8 @@ export default function TestimonialCard({
                         key={index}
                         className={`h-2 w-2 rounded-full transition-colors ${
                           index === currentImageIndex
-                            ? 'bg-white'
-                            : 'bg-white/50'
+                            ? "bg-white"
+                            : "bg-white/50"
                         }`}
                         onClick={() => setCurrentImageIndex(index)}
                       />
@@ -237,4 +249,4 @@ export default function TestimonialCard({
       </CardContent>
     </Card>
   );
-} 
+}

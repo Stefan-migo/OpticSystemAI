@@ -69,7 +69,7 @@ export default function BackupManager({
               No hay backups disponibles
             </p>
             <p className="text-xs text-tierra-media">
-              Crea un backup usando el botón "Backup Base de Datos"
+              Crea un backup usando el botón &quot;Backup Base de Datos&quot;
             </p>
           </div>
         ) : (

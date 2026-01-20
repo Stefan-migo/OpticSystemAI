@@ -8,8 +8,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
-    const { id } = await params;
     const supabase = await createClient();
     const {
       data: { user },
@@ -71,8 +71,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
-    const { id } = await params;
     const body = await request.json();
     const { branch_id, role = "manager", is_primary = false } = body;
 
@@ -191,7 +191,7 @@ export async function POST(
       logger.error("Error assigning branch access:", {
         error: upsertError,
         adminUserId: id,
-        branchId,
+        branchId: branch_id,
       });
       return NextResponse.json(
         { error: "Failed to assign branch access" },
@@ -214,8 +214,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
-    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const branch_id = searchParams.get("branch_id");
 
@@ -256,7 +256,7 @@ export async function DELETE(
       logger.error("Error removing branch access:", {
         error: deleteError,
         adminUserId: id,
-        branchId,
+        branchId: branch_id,
       });
       return NextResponse.json(
         { error: "Failed to remove branch access" },

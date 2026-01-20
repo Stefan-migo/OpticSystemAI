@@ -7,7 +7,7 @@ import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
 import { RateLimitError } from "@/lib/api/errors";
 
 export async function GET(request: NextRequest) {
-  return withRateLimit(rateLimitConfigs.search, async () => {
+  return (withRateLimit(rateLimitConfigs.search) as any)(request, async () => {
     try {
       const supabase = await createClient();
 
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
           .from("products")
           .select(
             "id, name, price, price_includes_tax, inventory_quantity, status, featured_image, sku, barcode, product_type, frame_brand, frame_model, frame_color, frame_size",
-          ),
+          ) as any,
       )
         .or(searchConditions)
         .eq("status", "active");

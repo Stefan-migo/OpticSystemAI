@@ -15,6 +15,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
     const supabase = await createClient();
     const supabaseServiceRole = createServiceRoleClient();
@@ -37,8 +38,6 @@ export async function GET(
         { status: 403 },
       );
     }
-
-    const { id } = await params;
 
     // Get closure
     const { data: closure, error } = await supabaseServiceRole
@@ -136,6 +135,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
     const supabase = await createClient();
     const supabaseServiceRole = createServiceRoleClient();
@@ -159,7 +159,6 @@ export async function PUT(
       );
     }
 
-    const { id } = await params;
     const body = await request.json();
 
     // Get existing closure
@@ -224,8 +223,8 @@ export async function PUT(
       body.card_machine_credit_total !== undefined
     ) {
       const expectedCash =
-        Number(existingClosure.opening_cash_amount) +
-        Number(existingClosure.cash_sales);
+        Number((existingClosure as any).opening_cash_amount || 0) +
+        Number((existingClosure as any).cash_sales || 0);
       if (updateData.actual_cash !== undefined) {
         updateData.cash_difference =
           Number(updateData.actual_cash) - expectedCash;
@@ -239,13 +238,17 @@ export async function PUT(
         const debitTotal =
           updateData.card_machine_debit_total !== undefined
             ? Number(updateData.card_machine_debit_total)
-            : Number(existingClosure.card_machine_debit_total) || 0;
+            : Number((existingClosure as any).card_machine_debit_total || 0);
         const creditTotal =
           updateData.card_machine_credit_total !== undefined
             ? Number(updateData.card_machine_credit_total)
-            : Number(existingClosure.card_machine_credit_total) || 0;
-        const expectedDebit = Number(existingClosure.debit_card_sales) || 0;
-        const expectedCredit = Number(existingClosure.credit_card_sales) || 0;
+            : Number((existingClosure as any).card_machine_credit_total || 0);
+        const expectedDebit = Number(
+          (existingClosure as any).debit_card_sales || 0,
+        );
+        const expectedCredit = Number(
+          (existingClosure as any).credit_card_sales || 0,
+        );
         updateData.card_machine_difference =
           debitTotal - expectedDebit + (creditTotal - expectedCredit);
       }

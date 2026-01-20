@@ -214,7 +214,7 @@ export async function PUT(
       body.weight !== null &&
       body.weight !== ""
     ) {
-      productData.weight = parseFloat(body.weight) || null;
+      productData.weight = parseFloat(body.weight) || undefined;
     }
     if (
       body.dimensions !== undefined &&

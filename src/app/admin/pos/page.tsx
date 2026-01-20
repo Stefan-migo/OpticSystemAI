@@ -1003,6 +1003,7 @@ export default function POSPage() {
               quantity: 1,
               unitPrice: product.price,
               subtotal: product.price,
+              priceIncludesTax: product.price_includes_tax ?? false,
             });
           }
         });
@@ -1028,6 +1029,7 @@ export default function POSPage() {
               quantity: 1,
               unitPrice: -discountAmount,
               subtotal: -discountAmount,
+              priceIncludesTax: false, // Discounts don't include tax
             };
           } else {
             // Add discount
@@ -1036,6 +1038,7 @@ export default function POSPage() {
               quantity: 1,
               unitPrice: -discountAmount,
               subtotal: -discountAmount,
+              priceIncludesTax: false, // Discounts don't include tax
             });
           }
         }
@@ -1147,7 +1150,6 @@ export default function POSPage() {
 
       toast.success(`Presupuesto ${quote.quote_number} cargado al carrito`);
       setShowQuoteDialog(false);
-      setShowCompleteOrderForm(false); // Hide form when quote is loaded
     } catch (error: any) {
       console.error("Error loading quote:", error);
       toast.error(error.message || "Error al cargar el presupuesto");
@@ -1263,12 +1265,7 @@ export default function POSPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {isSuperAdmin && (
-            <BranchSelector
-              branches={branches}
-              currentBranchId={currentBranchId}
-            />
-          )}
+          {isSuperAdmin && <BranchSelector />}
           <Link href="/admin/cash-register">
             <Button variant="outline">
               <DollarSign className="h-4 w-4 mr-2" />

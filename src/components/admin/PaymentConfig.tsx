@@ -1,32 +1,38 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { 
+import { useState, useEffect, useRef } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { 
-  CreditCard, 
-  Eye, 
-  EyeOff, 
-  Copy, 
-  CheckCircle, 
+} from "@/components/ui/select";
+import {
+  CreditCard,
+  Eye,
+  EyeOff,
+  Copy,
+  CheckCircle,
   AlertTriangle,
   TestTube,
   Globe,
   Shield,
-  Settings
-} from 'lucide-react';
-import { toast } from 'sonner';
+  Settings,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface PaymentConfig {
   mercadopago_access_token?: string;
@@ -44,34 +50,40 @@ interface PaymentConfigProps {
   onUpdate: (configKey: string, value: any) => Promise<void>;
 }
 
-export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps) {
+export default function PaymentConfig({
+  configs,
+  onUpdate,
+}: PaymentConfigProps) {
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [showTokens, setShowTokens] = useState<Record<string, boolean>>({});
-  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState("");
   const [connectionStatus, setConnectionStatus] = useState<{
-    status: 'idle' | 'success' | 'error';
+    status: "idle" | "success" | "error";
     message?: string;
-  }>({ status: 'idle' });
-  
+  }>({ status: "idle" });
+
   // Local state for credential inputs (to avoid updating on every keystroke)
-  const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
+  const [credentialValues, setCredentialValues] = useState<
+    Record<string, string>
+  >({});
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
   // Build config map from props
   const configMap: PaymentConfig = {};
-  configs.forEach(config => {
-    const key = config.config_key.replace('mercadopago_', '');
+  configs.forEach((config) => {
+    const key = config.config_key.replace("mercadopago_", "");
     configMap[key as keyof PaymentConfig] = config.config_value;
   });
 
   useEffect(() => {
     // Set webhook URL based on environment
     // Priority: 1. NEXT_PUBLIC_SITE_URL, 2. NEXT_PUBLIC_APP_URL, 3. Current origin, 4. Fallback
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
       process.env.NEXT_PUBLIC_APP_URL ||
-      (typeof window !== 'undefined' ? window.location.origin : '') ||
-      'https://daluzconsciente.com';
+      (typeof window !== "undefined" ? window.location.origin : "") ||
+      "https://daluzconsciente.com";
     setWebhookUrl(`${baseUrl}/api/webhooks/mercadopago`);
   }, []);
 
@@ -79,76 +91,84 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
   useEffect(() => {
     const initialValues: Record<string, string> = {};
     // Production credentials
-    ['access_token', 'public_key', 'webhook_secret'].forEach(key => {
-      const config = configs.find(c => c.config_key === `mercadopago_${key}`);
+    ["access_token", "public_key", "webhook_secret"].forEach((key) => {
+      const config = configs.find((c) => c.config_key === `mercadopago_${key}`);
       const value = config?.config_value;
       if (value) {
         initialValues[key] = value;
       }
     });
     // Test credentials
-    ['test_access_token', 'test_public_key', 'test_webhook_secret'].forEach(key => {
-      const config = configs.find(c => c.config_key === `mercadopago_${key}`);
-      const value = config?.config_value;
-      if (value) {
-        initialValues[key] = value;
-      }
-    });
-    setCredentialValues(prev => ({ ...prev, ...initialValues }));
+    ["test_access_token", "test_public_key", "test_webhook_secret"].forEach(
+      (key) => {
+        const config = configs.find(
+          (c) => c.config_key === `mercadopago_${key}`,
+        );
+        const value = config?.config_value;
+        if (value) {
+          initialValues[key] = value;
+        }
+      },
+    );
+    setCredentialValues((prev) => ({ ...prev, ...initialValues }));
   }, [configs]);
 
   const handleToggleVisibility = (key: string) => {
-    setShowTokens(prev => ({ ...prev, [key]: !prev[key] }));
+    setShowTokens((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleCopyWebhookUrl = () => {
     navigator.clipboard.writeText(webhookUrl);
-    toast.success('URL del webhook copiada al portapapeles');
+    toast.success("URL del webhook copiada al portapapeles");
   };
 
   const handleTestConnection = async () => {
     try {
       setTesting(true);
-      setConnectionStatus({ status: 'idle' });
+      setConnectionStatus({ status: "idle" });
 
-      const response = await fetch('/api/admin/system/payments/test', {
-        method: 'POST',
+      const response = await fetch("/api/admin/system/payments/test", {
+        method: "POST",
       });
 
       const data = await response.json();
 
       if (data.success) {
         setConnectionStatus({
-          status: 'success',
-          message: data.message || 'Conexión exitosa'
+          status: "success",
+          message: data.message || "Conexión exitosa",
         });
-        toast.success('Conexión con MercadoPago exitosa');
+        toast.success("Conexión con MercadoPago exitosa");
       } else {
         setConnectionStatus({
-          status: 'error',
-          message: data.message || data.error || 'Error al conectar'
+          status: "error",
+          message: data.message || data.error || "Error al conectar",
         });
-        toast.error(data.message || data.error || 'Error al conectar con MercadoPago');
+        toast.error(
+          data.message || data.error || "Error al conectar con MercadoPago",
+        );
       }
     } catch (error) {
-      console.error('Error testing connection:', error);
+      console.error("Error testing connection:", error);
       setConnectionStatus({
-        status: 'error',
-        message: 'Error al probar la conexión'
+        status: "error",
+        message: "Error al probar la conexión",
       });
-      toast.error('Error al probar la conexión');
+      toast.error("Error al probar la conexión");
     } finally {
       setTesting(false);
     }
   };
 
   const maskValue = (value: string | undefined): string => {
-    if (!value || value.length < 8) return '••••••••';
-    return value.substring(0, 4) + '••••••••' + value.substring(value.length - 4);
+    if (!value || value.length < 8) return "••••••••";
+    return (
+      value.substring(0, 4) + "••••••••" + value.substring(value.length - 4)
+    );
   };
 
   const getConfigValue = (key: string): any => {
-    const config = configs.find(c => c.config_key === `mercadopago_${key}`);
+    const config = configs.find((c) => c.config_key === `mercadopago_${key}`);
     return config?.config_value;
   };
 
@@ -157,7 +177,7 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
       setLoading(true);
       await onUpdate(`mercadopago_${key}`, value);
     } catch (error) {
-      console.error('Error updating config:', error);
+      console.error("Error updating config:", error);
     } finally {
       setLoading(false);
     }
@@ -166,7 +186,7 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
   // Debounced update for credential inputs
   const handleCredentialChange = (key: string, value: string) => {
     // Update local state immediately for responsive UI
-    setCredentialValues(prev => ({ ...prev, [key]: value }));
+    setCredentialValues((prev) => ({ ...prev, [key]: value }));
 
     // Clear existing timer for this key
     if (debounceTimers.current[key]) {
@@ -187,7 +207,7 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
       clearTimeout(debounceTimers.current[key]);
       delete debounceTimers.current[key];
     }
-    
+
     // Immediately save the current value
     const currentValue = credentialValues[key];
     if (currentValue !== undefined) {
@@ -198,7 +218,7 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      Object.values(debounceTimers.current).forEach(timer => {
+      Object.values(debounceTimers.current).forEach((timer) => {
         clearTimeout(timer);
       });
     };
@@ -207,13 +227,17 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-azul-profundo">Configuración de Pagos</h2>
-        <p className="text-tierra-media">Gestiona la configuración de pagos con MercadoPago</p>
+        <h2 className="text-2xl font-bold text-azul-profundo">
+          Configuración de Pagos
+        </h2>
+        <p className="text-tierra-media">
+          Gestiona la configuración de pagos con MercadoPago
+        </p>
       </div>
       {/* Credentials Section */}
-      <Card 
+      <Card
         className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
-        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+        style={{ backgroundColor: "var(--admin-border-primary)" }}
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -221,11 +245,14 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
             Credenciales de MercadoPago
           </CardTitle>
           <CardDescription>
-            Configura las credenciales de acceso a MercadoPago. Estas son sensibles y se almacenan de forma segura.
+            Configura las credenciales de acceso a MercadoPago. Estas son
+            sensibles y se almacenan de forma segura.
             <br />
             <span className="text-xs text-muted-foreground mt-2 block">
-              <strong>Nota:</strong> Las credenciales de producción se usan cuando "Modo de Prueba" está desactivado.
-              Las credenciales de prueba se usan cuando "Modo de Prueba" está activado. Puedes configurar ambas por separado.
+              <strong>Nota:</strong> Las credenciales de producción se usan
+              cuando &quot;Modo de Prueba&quot; está desactivado. Las
+              credenciales de prueba se usan cuando &quot;Modo de Prueba&quot;
+              está activado. Puedes configurar ambas por separado.
             </span>
           </CardDescription>
         </CardHeader>
@@ -233,45 +260,54 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
           {/* Production Credentials Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b">
-              <Badge variant="default" className="font-semibold">Producción</Badge>
+              <Badge variant="default" className="font-semibold">
+                Producción
+              </Badge>
               <p className="text-xs text-muted-foreground">
-                Usadas cuando "Modo de Prueba" está desactivado
+                Usadas cuando &quot;Modo de Prueba&quot; está desactivado
               </p>
             </div>
-            
+
             {/* Access Token */}
             <div className="space-y-2">
               <Label htmlFor="access_token">Access Token (Producción)</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  id="access_token"
-                  type={showTokens.access_token ? 'text' : 'password'}
-                  value={showTokens.access_token 
-                    ? (credentialValues.access_token ?? getConfigValue('access_token') ?? '') 
-                    : (credentialValues.access_token ? maskValue(credentialValues.access_token) : maskValue(getConfigValue('access_token')))
-                  }
-                  onChange={(e) => handleCredentialChange('access_token', e.target.value)}
-                  onBlur={() => handleCredentialBlur('access_token')}
-                  placeholder="PROD_ACCESS_TOKEN_HERE"
-                  disabled={loading}
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => handleToggleVisibility('access_token')}
-                >
-                  {showTokens.access_token ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    id="access_token"
+                    type={showTokens.access_token ? "text" : "password"}
+                    value={
+                      showTokens.access_token
+                        ? (credentialValues.access_token ??
+                          getConfigValue("access_token") ??
+                          "")
+                        : credentialValues.access_token
+                          ? maskValue(credentialValues.access_token)
+                          : maskValue(getConfigValue("access_token"))
+                    }
+                    onChange={(e) =>
+                      handleCredentialChange("access_token", e.target.value)
+                    }
+                    onBlur={() => handleCredentialBlur("access_token")}
+                    placeholder="PROD_ACCESS_TOKEN_HERE"
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => handleToggleVisibility("access_token")}
+                  >
+                    {showTokens.access_token ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
               <p className="text-xs text-muted-foreground">
                 Token de acceso de producción de MercadoPago
               </p>
@@ -280,76 +316,94 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
             {/* Public Key */}
             <div className="space-y-2">
               <Label htmlFor="public_key">Public Key (Producción)</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  id="public_key"
-                  type={showTokens.public_key ? 'text' : 'password'}
-                  value={showTokens.public_key 
-                    ? (credentialValues.public_key ?? getConfigValue('public_key') ?? '') 
-                    : (credentialValues.public_key ? maskValue(credentialValues.public_key) : maskValue(getConfigValue('public_key')))
-                  }
-                  onChange={(e) => handleCredentialChange('public_key', e.target.value)}
-                  onBlur={() => handleCredentialBlur('public_key')}
-                  placeholder="PUBLIC_KEY_HERE"
-                  disabled={loading}
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => handleToggleVisibility('public_key')}
-                >
-                  {showTokens.public_key ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    id="public_key"
+                    type={showTokens.public_key ? "text" : "password"}
+                    value={
+                      showTokens.public_key
+                        ? (credentialValues.public_key ??
+                          getConfigValue("public_key") ??
+                          "")
+                        : credentialValues.public_key
+                          ? maskValue(credentialValues.public_key)
+                          : maskValue(getConfigValue("public_key"))
+                    }
+                    onChange={(e) =>
+                      handleCredentialChange("public_key", e.target.value)
+                    }
+                    onBlur={() => handleCredentialBlur("public_key")}
+                    placeholder="PUBLIC_KEY_HERE"
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => handleToggleVisibility("public_key")}
+                  >
+                    {showTokens.public_key ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
               <p className="text-xs text-muted-foreground">
-                Clave pública de producción de MercadoPago (usada en el frontend)
+                Clave pública de producción de MercadoPago (usada en el
+                frontend)
               </p>
             </div>
 
             {/* Webhook Secret */}
             <div className="space-y-2">
-              <Label htmlFor="webhook_secret">Webhook Secret (Producción)</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  id="webhook_secret"
-                  type={showTokens.webhook_secret ? 'text' : 'password'}
-                  value={showTokens.webhook_secret 
-                    ? (credentialValues.webhook_secret ?? getConfigValue('webhook_secret') ?? '') 
-                    : (credentialValues.webhook_secret ? maskValue(credentialValues.webhook_secret) : maskValue(getConfigValue('webhook_secret')))
-                  }
-                  onChange={(e) => handleCredentialChange('webhook_secret', e.target.value)}
-                  onBlur={() => handleCredentialBlur('webhook_secret')}
-                  placeholder="WEBHOOK_SECRET_HERE"
-                  disabled={loading}
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => handleToggleVisibility('webhook_secret')}
-                >
-                  {showTokens.webhook_secret ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
+              <Label htmlFor="webhook_secret">
+                Webhook Secret (Producción)
+              </Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    id="webhook_secret"
+                    type={showTokens.webhook_secret ? "text" : "password"}
+                    value={
+                      showTokens.webhook_secret
+                        ? (credentialValues.webhook_secret ??
+                          getConfigValue("webhook_secret") ??
+                          "")
+                        : credentialValues.webhook_secret
+                          ? maskValue(credentialValues.webhook_secret)
+                          : maskValue(getConfigValue("webhook_secret"))
+                    }
+                    onChange={(e) =>
+                      handleCredentialChange("webhook_secret", e.target.value)
+                    }
+                    onBlur={() => handleCredentialBlur("webhook_secret")}
+                    placeholder="WEBHOOK_SECRET_HERE"
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => handleToggleVisibility("webhook_secret")}
+                  >
+                    {showTokens.webhook_secret ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
               <p className="text-xs text-muted-foreground">
-                Secreto para verificar la autenticidad de los webhooks de producción
+                Secreto para verificar la autenticidad de los webhooks de
+                producción
               </p>
             </div>
           </div>
@@ -357,12 +411,14 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
           {/* Test Credentials Section */}
           <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-dashed">
             <div className="flex items-center gap-2 pb-2 border-b">
-              <Badge variant="default" className="font-semibold">Prueba (Sandbox)</Badge>
+              <Badge variant="default" className="font-semibold">
+                Prueba (Sandbox)
+              </Badge>
               <p className="text-xs text-muted-foreground">
-                Usadas cuando "Modo de Prueba" está activado
+                Usadas cuando &quot;Modo de Prueba&quot; está activado
               </p>
             </div>
-            
+
             {/* Test Access Token */}
             <div className="space-y-2">
               <Label htmlFor="test_access_token">Access Token (Prueba)</Label>
@@ -370,13 +426,23 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
                 <div className="relative flex-1">
                   <Input
                     id="test_access_token"
-                    type={showTokens.test_access_token ? 'text' : 'password'}
-                    value={showTokens.test_access_token 
-                      ? (credentialValues.test_access_token ?? getConfigValue('test_access_token') ?? '') 
-                      : (credentialValues.test_access_token ? maskValue(credentialValues.test_access_token) : maskValue(getConfigValue('test_access_token')))
+                    type={showTokens.test_access_token ? "text" : "password"}
+                    value={
+                      showTokens.test_access_token
+                        ? (credentialValues.test_access_token ??
+                          getConfigValue("test_access_token") ??
+                          "")
+                        : credentialValues.test_access_token
+                          ? maskValue(credentialValues.test_access_token)
+                          : maskValue(getConfigValue("test_access_token"))
                     }
-                    onChange={(e) => handleCredentialChange('test_access_token', e.target.value)}
-                    onBlur={() => handleCredentialBlur('test_access_token')}
+                    onChange={(e) =>
+                      handleCredentialChange(
+                        "test_access_token",
+                        e.target.value,
+                      )
+                    }
+                    onBlur={() => handleCredentialBlur("test_access_token")}
                     placeholder="TEST_ACCESS_TOKEN_HERE"
                     disabled={loading}
                     className="pr-10"
@@ -386,7 +452,7 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => handleToggleVisibility('test_access_token')}
+                    onClick={() => handleToggleVisibility("test_access_token")}
                   >
                     {showTokens.test_access_token ? (
                       <EyeOff className="h-4 w-4" />
@@ -408,13 +474,20 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
                 <div className="relative flex-1">
                   <Input
                     id="test_public_key"
-                    type={showTokens.test_public_key ? 'text' : 'password'}
-                    value={showTokens.test_public_key 
-                      ? (credentialValues.test_public_key ?? getConfigValue('test_public_key') ?? '') 
-                      : (credentialValues.test_public_key ? maskValue(credentialValues.test_public_key) : maskValue(getConfigValue('test_public_key')))
+                    type={showTokens.test_public_key ? "text" : "password"}
+                    value={
+                      showTokens.test_public_key
+                        ? (credentialValues.test_public_key ??
+                          getConfigValue("test_public_key") ??
+                          "")
+                        : credentialValues.test_public_key
+                          ? maskValue(credentialValues.test_public_key)
+                          : maskValue(getConfigValue("test_public_key"))
                     }
-                    onChange={(e) => handleCredentialChange('test_public_key', e.target.value)}
-                    onBlur={() => handleCredentialBlur('test_public_key')}
+                    onChange={(e) =>
+                      handleCredentialChange("test_public_key", e.target.value)
+                    }
+                    onBlur={() => handleCredentialBlur("test_public_key")}
                     placeholder="TEST_PUBLIC_KEY_HERE"
                     disabled={loading}
                     className="pr-10"
@@ -424,7 +497,7 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => handleToggleVisibility('test_public_key')}
+                    onClick={() => handleToggleVisibility("test_public_key")}
                   >
                     {showTokens.test_public_key ? (
                       <EyeOff className="h-4 w-4" />
@@ -441,18 +514,30 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
 
             {/* Test Webhook Secret */}
             <div className="space-y-2">
-              <Label htmlFor="test_webhook_secret">Webhook Secret (Prueba)</Label>
+              <Label htmlFor="test_webhook_secret">
+                Webhook Secret (Prueba)
+              </Label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Input
                     id="test_webhook_secret"
-                    type={showTokens.test_webhook_secret ? 'text' : 'password'}
-                    value={showTokens.test_webhook_secret 
-                      ? (credentialValues.test_webhook_secret ?? getConfigValue('test_webhook_secret') ?? '') 
-                      : (credentialValues.test_webhook_secret ? maskValue(credentialValues.test_webhook_secret) : maskValue(getConfigValue('test_webhook_secret')))
+                    type={showTokens.test_webhook_secret ? "text" : "password"}
+                    value={
+                      showTokens.test_webhook_secret
+                        ? (credentialValues.test_webhook_secret ??
+                          getConfigValue("test_webhook_secret") ??
+                          "")
+                        : credentialValues.test_webhook_secret
+                          ? maskValue(credentialValues.test_webhook_secret)
+                          : maskValue(getConfigValue("test_webhook_secret"))
                     }
-                    onChange={(e) => handleCredentialChange('test_webhook_secret', e.target.value)}
-                    onBlur={() => handleCredentialBlur('test_webhook_secret')}
+                    onChange={(e) =>
+                      handleCredentialChange(
+                        "test_webhook_secret",
+                        e.target.value,
+                      )
+                    }
+                    onBlur={() => handleCredentialBlur("test_webhook_secret")}
                     placeholder="TEST_WEBHOOK_SECRET_HERE"
                     disabled={loading}
                     className="pr-10"
@@ -462,7 +547,9 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => handleToggleVisibility('test_webhook_secret')}
+                    onClick={() =>
+                      handleToggleVisibility("test_webhook_secret")
+                    }
                   >
                     {showTokens.test_webhook_secret ? (
                       <EyeOff className="h-4 w-4" />
@@ -483,16 +570,24 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
             <div className="space-y-0.5">
               <Label htmlFor="test_mode">Modo de Prueba (Sandbox)</Label>
               <p className="text-xs text-muted-foreground">
-                <strong>¿Cómo funciona?</strong> Cuando está activado, el sistema automáticamente usará las credenciales de prueba configuradas arriba.
-                Cuando está desactivado, usará las credenciales de producción. Esto permite cambiar entre entornos sin modificar las credenciales manualmente.
+                <strong>¿Cómo funciona?</strong> Cuando está activado, el
+                sistema automáticamente usará las credenciales de prueba
+                configuradas arriba. Cuando está desactivado, usará las
+                credenciales de producción. Esto permite cambiar entre entornos
+                sin modificar las credenciales manualmente.
                 <br />
-                <span className="text-amber-600 font-semibold mt-1 block">Estado actual: {getConfigValue('test_mode') ? 'Sandbox (Pruebas) - Usando credenciales de prueba' : 'Producción - Usando credenciales de producción'}</span>
+                <span className="text-amber-600 font-semibold mt-1 block">
+                  Estado actual:{" "}
+                  {getConfigValue("test_mode")
+                    ? "Sandbox (Pruebas) - Usando credenciales de prueba"
+                    : "Producción - Usando credenciales de producción"}
+                </span>
               </p>
             </div>
             <Switch
               id="test_mode"
-              checked={getConfigValue('test_mode') || false}
-              onCheckedChange={(checked) => handleUpdate('test_mode', checked)}
+              checked={getConfigValue("test_mode") || false}
+              onCheckedChange={(checked) => handleUpdate("test_mode", checked)}
               disabled={loading}
             />
           </div>
@@ -504,16 +599,18 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
               disabled={testing || loading}
               variant="outline"
             >
-              <TestTube className={`h-4 w-4 mr-2 ${testing ? 'animate-spin' : ''}`} />
-              {testing ? 'Probando...' : 'Probar Conexión'}
+              <TestTube
+                className={`h-4 w-4 mr-2 ${testing ? "animate-spin" : ""}`}
+              />
+              {testing ? "Probando..." : "Probar Conexión"}
             </Button>
-            {connectionStatus.status === 'success' && (
+            {connectionStatus.status === "success" && (
               <div className="flex items-center gap-2 text-green-600">
                 <CheckCircle className="h-4 w-4" />
                 <span className="text-sm">{connectionStatus.message}</span>
               </div>
             )}
-            {connectionStatus.status === 'error' && (
+            {connectionStatus.status === "error" && (
               <div className="flex items-center gap-2 text-red-600">
                 <AlertTriangle className="h-4 w-4" />
                 <span className="text-sm">{connectionStatus.message}</span>
@@ -524,9 +621,9 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
       </Card>
 
       {/* Payment Methods Section */}
-      <Card 
+      <Card
         className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
-        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+        style={{ backgroundColor: "var(--admin-border-primary)" }}
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -534,10 +631,13 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
             Métodos de Pago
           </CardTitle>
           <CardDescription>
-            Selecciona los métodos de pago que estarán disponibles para tus clientes.
+            Selecciona los métodos de pago que estarán disponibles para tus
+            clientes.
             <br />
             <span className="text-xs text-muted-foreground mt-1 block">
-              Nota: "Dinero en cuenta de Mercado Pago" siempre está disponible y no puede deshabilitarse según las políticas de MercadoPago.
+              Nota: &quot;Dinero en cuenta de Mercado Pago&quot; siempre está
+              disponible y no puede deshabilitarse según las políticas de
+              MercadoPago.
             </span>
           </CardDescription>
         </CardHeader>
@@ -548,7 +648,9 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
               <Label htmlFor="method_account_money" className="font-semibold">
                 Dinero en cuenta de Mercado Pago
               </Label>
-              <Badge variant="default" className="text-xs">Siempre disponible</Badge>
+              <Badge variant="default" className="text-xs">
+                Siempre disponible
+              </Badge>
             </div>
             <Switch
               id="method_account_money"
@@ -557,44 +659,52 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
               className="opacity-50"
             />
           </div>
-          
+
           {/* Other Payment Methods */}
-          {['credit_card', 'debit_card', 'cash', 'bank_transfer'].map((method) => {
-            const methodNames: Record<string, string> = {
-              credit_card: 'Tarjeta de Crédito',
-              debit_card: 'Tarjeta de Débito',
-              cash: 'Efectivo',
-              bank_transfer: 'Transferencia Bancaria'
-            };
+          {["credit_card", "debit_card", "cash", "bank_transfer"].map(
+            (method) => {
+              const methodNames: Record<string, string> = {
+                credit_card: "Tarjeta de Crédito",
+                debit_card: "Tarjeta de Débito",
+                cash: "Efectivo",
+                bank_transfer: "Transferencia Bancaria",
+              };
 
-            const currentMethods = getConfigValue('payment_methods') || [];
-            const isEnabled = Array.isArray(currentMethods) && currentMethods.includes(method);
+              const currentMethods = getConfigValue("payment_methods") || [];
+              const isEnabled =
+                Array.isArray(currentMethods) &&
+                currentMethods.includes(method);
 
-            return (
-              <div key={method} className="flex items-center justify-between">
-                <Label htmlFor={`method_${method}`}>{methodNames[method]}</Label>
-                <Switch
-                  id={`method_${method}`}
-                  checked={isEnabled}
-                  onCheckedChange={(checked) => {
-                    const current = getConfigValue('payment_methods') || [];
-                    const updated = checked
-                      ? [...(Array.isArray(current) ? current : []), method]
-                      : (Array.isArray(current) ? current.filter((m: string) => m !== method) : []);
-                    handleUpdate('payment_methods', updated);
-                  }}
-                  disabled={loading}
-                />
-              </div>
-            );
-          })}
+              return (
+                <div key={method} className="flex items-center justify-between">
+                  <Label htmlFor={`method_${method}`}>
+                    {methodNames[method]}
+                  </Label>
+                  <Switch
+                    id={`method_${method}`}
+                    checked={isEnabled}
+                    onCheckedChange={(checked) => {
+                      const current = getConfigValue("payment_methods") || [];
+                      const updated = checked
+                        ? [...(Array.isArray(current) ? current : []), method]
+                        : Array.isArray(current)
+                          ? current.filter((m: string) => m !== method)
+                          : [];
+                      handleUpdate("payment_methods", updated);
+                    }}
+                    disabled={loading}
+                  />
+                </div>
+              );
+            },
+          )}
         </CardContent>
       </Card>
 
       {/* Checkout Settings */}
-      <Card 
+      <Card
         className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
-        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+        style={{ backgroundColor: "var(--admin-border-primary)" }}
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -610,17 +720,19 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
           <div className="space-y-2">
             <Label htmlFor="max_installments">Máximo de Cuotas</Label>
             <Select
-              value={String(getConfigValue('max_installments') || 12)}
-              onValueChange={(value) => handleUpdate('max_installments', parseInt(value))}
+              value={String(getConfigValue("max_installments") || 12)}
+              onValueChange={(value) =>
+                handleUpdate("max_installments", parseInt(value))
+              }
               disabled={loading}
             >
               <SelectTrigger id="max_installments">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[1, 3, 6, 9, 12].map(num => (
+                {[1, 3, 6, 9, 12].map((num) => (
                   <SelectItem key={num} value={String(num)}>
-                    {num} {num === 1 ? 'cuota' : 'cuotas'}
+                    {num} {num === 1 ? "cuota" : "cuotas"}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -640,8 +752,10 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
             </div>
             <Switch
               id="auto_return"
-              checked={getConfigValue('auto_return') ?? true}
-              onCheckedChange={(checked) => handleUpdate('auto_return', checked)}
+              checked={getConfigValue("auto_return") ?? true}
+              onCheckedChange={(checked) =>
+                handleUpdate("auto_return", checked)
+              }
               disabled={loading}
             />
           </div>
@@ -651,13 +765,16 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
             <div className="space-y-0.5">
               <Label htmlFor="binary_mode">Modo Binario</Label>
               <p className="text-xs text-muted-foreground">
-                Los pagos solo pueden estar aprobados o rechazados (sin estados intermedios)
+                Los pagos solo pueden estar aprobados o rechazados (sin estados
+                intermedios)
               </p>
             </div>
             <Switch
               id="binary_mode"
-              checked={getConfigValue('binary_mode') || false}
-              onCheckedChange={(checked) => handleUpdate('binary_mode', checked)}
+              checked={getConfigValue("binary_mode") || false}
+              onCheckedChange={(checked) =>
+                handleUpdate("binary_mode", checked)
+              }
               disabled={loading}
             />
           </div>
@@ -665,9 +782,9 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
       </Card>
 
       {/* Webhook Configuration */}
-      <Card 
+      <Card
         className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
-        style={{ backgroundColor: 'var(--admin-border-primary)' }}
+        style={{ backgroundColor: "var(--admin-border-primary)" }}
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -697,10 +814,12 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Copia esta URL y configúrala en tu dashboard de MercadoPago en la sección de Webhooks.
+              Copia esta URL y configúrala en tu dashboard de MercadoPago en la
+              sección de Webhooks.
               <br />
-              <strong>Nota:</strong> Esta URL se actualiza automáticamente según el dominio de tu aplicación.
-              Si cambias de dominio, simplemente copia la nueva URL y actualízala en MercadoPago.
+              <strong>Nota:</strong> Esta URL se actualiza automáticamente según
+              el dominio de tu aplicación. Si cambias de dominio, simplemente
+              copia la nueva URL y actualízala en MercadoPago.
             </p>
           </div>
         </CardContent>
@@ -708,4 +827,3 @@ export default function PaymentConfig({ configs, onUpdate }: PaymentConfigProps)
     </div>
   );
 }
-

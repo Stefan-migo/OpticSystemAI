@@ -16,7 +16,8 @@ import { logger } from "@/lib/logger";
 function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   // Log error to logger
   React.useEffect(() => {
-    logger.error("Error Boundary caught an error", error, {
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    logger.error("Error Boundary caught an error", errorObj as any, {
       errorBoundary: true,
       timestamp: new Date().toISOString(),
     });
@@ -41,9 +42,9 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
                 Detalles del error (solo en desarrollo)
               </summary>
               <pre className="mt-2 overflow-auto text-xs text-muted-foreground">
-                {error.message}
+                {error instanceof Error ? error.message : String(error)}
                 {"\n\n"}
-                {error.stack}
+                {error instanceof Error ? error.stack : ""}
               </pre>
             </details>
           )}
@@ -91,7 +92,9 @@ export function ErrorBoundary({ children }: { children: React.ReactNode }) {
       FallbackComponent={ErrorFallback}
       onError={(error, errorInfo) => {
         // Additional error logging
-        logger.error("Error Boundary onError", error, {
+        const errorObj =
+          error instanceof Error ? error : new Error(String(error));
+        logger.error("Error Boundary onError", errorObj as any, {
           componentStack: errorInfo.componentStack,
           errorBoundary: true,
         });

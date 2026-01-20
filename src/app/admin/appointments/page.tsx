@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { 
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { 
+} from "@/components/ui/select";
+import {
   Calendar,
   Plus,
   Settings,
@@ -28,23 +28,23 @@ import {
   CheckCircle,
   XCircle,
   RefreshCw,
-  Trash2
-} from 'lucide-react';
-import { toast } from 'sonner';
-import Link from 'next/link';
-import AppointmentCalendar from '@/components/admin/AppointmentCalendar';
-import CreateAppointmentForm from '@/components/admin/CreateAppointmentForm';
-import { useBranch } from '@/hooks/useBranch';
-import { Building2 } from 'lucide-react';
-import { 
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
+import AppointmentCalendar from "@/components/admin/AppointmentCalendar";
+import CreateAppointmentForm from "@/components/admin/CreateAppointmentForm";
+import { useBranch } from "@/hooks/useBranch";
+import { Building2 } from "lucide-react";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { useAuthContext } from '@/contexts/AuthContext';
-import { getBranchHeader } from '@/lib/utils/branch';
+} from "@/components/ui/dialog";
+import { useAuthContext } from "@/contexts/AuthContext";
+import { getBranchHeader } from "@/lib/utils/branch";
 
 interface Appointment {
   id: string;
@@ -75,28 +75,48 @@ interface Appointment {
 }
 
 export default function AppointmentsPage() {
-  const { user, authLoading } = useAuthContext();
-  const [view, setView] = useState<'week' | 'month'>('week');
+  const { user, loading: authLoading } = useAuthContext();
+  const [view, setView] = useState<"week" | "month">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateAppointment, setShowCreateAppointment] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [prefilledAppointmentData, setPrefilledAppointmentData] = useState<{date?: string; time?: string; lockDateTime?: boolean} | null>(null);
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<Appointment | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [prefilledAppointmentData, setPrefilledAppointmentData] = useState<{
+    date?: string;
+    time?: string;
+    lockDateTime?: boolean;
+  } | null>(null);
   const [scheduleSettings, setScheduleSettings] = useState<any>(null);
 
-  const { currentBranch, branches, isGlobalView, isSuperAdmin, setCurrentBranch, currentBranchId } = useBranch();
-  const [selectedBranchForView, setSelectedBranchForView] = useState<string | null>(null);
+  const {
+    currentBranch,
+    branches,
+    isGlobalView,
+    isSuperAdmin,
+    setCurrentBranch,
+    currentBranchId,
+  } = useBranch();
+  const [selectedBranchForView, setSelectedBranchForView] = useState<
+    string | null
+  >(null);
 
   // Determine which branch to use for filtering
-  const branchIdForFilter = isGlobalView && selectedBranchForView 
-    ? selectedBranchForView 
-    : (currentBranch?.id || null);
+  const branchIdForFilter =
+    isGlobalView && selectedBranchForView
+      ? selectedBranchForView
+      : currentBranch?.id || null;
 
   // Initialize selectedBranchForView when in global view
   useEffect(() => {
-    if (isGlobalView && isSuperAdmin && branches.length > 0 && !selectedBranchForView) {
+    if (
+      isGlobalView &&
+      isSuperAdmin &&
+      branches.length > 0 &&
+      !selectedBranchForView
+    ) {
       // Default to first branch when entering global view
       setSelectedBranchForView(branches[0]?.id || null);
     } else if (!isGlobalView && selectedBranchForView) {
@@ -114,35 +134,37 @@ export default function AppointmentsPage() {
 
   const fetchAppointments = async () => {
     if (!user || authLoading) return;
-    
+
     try {
       setLoading(true);
       const startDate = new Date(currentDate);
-      startDate.setDate(startDate.getDate() - (view === 'week' ? 7 : 30));
+      startDate.setDate(startDate.getDate() - (view === "week" ? 7 : 30));
       const endDate = new Date(currentDate);
-      endDate.setDate(endDate.getDate() + (view === 'week' ? 7 : 30));
+      endDate.setDate(endDate.getDate() + (view === "week" ? 7 : 30));
 
       const params = new URLSearchParams({
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
-        ...(statusFilter !== 'all' && { status: statusFilter }),
-        ...(branchIdForFilter && { branch_id: branchIdForFilter })
+        start_date: startDate.toISOString().split("T")[0],
+        end_date: endDate.toISOString().split("T")[0],
+        ...(statusFilter !== "all" && { status: statusFilter }),
+        ...(branchIdForFilter && { branch_id: branchIdForFilter }),
       });
 
       const headers: HeadersInit = {
-        ...getBranchHeader(branchIdForFilter || currentBranchId)
+        ...getBranchHeader(branchIdForFilter || currentBranchId),
       };
 
-      const response = await fetch(`/api/admin/appointments?${params}`, { headers });
+      const response = await fetch(`/api/admin/appointments?${params}`, {
+        headers,
+      });
       if (!response.ok) {
-        throw new Error('Failed to fetch appointments');
+        throw new Error("Failed to fetch appointments");
       }
 
       const data = await response.json();
       setAppointments(data.appointments || []);
     } catch (error) {
-      console.error('Error fetching appointments:', error);
-      toast.error('Error al cargar citas');
+      console.error("Error fetching appointments:", error);
+      toast.error("Error al cargar citas");
     } finally {
       setLoading(false);
     }
@@ -150,29 +172,29 @@ export default function AppointmentsPage() {
 
   const fetchScheduleSettings = async () => {
     if (!user || authLoading) return;
-    
+
     try {
       const headers: HeadersInit = {
-        ...getBranchHeader(branchIdForFilter || currentBranchId)
+        ...getBranchHeader(branchIdForFilter || currentBranchId),
       };
 
-      const response = await fetch('/api/admin/schedule-settings', { headers });
+      const response = await fetch("/api/admin/schedule-settings", { headers });
       if (!response.ok) {
-        throw new Error('Failed to fetch schedule settings');
+        throw new Error("Failed to fetch schedule settings");
       }
       const data = await response.json();
       setScheduleSettings(data.settings || null);
     } catch (error) {
-      console.error('Error fetching schedule settings:', error);
+      console.error("Error fetching schedule settings:", error);
     }
   };
 
-  const navigateDate = (direction: 'prev' | 'next') => {
+  const navigateDate = (direction: "prev" | "next") => {
     const newDate = new Date(currentDate);
-    if (view === 'week') {
-      newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+    if (view === "week") {
+      newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7));
     } else {
-      newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+      newDate.setMonth(newDate.getMonth() + (direction === "next" ? 1 : -1));
     }
     setCurrentDate(newDate);
   };
@@ -190,35 +212,47 @@ export default function AppointmentsPage() {
       repair: Wrench,
       follow_up: RefreshCw,
       emergency: AlertCircle,
-      other: Calendar
+      other: Calendar,
     };
     return icons[type] || Calendar;
   };
 
   const getAppointmentTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      eye_exam: 'Examen de la Vista',
-      consultation: 'Consulta',
-      fitting: 'Ajuste',
-      delivery: 'Entrega',
-      repair: 'Reparación',
-      follow_up: 'Seguimiento',
-      emergency: 'Emergencia',
-      other: 'Otro'
+      eye_exam: "Examen de la Vista",
+      consultation: "Consulta",
+      fitting: "Ajuste",
+      delivery: "Entrega",
+      repair: "Reparación",
+      follow_up: "Seguimiento",
+      emergency: "Emergencia",
+      other: "Otro",
     };
     return labels[type] || type;
   };
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: any; label: string; icon: any }> = {
-      scheduled: { variant: 'outline', label: 'Programada', icon: Clock },
-      confirmed: { variant: 'default', label: 'Confirmada', icon: CheckCircle },
-      completed: { variant: 'secondary', label: 'Completada', icon: CheckCircle },
-      cancelled: { variant: 'destructive', label: 'Cancelada', icon: XCircle },
-      no_show: { variant: 'destructive', label: 'No se presentó', icon: XCircle }
+      scheduled: { variant: "outline", label: "Programada", icon: Clock },
+      confirmed: { variant: "default", label: "Confirmada", icon: CheckCircle },
+      completed: {
+        variant: "secondary",
+        label: "Completada",
+        icon: CheckCircle,
+      },
+      cancelled: { variant: "destructive", label: "Cancelada", icon: XCircle },
+      no_show: {
+        variant: "destructive",
+        label: "No se presentó",
+        icon: XCircle,
+      },
     };
 
-    const statusConfig = config[status] || { variant: 'outline', label: status, icon: Clock };
+    const statusConfig = config[status] || {
+      variant: "outline",
+      label: status,
+      icon: Clock,
+    };
     const Icon = statusConfig.icon;
 
     return (
@@ -248,9 +282,9 @@ export default function AppointmentsPage() {
     // Format time correctly (HH:MM)
     const timeFormatted = time.length >= 5 ? time.substring(0, 5) : time;
     setPrefilledAppointmentData({
-      date: date.toISOString().split('T')[0],
+      date: date.toISOString().split("T")[0],
       time: timeFormatted,
-      lockDateTime: true // Lock date and time when opened from slot
+      lockDateTime: true, // Lock date and time when opened from slot
     });
     setShowCreateAppointment(true);
   };
@@ -260,8 +294,12 @@ export default function AppointmentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">Agenda y Citas</h1>
-          <p className="text-tierra-media">Gestiona las citas y agenda de la óptica</p>
+          <h1 className="text-3xl font-bold text-azul-profundo">
+            Agenda y Citas
+          </h1>
+          <p className="text-tierra-media">
+            Gestiona las citas y agenda de la óptica
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/admin/appointments/settings">
@@ -270,11 +308,13 @@ export default function AppointmentsPage() {
               Configuración
             </Button>
           </Link>
-          <Button onClick={() => {
-            setSelectedAppointment(null);
-            setPrefilledAppointmentData(null); // Ensure no prefilled data when creating new appointment
-            setShowCreateAppointment(true);
-          }}>
+          <Button
+            onClick={() => {
+              setSelectedAppointment(null);
+              setPrefilledAppointmentData(null); // Ensure no prefilled data when creating new appointment
+              setShowCreateAppointment(true);
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Nueva Cita
           </Button>
@@ -290,37 +330,35 @@ export default function AppointmentsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigateDate('prev')}
+                  onClick={() => navigateDate("prev")}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToToday}
-                >
+                <Button variant="outline" size="sm" onClick={goToToday}>
                   Hoy
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigateDate('next')}
+                  onClick={() => navigateDate("next")}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
               <div className="text-lg font-semibold">
-                {view === 'week' 
-                  ? `Semana del ${currentDate.toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })}`
-                  : currentDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
-                }
+                {view === "week"
+                  ? `Semana del ${currentDate.toLocaleDateString("es-CL", { day: "numeric", month: "long" })}`
+                  : currentDate.toLocaleDateString("es-CL", {
+                      month: "long",
+                      year: "numeric",
+                    })}
               </div>
             </div>
             <div className="flex items-center gap-4">
               {/* Branch selector for global view */}
               {isGlobalView && isSuperAdmin && (
-                <Select 
-                  value={selectedBranchForView || ''} 
+                <Select
+                  value={selectedBranchForView || ""}
                   onValueChange={(value) => setSelectedBranchForView(value)}
                 >
                   <SelectTrigger className="w-[200px]">
@@ -336,7 +374,10 @@ export default function AppointmentsPage() {
                   </SelectContent>
                 </Select>
               )}
-              <Select value={view} onValueChange={(value: 'week' | 'month') => setView(value)}>
+              <Select
+                value={view}
+                onValueChange={(value: "week" | "month") => setView(value)}
+              >
                 <SelectTrigger className="w-[120px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -385,20 +426,25 @@ export default function AppointmentsPage() {
       </Card>
 
       {/* Create/Edit Appointment Dialog */}
-      <Dialog open={showCreateAppointment} onOpenChange={setShowCreateAppointment}>
+      <Dialog
+        open={showCreateAppointment}
+        onOpenChange={setShowCreateAppointment}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {selectedAppointment ? 'Editar Cita' : 'Nueva Cita'}
+              {selectedAppointment ? "Editar Cita" : "Nueva Cita"}
             </DialogTitle>
             <DialogDescription>
-              {selectedAppointment 
-                ? 'Modifica los detalles de la cita'
-                : 'Crea una nueva cita en la agenda'}
+              {selectedAppointment
+                ? "Modifica los detalles de la cita"
+                : "Crea una nueva cita en la agenda"}
             </DialogDescription>
           </DialogHeader>
           <CreateAppointmentForm
-            initialData={selectedAppointment || prefilledAppointmentData || undefined}
+            initialData={
+              selectedAppointment || prefilledAppointmentData || undefined
+            }
             initialCustomerId={undefined}
             lockDateTime={prefilledAppointmentData?.lockDateTime || false}
             onSuccess={handleAppointmentCreated}
@@ -413,7 +459,10 @@ export default function AppointmentsPage() {
 
       {/* Appointment Detail Dialog */}
       {selectedAppointment && !showCreateAppointment && (
-        <Dialog open={!!selectedAppointment} onOpenChange={() => setSelectedAppointment(null)}>
+        <Dialog
+          open={!!selectedAppointment}
+          onOpenChange={() => setSelectedAppointment(null)}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Cita Detalle</DialogTitle>
@@ -425,7 +474,8 @@ export default function AppointmentsPage() {
                   // Registered customer
                   <>
                     <p className="font-medium">
-                      {selectedAppointment.customer.first_name} {selectedAppointment.customer.last_name}
+                      {selectedAppointment.customer.first_name}{" "}
+                      {selectedAppointment.customer.last_name}
                     </p>
                     {selectedAppointment.customer.phone && (
                       <p className="text-sm text-tierra-media">
@@ -442,7 +492,8 @@ export default function AppointmentsPage() {
                   // Guest (non-registered) customer
                   <>
                     <p className="font-medium">
-                      {selectedAppointment.guest_first_name} {selectedAppointment.guest_last_name}
+                      {selectedAppointment.guest_first_name}{" "}
+                      {selectedAppointment.guest_last_name}
                     </p>
                     {selectedAppointment.guest_rut && (
                       <p className="text-sm text-tierra-media">
@@ -460,7 +511,8 @@ export default function AppointmentsPage() {
                       </p>
                     )}
                     <p className="text-xs text-yellow-600 mt-1">
-                      ⚠️ Cliente no registrado - Se registrará cuando asista a la cita
+                      ⚠️ Cliente no registrado - Se registrará cuando asista a
+                      la cita
                     </p>
                   </>
                 )}
@@ -468,23 +520,31 @@ export default function AppointmentsPage() {
               <div>
                 <p className="text-sm text-tierra-media">Fecha y Hora</p>
                 <p className="font-medium">
-                  {new Date(selectedAppointment.appointment_date).toLocaleDateString('es-CL')} a las{' '}
-                  {selectedAppointment.appointment_time}
+                  {new Date(
+                    selectedAppointment.appointment_date,
+                  ).toLocaleDateString("es-CL")}{" "}
+                  a las {selectedAppointment.appointment_time}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-tierra-media">Duración</p>
-                <p className="font-medium">{selectedAppointment.duration_minutes} minutos</p>
+                <p className="font-medium">
+                  {selectedAppointment.duration_minutes} minutos
+                </p>
               </div>
               <div>
                 <p className="text-sm text-tierra-media">Tipo</p>
                 <div className="flex items-center gap-2 mt-1">
                   {(() => {
-                    const Icon = getAppointmentTypeIcon(selectedAppointment.appointment_type);
+                    const Icon = getAppointmentTypeIcon(
+                      selectedAppointment.appointment_type,
+                    );
                     return <Icon className="h-4 w-4" />;
                   })()}
                   <span className="font-medium">
-                    {getAppointmentTypeLabel(selectedAppointment.appointment_type)}
+                    {getAppointmentTypeLabel(
+                      selectedAppointment.appointment_type,
+                    )}
                   </span>
                 </div>
               </div>
@@ -493,30 +553,42 @@ export default function AppointmentsPage() {
                 <div className="mb-3">
                   {getStatusBadge(selectedAppointment.status)}
                 </div>
-                <Label className="text-sm text-tierra-media mb-2 block">Cambiar Estado</Label>
+                <Label className="text-sm text-tierra-media mb-2 block">
+                  Cambiar Estado
+                </Label>
                 <div className="flex items-center gap-2">
                   <Select
                     value={selectedAppointment.status}
                     onValueChange={async (newStatus) => {
                       try {
-                        const response = await fetch(`/api/admin/appointments/${selectedAppointment.id}`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ status: newStatus })
-                        });
+                        const response = await fetch(
+                          `/api/admin/appointments/${selectedAppointment.id}`,
+                          {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status: newStatus }),
+                          },
+                        );
 
                         if (response.ok) {
                           const data = await response.json();
-                          setSelectedAppointment({ ...selectedAppointment, status: newStatus });
+                          setSelectedAppointment({
+                            ...selectedAppointment,
+                            status: newStatus,
+                          });
                           fetchAppointments();
-                          toast.success('Estado actualizado exitosamente');
+                          toast.success("Estado actualizado exitosamente");
                         } else {
                           const errorData = await response.json();
-                          throw new Error(errorData.error || 'Error al actualizar estado');
+                          throw new Error(
+                            errorData.error || "Error al actualizar estado",
+                          );
                         }
                       } catch (error: any) {
-                        console.error('Error updating status:', error);
-                        toast.error(error.message || 'Error al actualizar estado');
+                        console.error("Error updating status:", error);
+                        toast.error(
+                          error.message || "Error al actualizar estado",
+                        );
                       }
                     }}
                   >
@@ -536,26 +608,35 @@ export default function AppointmentsPage() {
                     size="sm"
                     onClick={async (e) => {
                       e.stopPropagation();
-                      if (!confirm('¿Estás seguro de que deseas eliminar esta cita?')) {
+                      if (
+                        !confirm(
+                          "¿Estás seguro de que deseas eliminar esta cita?",
+                        )
+                      ) {
                         return;
                       }
 
                       try {
-                        const response = await fetch(`/api/admin/appointments/${selectedAppointment.id}`, {
-                          method: 'DELETE'
-                        });
+                        const response = await fetch(
+                          `/api/admin/appointments/${selectedAppointment.id}`,
+                          {
+                            method: "DELETE",
+                          },
+                        );
 
                         if (response.ok) {
-                          toast.success('Cita eliminada exitosamente');
+                          toast.success("Cita eliminada exitosamente");
                           setSelectedAppointment(null);
                           fetchAppointments();
                         } else {
                           const errorData = await response.json();
-                          throw new Error(errorData.error || 'Error al eliminar cita');
+                          throw new Error(
+                            errorData.error || "Error al eliminar cita",
+                          );
                         }
                       } catch (error: any) {
-                        console.error('Error deleting appointment:', error);
-                        toast.error(error.message || 'Error al eliminar cita');
+                        console.error("Error deleting appointment:", error);
+                        toast.error(error.message || "Error al eliminar cita");
                       }
                     }}
                     className="flex-shrink-0"
@@ -568,7 +649,7 @@ export default function AppointmentsPage() {
               <div>
                 <p className="text-sm text-tierra-media">Motivo de Consulta</p>
                 <p className="font-medium">
-                  {selectedAppointment.reason || 'No especificado'}
+                  {selectedAppointment.reason || "No especificado"}
                 </p>
               </div>
               {selectedAppointment.notes && (
@@ -588,7 +669,10 @@ export default function AppointmentsPage() {
                   Editar
                 </Button>
                 {selectedAppointment.customer?.id && (
-                  <Link href={`/admin/customers/${selectedAppointment.customer.id}`} className="flex-1">
+                  <Link
+                    href={`/admin/customers/${selectedAppointment.customer.id}`}
+                    className="flex-1"
+                  >
                     <Button variant="outline" className="w-full">
                       Ver Cliente
                     </Button>
@@ -602,4 +686,3 @@ export default function AppointmentsPage() {
     </div>
   );
 }
-

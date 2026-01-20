@@ -10,25 +10,45 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Eye, EyeOff, User, Mail, Phone, Lock, ArrowRight, Shield, CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  Eye,
+  EyeOff,
+  User,
+  Mail,
+  Phone,
+  Lock,
+  ArrowRight,
+  Shield,
+  CheckCircle2,
+} from "lucide-react";
 
-const signupSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email"),
-  phone: z.string().optional().or(z.literal('')),
-  password: z.string()
-    .min(6, "Password must be at least 6 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
+const signupSchema = z
+  .object({
+    firstName: z.string().min(2, "First name must be at least 2 characters"),
+    lastName: z.string().min(2, "Last name must be at least 2 characters"),
+    email: z.string().email("Please enter a valid email"),
+    phone: z.string().optional().or(z.literal("")),
+    password: z
+      .string()
+      .min(6, "Password must be at least 6 characters")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 type SignupForm = z.infer<typeof signupSchema>;
 
@@ -51,16 +71,12 @@ export default function SignupPage() {
   const onSubmit = async (data: SignupForm) => {
     try {
       setError(null);
-      const result = await signUp(
-        data.email,
-        data.password,
-        {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
-        }
-      );
-      
+      const result = await signUp(data.email, data.password, {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+      });
+
       if (result.error) {
         setError(result.error.message || "Signup failed");
       } else {
@@ -94,10 +110,14 @@ export default function SignupPage() {
           <CardContent className="text-center space-y-4">
             <Alert className="border-green-200 bg-green-50">
               <AlertDescription className="text-green-800">
-                Please check your email to confirm your account. You'll be redirected to login shortly.
+                Please check your email to confirm your account. You&apos;ll be
+                redirected to login shortly.
               </AlertDescription>
             </Alert>
-            <Button asChild className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+            <Button
+              asChild
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+            >
               <Link href="/login">
                 Go to Login
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -117,7 +137,9 @@ export default function SignupPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg mb-4">
             <Shield className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Create Account
+          </h1>
           <p className="text-gray-600">Join us to get started</p>
         </div>
 
@@ -133,14 +155,22 @@ export default function SignupPage() {
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {error && (
-                <Alert variant="destructive" className="border-red-200 bg-red-50">
-                  <AlertDescription className="text-red-800">{error}</AlertDescription>
+                <Alert
+                  variant="destructive"
+                  className="border-red-200 bg-red-50"
+                >
+                  <AlertDescription className="text-red-800">
+                    {error}
+                  </AlertDescription>
                 </Alert>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Label
+                    htmlFor="firstName"
+                    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                  >
                     <User className="h-4 w-4" />
                     First Name
                   </Label>
@@ -153,12 +183,17 @@ export default function SignupPage() {
                     disabled={loading}
                   />
                   {errors.firstName && (
-                    <p className="text-sm text-red-600">{errors.firstName.message}</p>
+                    <p className="text-sm text-red-600">
+                      {errors.firstName.message}
+                    </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Label
+                    htmlFor="lastName"
+                    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                  >
                     <User className="h-4 w-4" />
                     Last Name
                   </Label>
@@ -171,13 +206,18 @@ export default function SignupPage() {
                     disabled={loading}
                   />
                   {errors.lastName && (
-                    <p className="text-sm text-red-600">{errors.lastName.message}</p>
+                    <p className="text-sm text-red-600">
+                      {errors.lastName.message}
+                    </p>
                   )}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Label
+                  htmlFor="email"
+                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                >
                   <Mail className="h-4 w-4" />
                   Email Address
                 </Label>
@@ -198,7 +238,10 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Label
+                  htmlFor="phone"
+                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                >
                   <Phone className="h-4 w-4" />
                   Phone (Optional)
                 </Label>
@@ -219,7 +262,10 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Label
+                  htmlFor="password"
+                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                >
                   <Lock className="h-4 w-4" />
                   Password
                 </Label>
@@ -249,12 +295,17 @@ export default function SignupPage() {
                   </Button>
                 </div>
                 {errors.password && (
-                  <p className="text-sm text-red-600">{errors.password.message}</p>
+                  <p className="text-sm text-red-600">
+                    {errors.password.message}
+                  </p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Label
+                  htmlFor="confirmPassword"
+                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                >
                   <Lock className="h-4 w-4" />
                   Confirm Password
                 </Label>
@@ -284,7 +335,9 @@ export default function SignupPage() {
                   </Button>
                 </div>
                 {errors.confirmPassword && (
-                  <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>
+                  <p className="text-sm text-red-600">
+                    {errors.confirmPassword.message}
+                  </p>
                 )}
               </div>
 
@@ -313,7 +366,9 @@ export default function SignupPage() {
                   <div className="w-full border-t border-gray-300"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-gray-500">Already have an account?</span>
+                  <span className="px-4 bg-white text-gray-500">
+                    Already have an account?
+                  </span>
                 </div>
               </div>
 
@@ -337,4 +392,3 @@ export default function SignupPage() {
     </div>
   );
 }
-

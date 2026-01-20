@@ -47,15 +47,16 @@ export async function GET(request: NextRequest) {
 
     const toolsByCategory = allTools.reduce(
       (acc, tool) => {
-        if (!acc[tool.category]) {
-          acc[tool.category] = [];
+        const category = tool.category || "other";
+        if (!acc[category]) {
+          acc[category] = [];
         }
-        acc[tool.category].push({
+        acc[category].push({
           name: tool.name,
           description: tool.description,
-          category: tool.category,
+          category: category,
           parameters: tool.parameters,
-          requiresConfirmation: tool.requiresConfirmation,
+          requiresConfirmation: tool.requiresConfirmation || false,
         });
         return acc;
       },

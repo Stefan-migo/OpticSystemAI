@@ -63,7 +63,7 @@ export async function POST(
           *,
           customer:customers!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
           prescription:prescriptions!quotes_prescription_id_fkey(*)
-        `),
+        `) as any,
     )
       .eq("id", id)
       .single();

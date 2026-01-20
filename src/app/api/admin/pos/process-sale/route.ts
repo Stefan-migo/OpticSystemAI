@@ -7,7 +7,7 @@ import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
 import { RateLimitError } from "@/lib/api/errors";
 
 export async function POST(request: NextRequest) {
-  return withRateLimit(rateLimitConfigs.pos, async () => {
+  return (withRateLimit(rateLimitConfigs.pos) as any)(request, async () => {
     try {
       logger.info("POS Process Sale API called");
       const supabase = await createClient();

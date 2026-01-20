@@ -43,20 +43,7 @@ export default function RootLayout({
             <QueryProvider>
               <AuthProvider>
                 <BranchProvider>{children}</BranchProvider>
-                <Toaster
-                  position="bottom-right"
-                  richColors
-                  closeButton
-                  expand={true}
-                  duration={4000}
-                  toastOptions={{
-                    style: {
-                      background: "var(--background)",
-                      color: "var(--foreground)",
-                      border: "1px solid var(--border)",
-                    },
-                  }}
-                />
+                <Toaster />
               </AuthProvider>
             </QueryProvider>
           </ErrorBoundary>

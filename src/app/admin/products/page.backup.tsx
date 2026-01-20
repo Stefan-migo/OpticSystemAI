@@ -777,7 +777,7 @@ export default function ProductsPage() {
                 <p className="text-sm text-red-600">
                   Los {selectedProducts.length} productos seleccionados serán
                   archivados (eliminación suave). Esta acción se puede deshacer
-                  cambiando el estado a "Activo".
+                  cambiando el estado a &quot;Activo&quot;.
                 </p>
               </div>
             </div>
@@ -805,8 +805,8 @@ export default function ProductsPage() {
             </div>
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
-                <strong>Recomendación:</strong> Considera usar "Eliminación
-                suave" (archivar) en su lugar, que permite recuperar los
+                <strong>Recomendación:</strong> Considera usar &quot;Eliminación
+                suave&quot; (archivar) en su lugar, que permite recuperar los
                 productos si es necesario.
               </p>
             </div>
@@ -2113,12 +2113,12 @@ export default function ProductsPage() {
           <DialogHeader>
             <DialogTitle>Confirmar Eliminación</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que deseas eliminar el producto "
-              {productToDelete?.name}"?
+              ¿Estás seguro de que deseas eliminar el producto &quot;
+              {productToDelete?.name}&quot;?
               <br />
               <strong>Esta es una eliminación suave:</strong> El producto será
-              archivado (cambio de estado a "Archivado") y se puede restaurar
-              cambiando su estado a "Activo".
+              archivado (cambio de estado a &quot;Archivado&quot;) y se puede
+              restaurar cambiando su estado a &quot;Activo&quot;.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

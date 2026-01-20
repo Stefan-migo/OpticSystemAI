@@ -57,7 +57,7 @@ export async function GET(
     };
 
     // Get customer from customers table (not profiles)
-    let customerQuery = applyBranchFilter(
+    const customerQuery = applyBranchFilter(
       supabase.from("customers").select("*").eq("id", params.id),
     );
 
@@ -192,27 +192,32 @@ export async function GET(
 
     // Calculate analytics
     const totalSpent =
-      orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+      orders?.reduce(
+        (sum: number, order: any) => sum + (order.total_amount || 0),
+        0,
+      ) || 0;
     const orderCount = orders?.length || 0;
     const avgOrderValue = orderCount > 0 ? totalSpent / orderCount : 0;
     const lastOrderDate = orders?.[0]?.created_at || null;
 
     // Determine customer segment
     let segment = "new";
-    if (orderCount > 10) segment = "vip";
-    else if (orderCount > 3) segment = "regular";
-    else if (orderCount > 0) segment = "first-time";
+    if (orderCount > 10) {
+      segment = "vip";
+    } else if (orderCount > 3) {
+      segment = "regular";
+    } else if (orderCount > 0) segment = "first-time";
 
     // Order status counts
     const orderStatusCounts =
-      orders?.reduce((acc: Record<string, number>, order) => {
+      orders?.reduce((acc: Record<string, number>, order: any) => {
         acc[order.status] = (acc[order.status] || 0) + 1;
         return acc;
       }, {}) || {};
 
     // Favorite products (most purchased)
     const productCounts =
-      orders?.reduce((acc: Record<string, any>, order) => {
+      orders?.reduce((acc: Record<string, any>, order: any) => {
         order.order_items?.forEach((item: any) => {
           // Try both 'products' and 'product' for compatibility
           const product = item.products || item.product;
@@ -260,13 +265,13 @@ export async function GET(
       const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
 
       const monthOrders =
-        orders?.filter((order) => {
+        orders?.filter((order: any) => {
           const orderDate = new Date(order.created_at);
           return orderDate >= month && orderDate < nextMonth;
         }) || [];
 
       const monthAmount = monthOrders.reduce(
-        (sum, order) => sum + (order.total_amount || 0),
+        (sum: number, order: any) => sum + (order.total_amount || 0),
         0,
       );
 

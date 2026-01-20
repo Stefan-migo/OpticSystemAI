@@ -34,6 +34,8 @@ interface FetchProductsParams {
   itemsPerPage: number;
   categoryFilter: string;
   statusFilter: string;
+  searchTerm?: string;
+  showLowStockOnly?: boolean;
   currentBranchId: string | null;
   isGlobalView: boolean;
   isSuperAdmin: boolean;
@@ -44,6 +46,8 @@ const fetchProducts = async ({
   itemsPerPage,
   categoryFilter,
   statusFilter,
+  searchTerm,
+  showLowStockOnly,
   currentBranchId,
   isGlobalView,
   isSuperAdmin,
@@ -63,6 +67,14 @@ const fetchProducts = async ({
 
   if (categoryFilter !== "all") {
     params.append("category", categoryFilter);
+  }
+
+  if (searchTerm && searchTerm.trim()) {
+    params.append("search", searchTerm.trim());
+  }
+
+  if (showLowStockOnly) {
+    params.append("low_stock_only", "true");
   }
 
   const headers: HeadersInit = {
@@ -95,6 +107,8 @@ export function useProducts(params: FetchProductsParams) {
       params.itemsPerPage,
       params.categoryFilter,
       params.statusFilter,
+      params.searchTerm,
+      params.showLowStockOnly,
       params.currentBranchId,
       params.isGlobalView,
     ],

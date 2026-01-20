@@ -27,7 +27,8 @@ export default function ProductPagination({
   onPageChange,
   onItemsPerPageChange,
 }: ProductPaginationProps) {
-  if (totalPages <= 1) {
+  // Show pagination if there are products or if we have more than 1 page
+  if (totalPages <= 1 && totalProducts === 0) {
     return null;
   }
 

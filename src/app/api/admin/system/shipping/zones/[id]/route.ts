@@ -82,7 +82,7 @@ export async function PUT(
           ? [body.cities]
           : [];
     if (body.postal_codes !== undefined)
-      updateData.postal_codes = Array.isArray(body.postal_codes)
+      (updateData as any).postal_codes = Array.isArray(body.postal_codes)
         ? body.postal_codes
         : body.postal_codes
           ? [body.postal_codes]

@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { 
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
   Settings,
   Save,
   Loader2,
@@ -18,13 +24,13 @@ import {
   FileText,
   X,
   Plus,
-  ArrowLeft
-} from 'lucide-react';
-import { toast } from 'sonner';
-import Link from 'next/link';
-import { useBranch } from '@/hooks/useBranch';
-import { getBranchHeader } from '@/lib/utils/branch';
-import { BranchSelector } from '@/components/admin/BranchSelector';
+  ArrowLeft,
+} from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
+import { useBranch } from "@/hooks/useBranch";
+import { getBranchHeader } from "@/lib/utils/branch";
+import { BranchSelector } from "@/components/admin/BranchSelector";
 
 interface QuoteSettings {
   treatment_prices: {
@@ -68,7 +74,12 @@ interface QuoteSettings {
 }
 
 export default function QuoteSettingsPage() {
-  const { currentBranchId, isSuperAdmin, branches, isLoading: branchLoading } = useBranch();
+  const {
+    currentBranchId,
+    isSuperAdmin,
+    branches,
+    isLoading: branchLoading,
+  } = useBranch();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<QuoteSettings | null>(null);
@@ -83,18 +94,18 @@ export default function QuoteSettingsPage() {
     try {
       setLoading(true);
       const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...getBranchHeader(currentBranchId)
+        "Content-Type": "application/json",
+        ...getBranchHeader(currentBranchId),
       };
-      const response = await fetch('/api/admin/quote-settings', { headers });
+      const response = await fetch("/api/admin/quote-settings", { headers });
       if (!response.ok) {
-        throw new Error('Failed to fetch settings');
+        throw new Error("Failed to fetch settings");
       }
       const data = await response.json();
       setSettings(data.settings);
     } catch (error) {
-      console.error('Error fetching settings:', error);
-      toast.error('Error al cargar configuración');
+      console.error("Error fetching settings:", error);
+      toast.error("Error al cargar configuración");
     } finally {
       setLoading(false);
     }
@@ -106,23 +117,23 @@ export default function QuoteSettingsPage() {
     try {
       setSaving(true);
       const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...getBranchHeader(currentBranchId)
+        "Content-Type": "application/json",
+        ...getBranchHeader(currentBranchId),
       };
-      const response = await fetch('/api/admin/quote-settings', {
-        method: 'PUT',
+      const response = await fetch("/api/admin/quote-settings", {
+        method: "PUT",
         headers,
-        body: JSON.stringify(settings)
+        body: JSON.stringify(settings),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save settings');
+        throw new Error("Failed to save settings");
       }
 
-      toast.success('Configuración guardada exitosamente');
+      toast.success("Configuración guardada exitosamente");
     } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Error al guardar configuración');
+      console.error("Error saving settings:", error);
+      toast.error("Error al guardar configuración");
     } finally {
       setSaving(false);
     }
@@ -134,8 +145,8 @@ export default function QuoteSettingsPage() {
       ...settings,
       treatment_prices: {
         ...settings.treatment_prices,
-        [treatment]: price
-      }
+        [treatment]: price,
+      },
     });
   };
 
@@ -145,8 +156,8 @@ export default function QuoteSettingsPage() {
       ...settings,
       lens_type_base_costs: {
         ...settings.lens_type_base_costs,
-        [type]: cost
-      }
+        [type]: cost,
+      },
     });
   };
 
@@ -156,8 +167,8 @@ export default function QuoteSettingsPage() {
       ...settings,
       lens_material_multipliers: {
         ...settings.lens_material_multipliers,
-        [material]: multiplier
-      }
+        [material]: multiplier,
+      },
     });
   };
 
@@ -167,18 +178,22 @@ export default function QuoteSettingsPage() {
       ...settings,
       volume_discounts: [
         ...settings.volume_discounts,
-        { min_amount: 0, discount_percentage: 0 }
-      ]
+        { min_amount: 0, discount_percentage: 0 },
+      ],
     });
   };
 
-  const updateVolumeDiscount = (index: number, field: 'min_amount' | 'discount_percentage', value: number) => {
+  const updateVolumeDiscount = (
+    index: number,
+    field: "min_amount" | "discount_percentage",
+    value: number,
+  ) => {
     if (!settings) return;
     const updated = [...settings.volume_discounts];
     updated[index] = { ...updated[index], [field]: value };
     setSettings({
       ...settings,
-      volume_discounts: updated
+      volume_discounts: updated,
     });
   };
 
@@ -186,15 +201,15 @@ export default function QuoteSettingsPage() {
     if (!settings) return;
     setSettings({
       ...settings,
-      volume_discounts: settings.volume_discounts.filter((_, i) => i !== index)
+      volume_discounts: settings.volume_discounts.filter((_, i) => i !== index),
     });
   };
 
   const formatPrice = (amount: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      minimumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -219,51 +234,49 @@ export default function QuoteSettingsPage() {
   }
 
   const treatmentLabels: Record<string, string> = {
-    anti_reflective: 'Anti-reflejante',
-    blue_light_filter: 'Filtro Luz Azul',
-    uv_protection: 'Protección UV',
-    scratch_resistant: 'Anti-rayas',
-    anti_fog: 'Anti-empañamiento',
-    photochromic: 'Fotocromático',
-    polarized: 'Polarizado',
-    tint: 'Tinte'
+    anti_reflective: "Anti-reflejante",
+    blue_light_filter: "Filtro Luz Azul",
+    uv_protection: "Protección UV",
+    scratch_resistant: "Anti-rayas",
+    anti_fog: "Anti-empañamiento",
+    photochromic: "Fotocromático",
+    polarized: "Polarizado",
+    tint: "Tinte",
   };
 
   const lensTypeLabels: Record<string, string> = {
-    single_vision: 'Monofocal',
-    bifocal: 'Bifocal',
-    trifocal: 'Trifocal',
-    progressive: 'Progresivo',
-    reading: 'Lectura',
-    computer: 'Computadora',
-    sports: 'Deportes'
+    single_vision: "Monofocal",
+    bifocal: "Bifocal",
+    trifocal: "Trifocal",
+    progressive: "Progresivo",
+    reading: "Lectura",
+    computer: "Computadora",
+    sports: "Deportes",
   };
 
   const materialLabels: Record<string, string> = {
-    cr39: 'CR-39',
-    polycarbonate: 'Policarbonato',
-    high_index_1_67: 'Alto Índice 1.67',
-    high_index_1_74: 'Alto Índice 1.74',
-    trivex: 'Trivex',
-    glass: 'Vidrio'
+    cr39: "CR-39",
+    polycarbonate: "Policarbonato",
+    high_index_1_67: "Alto Índice 1.67",
+    high_index_1_74: "Alto Índice 1.74",
+    trivex: "Trivex",
+    glass: "Vidrio",
   };
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">Configuración de Presupuestos</h1>
+          <h1 className="text-3xl font-bold text-azul-profundo">
+            Configuración de Presupuestos
+          </h1>
           <p className="text-tierra-media mt-2">
-            Personaliza los precios de tratamientos, costos de lentes y otros parámetros del sistema de presupuestos
+            Personaliza los precios de tratamientos, costos de lentes y otros
+            parámetros del sistema de presupuestos
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isSuperAdmin && (
-            <BranchSelector 
-              branches={branches} 
-              currentBranchId={currentBranchId}
-            />
-          )}
+          {isSuperAdmin && <BranchSelector />}
           <Link href="/admin/quotes">
             <Button variant="outline" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -294,7 +307,8 @@ export default function QuoteSettingsPage() {
             Precios de Tratamientos y Recubrimientos
           </CardTitle>
           <CardDescription>
-            Configura los precios de los tratamientos aplicables a los lentes (en CLP)
+            Configura los precios de los tratamientos aplicables a los lentes
+            (en CLP)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -305,7 +319,9 @@ export default function QuoteSettingsPage() {
                 <Input
                   type="number"
                   value={price}
-                  onChange={(e) => updateTreatmentPrice(key, parseFloat(e.target.value) || 0)}
+                  onChange={(e) =>
+                    updateTreatmentPrice(key, parseFloat(e.target.value) || 0)
+                  }
                   className="mt-1"
                 />
               </div>
@@ -327,17 +343,21 @@ export default function QuoteSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(settings.lens_type_base_costs).map(([key, cost]) => (
-              <div key={key}>
-                <Label>{lensTypeLabels[key] || key}</Label>
-                <Input
-                  type="number"
-                  value={cost}
-                  onChange={(e) => updateLensTypeCost(key, parseFloat(e.target.value) || 0)}
-                  className="mt-1"
-                />
-              </div>
-            ))}
+            {Object.entries(settings.lens_type_base_costs).map(
+              ([key, cost]) => (
+                <div key={key}>
+                  <Label>{lensTypeLabels[key] || key}</Label>
+                  <Input
+                    type="number"
+                    value={cost}
+                    onChange={(e) =>
+                      updateLensTypeCost(key, parseFloat(e.target.value) || 0)
+                    }
+                    className="mt-1"
+                  />
+                </div>
+              ),
+            )}
           </div>
         </CardContent>
       </Card>
@@ -350,23 +370,31 @@ export default function QuoteSettingsPage() {
             Multiplicadores por Material de Lente
           </CardTitle>
           <CardDescription>
-            Configura los multiplicadores que se aplican al costo base según el material del lente
+            Configura los multiplicadores que se aplican al costo base según el
+            material del lente
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {Object.entries(settings.lens_material_multipliers).map(([key, multiplier]) => (
-              <div key={key}>
-                <Label>{materialLabels[key] || key}</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={multiplier}
-                  onChange={(e) => updateMaterialMultiplier(key, parseFloat(e.target.value) || 1.0)}
-                  className="mt-1"
-                />
-              </div>
-            ))}
+            {Object.entries(settings.lens_material_multipliers).map(
+              ([key, multiplier]) => (
+                <div key={key}>
+                  <Label>{materialLabels[key] || key}</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={multiplier}
+                    onChange={(e) =>
+                      updateMaterialMultiplier(
+                        key,
+                        parseFloat(e.target.value) || 1.0,
+                      )
+                    }
+                    className="mt-1"
+                  />
+                </div>
+              ),
+            )}
           </div>
         </CardContent>
       </Card>
@@ -379,32 +407,45 @@ export default function QuoteSettingsPage() {
             Tiempo de Validez de Presupuestos
           </CardTitle>
           <CardDescription>
-            Configura el tiempo límite de validez para los presupuestos. Los presupuestos expirarán automáticamente después de este período.
+            Configura el tiempo límite de validez para los presupuestos. Los
+            presupuestos expirarán automáticamente después de este período.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-base font-semibold">Días de Validez por Defecto</Label>
+              <Label className="text-base font-semibold">
+                Días de Validez por Defecto
+              </Label>
               <p className="text-sm text-tierra-media mb-2">
-                Los presupuestos nuevos usarán este número de días como período de validez
+                Los presupuestos nuevos usarán este número de días como período
+                de validez
               </p>
               <Input
                 type="number"
                 min="1"
                 value={settings.default_expiration_days}
-                onChange={(e) => setSettings({ ...settings, default_expiration_days: parseInt(e.target.value) || 30 })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    default_expiration_days: parseInt(e.target.value) || 30,
+                  })
+                }
                 className="mt-1"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Los presupuestos expirarán automáticamente después de {settings.default_expiration_days} días desde su creación
+                Los presupuestos expirarán automáticamente después de{" "}
+                {settings.default_expiration_days} días desde su creación
               </p>
             </div>
             <div className="flex items-center justify-center p-4 bg-white rounded-lg border border-blue-200">
               <div className="text-center">
-                <p className="text-sm text-tierra-media mb-1">Estado de Expiración</p>
+                <p className="text-sm text-tierra-media mb-1">
+                  Estado de Expiración
+                </p>
                 <p className="text-lg font-semibold text-blue-600">
-                  Los presupuestos se marcarán automáticamente como "Expirado" cuando la fecha de expiración haya pasado
+                  Los presupuestos se marcarán automáticamente como
+                  &quot;Expirado&quot; cuando la fecha de expiración haya pasado
                 </p>
               </div>
             </div>
@@ -427,7 +468,12 @@ export default function QuoteSettingsPage() {
               <Input
                 type="number"
                 value={settings.default_labor_cost}
-                onChange={(e) => setSettings({ ...settings, default_labor_cost: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    default_labor_cost: parseFloat(e.target.value) || 0,
+                  })
+                }
                 className="mt-1"
               />
             </div>
@@ -437,7 +483,12 @@ export default function QuoteSettingsPage() {
                 type="number"
                 step="0.1"
                 value={settings.default_tax_percentage}
-                onChange={(e) => setSettings({ ...settings, default_tax_percentage: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    default_tax_percentage: parseFloat(e.target.value) || 0,
+                  })
+                }
                 className="mt-1"
               />
             </div>
@@ -447,23 +498,38 @@ export default function QuoteSettingsPage() {
                 type="number"
                 step="0.1"
                 value={settings.default_margin_percentage}
-                onChange={(e) => setSettings({ ...settings, default_margin_percentage: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    default_margin_percentage: parseFloat(e.target.value) || 0,
+                  })
+                }
                 className="mt-1"
               />
             </div>
           </div>
           <div className="mt-6 pt-6 border-t">
-            <Label className="text-base font-semibold mb-4 block">Configuración de IVA</Label>
+            <Label className="text-base font-semibold mb-4 block">
+              Configuración de IVA
+            </Label>
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="labor_cost_includes_tax"
                   checked={settings.labor_cost_includes_tax ?? true}
-                  onChange={(e) => setSettings({ ...settings, labor_cost_includes_tax: e.target.checked })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      labor_cost_includes_tax: e.target.checked,
+                    })
+                  }
                   className="h-4 w-4 rounded border-gray-300 text-azul-profundo focus:ring-azul-profundo"
                 />
-                <Label htmlFor="labor_cost_includes_tax" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="labor_cost_includes_tax"
+                  className="text-sm font-normal cursor-pointer"
+                >
                   El costo de mano de obra incluye IVA
                 </Label>
               </div>
@@ -472,10 +538,18 @@ export default function QuoteSettingsPage() {
                   type="checkbox"
                   id="lens_cost_includes_tax"
                   checked={settings.lens_cost_includes_tax ?? true}
-                  onChange={(e) => setSettings({ ...settings, lens_cost_includes_tax: e.target.checked })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      lens_cost_includes_tax: e.target.checked,
+                    })
+                  }
                   className="h-4 w-4 rounded border-gray-300 text-azul-profundo focus:ring-azul-profundo"
                 />
-                <Label htmlFor="lens_cost_includes_tax" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="lens_cost_includes_tax"
+                  className="text-sm font-normal cursor-pointer"
+                >
                   El costo de lentes incluye IVA
                 </Label>
               </div>
@@ -484,10 +558,18 @@ export default function QuoteSettingsPage() {
                   type="checkbox"
                   id="treatments_cost_includes_tax"
                   checked={settings.treatments_cost_includes_tax ?? true}
-                  onChange={(e) => setSettings({ ...settings, treatments_cost_includes_tax: e.target.checked })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      treatments_cost_includes_tax: e.target.checked,
+                    })
+                  }
                   className="h-4 w-4 rounded border-gray-300 text-azul-profundo focus:ring-azul-profundo"
                 />
-                <Label htmlFor="treatments_cost_includes_tax" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="treatments_cost_includes_tax"
+                  className="text-sm font-normal cursor-pointer"
+                >
                   El costo de tratamientos incluye IVA
                 </Label>
               </div>
@@ -504,19 +586,29 @@ export default function QuoteSettingsPage() {
             Descuentos por Volumen
           </CardTitle>
           <CardDescription>
-            Configura descuentos automáticos según el monto total del presupuesto
+            Configura descuentos automáticos según el monto total del
+            presupuesto
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {settings.volume_discounts.map((discount, index) => (
-              <div key={index} className="flex items-center gap-4 p-4 border rounded-lg">
+              <div
+                key={index}
+                className="flex items-center gap-4 p-4 border rounded-lg"
+              >
                 <div className="flex-1">
                   <Label>Monto Mínimo (CLP)</Label>
                   <Input
                     type="number"
                     value={discount.min_amount}
-                    onChange={(e) => updateVolumeDiscount(index, 'min_amount', parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateVolumeDiscount(
+                        index,
+                        "min_amount",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
                     className="mt-1"
                   />
                 </div>
@@ -526,7 +618,13 @@ export default function QuoteSettingsPage() {
                     type="number"
                     step="0.1"
                     value={discount.discount_percentage}
-                    onChange={(e) => updateVolumeDiscount(index, 'discount_percentage', parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateVolumeDiscount(
+                        index,
+                        "discount_percentage",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
                     className="mt-1"
                   />
                 </div>
@@ -556,15 +654,21 @@ export default function QuoteSettingsPage() {
             Términos y Condiciones / Plantilla de Notas
           </CardTitle>
           <CardDescription>
-            Configura texto por defecto para términos y condiciones y notas en los presupuestos
+            Configura texto por defecto para términos y condiciones y notas en
+            los presupuestos
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <Label>Términos y Condiciones por Defecto</Label>
             <Textarea
-              value={settings.terms_and_conditions || ''}
-              onChange={(e) => setSettings({ ...settings, terms_and_conditions: e.target.value })}
+              value={settings.terms_and_conditions || ""}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  terms_and_conditions: e.target.value,
+                })
+              }
               rows={6}
               className="mt-1"
               placeholder="Ingresa los términos y condiciones por defecto para los presupuestos..."
@@ -573,8 +677,10 @@ export default function QuoteSettingsPage() {
           <div>
             <Label>Plantilla de Notas</Label>
             <Textarea
-              value={settings.notes_template || ''}
-              onChange={(e) => setSettings({ ...settings, notes_template: e.target.value })}
+              value={settings.notes_template || ""}
+              onChange={(e) =>
+                setSettings({ ...settings, notes_template: e.target.value })
+              }
               rows={4}
               className="mt-1"
               placeholder="Ingresa una plantilla de notas por defecto..."
@@ -585,4 +691,3 @@ export default function QuoteSettingsPage() {
     </div>
   );
 }
-

@@ -186,9 +186,11 @@ export async function GET(request: NextRequest) {
  * Restore a specific backup
  */
 export async function POST(request: NextRequest) {
+  let backup_filename: string | null = null;
   try {
     const body = await request.json();
-    const { backup_filename, create_safety_backup = true } = body;
+    backup_filename = body.backup_filename;
+    const { create_safety_backup = true } = body;
 
     if (!backup_filename) {
       return NextResponse.json(
@@ -219,7 +221,7 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info("Starting backup restoration", {
-      backupFilename: backup_filename,
+      backup_filename: backup_filename,
       userEmail: user.email,
     });
 
@@ -287,7 +289,7 @@ export async function POST(request: NextRequest) {
     if (downloadError || !backupFile) {
       logger.error("Error downloading backup:", {
         error: downloadError,
-        backupFilename,
+        backup_filename,
       });
       return NextResponse.json(
         {
@@ -513,8 +515,8 @@ export async function POST(request: NextRequest) {
         const batchSize = 100;
         let inserted = 0;
         let insertErrors = 0;
-        let errorDetails: string[] = [];
-        let problematicRecords: any[] = [];
+        const errorDetails: string[] = [];
+        const problematicRecords: any[] = [];
 
         for (let i = 0; i < tableData.length; i += batchSize) {
           const batch = tableData.slice(i, i + batchSize);
@@ -750,7 +752,7 @@ export async function POST(request: NextRequest) {
       duration_seconds: restoreDuration.toFixed(2),
     });
   } catch (error) {
-    logger.error("Error in restore backup API:", { error, backupFilename });
+    logger.error("Error in restore backup API:", { error, backup_filename });
     return NextResponse.json(
       {
         error: "Error al restaurar backup",
@@ -766,10 +768,9 @@ export async function POST(request: NextRequest) {
  * Delete a specific backup file
  */
 export async function DELETE(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const backup_filename = searchParams.get("filename");
   try {
-    const { searchParams } = new URL(request.url);
-    const backup_filename = searchParams.get("filename");
-
     if (!backup_filename) {
       return NextResponse.json(
         { error: "backup_filename es requerido" },
@@ -798,7 +799,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    logger.info("Deleting backup", { backupFilename, userEmail: user.email });
+    logger.info("Deleting backup", { backup_filename, userEmail: user.email });
 
     const supabaseService = createServiceRoleClient();
 
@@ -810,7 +811,7 @@ export async function DELETE(request: NextRequest) {
     if (deleteError) {
       logger.error("Error deleting backup:", {
         error: deleteError,
-        backupFilename,
+        backup_filename,
       });
       return NextResponse.json(
         {
@@ -838,7 +839,7 @@ export async function DELETE(request: NextRequest) {
       message: `Backup ${backup_filename} eliminado exitosamente`,
     });
   } catch (error) {
-    logger.error("Error in delete backup API:", { error, backupFilename });
+    logger.error("Error in delete backup API:", { error, backup_filename });
     return NextResponse.json(
       {
         error: "Error al eliminar backup",

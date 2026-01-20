@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +17,7 @@ interface LabInfoSectionProps {
   onLabDeliveryDateChange: (date: string) => void;
 }
 
-export default function LabInfoSection({
+function LabInfoSectionComponent({
   labName,
   labContact,
   labOrderNumber,
@@ -73,3 +74,6 @@ export default function LabInfoSection({
     </Card>
   );
 }
+
+// Memoize LabInfoSection to prevent unnecessary re-renders
+export default memo(LabInfoSectionComponent);

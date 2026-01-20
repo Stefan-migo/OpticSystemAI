@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -43,7 +44,7 @@ const formatPrice = (amount: number) =>
     minimumFractionDigits: 0,
   }).format(amount);
 
-export default function PricingSection({
+function PricingSectionComponent({
   frameCost,
   lensCost,
   treatmentsCost,
@@ -208,3 +209,6 @@ export default function PricingSection({
     </Card>
   );
 }
+
+// Memoize PricingSection to prevent unnecessary re-renders
+export default memo(PricingSectionComponent);

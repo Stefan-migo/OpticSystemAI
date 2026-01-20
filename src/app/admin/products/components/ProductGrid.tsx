@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ interface ProductGridProps {
   getStatusBadge: (status: string) => React.ReactNode;
 }
 
-export default function ProductGrid({
+function ProductGridComponent({
   products,
   selectedProducts,
   onSelectProduct,
@@ -190,3 +191,6 @@ export default function ProductGrid({
     </div>
   );
 }
+
+// Memoize ProductGrid to prevent unnecessary re-renders
+export default memo(ProductGridComponent);

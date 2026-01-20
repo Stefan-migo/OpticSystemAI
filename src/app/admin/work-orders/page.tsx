@@ -51,10 +51,26 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import CreateWorkOrderForm from "@/components/admin/CreateWorkOrderForm";
+import dynamic from "next/dynamic";
 import { useBranch } from "@/hooks/useBranch";
 import { getBranchHeader } from "@/lib/utils/branch";
 import { BranchSelector } from "@/components/admin/BranchSelector";
+
+// Lazy load CreateWorkOrderForm to reduce initial bundle size
+const CreateWorkOrderForm = dynamic(
+  () => import("@/components/admin/CreateWorkOrderForm"),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-azul-profundo mx-auto"></div>
+          <p className="text-tierra-media">Cargando formulario...</p>
+        </div>
+      </div>
+    ),
+    ssr: false, // Form doesn't need SSR
+  },
+);
 
 interface WorkOrder {
   id: string;

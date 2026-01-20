@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     // Otherwise use the branch context
     const branchIdToFilter = requestedBranchId || branchContext.branchId;
 
-    // First, fetch basic appointment data (including guest customer fields)
+    // Fetch appointment data
     let query = supabase
       .from("appointments")
       .select(
@@ -102,11 +102,18 @@ export async function GET(request: NextRequest) {
     const { data: appointments, error } = await query;
 
     if (error) {
-      logger.error("Error fetching appointments", error);
+      logger.error("Error fetching appointments", error, {
+        errorDetails: JSON.stringify(error, null, 2),
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorHint: error.hint,
+      });
       return NextResponse.json(
         {
           error: "Failed to fetch appointments",
           details: error.message,
+          code: error.code,
+          hint: error.hint,
         },
         { status: 500 },
       );
@@ -118,7 +125,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch related data manually
+    // Fetch related data using batch queries to avoid N+1
     const customerIds = [
       ...new Set(appointments.map((a) => a.customer_id).filter(Boolean)),
     ];
@@ -136,7 +143,7 @@ export async function GET(request: NextRequest) {
     const { data: customers } =
       customerIds.length > 0
         ? await supabase
-            .from("profiles")
+            .from("customers")
             .select("id, first_name, last_name, email, phone")
             .in("id", customerIds)
         : { data: [] };

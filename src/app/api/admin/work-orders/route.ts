@@ -71,29 +71,39 @@ export async function GET(request: NextRequest) {
     const { data: workOrders, error, count } = await query.range(from, to);
 
     if (error) {
-      logger.error("Error fetching work orders", error);
+      logger.error("Error fetching work orders", error, {
+        errorDetails: JSON.stringify(error, null, 2),
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorHint: error.hint,
+      });
       return NextResponse.json(
         {
           error: "Failed to fetch work orders",
           details: error.message,
+          code: error.code,
+          hint: error.hint,
         },
         { status: 500 },
       );
     }
 
-    // Fetch related data separately if work orders exist
+    // Fetch related data using batch queries to avoid N+1
     let workOrdersWithRelations = workOrders || [];
     if (workOrdersWithRelations.length > 0) {
-      // Fetch customers (from customers table, not profiles)
+      // Fetch customers (from customers table)
       const customerIds = [
         ...new Set(
           workOrdersWithRelations.map((wo) => wo.customer_id).filter(Boolean),
         ),
       ];
-      const { data: customers } = await supabase
-        .from("customers")
-        .select("id, first_name, last_name, email, phone")
-        .in("id", customerIds);
+      const { data: customers } =
+        customerIds.length > 0
+          ? await supabase
+              .from("customers")
+              .select("id, first_name, last_name, email, phone")
+              .in("id", customerIds)
+          : { data: [] };
 
       // Fetch prescriptions
       const prescriptionIds = [

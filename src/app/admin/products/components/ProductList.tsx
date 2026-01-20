@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import ProductGrid from "./ProductGrid";
 import ProductTable from "./ProductTable";
 import { Product } from "../hooks/useProducts";
@@ -15,7 +16,7 @@ interface ProductListProps {
   getStatusBadge: (status: string) => React.ReactNode;
 }
 
-export default function ProductList({
+function ProductListComponent({
   products,
   viewMode,
   selectedProducts,
@@ -50,3 +51,6 @@ export default function ProductList({
     />
   );
 }
+
+// Memoize ProductList to prevent unnecessary re-renders
+export default memo(ProductListComponent);

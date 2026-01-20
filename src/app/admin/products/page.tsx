@@ -225,11 +225,11 @@ export default function ProductsPage() {
       toast.success(
         `Operación completada: ${result.affected_count} productos afectados`,
       );
-      setShowBulkDialog(false);
       setIsDeleteDialog(false);
       setSelectedProducts([]);
       setBulkOperation("");
       setBulkUpdates({});
+      setForceDelete(false);
       refetchProducts();
     } catch (error) {
       console.error("Error performing bulk operation:", error);
@@ -754,7 +754,11 @@ export default function ProductsPage() {
             setBulkOperation("");
             setBulkUpdates({});
             setForceDelete(false);
-            setShowBulkDialog(true);
+            // Scroll to panel when opened
+            setTimeout(() => {
+              const panel = document.querySelector("[data-bulk-panel]");
+              panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }, 100);
           }}
           onJsonExport={handleJsonExport}
           onJsonImport={() => setShowJsonImportDialog(true)}
@@ -841,8 +845,12 @@ export default function ProductsPage() {
           />
 
           {/* Bulk Operations Panel - Shows when products are selected */}
-          {selectedProducts.length > 0 && showBulkDialog && (
-            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2 border-blue-200 dark:border-blue-800 shadow-lg animate-in slide-in-from-top-2 duration-300">
+          {selectedProducts.length > 0 && (
+            <Card
+              data-bulk-panel
+              className="w-full bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2 border-blue-200 dark:border-blue-800 shadow-lg animate-in slide-in-from-top-2 duration-300"
+              style={{ position: "relative", zIndex: 1 }}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
@@ -864,11 +872,11 @@ export default function ProductsPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      setShowBulkDialog(false);
                       setIsDeleteDialog(false);
                       setBulkOperation("");
                       setBulkUpdates({});
                       setForceDelete(false);
+                      setSelectedProducts([]);
                     }}
                     className="h-8 w-8 p-0"
                   >
@@ -932,11 +940,11 @@ export default function ProductsPage() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setShowBulkDialog(false);
                       setIsDeleteDialog(false);
                       setBulkOperation("");
                       setBulkUpdates({});
                       setForceDelete(false);
+                      setSelectedProducts([]);
                     }}
                     disabled={processing}
                   >

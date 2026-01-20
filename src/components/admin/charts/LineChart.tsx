@@ -200,3 +200,6 @@ function LineChartComponent({
     </div>
   );
 }
+
+// Memoize LineChart to prevent unnecessary re-renders
+export const LineChart = memo(LineChartComponent);

@@ -273,3 +273,6 @@ function AreaChartComponent({
     </div>
   );
 }
+
+// Memoize AreaChart to prevent unnecessary re-renders
+export const AreaChart = memo(AreaChartComponent);

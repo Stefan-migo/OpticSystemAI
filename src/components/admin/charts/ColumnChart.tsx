@@ -149,3 +149,6 @@ function ColumnChartComponent({
     </div>
   );
 }
+
+// Memoize ColumnChart to prevent unnecessary re-renders
+export const ColumnChart = memo(ColumnChartComponent);

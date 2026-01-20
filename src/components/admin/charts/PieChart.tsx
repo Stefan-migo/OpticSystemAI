@@ -167,3 +167,6 @@ function PieChartComponent({
     </div>
   );
 }
+
+// Memoize PieChart to prevent unnecessary re-renders
+export const PieChart = memo(PieChartComponent);

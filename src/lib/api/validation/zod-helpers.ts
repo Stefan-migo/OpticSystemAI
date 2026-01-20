@@ -35,6 +35,7 @@ export function validateBody<T extends z.ZodTypeAny>(
       logger.warn(
         {
           errors: errors.map((e) => `${e.field}: ${e.message}`).join(", "),
+          body: JSON.stringify(body),
         },
         "Validation failed",
       );
@@ -42,6 +43,21 @@ export function validateBody<T extends z.ZodTypeAny>(
       throw new ValidationError(
         `Validation failed: ${errors.map((e) => `${e.field}: ${e.message}`).join(", ")}`,
         errors,
+      );
+    }
+
+    // Log unexpected errors
+    if (error instanceof Error) {
+      logger.error(error, "Unexpected error in validateBody", {
+        body: JSON.stringify(body),
+      });
+    } else {
+      logger.error(
+        new Error(String(error)),
+        "Unexpected error in validateBody",
+        {
+          body: JSON.stringify(body),
+        },
       );
     }
 

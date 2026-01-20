@@ -116,20 +116,43 @@ export function withRateLimit(
       rateLimitStore.set(key, current);
     }
 
-    const response = await handler();
+    try {
+      const response = await handler();
 
-    // Add rate limit headers
-    response.headers.set("X-RateLimit-Limit", config.maxRequests.toString());
-    response.headers.set(
-      "X-RateLimit-Remaining",
-      Math.max(0, config.maxRequests - (current?.count || 1)).toString(),
-    );
-    response.headers.set(
-      "X-RateLimit-Reset",
-      ((current?.resetTime || now + config.windowMs) / 1000).toString(),
-    );
+      // Add rate limit headers
+      response.headers.set("X-RateLimit-Limit", config.maxRequests.toString());
+      response.headers.set(
+        "X-RateLimit-Remaining",
+        Math.max(0, config.maxRequests - (current?.count || 1)).toString(),
+      );
+      response.headers.set(
+        "X-RateLimit-Reset",
+        ((current?.resetTime || now + config.windowMs) / 1000).toString(),
+      );
 
-    return response;
+      return response;
+    } catch (error) {
+      // If handler throws an error, ensure we return a proper JSON response
+      if (error instanceof RateLimitError) {
+        throw error; // Let rate limit errors bubble up
+      }
+
+      // Log unexpected errors
+      if (error instanceof Error) {
+        logger.error("Error in rate-limited handler", error);
+      } else {
+        logger.error("Error in rate-limited handler", new Error(String(error)));
+      }
+
+      // Return proper error response
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error ? error.message : "Internal server error",
+        },
+        { status: 500 },
+      );
+    }
   };
 }
 

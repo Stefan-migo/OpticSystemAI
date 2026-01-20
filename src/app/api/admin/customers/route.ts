@@ -486,9 +486,24 @@ export async function POST(request: NextRequest) {
           });
           return NextResponse.json({ error: error.message }, { status: 429 });
         }
-        logger.error("Error in customers API POST", error);
+
+        // Log error details for debugging
+        if (error instanceof Error) {
+          logger.error("Error in customers API POST", error);
+        } else {
+          logger.error("Error in customers API POST", new Error(String(error)));
+        }
+
+        // Return proper JSON error response
+        const errorMessage =
+          error instanceof Error ? error.message : "Internal server error";
         return NextResponse.json(
-          { error: "Internal server error" },
+          {
+            error: errorMessage,
+            ...(process.env.NODE_ENV === "development" && error instanceof Error
+              ? { details: error.stack }
+              : {}),
+          },
           { status: 500 },
         );
       }

@@ -212,13 +212,20 @@ export const dateISOSchema = z
 
 /**
  * Schema para validar fecha ISO opcional
+ * Acepta string ISO, Date object, o null/undefined
  */
 export const dateISOOptionalSchema = z
-  .string()
-  .datetime("Debe ser una fecha válida en formato ISO")
+  .union([
+    z.string().datetime("Debe ser una fecha válida en formato ISO"),
+    z.date(),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Debe ser una fecha en formato YYYY-MM-DD"), // También acepta YYYY-MM-DD
+    z.null(),
+    z.undefined(),
+  ])
   .optional()
-  .nullable()
-  .or(z.date().optional().nullable());
+  .nullable();
 
 /**
  * Schema para validar paginación

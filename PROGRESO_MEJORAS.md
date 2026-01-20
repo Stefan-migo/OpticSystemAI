@@ -239,17 +239,21 @@
 
 ### Tarea 2.3: Refactorizar System Page
 
-- **Estado:** 🔴 No Iniciada
+- **Estado:** 🟡 En Progreso
 - **Prioridad:** 🟡 MEDIA
 - **Tiempo Estimado:** 1 semana
 - **Líneas Iniciales:** 2,110
 - **Líneas Objetivo:** < 400 (página principal)
-- **Progreso:** 0/4 pasos
+- **Progreso:** 7/8 pasos
 - **Notas:**
-  - [ ] Análisis
-  - [ ] Crear estructura de tabs
-  - [ ] Extraer secciones
-  - [ ] Verificación
+  - [x] Análisis y planificación
+  - [x] Crear hooks de datos (useSystemConfig, useSystemHealth, useBackups)
+  - [x] Extraer SystemOverview component
+  - [x] Extraer SystemConfig component
+  - [x] Extraer SystemHealth component
+  - [x] Extraer SystemMaintenance y BackupManager components
+  - [ ] Refactorizar página principal (en progreso - componentes creados, falta integrar)
+  - [ ] Verificación final
 
 ---
 

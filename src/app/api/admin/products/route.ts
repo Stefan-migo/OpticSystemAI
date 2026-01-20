@@ -4,7 +4,17 @@ import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
-import { RateLimitError } from "@/lib/api/errors";
+import { RateLimitError, ValidationError } from "@/lib/api/errors";
+import {
+  createProductSchema,
+  searchProductSchema,
+  paginationSchema,
+} from "@/lib/api/validation/zod-schemas";
+import {
+  parseAndValidateBody,
+  parseAndValidateQuery,
+  validationErrorResponse,
+} from "@/lib/api/validation/zod-helpers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -234,12 +244,34 @@ export async function POST(request: NextRequest) {
         // Get branch context
         const branchContext = await getBranchContext(request, user.id);
 
-        // Get request body
-        const body = await request.json();
+        // Get request body first (needed for fields not in Zod schema)
+        let body: any;
+        try {
+          body = await request.json();
+        } catch (error) {
+          return NextResponse.json(
+            { error: "Invalid JSON in request body" },
+            { status: 400 },
+          );
+        }
+
+        // Validate request body with Zod (only fields in schema)
+        let validatedBody;
+        try {
+          validatedBody = await parseAndValidateBody(
+            request,
+            createProductSchema,
+          );
+        } catch (error) {
+          if (error instanceof ValidationError) {
+            return validationErrorResponse(error);
+          }
+          throw error;
+        }
 
         // Debug: Log branch context
         logger.debug("Branch context for product creation", {
-          body_branch_id: body.branch_id,
+          body_branch_id: validatedBody.branch_id,
           context_branch_id: branchContext.branchId,
           is_super_admin: branchContext.isSuperAdmin,
           accessible_branches: branchContext.accessibleBranches.map(
@@ -249,7 +281,7 @@ export async function POST(request: NextRequest) {
 
         // Use branch_id from body, or current branch context, or null for super admin
         const productBranchId =
-          body.branch_id || branchContext.branchId || null;
+          validatedBody.branch_id || branchContext.branchId || null;
 
         // Validate branch_id is provided (required for product creation, except for super admins)
         if (!productBranchId && !branchContext.isSuperAdmin) {
@@ -280,52 +312,23 @@ export async function POST(request: NextRequest) {
         }
 
         logger.debug("Creating product with data", {
-          name: body.name,
-          product_type: body.product_type,
-          has_optical_fields: !!body.optical_category,
-          has_frame_fields: !!body.frame_type,
-          has_lens_fields: !!body.lens_type,
+          name: validatedBody.name,
+          product_type: validatedBody.product_type,
+          has_optical_fields: !!validatedBody.optical_category,
+          has_frame_fields: !!validatedBody.frame_type,
+          has_lens_fields: !!validatedBody.lens_type,
         });
 
-        // Validate required fields
-        if (!body.name || !body.name.trim()) {
-          logger.warn("Validation failed: Product name is required");
-          return NextResponse.json(
-            { error: "Product name is required", field: "name" },
-            { status: 400 },
-          );
-        }
-
+        // Price ya está validado por Zod
         logger.debug("Price validation", {
-          price: body.price,
-          type: typeof body.price,
-          parsed:
-            body.price !== undefined ? parseFloat(body.price) : "undefined",
-          isNaN:
-            body.price !== undefined
-              ? isNaN(parseFloat(body.price))
-              : "undefined",
+          price: validatedBody.price,
+          type: typeof validatedBody.price,
         });
-
-        if (
-          body.price === undefined ||
-          body.price === null ||
-          isNaN(parseFloat(body.price))
-        ) {
-          logger.warn("Validation failed: Valid price is required", {
-            price: body.price,
-            type: typeof body.price,
-          });
-          return NextResponse.json(
-            { error: "Valid price is required", field: "price" },
-            { status: 400 },
-          );
-        }
 
         // Generate slug if not provided
-        let slug = body.slug?.trim();
+        let slug = validatedBody.slug?.trim();
         if (!slug) {
-          slug = body.name
+          slug = validatedBody.name
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "") // Remove accents
@@ -350,76 +353,84 @@ export async function POST(request: NextRequest) {
         }
 
         // Prepare product data with defaults
+        // Usar validatedBody para campos validados por Zod, y body para campos adicionales opcionales
         const productData: Record<string, unknown> = {
-          name: body.name.trim(),
+          name: validatedBody.name.trim(),
           slug: slug,
-          description: body.description || null,
-          short_description: body.short_description || null,
-          price: parseFloat(body.price),
-          compare_at_price: body.compare_at_price
-            ? parseFloat(body.compare_at_price)
-            : null,
-          cost_price: body.cost_price ? parseFloat(body.cost_price) : null,
-          price_includes_tax: body.price_includes_tax ?? false,
-          category_id: body.category_id || null,
+          description: validatedBody.description || null,
+          short_description: validatedBody.short_description || null,
+          price:
+            typeof validatedBody.price === "number"
+              ? validatedBody.price
+              : parseFloat(String(validatedBody.price)),
+          compare_at_price: validatedBody.compare_at_price || null,
+          cost_price: validatedBody.cost_price || null,
+          price_includes_tax: validatedBody.price_includes_tax ?? false,
+          category_id: validatedBody.category_id || null,
           branch_id: productBranchId, // Associate product with branch
           inventory_quantity: 0, // Will be managed in product_branch_stock
-          status: body.status || "draft",
-          featured_image: body.featured_image || null,
-          gallery: body.gallery || [],
-          tags: body.tags || [],
-          is_featured: body.is_featured || false,
+          status: validatedBody.status || "draft",
+          featured_image: validatedBody.featured_image || null,
+          gallery: validatedBody.gallery || [],
+          tags: validatedBody.tags || [],
+          is_featured: validatedBody.is_featured || false,
           published_at:
-            body.published_at ||
-            (body.status === "active" ? new Date().toISOString() : null),
+            validatedBody.published_at ||
+            (validatedBody.status === "active"
+              ? new Date().toISOString()
+              : null),
           // Optical product fields
-          product_type: body.product_type || "frame",
-          optical_category:
-            (body.optical_category && body.optical_category.trim()) || null,
-          sku: (body.sku && body.sku.trim()) || null,
-          barcode: (body.barcode && body.barcode.trim()) || null,
-          brand: (body.brand && body.brand.trim()) || null,
-          manufacturer: (body.manufacturer && body.manufacturer.trim()) || null,
-          model_number: (body.model_number && body.model_number.trim()) || null,
+          product_type: validatedBody.product_type || "frame",
+          optical_category: validatedBody.optical_category || null,
+          sku: validatedBody.sku || null,
+          barcode: validatedBody.barcode || null,
+          brand: validatedBody.brand || null,
+          manufacturer: validatedBody.manufacturer || null,
+          model_number: validatedBody.model_number || null,
           // Frame fields
-          frame_type: (body.frame_type && body.frame_type.trim()) || null,
-          frame_material:
-            (body.frame_material && body.frame_material.trim()) || null,
-          frame_shape: (body.frame_shape && body.frame_shape.trim()) || null,
-          frame_color: (body.frame_color && body.frame_color.trim()) || null,
-          frame_colors: body.frame_colors || [],
-          frame_brand: (body.frame_brand && body.frame_brand.trim()) || null,
-          frame_model: (body.frame_model && body.frame_model.trim()) || null,
-          frame_sku: (body.frame_sku && body.frame_sku.trim()) || null,
-          frame_gender: (body.frame_gender && body.frame_gender.trim()) || null,
-          frame_age_group:
-            (body.frame_age_group && body.frame_age_group.trim()) || null,
-          frame_size: (body.frame_size && body.frame_size.trim()) || null,
-          frame_features: body.frame_features || [],
-          frame_measurements: body.frame_measurements || null,
+          frame_type: validatedBody.frame_type || null,
+          frame_material: validatedBody.frame_material || null,
+          frame_shape: validatedBody.frame_shape || null,
+          frame_color: validatedBody.frame_color || null,
+          frame_size: validatedBody.frame_size || null,
+          frame_bridge_width: validatedBody.frame_bridge_width || null,
+          frame_temple_length: validatedBody.frame_temple_length || null,
+          frame_lens_width: validatedBody.frame_lens_width || null,
+          frame_lens_height: validatedBody.frame_lens_height || null,
           // Lens fields
-          lens_type: (body.lens_type && body.lens_type.trim()) || null,
-          lens_material:
-            (body.lens_material && body.lens_material.trim()) || null,
-          lens_index: body.lens_index ? parseFloat(body.lens_index) : null,
-          lens_coatings: body.lens_coatings || [],
-          lens_tint_options: body.lens_tint_options || [],
-          uv_protection:
-            (body.uv_protection && body.uv_protection.trim()) || null,
-          blue_light_filter: body.blue_light_filter || false,
-          blue_light_filter_percentage: body.blue_light_filter_percentage
-            ? parseInt(body.blue_light_filter_percentage)
+          lens_type: validatedBody.lens_type || null,
+          lens_material: validatedBody.lens_material || null,
+          lens_coating: validatedBody.lens_coating || null,
+          lens_prescription_type: validatedBody.lens_prescription_type || null,
+          // Additional optional fields from body (not in schema yet)
+          frame_colors: (body as any).frame_colors || [],
+          frame_brand: (body as any).frame_brand || null,
+          frame_model: (body as any).frame_model || null,
+          frame_sku: (body as any).frame_sku || null,
+          frame_gender: (body as any).frame_gender || null,
+          frame_age_group: (body as any).frame_age_group || null,
+          frame_features: (body as any).frame_features || [],
+          frame_measurements: (body as any).frame_measurements || null,
+          lens_index: (body as any).lens_index
+            ? parseFloat((body as any).lens_index)
             : null,
-          photochromic: body.photochromic || false,
-          prescription_available: body.prescription_available || false,
-          prescription_range: body.prescription_range || null,
-          requires_prescription: body.requires_prescription || false,
-          is_customizable: body.is_customizable || false,
-          warranty_months: body.warranty_months
-            ? parseInt(body.warranty_months)
+          lens_coatings: (body as any).lens_coatings || [],
+          lens_tint_options: (body as any).lens_tint_options || [],
+          uv_protection: (body as any).uv_protection || null,
+          blue_light_filter: (body as any).blue_light_filter || false,
+          blue_light_filter_percentage: (body as any)
+            .blue_light_filter_percentage
+            ? parseInt((body as any).blue_light_filter_percentage)
             : null,
-          warranty_details:
-            (body.warranty_details && body.warranty_details.trim()) || null,
+          photochromic: (body as any).photochromic || false,
+          prescription_available: (body as any).prescription_available || false,
+          prescription_range: (body as any).prescription_range || null,
+          requires_prescription: (body as any).requires_prescription || false,
+          is_customizable: (body as any).is_customizable || false,
+          warranty_months: (body as any).warranty_months
+            ? parseInt((body as any).warranty_months)
+            : null,
+          warranty_details: (body as any).warranty_details || null,
         };
 
         // Add optional fields only if they exist (and are valid DB columns)

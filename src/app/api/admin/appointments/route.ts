@@ -11,6 +11,12 @@ import type {
   CheckAppointmentAvailabilityParams,
   CheckAppointmentAvailabilityResult,
 } from "@/types/supabase-rpc";
+import { ValidationError } from "@/lib/api/errors";
+import { createAppointmentSchema } from "@/lib/api/validation/zod-schemas";
+import {
+  parseAndValidateBody,
+  validationErrorResponse,
+} from "@/lib/api/validation/zod-helpers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -230,11 +236,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For super admins in global view, we need to get branch_id from the request body if provided
-    const body = await request.json();
+    // Get body first for guest_customer (not in schema yet)
+    let body: any;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Invalid JSON in request body" },
+        { status: 400 },
+      );
+    }
 
-    // If branch_id is provided in body, use it (for super admins)
-    const finalBranchId = body.branch_id || branchContext.branchId;
+    // Validate request body with Zod
+    let validatedBody;
+    try {
+      validatedBody = await parseAndValidateBody(
+        request,
+        createAppointmentSchema,
+      );
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return validationErrorResponse(error);
+      }
+      throw error;
+    }
+
+    // If branch_id is provided in validatedBody, use it (for super admins)
+    const finalBranchId = validatedBody.branch_id || branchContext.branchId;
 
     // Final validation: ensure we have a branch_id (required by database)
     if (!finalBranchId) {
@@ -247,48 +275,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalize time format (ensure HH:MM:SS)
-    let normalizedTime = body.appointment_time;
-    if (normalizedTime) {
-      // Remove any extra characters and ensure proper format
-      normalizedTime = normalizedTime.trim();
-
-      if (normalizedTime.length === 5 && normalizedTime.includes(":")) {
-        // If time is HH:MM, add :00 seconds
-        normalizedTime = normalizedTime + ":00";
-      } else if (
-        normalizedTime.length === 8 &&
-        normalizedTime.match(/^\d{2}:\d{2}:\d{2}$/)
-      ) {
-        // Already in HH:MM:SS format, keep as is
-        normalizedTime = normalizedTime;
-      } else if (normalizedTime.length > 8) {
-        // If longer than HH:MM:SS, truncate to first 8 characters
-        normalizedTime = normalizedTime.substring(0, 8);
-      }
-    }
-
-    if (!normalizedTime || !normalizedTime.match(/^\d{2}:\d{2}:\d{2}$/)) {
-      logger.warn("Invalid time format", {
-        received: body.appointment_time,
-        normalized: normalizedTime,
-      });
-      return NextResponse.json(
-        {
-          error: "Formato de hora inválido",
-          code: "INVALID_TIME_FORMAT",
-          received: body.appointment_time,
-          normalized: normalizedTime,
-        },
-        { status: 400 },
-      );
-    }
+    // Time format is already validated by Zod (HH:MM:SS)
+    const normalizedTime = validatedBody.appointment_time;
 
     logger.debug("Checking availability", {
-      date: body.appointment_date,
+      date: validatedBody.appointment_date,
       time: normalizedTime,
-      originalTime: body.appointment_time,
-      duration: body.duration_minutes || 30,
+      originalTime: validatedBody.appointment_time,
+      duration: validatedBody.duration_minutes || 30,
     });
 
     // Check availability using the function
@@ -296,7 +290,7 @@ export async function POST(request: NextRequest) {
     const timeForRPC = normalizedTime.substring(0, 8); // Ensure HH:MM:SS format (max 8 chars)
 
     logger.debug("Calling RPC with", {
-      p_date: body.appointment_date,
+      p_date: validatedBody.appointment_date,
       p_time: timeForRPC,
       p_duration_minutes: body.duration_minutes || 30,
       p_appointment_id: null,
@@ -311,11 +305,11 @@ export async function POST(request: NextRequest) {
       // Only check availability if branch_id is set (required for non-super admins)
       // For super admins in global view, skip availability check or use a default branch
       const rpcParams: CheckAppointmentAvailabilityParams = {
-        p_date: body.appointment_date,
+        p_date: validatedBody.appointment_date,
         p_time: timeForRPC,
-        p_duration_minutes: body.duration_minutes || 30,
+        p_duration_minutes: validatedBody.duration_minutes || 30,
         p_appointment_id: null,
-        p_staff_id: body.assigned_to || null,
+        p_staff_id: (validatedBody as any).assigned_to || null,
         p_branch_id: finalBranchId,
       };
 
@@ -357,11 +351,11 @@ export async function POST(request: NextRequest) {
 
     logger.debug("Availability check result", { isAvailable });
     logger.debug("Check parameters", {
-      p_date: body.appointment_date,
+      p_date: validatedBody.appointment_date,
       p_time: timeForRPC,
-      p_duration_minutes: body.duration_minutes || 30,
+      p_duration_minutes: validatedBody.duration_minutes || 30,
       p_appointment_id: null,
-      p_staff_id: body.assigned_to || null,
+      p_staff_id: (validatedBody as any).assigned_to || null,
     });
 
     // Handle boolean result - Supabase might return it as a string 't'/'f' or boolean
@@ -383,10 +377,10 @@ export async function POST(request: NextRequest) {
 
     if (!available) {
       logger.warn("Slot not available", {
-        date: body.appointment_date,
+        date: validatedBody.appointment_date,
         time: normalizedTime,
         timeForRPC,
-        duration: body.duration_minutes,
+        duration: validatedBody.duration_minutes,
         rawResult: isAvailable,
       });
 
@@ -395,9 +389,9 @@ export async function POST(request: NextRequest) {
           error: "El horario seleccionado no está disponible",
           code: "SLOT_NOT_AVAILABLE",
           details: {
-            date: body.appointment_date,
+            date: validatedBody.appointment_date,
             time: normalizedTime,
-            duration: body.duration_minutes,
+            duration: validatedBody.duration_minutes,
             rawAvailabilityResult: isAvailable,
           },
         },
@@ -406,10 +400,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle guest customer (non-registered) - store data directly in appointment
-    let customerId = body.customer_id || null;
+    let customerId = validatedBody.customer_id || null;
     let guestData = null;
 
-    if (body.guest_customer) {
+    if (body?.guest_customer) {
       const guest = body.guest_customer;
 
       // Validate required fields
@@ -461,18 +455,18 @@ export async function POST(request: NextRequest) {
       [key: string]: unknown;
     } = {
       customer_id: customerId, // NULL for guest customers
-      appointment_date: body.appointment_date,
+      appointment_date: validatedBody.appointment_date,
       appointment_time: normalizedTime,
-      duration_minutes: body.duration_minutes || 30,
-      appointment_type: body.appointment_type || "consultation",
-      status: body.status || "scheduled",
-      assigned_to: body.assigned_to || null,
-      notes: body.notes || null,
-      reason: body.reason || null,
-      prescription_id: body.prescription_id || null,
-      order_id: body.order_id || null,
-      follow_up_required: body.follow_up_required || false,
-      follow_up_date: body.follow_up_date || null,
+      duration_minutes: validatedBody.duration_minutes || 30,
+      appointment_type: validatedBody.appointment_type,
+      status: (body as any)?.status || "scheduled",
+      assigned_to: (body as any)?.assigned_to || null,
+      notes: validatedBody.notes || null,
+      reason: (body as any)?.reason || null,
+      prescription_id: (body as any)?.prescription_id || null,
+      order_id: (body as any)?.order_id || null,
+      follow_up_required: (body as any)?.follow_up_required || false,
+      follow_up_date: (body as any)?.follow_up_date || null,
       created_by: user.id,
       branch_id: finalBranchId, // Always include branch_id (required by database)
     };

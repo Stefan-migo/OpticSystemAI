@@ -5,6 +5,12 @@ import { NotificationService } from "@/lib/notifications/notification-service";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
+import { ValidationError } from "@/lib/api/errors";
+import { createQuoteSchema } from "@/lib/api/validation/zod-schemas";
+import {
+  parseAndValidateBody,
+  validationErrorResponse,
+} from "@/lib/api/validation/zod-helpers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -186,7 +192,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    // Validate request body with Zod
+    let validatedBody;
+    try {
+      validatedBody = await parseAndValidateBody(request, createQuoteSchema);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return validationErrorResponse(error);
+      }
+      throw error;
+    }
 
     // Generate quote number
     const { data: quoteNumber, error: quoteNumberError } =
@@ -213,15 +228,15 @@ export async function POST(request: NextRequest) {
     const branchContext = await getBranchContext(request, user.id);
 
     // Determine branch_id for the quote
-    // Priority: body.branch_id > branchContext.branchId > customer's branch
-    let quoteBranchId = body.branch_id || branchContext.branchId;
+    // Priority: validatedBody.branch_id > branchContext.branchId > customer's branch
+    let quoteBranchId = validatedBody.branch_id || branchContext.branchId;
 
     // If no branch_id provided, try to get it from customer
-    if (!quoteBranchId && body.customer_id) {
+    if (!quoteBranchId && validatedBody.customer_id) {
       const { data: customer } = await supabaseServiceRole
         .from("customers")
         .select("branch_id")
-        .eq("id", body.customer_id)
+        .eq("id", validatedBody.customer_id)
         .single();
       quoteBranchId = customer?.branch_id || null;
     }
@@ -252,46 +267,74 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate expiration date
-    const expirationDate = body.expiration_date
-      ? new Date(body.expiration_date)
+    const expirationDate = validatedBody.expiration_date
+      ? new Date(validatedBody.expiration_date)
       : new Date(Date.now() + defaultExpirationDays * 24 * 60 * 60 * 1000);
 
     // Create quote
+    // Usar validatedBody para campos validados por Zod
     const { data: newQuote, error: quoteError } = await supabaseServiceRole
       .from("quotes")
       .insert({
         quote_number: quoteNumber,
-        customer_id: body.customer_id,
+        customer_id: validatedBody.customer_id,
         branch_id: quoteBranchId,
-        prescription_id: body.prescription_id || null,
-        frame_product_id: body.frame_product_id || null,
-        frame_name: body.frame_name,
-        frame_brand: body.frame_brand,
-        frame_model: body.frame_model,
-        frame_color: body.frame_color,
-        frame_size: body.frame_size,
-        frame_sku: body.frame_sku,
-        frame_price: body.frame_price || 0,
-        lens_type: body.lens_type,
-        lens_material: body.lens_material,
-        lens_index: body.lens_index,
-        lens_treatments: body.lens_treatments || [],
-        lens_tint_color: body.lens_tint_color,
-        lens_tint_percentage: body.lens_tint_percentage,
-        frame_cost: body.frame_cost || 0,
-        lens_cost: body.lens_cost || 0,
-        treatments_cost: body.treatments_cost || 0,
-        labor_cost: body.labor_cost || 0,
-        subtotal: body.subtotal || 0,
-        tax_amount: body.tax_amount || 0,
-        discount_amount: body.discount_amount || 0,
-        discount_percentage: body.discount_percentage || 0,
-        total_amount: body.total_amount,
-        currency: body.currency || "CLP",
-        status: body.status || "draft",
-        notes: body.notes,
-        customer_notes: body.customer_notes,
-        terms_and_conditions: body.terms_and_conditions,
+        prescription_id: validatedBody.prescription_id || null,
+        frame_product_id: validatedBody.frame_product_id || null,
+        frame_name: validatedBody.frame_name || null,
+        frame_brand: validatedBody.frame_brand || null,
+        frame_model: validatedBody.frame_model || null,
+        frame_color: validatedBody.frame_color || null,
+        frame_size: validatedBody.frame_size || null,
+        frame_sku: validatedBody.frame_sku || null,
+        frame_price:
+          typeof validatedBody.frame_price === "number"
+            ? validatedBody.frame_price
+            : validatedBody.frame_price || 0,
+        lens_type: validatedBody.lens_type || null,
+        lens_material: validatedBody.lens_material || null,
+        lens_index: validatedBody.lens_index || null,
+        lens_treatments: validatedBody.lens_treatments || [],
+        lens_tint_color: validatedBody.lens_tint_color || null,
+        lens_tint_percentage: validatedBody.lens_tint_percentage || null,
+        frame_cost:
+          typeof validatedBody.frame_cost === "number"
+            ? validatedBody.frame_cost
+            : validatedBody.frame_cost || 0,
+        lens_cost:
+          typeof validatedBody.lens_cost === "number"
+            ? validatedBody.lens_cost
+            : validatedBody.lens_cost || 0,
+        treatments_cost:
+          typeof validatedBody.treatments_cost === "number"
+            ? validatedBody.treatments_cost
+            : validatedBody.treatments_cost || 0,
+        labor_cost:
+          typeof validatedBody.labor_cost === "number"
+            ? validatedBody.labor_cost
+            : validatedBody.labor_cost || 0,
+        subtotal:
+          typeof validatedBody.subtotal === "number"
+            ? validatedBody.subtotal
+            : validatedBody.subtotal || 0,
+        tax_amount:
+          typeof validatedBody.tax_amount === "number"
+            ? validatedBody.tax_amount
+            : validatedBody.tax_amount || 0,
+        discount_amount:
+          typeof validatedBody.discount_amount === "number"
+            ? validatedBody.discount_amount
+            : validatedBody.discount_amount || 0,
+        discount_percentage: validatedBody.discount_percentage || 0,
+        total_amount:
+          typeof validatedBody.total_amount === "number"
+            ? validatedBody.total_amount
+            : parseFloat(String(validatedBody.total_amount)),
+        currency: validatedBody.currency || "CLP",
+        status: validatedBody.status || "draft",
+        notes: validatedBody.notes || null,
+        customer_notes: validatedBody.customer_notes || null,
+        terms_and_conditions: validatedBody.terms_and_conditions || null,
         expiration_date: expirationDate.toISOString().split("T")[0],
         created_by: user.id,
       })

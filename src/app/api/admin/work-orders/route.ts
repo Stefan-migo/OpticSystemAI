@@ -5,6 +5,12 @@ import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { NotificationService } from "@/lib/notifications/notification-service";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
+import { ValidationError } from "@/lib/api/errors";
+import { createWorkOrderSchema } from "@/lib/api/validation/zod-schemas";
+import {
+  parseAndValidateBody,
+  validationErrorResponse,
+} from "@/lib/api/validation/zod-helpers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -204,7 +210,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    // Validate request body with Zod
+    let validatedBody;
+    try {
+      validatedBody = await parseAndValidateBody(
+        request,
+        createWorkOrderSchema,
+      );
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return validationErrorResponse(error);
+      }
+      throw error;
+    }
 
     // Get branch context
     const branchContext = await getBranchContext(request, user.id);
@@ -233,11 +251,11 @@ export async function POST(request: NextRequest) {
 
     // Get prescription snapshot if prescription_id is provided
     let prescriptionSnapshot = null;
-    if (body.prescription_id) {
+    if (validatedBody.prescription_id) {
       const { data: prescription } = await supabaseServiceRole
         .from("prescriptions")
         .select("*")
-        .eq("id", body.prescription_id)
+        .eq("id", validatedBody.prescription_id)
         .single();
 
       if (prescription) {
@@ -245,91 +263,84 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate required fields
-    if (!body.frame_name || !body.frame_name.trim()) {
-      return NextResponse.json(
-        {
-          error: "El nombre del marco es requerido",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (!body.lens_type || !body.lens_type.trim()) {
-      return NextResponse.json(
-        {
-          error: "El tipo de lente es requerido",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (!body.lens_material || !body.lens_material.trim()) {
-      return NextResponse.json(
-        {
-          error: "El material del lente es requerido",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (!body.total_amount || body.total_amount <= 0) {
-      return NextResponse.json(
-        {
-          error: "El monto total debe ser mayor a 0",
-        },
-        { status: 400 },
-      );
-    }
-
     // Prepare insert data - ensure no undefined values
+    // Usar validatedBody para campos validados por Zod
     const insertData: Record<string, unknown> = {
       work_order_number: workOrderNumber,
       branch_id: branchContext.branchId,
-      customer_id: body.customer_id,
-      prescription_id: body.prescription_id ?? null,
-      quote_id: body.quote_id ?? null,
-      frame_product_id: body.frame_product_id ?? null,
-      frame_name: body.frame_name.trim(),
-      frame_brand: body.frame_brand?.trim() ?? null,
-      frame_model: body.frame_model?.trim() ?? null,
-      frame_color: body.frame_color?.trim() ?? null,
-      frame_size: body.frame_size?.trim() ?? null,
-      frame_sku: body.frame_sku?.trim() ?? null,
-      frame_serial_number: body.frame_serial_number?.trim() ?? null,
-      lens_type: body.lens_type.trim(),
-      lens_material: body.lens_material.trim(),
-      lens_index: body.lens_index ?? null,
-      lens_treatments: Array.isArray(body.lens_treatments)
-        ? body.lens_treatments
-        : [],
-      lens_tint_color: body.lens_tint_color?.trim() ?? null,
-      lens_tint_percentage: body.lens_tint_percentage ?? null,
+      customer_id: validatedBody.customer_id,
+      prescription_id: validatedBody.prescription_id ?? null,
+      quote_id: (validatedBody as any).quote_id ?? null,
+      frame_product_id: validatedBody.frame_product_id ?? null,
+      frame_name: validatedBody.frame_name.trim(),
+      frame_brand: validatedBody.frame_brand ?? null,
+      frame_model: validatedBody.frame_model ?? null,
+      frame_color: validatedBody.frame_color ?? null,
+      frame_size: validatedBody.frame_size ?? null,
+      frame_sku: validatedBody.frame_sku ?? null,
+      frame_serial_number: (validatedBody as any).frame_serial_number ?? null,
+      lens_type: validatedBody.lens_type.trim(),
+      lens_material: validatedBody.lens_material.trim(),
+      lens_index: validatedBody.lens_index ?? null,
+      lens_treatments: validatedBody.lens_treatments || [],
+      lens_tint_color: validatedBody.lens_tint_color ?? null,
+      lens_tint_percentage: validatedBody.lens_tint_percentage ?? null,
       prescription_snapshot: prescriptionSnapshot,
-      lab_name: body.lab_name?.trim() ?? null,
-      lab_contact: body.lab_contact?.trim() ?? null,
-      lab_order_number: body.lab_order_number?.trim() ?? null,
-      lab_estimated_delivery_date: body.lab_estimated_delivery_date ?? null,
-      status: body.status || "quote",
-      frame_cost: Number(body.frame_cost) || 0,
-      lens_cost: Number(body.lens_cost) || 0,
-      treatments_cost: Number(body.treatments_cost) || 0,
-      labor_cost: Number(body.labor_cost) || 0,
-      lab_cost: Number(body.lab_cost) || 0,
-      subtotal: Number(body.subtotal) || 0,
-      tax_amount: Number(body.tax_amount) || 0,
-      discount_amount: Number(body.discount_amount) || 0,
-      total_amount: Number(body.total_amount) || 0,
-      currency: body.currency || "CLP",
-      payment_status: body.payment_status || "pending",
-      payment_method: body.payment_method?.trim() ?? null,
-      deposit_amount: Number(body.deposit_amount) || 0,
+      lab_name: validatedBody.lab_name ?? null,
+      lab_contact: validatedBody.lab_contact ?? null,
+      lab_order_number: validatedBody.lab_order_number ?? null,
+      lab_estimated_delivery_date:
+        validatedBody.lab_estimated_delivery_date ?? null,
+      status: validatedBody.status || "quote",
+      frame_cost:
+        typeof validatedBody.frame_cost === "number"
+          ? validatedBody.frame_cost
+          : validatedBody.frame_cost || 0,
+      lens_cost:
+        typeof validatedBody.lens_cost === "number"
+          ? validatedBody.lens_cost
+          : validatedBody.lens_cost || 0,
+      treatments_cost:
+        typeof validatedBody.treatments_cost === "number"
+          ? validatedBody.treatments_cost
+          : validatedBody.treatments_cost || 0,
+      labor_cost:
+        typeof validatedBody.labor_cost === "number"
+          ? validatedBody.labor_cost
+          : validatedBody.labor_cost || 0,
+      lab_cost:
+        typeof validatedBody.lab_cost === "number"
+          ? validatedBody.lab_cost
+          : validatedBody.lab_cost || 0,
+      subtotal:
+        typeof validatedBody.subtotal === "number"
+          ? validatedBody.subtotal
+          : validatedBody.subtotal || 0,
+      tax_amount:
+        typeof validatedBody.tax_amount === "number"
+          ? validatedBody.tax_amount
+          : validatedBody.tax_amount || 0,
+      discount_amount:
+        typeof validatedBody.discount_amount === "number"
+          ? validatedBody.discount_amount
+          : validatedBody.discount_amount || 0,
+      total_amount:
+        typeof validatedBody.total_amount === "number"
+          ? validatedBody.total_amount
+          : parseFloat(String(validatedBody.total_amount)),
+      currency: validatedBody.currency || "CLP",
+      payment_status: validatedBody.payment_status || "pending",
+      payment_method: validatedBody.payment_method ?? null,
+      deposit_amount:
+        typeof validatedBody.deposit_amount === "number"
+          ? validatedBody.deposit_amount
+          : validatedBody.deposit_amount || 0,
       balance_amount:
-        Number(body.balance_amount) || Number(body.total_amount) || 0,
-      pos_order_id: body.pos_order_id ?? null,
-      internal_notes: body.internal_notes?.trim() ?? null,
-      customer_notes: body.customer_notes?.trim() ?? null,
-      assigned_to: body.assigned_to || user.id,
+        validatedBody.balance_amount ?? validatedBody.total_amount,
+      pos_order_id: validatedBody.pos_order_id ?? null,
+      internal_notes: validatedBody.internal_notes ?? null,
+      customer_notes: validatedBody.customer_notes ?? null,
+      assigned_to: validatedBody.assigned_to || user.id,
       created_by: user.id,
     };
 
@@ -375,10 +386,10 @@ export async function POST(request: NextRequest) {
     }
 
     // If status is not 'quote', update status dates
-    if (body.status && body.status !== "quote") {
+    if (validatedBody.status && validatedBody.status !== "quote") {
       await supabaseServiceRole.rpc("update_work_order_status", {
         p_work_order_id: newWorkOrder.id,
-        p_new_status: body.status,
+        p_new_status: validatedBody.status,
         p_changed_by: user.id,
         p_notes: "Work order created",
       });

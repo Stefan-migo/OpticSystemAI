@@ -534,20 +534,58 @@ export const processSaleSchema = z
 export const createWorkOrderSchema = z.object({
   customer_id: uuidSchema,
   prescription_id: uuidOptionalSchema,
-  frame_id: uuidOptionalSchema,
-  lens_type: z.string().max(100).trim().optional().nullable(),
-  lens_material: z.string().max(100).trim().optional().nullable(),
-  lens_coating: z.string().max(100).trim().optional().nullable(),
+  quote_id: uuidOptionalSchema,
+  frame_product_id: uuidOptionalSchema,
+  frame_name: z
+    .string()
+    .min(1, "El nombre del marco es requerido")
+    .max(255)
+    .trim(),
+  frame_brand: z.string().max(100).trim().optional().nullable(),
+  frame_model: z.string().max(100).trim().optional().nullable(),
+  frame_color: z.string().max(100).trim().optional().nullable(),
+  frame_size: z.string().max(50).trim().optional().nullable(),
+  frame_sku: z.string().max(100).trim().optional().nullable(),
+  frame_serial_number: z.string().max(100).trim().optional().nullable(),
+  lens_type: z.string().min(1, "El tipo de lente es requerido").max(100).trim(),
+  lens_material: z
+    .string()
+    .min(1, "El material del lente es requerido")
+    .max(100)
+    .trim(),
+  lens_index: z.number().positive().optional().nullable(),
+  lens_treatments: z.array(z.string()).optional(),
+  lens_tint_color: z.string().max(100).trim().optional().nullable(),
+  lens_tint_percentage: z.number().min(0).max(100).optional().nullable(),
+  lab_name: z.string().max(200).trim().optional().nullable(),
+  lab_contact: z.string().max(200).trim().optional().nullable(),
+  lab_order_number: z.string().max(100).trim().optional().nullable(),
+  lab_estimated_delivery_date: dateISOOptionalSchema,
   status: z
-    .enum(["pending", "in_progress", "completed", "cancelled"])
+    .enum(["quote", "pending", "in_progress", "completed", "cancelled"])
+    .default("quote")
+    .optional(),
+  frame_cost: priceSchema.default(0).optional(),
+  lens_cost: priceSchema.default(0).optional(),
+  treatments_cost: priceSchema.default(0).optional(),
+  labor_cost: priceSchema.default(0).optional(),
+  lab_cost: priceSchema.default(0).optional(),
+  subtotal: priceSchema.default(0).optional(),
+  tax_amount: priceSchema.default(0).optional(),
+  discount_amount: priceSchema.default(0).optional(),
+  total_amount: priceSchema,
+  currency: z.string().max(10).default("CLP").optional(),
+  payment_status: z
+    .enum(["pending", "partial", "paid", "refunded"])
     .default("pending")
     .optional(),
-  priority: z
-    .enum(["low", "normal", "high", "urgent"])
-    .default("normal")
-    .optional(),
-  due_date: dateISOOptionalSchema,
-  notes: z.string().max(5000).trim().optional().nullable(),
+  payment_method: z.string().max(50).trim().optional().nullable(),
+  deposit_amount: priceSchema.default(0).optional(),
+  balance_amount: priceSchema.optional(),
+  pos_order_id: uuidOptionalSchema,
+  internal_notes: z.string().max(5000).trim().optional().nullable(),
+  customer_notes: z.string().max(5000).trim().optional().nullable(),
+  assigned_to: uuidOptionalSchema,
   branch_id: uuidOptionalSchema,
 });
 
@@ -560,17 +598,39 @@ export const createWorkOrderSchema = z.object({
  */
 export const createQuoteSchema = z.object({
   customer_id: uuidSchema,
-  items: z
-    .array(
-      z.object({
-        product_id: uuidSchema,
-        quantity: quantitySchema,
-        price: priceSchema,
-      }),
-    )
-    .min(1, "Debe incluir al menos un item"),
-  expires_at: dateISOOptionalSchema,
-  notes: z.string().max(2000).trim().optional().nullable(),
+  prescription_id: uuidOptionalSchema,
+  frame_product_id: uuidOptionalSchema,
+  frame_name: z.string().max(255).trim().optional().nullable(),
+  frame_brand: z.string().max(100).trim().optional().nullable(),
+  frame_model: z.string().max(100).trim().optional().nullable(),
+  frame_color: z.string().max(100).trim().optional().nullable(),
+  frame_size: z.string().max(50).trim().optional().nullable(),
+  frame_sku: z.string().max(100).trim().optional().nullable(),
+  frame_price: priceSchema.default(0).optional(),
+  lens_type: z.string().max(100).trim().optional().nullable(),
+  lens_material: z.string().max(100).trim().optional().nullable(),
+  lens_index: z.number().positive().optional().nullable(),
+  lens_treatments: z.array(z.string()).optional(),
+  lens_tint_color: z.string().max(100).trim().optional().nullable(),
+  lens_tint_percentage: z.number().min(0).max(100).optional().nullable(),
+  frame_cost: priceSchema.default(0).optional(),
+  lens_cost: priceSchema.default(0).optional(),
+  treatments_cost: priceSchema.default(0).optional(),
+  labor_cost: priceSchema.default(0).optional(),
+  subtotal: priceSchema.default(0).optional(),
+  tax_amount: priceSchema.default(0).optional(),
+  discount_amount: priceSchema.default(0).optional(),
+  discount_percentage: z.number().min(0).max(100).default(0).optional(),
+  total_amount: priceSchema,
+  currency: z.string().max(10).default("CLP").optional(),
+  status: z
+    .enum(["draft", "sent", "accepted", "rejected", "expired"])
+    .default("draft")
+    .optional(),
+  notes: z.string().max(5000).trim().optional().nullable(),
+  customer_notes: z.string().max(5000).trim().optional().nullable(),
+  terms_and_conditions: z.string().max(5000).trim().optional().nullable(),
+  expiration_date: dateISOOptionalSchema,
   branch_id: uuidOptionalSchema,
 });
 
@@ -581,16 +641,20 @@ export const createQuoteSchema = z.object({
 /**
  * Schema para crear una cita
  */
-export const createAppointmentSchema = z
-  .object({
-    customer_id: uuidSchema,
-    appointment_type: z.string().max(100).trim(),
-    start_time: dateISOSchema,
-    end_time: dateISOSchema,
-    notes: z.string().max(1000).trim().optional().nullable(),
-    branch_id: uuidOptionalSchema,
-  })
-  .refine((data) => new Date(data.end_time) > new Date(data.start_time), {
-    message: "La hora de fin debe ser posterior a la hora de inicio",
-    path: ["end_time"],
-  });
+export const createAppointmentSchema = z.object({
+  customer_id: uuidSchema,
+  appointment_type: z
+    .string()
+    .min(1, "El tipo de cita es requerido")
+    .max(100)
+    .trim(),
+  appointment_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe estar en formato YYYY-MM-DD"),
+  appointment_time: z
+    .string()
+    .regex(/^\d{2}:\d{2}:\d{2}$/, "La hora debe estar en formato HH:MM:SS"),
+  duration_minutes: z.number().int().positive().default(30).optional(),
+  notes: z.string().max(5000).trim().optional().nullable(),
+  branch_id: uuidOptionalSchema,
+});

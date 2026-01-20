@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     // Build base query with branch filter
     let query = applyBranchFilter(
-      supabase.from("quotes").select("*", { count: "exact" }),
+      supabase.from("quotes").select("*", { count: "exact" }) as any,
     ).order("created_at", { ascending: false });
 
     if (status !== "all") {
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
       // Fetch customers
       const customerIds = [
         ...new Set(
-          quotesWithRelations.map((q) => q.customer_id).filter(Boolean),
+          quotesWithRelations.map((q: any) => q.customer_id).filter(Boolean),
         ),
       ];
       const { data: customers } =
@@ -100,7 +100,9 @@ export async function GET(request: NextRequest) {
       // Fetch prescriptions
       const prescriptionIds = [
         ...new Set(
-          quotesWithRelations.map((q) => q.prescription_id).filter(Boolean),
+          quotesWithRelations
+            .map((q: any) => q.prescription_id)
+            .filter(Boolean),
         ),
       ];
       const { data: prescriptions } =
@@ -114,7 +116,9 @@ export async function GET(request: NextRequest) {
       // Fetch products
       const productIds = [
         ...new Set(
-          quotesWithRelations.map((q) => q.frame_product_id).filter(Boolean),
+          quotesWithRelations
+            .map((q: any) => q.frame_product_id)
+            .filter(Boolean),
         ),
       ];
       const { data: products } =
@@ -126,7 +130,7 @@ export async function GET(request: NextRequest) {
           : { data: [] };
 
       // Map relations to quotes
-      quotesWithRelations = quotesWithRelations.map((quote) => ({
+      quotesWithRelations = quotesWithRelations.map((quote: any) => ({
         ...quote,
         customer: customers?.find((c) => c.id === quote.customer_id) || null,
         prescription:

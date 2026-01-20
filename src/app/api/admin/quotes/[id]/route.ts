@@ -56,7 +56,7 @@ export async function GET(
           customer:customers!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
           prescription:prescriptions!quotes_prescription_id_fkey(*),
           frame_product:products!quotes_frame_product_id_fkey(id, name, price, frame_brand, frame_model)
-        `),
+        `) as any,
     )
       .eq("id", id)
       .single();
@@ -118,7 +118,7 @@ export async function PUT(
 
     // First, verify the quote exists and user has access
     const { data: existingQuote, error: fetchError } = await applyBranchFilter(
-      supabase.from("quotes").select("id, branch_id"),
+      supabase.from("quotes").select("id, branch_id") as any,
     )
       .eq("id", id)
       .single();

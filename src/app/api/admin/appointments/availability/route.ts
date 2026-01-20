@@ -115,15 +115,16 @@ export async function GET(request: NextRequest) {
           timeSlot = slot.time_slot;
         } else if (slot.time_slot) {
           // If it's a TIME object, convert to string
-          const timeValue = slot.time_slot;
+          const timeValue = slot.time_slot as any;
           if (
             typeof timeValue === "object" &&
+            timeValue !== null &&
             "hours" in timeValue &&
             "minutes" in timeValue
           ) {
             timeSlot = `${String(timeValue.hours).padStart(2, "0")}:${String(timeValue.minutes).padStart(2, "0")}`;
           } else {
-            timeSlot = timeValue.toString();
+            timeSlot = String(timeValue);
           }
         }
 

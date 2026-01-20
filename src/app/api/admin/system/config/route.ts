@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // For testing: don't filter sensitive configs
     logger.debug("Executing query to system_config table", {
       category,
-      publicOnly,
+      public_only,
     });
 
     const { data: configs, error } = await query
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
           } catch (error) {
             // If JSON parsing fails, keep the original string value
             logger.warn("Config value is not valid JSON, keeping as string:", {
-              configKey: config.config_key,
+              config_key: config.config_key,
             });
             parsedValue = config.config_value;
           }
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     // Temporarily bypass admin role checks for testing
     logger.debug("Testing config creation for user:", {
       email: user.email,
-      configKey,
+      config_key,
     });
 
     // Validate input
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
     if (configError) {
       logger.error("Error creating system config:", {
         error: configError,
-        configKey,
+        config_key,
       });
       return NextResponse.json(
         { error: "Failed to create system config" },
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
 
     // Temporarily skip activity logging for testing
     logger.info("Config created successfully, skipping activity log", {
-      configKey,
+      config_key,
     });
 
     // Parse the config value safely
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       logger.warn(
         "Created config value is not valid JSON, keeping as string:",
-        { configKey: config.config_key },
+        { config_key: config.config_key },
       );
     }
 
@@ -355,7 +355,7 @@ export async function PUT(request: NextRequest) {
           } catch (error) {
             logger.warn(
               "Created config value is not valid JSON, keeping as string:",
-              { configKey },
+              { config_key },
             );
           }
 
@@ -370,7 +370,7 @@ export async function PUT(request: NextRequest) {
           continue;
         }
 
-        logger.debug("Updating config:", { configKey, isSensitive });
+        logger.debug("Updating config:", { config_key, isSensitive });
 
         // Update the config (use service role client for sensitive configs to bypass RLS)
         const { data: updatedConfig, error: updateError } = await dbClient
@@ -405,7 +405,7 @@ export async function PUT(request: NextRequest) {
         } catch (error) {
           logger.warn(
             "Updated config value is not valid JSON, keeping as string:",
-            { configKey },
+            { config_key },
           );
         }
 

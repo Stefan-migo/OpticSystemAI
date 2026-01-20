@@ -328,7 +328,9 @@ export async function POST(request: NextRequest) {
       };
 
       // Supabase RPC returns { data, error } structure
-      isAvailable = rpcResult.data;
+      // CheckAppointmentAvailabilityResult is boolean | string ('t'/'f')
+      const result = rpcResult.data;
+      isAvailable = result === true || result === "t" || result === "true";
       availabilityError = rpcResult.error;
 
       logger.debug("RPC Result", {

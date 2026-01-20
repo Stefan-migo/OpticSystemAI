@@ -1,10 +1,11 @@
-import { productTools } from './products'
-import { categoryTools } from './categories'
-import { orderTools } from './orders'
-import { customerTools } from './customers'
-import { analyticsTools } from './analytics'
-import { supportTools } from './support'
-import type { ToolDefinition, LLMTool } from '../types'
+import { productTools } from "./products";
+import { categoryTools } from "./categories";
+import { orderTools } from "./orders";
+import { customerTools } from "./customers";
+import { analyticsTools } from "./analytics";
+import { supportTools } from "./support";
+import type { ToolDefinition } from "./types";
+import type { LLMTool } from "../types";
 
 export const allTools: ToolDefinition[] = [
   ...productTools,
@@ -12,49 +13,52 @@ export const allTools: ToolDefinition[] = [
   ...orderTools,
   ...customerTools,
   ...analyticsTools,
-  ...supportTools
-]
+  ...supportTools,
+];
 
 export function getAllTools(): ToolDefinition[] {
-  return allTools
+  return allTools;
 }
 
 export function getToolsByCategory(category: string): ToolDefinition[] {
-  return allTools.filter(tool => tool.category === category)
+  return allTools.filter((tool) => tool.category === category);
 }
 
 export function getToolByName(name: string): ToolDefinition | undefined {
-  return allTools.find(tool => tool.name === name)
+  return allTools.find((tool) => tool.name === name);
 }
 
 export function convertToolsToLLMTools(tools: ToolDefinition[]): LLMTool[] {
-  return tools.map(tool => ({
-    type: 'function',
+  return tools.map((tool) => ({
+    type: "function",
     function: {
       name: tool.name,
       description: tool.description,
-      parameters: tool.parameters
-    }
-  }))
+      parameters: tool.parameters,
+    },
+  }));
 }
 
-export function validateToolCall(toolName: string, params: any): { valid: boolean; error?: string } {
-  const tool = getToolByName(toolName)
+export function validateToolCall(
+  toolName: string,
+  params: any,
+): { valid: boolean; error?: string } {
+  const tool = getToolByName(toolName);
   if (!tool) {
-    return { valid: false, error: `Tool ${toolName} not found` }
+    return { valid: false, error: `Tool ${toolName} not found` };
   }
-  
+
   try {
-    const zodSchema = getZodSchemaForTool(toolName)
+    const zodSchema = getZodSchemaForTool(toolName);
     if (zodSchema) {
-      zodSchema.parse(params)
+      zodSchema.parse(params);
     }
-    return { valid: true }
+    return { valid: true };
   } catch (error: any) {
-    return { valid: false, error: error.message }
+    return { valid: false, error: error.message };
   }
 }
 
 function getZodSchemaForTool(toolName: string): any {
-  return null
+  return null;
 }

@@ -18,7 +18,7 @@ export default function AdminError({
 }) {
   useEffect(() => {
     // Log error to logger
-    logger.error("Admin error page triggered", error, {
+    logger.error("Admin error page triggered", error as any, {
       digest: error.digest,
       adminError: true,
       timestamp: new Date().toISOString(),

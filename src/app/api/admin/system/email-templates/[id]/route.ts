@@ -88,6 +88,7 @@ export async function PUT(
       content?: string;
       variables?: Record<string, unknown>;
       is_active?: boolean;
+      updated_at?: string;
     } = {
       updated_at: new Date().toISOString(),
     };

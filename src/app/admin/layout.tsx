@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { useAuthContext } from '@/contexts/AuthContext';
-import Link from 'next/link';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
-import Image from 'next/image';
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Package, 
-  Users, 
-  BarChart3, 
+import { useEffect, useState, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuthContext } from "@/contexts/AuthContext";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  Users,
+  BarChart3,
   Menu,
   LogOut,
   Bell,
@@ -28,15 +28,15 @@ import {
   FileText,
   Calendar,
   Building2,
-  DollarSign
-} from 'lucide-react';
-import AdminNotificationDropdown from '@/components/admin/AdminNotificationDropdown';
-import Chatbot from '@/components/admin/Chatbot';
-import { BranchSelector } from '@/components/admin/BranchSelector';
-import { ThemeSelector } from '@/components/theme-selector';
-import { useBranch } from '@/hooks/useBranch';
-import { getBranchHeader } from '@/lib/utils/branch';
-import businessConfig from '@/config/business';
+  DollarSign,
+} from "lucide-react";
+import AdminNotificationDropdown from "@/components/admin/AdminNotificationDropdown";
+import Chatbot from "@/components/admin/Chatbot";
+import { BranchSelector } from "@/components/admin/BranchSelector";
+import { ThemeSelector } from "@/components/theme-selector";
+import { useBranch } from "@/hooks/useBranch";
+import { getBranchHeader } from "@/lib/utils/branch";
+import businessConfig from "@/config/business";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -45,84 +45,87 @@ interface AdminLayoutProps {
 // Admin navigation items - will be populated dynamically
 const createNavigationItems = (newWorkOrdersCount?: number) => [
   {
-    href: '/admin/chat',
-    label: 'Chatbot IA',
+    href: "/admin/chat",
+    label: "Chatbot IA",
     icon: MessageSquare,
-    description: 'Asistente inteligente'
+    description: "Asistente inteligente",
   },
   {
-    href: '/admin',
-    label: 'Dashboard',
+    href: "/admin",
+    label: "Dashboard",
     icon: LayoutDashboard,
-    description: 'Visión general y KPIs'
+    description: "Visión general y KPIs",
   },
   {
-    href: '/admin/pos',
-    label: 'Punto de Venta',
+    href: "/admin/pos",
+    label: "Punto de Venta",
     icon: ShoppingCart,
-    description: 'Sistema POS'
+    description: "Sistema POS",
   },
   {
-    href: '/admin/work-orders',
-    label: 'Trabajos',
+    href: "/admin/work-orders",
+    label: "Trabajos",
     icon: Package,
-    description: 'Gestión de trabajos de laboratorio',
-    badge: newWorkOrdersCount !== undefined && newWorkOrdersCount > 0 ? newWorkOrdersCount.toString() : undefined
+    description: "Gestión de trabajos de laboratorio",
+    badge:
+      newWorkOrdersCount !== undefined && newWorkOrdersCount > 0
+        ? newWorkOrdersCount.toString()
+        : undefined,
   },
   {
-    href: '/admin/quotes',
-    label: 'Presupuestos',
+    href: "/admin/quotes",
+    label: "Presupuestos",
     icon: Receipt,
-    description: 'Crear y gestionar presupuestos',
+    description: "Crear y gestionar presupuestos",
   },
   {
-    href: '/admin/appointments',
-    label: 'Citas y Agenda',
+    href: "/admin/appointments",
+    label: "Citas y Agenda",
     icon: Calendar,
-    description: 'Gestión de citas y agenda',
+    description: "Gestión de citas y agenda",
   },
   {
-    href: '/admin/products',
-    label: 'Productos',
+    href: "/admin/products",
+    label: "Productos",
     icon: Package,
-    description: 'Catálogo e inventario'
+    description: "Catálogo e inventario",
   },
   {
-    href: '/admin/customers',
-    label: 'Clientes',
+    href: "/admin/customers",
+    label: "Clientes",
     icon: Users,
-    description: 'Gestión de clientes'
+    description: "Gestión de clientes",
   },
   {
-    href: '/admin/analytics',
-    label: 'Analíticas',
+    href: "/admin/analytics",
+    label: "Analíticas",
     icon: BarChart3,
-    description: 'Reportes y estadísticas'
+    description: "Reportes y estadísticas",
   },
   {
-    href: '/admin/support',
-    label: 'Soporte',
+    href: "/admin/support",
+    label: "Soporte",
     icon: MessageSquare,
-    description: 'Tickets y atención al cliente'
+    description: "Tickets y atención al cliente",
   },
   {
-    href: '/admin/admin-users',
-    label: 'Administradores',
+    href: "/admin/admin-users",
+    label: "Administradores",
     icon: Users,
-    description: 'Gestión de usuarios admin'
+    description: "Gestión de usuarios admin",
   },
   {
-    href: '/admin/branches',
-    label: 'Sucursales',
+    href: "/admin/branches",
+    label: "Sucursales",
     icon: Building2,
-    description: 'Gestión de sucursales',
-    superAdminOnly: true
+    description: "Gestión de sucursales",
+    superAdminOnly: true,
   },
   {
-    href: '/admin/system',
-    label: 'Sistema',
+    href: "/admin/system",
+    label: "Sistema",
     icon: Server,
-    description: 'Administración del sistema'
+    description: "Administración del sistema",
   },
 ];
 
@@ -144,7 +147,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     isChecking: true,
     isAdmin: false,
     hasChecked: false,
-    checkedUserId: null
+    checkedUserId: null,
   });
 
   // Dynamic stats state - Updated for Optical Shop
@@ -166,17 +169,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     newWorkOrders: 0,
     inProgressWorkOrders: 0,
     pendingQuotes: 0,
-    todayAppointments: 0
+    todayAppointments: 0,
   });
 
   // Add state to prevent multiple simultaneous admin checks
   const [isAdminCheckInProgress, setIsAdminCheckInProgress] = useState(false);
-  
+
   // Add ref to prevent multiple redirects
   const redirectInProgress = useRef(false);
-  
+
   // Debug mode - can be enabled via localStorage
-  const debugMode = typeof window !== 'undefined' && localStorage.getItem('admin-debug') === 'true';
+  const debugMode =
+    typeof window !== "undefined" &&
+    localStorage.getItem("admin-debug") === "true";
 
   // Fetch dashboard stats
   useEffect(() => {
@@ -185,17 +190,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       try {
         const headers: HeadersInit = {
-          ...getBranchHeader(currentBranchId)
+          ...getBranchHeader(currentBranchId),
         };
 
-        const response = await fetch('/api/admin/dashboard', { headers });
+        const response = await fetch("/api/admin/dashboard", { headers });
         if (response.ok) {
           const data = await response.json();
           // Extract optical shop specific data
           const workOrders = data.kpis?.workOrders || {};
           const quotes = data.kpis?.quotes || {};
           const appointments = data.kpis?.appointments || {};
-          
+
           setStats({
             todayOrders: data.kpis?.orders?.pending || 0,
             totalOrders: workOrders.pending || 0, // Trabajos pendientes para el badge
@@ -205,13 +210,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             newWorkOrders: workOrders.pending || 0, // Trabajos nuevos/pendientes
             inProgressWorkOrders: workOrders.inProgress || 0, // Trabajos en progreso
             pendingQuotes: quotes.pending || 0, // Presupuestos pendientes
-            todayAppointments: appointments.today || 0 // Citas de hoy
+            todayAppointments: appointments.today || 0, // Citas de hoy
           });
         }
       } catch (error) {
         // Silently handle 401 errors during initial load
-        if (error instanceof Error && !error.message.includes('401')) {
-          console.error('Error fetching stats:', error);
+        if (error instanceof Error && !error.message.includes("401")) {
+          console.error("Error fetching stats:", error);
         }
       }
     };
@@ -236,7 +241,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           isChecking: false,
           isAdmin: false,
           hasChecked: true,
-          checkedUserId: null
+          checkedUserId: null,
         });
         return;
       }
@@ -247,14 +252,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           isChecking: false,
           isAdmin: false,
           hasChecked: false, // Don't mark as checked yet
-          checkedUserId: null
+          checkedUserId: null,
         });
         return;
       }
 
       // 🚀 KEY FIX: Skip admin check if we already checked this exact user ID
       // This prevents re-checking during token refresh events
-      if (adminState.hasChecked && adminState.checkedUserId === user.id && adminState.isAdmin) {
+      if (
+        adminState.hasChecked &&
+        adminState.checkedUserId === user.id &&
+        adminState.isAdmin
+      ) {
         return;
       }
 
@@ -265,36 +274,48 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       // Start admin check
       setIsAdminCheckInProgress(true);
-      setAdminState(prev => ({ ...prev, isChecking: true, hasChecked: false }));
-      
+      setAdminState((prev) => ({
+        ...prev,
+        isChecking: true,
+        hasChecked: false,
+      }));
+
       try {
         if (debugMode) {
           setAdminState({
             isChecking: false,
             isAdmin: true, // Force admin access in debug mode
             hasChecked: true,
-            checkedUserId: user.id
+            checkedUserId: user.id,
           });
           setIsAdminCheckInProgress(false);
           return;
         }
-        
-        const { createClient } = await import('@/utils/supabase/client');
+
+        const { createClient } = await import("@/utils/supabase/client");
         const supabase = createClient();
 
         // Add timeout to admin check to prevent infinite loading
-        const adminCheckPromise = supabase.rpc('is_admin', { user_id: user.id });
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Admin check timeout')), 10000)
+        const adminCheckPromise = supabase.rpc("is_admin", {
+          user_id: user.id,
+        });
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Admin check timeout")), 10000),
         );
 
-        const { data, error } = await Promise.race([adminCheckPromise, timeoutPromise]) as any;
-        
+        const { data, error } = (await Promise.race([
+          adminCheckPromise,
+          timeoutPromise,
+        ])) as any;
+
         let isAdminResult = false;
-        
+
         if (error) {
-          if (error.message !== 'Admin check timeout' && process.env.NODE_ENV === 'development') {
-            console.error('❌ Error checking admin status:', error);
+          if (
+            error.message !== "Admin check timeout" &&
+            process.env.NODE_ENV === "development"
+          ) {
+            console.error("❌ Error checking admin status:", error);
           }
           isAdminResult = false;
         } else {
@@ -306,25 +327,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           isChecking: false,
           isAdmin: isAdminResult,
           hasChecked: true,
-          checkedUserId: user.id // 🚀 KEY FIX: Store the user ID we checked
+          checkedUserId: user.id, // 🚀 KEY FIX: Store the user ID we checked
         });
         setIsAdminCheckInProgress(false);
 
-        console.log('🏁 Admin check completed, isAdmin:', isAdminResult);
-        
+        console.log("🏁 Admin check completed, isAdmin:", isAdminResult);
       } catch (error: any) {
-        if (error.message === 'Admin check timeout') {
-          console.error('⏱️ Admin check timed out - assuming not admin');
+        if (error.message === "Admin check timeout") {
+          console.error("⏱️ Admin check timed out - assuming not admin");
         } else {
-          console.error('❌ Error checking admin status:', error);
+          console.error("❌ Error checking admin status:", error);
         }
-        
+
         // Atomic state update for error case
         setAdminState({
           isChecking: false,
           isAdmin: false,
           hasChecked: true,
-          checkedUserId: user.id
+          checkedUserId: user.id,
         });
         setIsAdminCheckInProgress(false);
       }
@@ -341,18 +361,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
     // Only redirect after both auth and admin checks are COMPLETELY finished
     if (!loading && adminState.hasChecked && !adminState.isChecking) {
-      if (process.env.NODE_ENV === 'development' && debugMode) {
-        console.log('🔄 Admin redirect check:', { 
-          user: !!user, 
+      if (process.env.NODE_ENV === "development" && debugMode) {
+        console.log("🔄 Admin redirect check:", {
+          user: !!user,
           userEmail: user?.email,
-          isAdmin: adminState.isAdmin, 
-          loading, 
+          isAdmin: adminState.isAdmin,
+          loading,
           isChecking: adminState.isChecking,
-        hasChecked: adminState.hasChecked
-      });
-      
+          hasChecked: adminState.hasChecked,
+        });
       }
-      
+
       // If user is admin, just mark as done and return early
       if (user && user.email && adminState.isAdmin) {
         return;
@@ -363,23 +382,30 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         redirectInProgress.current = true;
         setTimeout(() => {
           if (!user || !user.email) {
-            router.push('/login');
+            router.push("/login");
             return;
           }
 
           // Check admin access - only redirect if we've definitely checked and user is not admin
           if (!adminState.isAdmin) {
-            router.push('/login');
+            router.push("/login");
             return;
           }
         }, 500); // 500ms delay to let auth stabilize
       };
-      
+
       if (!user || !user.email || !adminState.isAdmin) {
         delayRedirect();
       }
     }
-  }, [user?.id, adminState.hasChecked, adminState.isChecking, adminState.isAdmin, loading, router]);
+  }, [
+    user?.id,
+    adminState.hasChecked,
+    adminState.isChecking,
+    adminState.isAdmin,
+    loading,
+    router,
+  ]);
 
   // Reset redirect flag when user changes
   useEffect(() => {
@@ -388,7 +414,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleSignOut = async () => {
     await signOut();
-    router.push('/');
+    router.push("/");
   };
 
   // Show loading while auth or admin check is in progress
@@ -399,16 +425,29 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-dorado mx-auto"></div>
           <div className="space-y-2">
             <p className="text-azul-profundo font-semibold">
-              {loading ? 'Cargando autenticación...' : 'Verificando permisos de admin...'}
+              {loading
+                ? "Cargando autenticación..."
+                : "Verificando permisos de admin..."}
             </p>
             <p className="text-tierra-media text-sm">
-              {loading ? 'Iniciando sesión...' : user?.email ? `Verificando acceso para ${user.email}` : 'Verificando permisos...'}
+              {loading
+                ? "Iniciando sesión..."
+                : user?.email
+                  ? `Verificando acceso para ${user.email}`
+                  : "Verificando permisos..."}
             </p>
             <div className="text-xs text-muted-foreground mt-2">
-              Estado: {loading ? 'Auth loading' : adminState.isChecking ? 'Admin checking' : adminState.hasChecked ? 'Check complete' : 'Not checked'} | 
-              User: {user ? '✓' : '✗'} | 
-              Admin: {adminState.isAdmin ? '✓' : '✗'} |
-              Checked: {adminState.hasChecked ? '✓' : '✗'}
+              Estado:{" "}
+              {loading
+                ? "Auth loading"
+                : adminState.isChecking
+                  ? "Admin checking"
+                  : adminState.hasChecked
+                    ? "Check complete"
+                    : "Not checked"}{" "}
+              | User: {user ? "✓" : "✗"} | Admin:{" "}
+              {adminState.isAdmin ? "✓" : "✗"} | Checked:{" "}
+              {adminState.hasChecked ? "✓" : "✗"}
             </div>
           </div>
         </div>
@@ -419,28 +458,29 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   // If auth is loaded but user is not found or not admin, let the redirect useEffect handle it
   // Don't render the admin interface until we confirm admin access
   if (!user || !adminState.isAdmin) {
-    console.log('🚨 Access denied - showing redirect screen:', { 
-      user: !!user, 
-      isAdmin: adminState.isAdmin, 
-      loading, 
+    console.log("🚨 Access denied - showing redirect screen:", {
+      user: !!user,
+      isAdmin: adminState.isAdmin,
+      loading,
       isChecking: adminState.isChecking,
       hasChecked: adminState.hasChecked,
-      userEmail: user?.email 
+      userEmail: user?.email,
     });
-    
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto"></div>
           <p className="text-red-600">
-            {!user ? 'Redirigiendo al login...' : 'Acceso no autorizado, redirigiendo...'}
+            {!user
+              ? "Redirigiendo al login..."
+              : "Acceso no autorizado, redirigiendo..."}
           </p>
           <div className="text-xs text-muted-foreground">
-            User: {user ? '✓' : '✗'} | 
-            Admin: {adminState.isAdmin ? '✓' : '✗'} | 
-            Loading: {loading ? '✓' : '✗'} | 
-            Checking: {adminState.isChecking ? '✓' : '✗'} |
-            HasChecked: {adminState.hasChecked ? '✓' : '✗'}
+            User: {user ? "✓" : "✗"} | Admin: {adminState.isAdmin ? "✓" : "✗"} |
+            Loading: {loading ? "✓" : "✗"} | Checking:{" "}
+            {adminState.isChecking ? "✓" : "✗"} | HasChecked:{" "}
+            {adminState.hasChecked ? "✓" : "✗"}
           </div>
         </div>
       </div>
@@ -448,7 +488,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   // If we reach here, user is authenticated and is admin
-  console.log('🎉 Admin dashboard rendering for:', user.email);
+  console.log("🎉 Admin dashboard rendering for:", user.email);
 
   return (
     <div className="admin-layout">
@@ -463,17 +503,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-80 p-0">
-                <AdminSidebar 
-                  pathname={pathname} 
-                  onNavigate={() => setSidebarOpen(false)} 
+                <AdminSidebar
+                  pathname={pathname}
+                  onNavigate={() => setSidebarOpen(false)}
                   stats={stats}
                 />
               </SheetContent>
             </Sheet>
-            
+
             <h1 className="admin-header-title">Admin</h1>
           </div>
-          
+
           <div className="admin-header-actions">
             <BranchSelector />
             <ThemeSelector />
@@ -488,17 +528,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <div className="lg:flex">
         {/* Desktop Sidebar */}
         <div className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0">
-          <AdminSidebar 
-            pathname={pathname} 
+          <AdminSidebar
+            pathname={pathname}
             stats={stats}
             onChatbotClick={() => setChatbotOpen(true)}
           />
         </div>
 
         {/* Main Content */}
-        <div className="lg:pl-72"
-        style={{width: '-webkit-fill-available'}}
-        >
+        <div className="lg:pl-72" style={{ width: "-webkit-fill-available" }}>
           {/* Desktop Header */}
           <div className="hidden lg:block admin-header">
             <div className="admin-header-content">
@@ -506,26 +544,30 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <h1 className="admin-header-title font-malisha text-admin-text-primary">
                   {businessConfig.displayName || businessConfig.name}
                 </h1>
-                <p className="admin-header-subtitle font-caption text-admin-text-primary">{businessConfig.admin.subtitle}</p>
+                <p className="admin-header-subtitle font-caption text-admin-text-primary">
+                  {businessConfig.admin.subtitle}
+                </p>
               </div>
-              
+
               <div className="admin-header-actions">
                 <BranchSelector />
                 <ThemeSelector />
                 <AdminNotificationDropdown />
-                
+
                 <div className="admin-header-user">
                   <div className="admin-header-user-info">
                     <p className="admin-header-user-name font-caption text-admin-text-primary">
-                      {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email}
+                      {profile?.first_name
+                        ? `${profile.first_name} ${profile.last_name || ""}`.trim()
+                        : user.email}
                     </p>
                     <p className="admin-header-user-role font-caption text-admin-text-secondary">
                       Administrador
                     </p>
                   </div>
                   <Link href="/admin/profile">
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       size="icon"
                       className="hover:bg-admin-bg-tertiary transition-colors"
                       title="Ver perfil"
@@ -533,9 +575,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       <User className="h-5 w-5 text-admin-text-primary" />
                     </Button>
                   </Link>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={handleSignOut}
                     className="hover:bg-admin-bg-tertiary transition-colors"
                     title="Cerrar sesión"
@@ -548,12 +590,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
 
           {/* Page Content */}
-          <main className="admin-content">
-            {children}
-          </main>
+          <main className="admin-content">{children}</main>
         </div>
       </div>
-      
+
       {/* Chatbot - Floating Button */}
       <Chatbot />
     </div>
@@ -561,36 +601,47 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 }
 
 // Sidebar Component
-function AdminSidebar({ 
-  pathname, 
+function AdminSidebar({
+  pathname,
   onNavigate,
-  stats
-}: { 
-  pathname: string; 
+  stats,
+  onChatbotClick,
+}: {
+  pathname: string;
   onNavigate?: () => void;
   stats: {
     todayOrders: number;
     totalOrders: number;
     revenue: number;
     lowStock: number;
+    newWorkOrders: number;
+    inProgressWorkOrders: number;
+    pendingQuotes: number;
+    todayAppointments: number;
   };
+  onChatbotClick?: () => void;
 }) {
   const { isSuperAdmin } = useBranch();
   return (
-    <div className="admin-sidebar flex grow flex-col gap-y-5 overflow-y-auto" style={{background: 'var(--admin-bg-primary)'}}>
+    <div
+      className="admin-sidebar flex grow flex-col gap-y-5 overflow-y-auto"
+      style={{ background: "var(--admin-bg-primary)" }}
+    >
       {/* Logo */}
       <div className="admin-sidebar-header bg-admin-bg-secondary">
         <Link href="/" className="admin-sidebar-logo">
           <div className="admin-sidebar-logo-icon">
-            <Image 
-                  src={businessConfig.admin.logo} 
-                  alt={`Logo`} 
-                  width={60} 
-                  height={60}
-                  className="transition-transform duration-300 hover:scale-105"
-                />
+            <Image
+              src={businessConfig.admin.logo}
+              alt={`Logo`}
+              width={60}
+              height={60}
+              className="transition-transform duration-300 hover:scale-105"
+            />
           </div>
-          <span className="font-malisha text-admin-text-primary">{businessConfig.name}</span>
+          <span className="font-malisha text-admin-text-primary">
+            {businessConfig.name}
+          </span>
         </Link>
       </div>
 
@@ -601,20 +652,32 @@ function AdminSidebar({
             <h3 className="admin-card-title">Resumen Rápido</h3>
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Trabajos Pendientes</span>
-                <span className="font-medium text-orange-600">{stats.newWorkOrders}</span>
+                <span className="text-muted-foreground">
+                  Trabajos Pendientes
+                </span>
+                <span className="font-medium text-orange-600">
+                  {stats.newWorkOrders}
+                </span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">En Proceso</span>
-                <span className="font-medium text-blue-600">{stats.inProgressWorkOrders}</span>
+                <span className="font-medium text-blue-600">
+                  {stats.inProgressWorkOrders}
+                </span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Presupuestos Pendientes</span>
-                <span className="font-medium text-purple-600">{stats.pendingQuotes}</span>
+                <span className="text-muted-foreground">
+                  Presupuestos Pendientes
+                </span>
+                <span className="font-medium text-purple-600">
+                  {stats.pendingQuotes}
+                </span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Citas Hoy</span>
-                <span className="font-medium text-green-600">{stats.todayAppointments}</span>
+                <span className="font-medium text-green-600">
+                  {stats.todayAppointments}
+                </span>
               </div>
             </div>
           </div>
@@ -633,40 +696,38 @@ function AdminSidebar({
               return true;
             })
             .map((item) => {
-            const isActive = pathname === item.href || 
-              (item.href !== '/admin' && pathname.startsWith(item.href));
-            
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={cn(
-                    'admin-nav-item',
-                    isActive && 'active'
-                  )}
-                >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span>{item.label}</span>
-                      {item.badge && (
-                        <Badge 
-                          variant="secondary" 
-                          className="admin-badge admin-badge-error"
-                        >
-                          {item.badge}
-                        </Badge>
-                      )}
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/admin" && pathname.startsWith(item.href));
+
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    onClick={onNavigate}
+                    className={cn("admin-nav-item", isActive && "active")}
+                  >
+                    <item.icon className="h-5 w-5 shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span>{item.label}</span>
+                        {item.badge && (
+                          <Badge
+                            variant="secondary"
+                            className="admin-badge admin-badge-error"
+                          >
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {item.description}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {item.description}
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
+                  </Link>
+                </li>
+              );
+            })}
         </ul>
       </nav>
 
@@ -676,9 +737,7 @@ function AdminSidebar({
           <p className="text-xs text-gray-500">
             {businessConfig.displayName || businessConfig.name} v1.0
           </p>
-          <p className="text-xs text-gray-500 mt-1">
-            Admin Panel
-          </p>
+          <p className="text-xs text-gray-500 mt-1">Admin Panel</p>
         </div>
       </div>
     </div>

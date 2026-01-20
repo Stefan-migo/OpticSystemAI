@@ -1,25 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { 
+import { useState, useEffect, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
   ArrowLeft,
   Save,
   Settings,
   Clock,
   Calendar,
   Loader2,
-  AlertCircle
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
-import { useBranch } from '@/hooks/useBranch';
-import { getBranchHeader } from '@/lib/utils/branch';
-import { useAuthContext } from '@/contexts/AuthContext';
+  AlertCircle,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useBranch } from "@/hooks/useBranch";
+import { getBranchHeader } from "@/lib/utils/branch";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 interface DayConfig {
   enabled: boolean;
@@ -48,33 +48,33 @@ interface ScheduleSettings {
 }
 
 export default function ScheduleSettingsPage() {
-  const { user, authLoading } = useAuthContext();
+  const { user, loading: authLoading } = useAuthContext();
   const router = useRouter();
   const { currentBranchId, isLoading: branchLoading } = useBranch();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<ScheduleSettings | null>(null);
-  const [newBlockedDate, setNewBlockedDate] = useState('');
+  const [newBlockedDate, setNewBlockedDate] = useState("");
 
   const fetchSettings = useCallback(async () => {
     if (!user || authLoading) return;
-    
+
     try {
       setLoading(true);
       const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...getBranchHeader(currentBranchId)
+        "Content-Type": "application/json",
+        ...getBranchHeader(currentBranchId),
       };
-      const response = await fetch('/api/admin/schedule-settings', { headers });
+      const response = await fetch("/api/admin/schedule-settings", { headers });
       if (!response.ok) {
-        throw new Error('Failed to fetch settings');
+        throw new Error("Failed to fetch settings");
       }
 
       const data = await response.json();
       setSettings(data.settings);
     } catch (error) {
-      console.error('Error fetching settings:', error);
-      toast.error('Error al cargar configuración');
+      console.error("Error fetching settings:", error);
+      toast.error("Error al cargar configuración");
     } finally {
       setLoading(false);
     }
@@ -86,42 +86,46 @@ export default function ScheduleSettingsPage() {
     }
   }, [branchLoading, authLoading, user, fetchSettings]);
 
-  const updateDayConfig = (day: keyof ScheduleSettings['working_hours'], field: keyof DayConfig, value: any) => {
+  const updateDayConfig = (
+    day: keyof ScheduleSettings["working_hours"],
+    field: keyof DayConfig,
+    value: any,
+  ) => {
     if (!settings) return;
-    
+
     setSettings({
       ...settings,
       working_hours: {
         ...settings.working_hours,
         [day]: {
           ...settings.working_hours[day],
-          [field]: value
-        }
-      }
+          [field]: value,
+        },
+      },
     });
   };
 
   const addBlockedDate = () => {
     if (!newBlockedDate || !settings) return;
-    
+
     if (settings.blocked_dates.includes(newBlockedDate)) {
-      toast.error('Esta fecha ya está bloqueada');
+      toast.error("Esta fecha ya está bloqueada");
       return;
     }
 
     setSettings({
       ...settings,
-      blocked_dates: [...settings.blocked_dates, newBlockedDate].sort()
+      blocked_dates: [...settings.blocked_dates, newBlockedDate].sort(),
     });
-    setNewBlockedDate('');
+    setNewBlockedDate("");
   };
 
   const removeBlockedDate = (date: string) => {
     if (!settings) return;
-    
+
     setSettings({
       ...settings,
-      blocked_dates: settings.blocked_dates.filter(d => d !== date)
+      blocked_dates: settings.blocked_dates.filter((d) => d !== date),
     });
   };
 
@@ -131,38 +135,38 @@ export default function ScheduleSettingsPage() {
     setSaving(true);
     try {
       const headers = {
-        'Content-Type': 'application/json',
-        ...getBranchHeader(currentBranchId)
+        "Content-Type": "application/json",
+        ...getBranchHeader(currentBranchId),
       };
-      const response = await fetch('/api/admin/schedule-settings', {
-        method: 'PUT',
+      const response = await fetch("/api/admin/schedule-settings", {
+        method: "PUT",
         headers,
-        body: JSON.stringify(settings)
+        body: JSON.stringify(settings),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Error al guardar configuración');
+        throw new Error(error.error || "Error al guardar configuración");
       }
 
-      toast.success('Configuración guardada exitosamente');
-      router.push('/admin/appointments');
+      toast.success("Configuración guardada exitosamente");
+      router.push("/admin/appointments");
     } catch (error: any) {
-      console.error('Error saving settings:', error);
-      toast.error(error.message || 'Error al guardar configuración');
+      console.error("Error saving settings:", error);
+      toast.error(error.message || "Error al guardar configuración");
     } finally {
       setSaving(false);
     }
   };
 
-  const dayLabels: Record<keyof ScheduleSettings['working_hours'], string> = {
-    monday: 'Lunes',
-    tuesday: 'Martes',
-    wednesday: 'Miércoles',
-    thursday: 'Jueves',
-    friday: 'Viernes',
-    saturday: 'Sábado',
-    sunday: 'Domingo'
+  const dayLabels: Record<keyof ScheduleSettings["working_hours"], string> = {
+    monday: "Lunes",
+    tuesday: "Martes",
+    wednesday: "Miércoles",
+    thursday: "Jueves",
+    friday: "Viernes",
+    saturday: "Sábado",
+    sunday: "Domingo",
   };
 
   if (loading) {
@@ -173,7 +177,9 @@ export default function ScheduleSettingsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Cargando...</h1>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Cargando...
+            </h1>
           </div>
         </div>
       </div>
@@ -189,7 +195,9 @@ export default function ScheduleSettingsPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-azul-profundo">Error</h1>
-            <p className="text-tierra-media">No se pudo cargar la configuración</p>
+            <p className="text-tierra-media">
+              No se pudo cargar la configuración
+            </p>
           </div>
         </div>
       </div>
@@ -205,8 +213,12 @@ export default function ScheduleSettingsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Configuración de Horarios</h1>
-            <p className="text-tierra-media">Personaliza los horarios de trabajo y disponibilidad</p>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Configuración de Horarios
+            </h1>
+            <p className="text-tierra-media">
+              Personaliza los horarios de trabajo y disponibilidad
+            </p>
           </div>
         </div>
         <Button onClick={handleSave} disabled={saving}>
@@ -242,10 +254,12 @@ export default function ScheduleSettingsPage() {
                 max="60"
                 step="5"
                 value={settings.slot_duration_minutes}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  slot_duration_minutes: parseInt(e.target.value) || 15
-                })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    slot_duration_minutes: parseInt(e.target.value) || 15,
+                  })
+                }
               />
               <p className="text-xs text-tierra-media mt-1">
                 Intervalo de tiempo para los slots (ej: 15 minutos)
@@ -259,10 +273,13 @@ export default function ScheduleSettingsPage() {
                 max="240"
                 step="15"
                 value={settings.default_appointment_duration}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  default_appointment_duration: parseInt(e.target.value) || 30
-                })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    default_appointment_duration:
+                      parseInt(e.target.value) || 30,
+                  })
+                }
               />
               <p className="text-xs text-tierra-media mt-1">
                 Duración predeterminada de las citas
@@ -276,10 +293,12 @@ export default function ScheduleSettingsPage() {
                 max="30"
                 step="5"
                 value={settings.buffer_time_minutes}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  buffer_time_minutes: parseInt(e.target.value) || 0
-                })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    buffer_time_minutes: parseInt(e.target.value) || 0,
+                  })
+                }
               />
               <p className="text-xs text-tierra-media mt-1">
                 Tiempo entre citas
@@ -292,10 +311,12 @@ export default function ScheduleSettingsPage() {
                 min="0"
                 max="48"
                 value={settings.min_advance_booking_hours}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  min_advance_booking_hours: parseInt(e.target.value) || 0
-                })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    min_advance_booking_hours: parseInt(e.target.value) || 0,
+                  })
+                }
               />
               <p className="text-xs text-tierra-media mt-1">
                 Mínimo de horas de anticipación
@@ -308,10 +329,12 @@ export default function ScheduleSettingsPage() {
                 min="1"
                 max="365"
                 value={settings.max_advance_booking_days}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  max_advance_booking_days: parseInt(e.target.value) || 90
-                })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    max_advance_booking_days: parseInt(e.target.value) || 90,
+                  })
+                }
               />
               <p className="text-xs text-tierra-media mt-1">
                 Máximo de días de anticipación
@@ -330,19 +353,27 @@ export default function ScheduleSettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {(Object.keys(settings.working_hours) as Array<keyof ScheduleSettings['working_hours']>).map((day) => {
+          {(
+            Object.keys(settings.working_hours) as Array<
+              keyof ScheduleSettings["working_hours"]
+            >
+          ).map((day) => {
             const dayConfig = settings.working_hours[day];
-            
+
             return (
               <div key={day} className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-lg font-semibold">{dayLabels[day]}</Label>
+                  <Label className="text-lg font-semibold">
+                    {dayLabels[day]}
+                  </Label>
                   <Switch
                     checked={dayConfig.enabled}
-                    onCheckedChange={(checked) => updateDayConfig(day, 'enabled', checked)}
+                    onCheckedChange={(checked) =>
+                      updateDayConfig(day, "enabled", checked)
+                    }
                   />
                 </div>
-                
+
                 {dayConfig.enabled && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
@@ -350,7 +381,9 @@ export default function ScheduleSettingsPage() {
                       <Input
                         type="time"
                         value={dayConfig.start_time}
-                        onChange={(e) => updateDayConfig(day, 'start_time', e.target.value)}
+                        onChange={(e) =>
+                          updateDayConfig(day, "start_time", e.target.value)
+                        }
                       />
                     </div>
                     <div>
@@ -358,15 +391,23 @@ export default function ScheduleSettingsPage() {
                       <Input
                         type="time"
                         value={dayConfig.end_time}
-                        onChange={(e) => updateDayConfig(day, 'end_time', e.target.value)}
+                        onChange={(e) =>
+                          updateDayConfig(day, "end_time", e.target.value)
+                        }
                       />
                     </div>
                     <div>
                       <Label>Inicio Almuerzo</Label>
                       <Input
                         type="time"
-                        value={dayConfig.lunch_start || ''}
-                        onChange={(e) => updateDayConfig(day, 'lunch_start', e.target.value || null)}
+                        value={dayConfig.lunch_start || ""}
+                        onChange={(e) =>
+                          updateDayConfig(
+                            day,
+                            "lunch_start",
+                            e.target.value || null,
+                          )
+                        }
                         placeholder="Opcional"
                       />
                     </div>
@@ -374,8 +415,14 @@ export default function ScheduleSettingsPage() {
                       <Label>Fin Almuerzo</Label>
                       <Input
                         type="time"
-                        value={dayConfig.lunch_end || ''}
-                        onChange={(e) => updateDayConfig(day, 'lunch_end', e.target.value || null)}
+                        value={dayConfig.lunch_end || ""}
+                        onChange={(e) =>
+                          updateDayConfig(
+                            day,
+                            "lunch_end",
+                            e.target.value || null,
+                          )
+                        }
                         placeholder="Opcional"
                       />
                     </div>
@@ -407,7 +454,7 @@ export default function ScheduleSettingsPage() {
               Agregar
             </Button>
           </div>
-          
+
           {settings.blocked_dates.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {settings.blocked_dates.map((date) => (
@@ -416,7 +463,7 @@ export default function ScheduleSettingsPage() {
                   className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
                 >
                   <span className="text-sm font-medium">
-                    {new Date(date).toLocaleDateString('es-CL')}
+                    {new Date(date).toLocaleDateString("es-CL")}
                   </span>
                   <Button
                     type="button"
@@ -458,4 +505,3 @@ export default function ScheduleSettingsPage() {
     </div>
   );
 }
-

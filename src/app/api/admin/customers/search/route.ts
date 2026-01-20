@@ -7,7 +7,7 @@ import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
 import { RateLimitError } from "@/lib/api/errors";
 
 export async function GET(request: NextRequest) {
-  return withRateLimit(rateLimitConfigs.search, async () => {
+  return (withRateLimit(rateLimitConfigs.search) as any)(request, async () => {
     try {
       const supabase = await createClient();
 
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 
       // Use service role client to bypass RLS and ensure we can search all customers
       const supabaseServiceRole = createServiceRoleClient();
-      let searchTerm = query.trim();
+      const searchTerm = query.trim();
 
       // Normalize RUT: remove dots, dashes, and spaces for searching
       // This allows searching with or without formatting
@@ -209,7 +209,7 @@ export async function GET(request: NextRequest) {
           const normalizedPattern = `%${normalizedSearchTerm}%`;
           const formattedPattern = `%${formattedSearchTerm}%`;
 
-          let allCustomers: any[] = [];
+          const allCustomers: any[] = [];
 
           const queries = [
             applyBranchFilter(

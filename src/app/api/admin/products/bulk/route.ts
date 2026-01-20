@@ -279,7 +279,9 @@ export async function POST(request: NextRequest) {
             }
 
             // Force delete: First delete order items, then products
-            logger.info("Force deleting products with orders", { productIds });
+            logger.info("Force deleting products with orders", {
+              productIds: product_ids,
+            });
 
             // Delete order items first
             const { error: orderItemsDeleteError } = await serviceSupabase
@@ -296,7 +298,9 @@ export async function POST(request: NextRequest) {
               );
             }
 
-            logger.info("Order items deleted successfully", { productIds });
+            logger.info("Order items deleted successfully", {
+              productIds: product_ids,
+            });
           }
 
           // Perform the hard delete (no foreign key constraints)

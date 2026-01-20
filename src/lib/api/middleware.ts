@@ -72,8 +72,16 @@ export const rateLimitConfigs = {
 };
 
 // Rate limiting middleware
-export function withRateLimit(config: RateLimitConfig) {
-  return async (request: NextRequest, handler: () => Promise<NextResponse>) => {
+export function withRateLimit(
+  config: RateLimitConfig,
+): (
+  request: NextRequest,
+  handler: () => Promise<NextResponse>,
+) => Promise<NextResponse> {
+  return async (
+    request: NextRequest,
+    handler: () => Promise<NextResponse>,
+  ): Promise<NextResponse> => {
     const key = config.keyGenerator
       ? config.keyGenerator(request)
       : getClientIdentifier(request);
@@ -163,7 +171,7 @@ export async function requireAuth(request: NextRequest): Promise<{
       throw new AuthenticationError("Invalid or expired token");
     }
 
-    return { userId: user.id, user };
+    return { userId: user.id, user: { email: user.email, ...user } };
   } catch (error) {
     throw new AuthenticationError("Authentication failed");
   }

@@ -3,9 +3,14 @@ import { createClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
+  let zone_id: string | null = null;
+  let weight: number | undefined = undefined;
+  let price: number | undefined = undefined;
   try {
     const body = await request.json();
-    const { zone_id, weight, price } = body;
+    zone_id = body.zone_id;
+    weight = body.weight;
+    price = body.price;
 
     if (!zone_id) {
       return NextResponse.json(
@@ -103,7 +108,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error("Error in shipping calculate API:", {
       error,
-      zoneId,
+      zoneId: zone_id,
       weight,
       price,
     });

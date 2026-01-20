@@ -76,7 +76,10 @@ export const appLogger = {
    * Error level - error messages
    * Accepts Error objects or plain messages
    */
-  error: (message: string, error?: Error | any, data?: any) => {
+  error: (message: string, errorOrData?: any, data?: any) => {
+    // Handle case where error is passed as second argument
+    const error = errorOrData instanceof Error ? errorOrData : undefined;
+    const errorData = errorOrData instanceof Error ? data : errorOrData;
     if (error instanceof Error) {
       logger.error(
         {
@@ -90,7 +93,8 @@ export const appLogger = {
         message,
       );
     } else if (error) {
-      logger.error({ ...error, ...data }, message);
+      const errorObj = typeof error === "object" && error !== null ? error : {};
+      logger.error({ ...errorObj, ...(data || {}) }, message);
     } else if (data) {
       logger.error(data, message);
     } else {

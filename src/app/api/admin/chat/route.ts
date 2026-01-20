@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
           modelToTry: string | undefined,
         ) => {
           let providerContent = "";
-          let providerToolCalls: ToolCall[] = [];
+          const providerToolCalls: ToolCall[] = [];
 
           try {
             const fallbackAgent = await createAgent({
@@ -187,7 +187,9 @@ export async function POST(request: NextRequest) {
             });
 
             // Check if it's a rate limit error - don't retry in this case
-            const errorMessage = error.message || error.toString();
+            const errorMessage =
+              (error instanceof Error ? error.message : String(error)) ||
+              String(error);
             const isRateLimit =
               errorMessage.includes("Too Many Requests") ||
               errorMessage.includes("429") ||
@@ -269,7 +271,9 @@ export async function POST(request: NextRequest) {
           }
         } catch (error) {
           logger.error("Stream error", { error });
-          const errorMessage = error.message || "An error occurred";
+          const errorMessage =
+            (error instanceof Error ? error.message : String(error)) ||
+            "An error occurred";
           const isRateLimit =
             errorMessage.includes("Too Many Requests") ||
             errorMessage.includes("429") ||
@@ -296,7 +300,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error("Chat API error", { error });
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        error:
+          (error instanceof Error ? error.message : String(error)) ||
+          "Internal server error",
+      },
       { status: 500 },
     );
   }
@@ -337,7 +345,11 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error("Providers API error", { error });
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        error:
+          (error instanceof Error ? error.message : String(error)) ||
+          "Internal server error",
+      },
       { status: 500 },
     );
   }

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BranchProvider } from "@/contexts/BranchContext";
+import { QueryProvider } from "@/lib/react-query/QueryProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
@@ -39,23 +40,12 @@ export default function RootLayout({
           enableSystem={false}
         >
           <ErrorBoundary>
-            <AuthProvider>
-              <BranchProvider>{children}</BranchProvider>
-              <Toaster
-                position="bottom-right"
-                richColors
-                closeButton
-                expand={true}
-                duration={4000}
-                toastOptions={{
-                  style: {
-                    background: "var(--background)",
-                    color: "var(--foreground)",
-                    border: "1px solid var(--border)",
-                  },
-                }}
-              />
-            </AuthProvider>
+            <QueryProvider>
+              <AuthProvider>
+                <BranchProvider>{children}</BranchProvider>
+                <Toaster />
+              </AuthProvider>
+            </QueryProvider>
           </ErrorBoundary>
         </ThemeProvider>
       </body>

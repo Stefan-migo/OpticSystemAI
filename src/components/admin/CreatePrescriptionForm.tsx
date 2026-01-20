@@ -1,28 +1,21 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { 
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { 
-  Eye, 
-  Loader2,
-  Plus,
-  Calendar,
-  User,
-  FileText
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Eye, Loader2, Plus, Calendar, User, FileText } from "lucide-react";
+import { toast } from "sonner";
 
 interface CreatePrescriptionFormProps {
   customerId: string;
@@ -31,129 +24,145 @@ interface CreatePrescriptionFormProps {
   initialData?: any;
 }
 
-export default function CreatePrescriptionForm({ 
+export default function CreatePrescriptionForm({
   customerId,
-  onSuccess, 
+  onSuccess,
   onCancel,
-  initialData
+  initialData,
 }: CreatePrescriptionFormProps) {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
-    prescription_date: initialData?.prescription_date || new Date().toISOString().split('T')[0],
-    expiration_date: initialData?.expiration_date || '',
-    prescription_number: initialData?.prescription_number || '',
-    issued_by: initialData?.issued_by || '',
-    issued_by_license: initialData?.issued_by_license || '',
-    
+    prescription_date:
+      initialData?.prescription_date || new Date().toISOString().split("T")[0],
+    expiration_date: initialData?.expiration_date || "",
+    prescription_number: initialData?.prescription_number || "",
+    issued_by: initialData?.issued_by || "",
+    issued_by_license: initialData?.issued_by_license || "",
+
     // Right Eye (OD - Oculus Dexter)
-    od_sphere: initialData?.od_sphere || '',
-    od_cylinder: initialData?.od_cylinder || '',
-    od_axis: initialData?.od_axis || '',
-    od_add: initialData?.od_add || '',
-    
+    od_sphere: initialData?.od_sphere || "",
+    od_cylinder: initialData?.od_cylinder || "",
+    od_axis: initialData?.od_axis || "",
+    od_add: initialData?.od_add || "",
+
     // Left Eye (OS - Oculus Sinister)
-    os_sphere: initialData?.os_sphere || '',
-    os_cylinder: initialData?.os_cylinder || '',
-    os_axis: initialData?.os_axis || '',
-    os_add: initialData?.os_add || '',
-    
+    os_sphere: initialData?.os_sphere || "",
+    os_cylinder: initialData?.os_cylinder || "",
+    os_axis: initialData?.os_axis || "",
+    os_add: initialData?.os_add || "",
+
     // Pupillary Distance (Binocular)
-    pd: initialData?.pd || (initialData?.od_pd && initialData?.os_pd ? (parseFloat(initialData.od_pd) + parseFloat(initialData.os_pd)).toString() : ''),
-    near_pd: initialData?.near_pd || (initialData?.od_near_pd && initialData?.os_near_pd ? (parseFloat(initialData.od_near_pd) + parseFloat(initialData.os_near_pd)).toString() : ''),
-    
+    pd:
+      initialData?.pd ||
+      (initialData?.od_pd && initialData?.os_pd
+        ? (
+            parseFloat(initialData.od_pd) + parseFloat(initialData.os_pd)
+          ).toString()
+        : ""),
+    near_pd:
+      initialData?.near_pd ||
+      (initialData?.od_near_pd && initialData?.os_near_pd
+        ? (
+            parseFloat(initialData.od_near_pd) +
+            parseFloat(initialData.os_near_pd)
+          ).toString()
+        : ""),
+
     // Additional measurements
-    frame_pd: initialData?.frame_pd || '',
-    height_segmentation: initialData?.height_segmentation || '',
-    
+    frame_pd: initialData?.frame_pd || "",
+    height_segmentation: initialData?.height_segmentation || "",
+
     // Prescription type
-    prescription_type: initialData?.prescription_type || '',
-    lens_type: initialData?.lens_type || '',
-    lens_material: initialData?.lens_material || '',
-    
+    prescription_type: initialData?.prescription_type || "",
+    lens_type: initialData?.lens_type || "",
+    lens_material: initialData?.lens_material || "",
+
     // Special requirements
-    prism_od: initialData?.prism_od || '',
-    prism_os: initialData?.prism_os || '',
-    tint_od: initialData?.tint_od || '',
-    tint_os: initialData?.tint_os || '',
-    coatings: initialData?.coatings || [] as string[],
-    
+    prism_od: initialData?.prism_od || "",
+    prism_os: initialData?.prism_os || "",
+    tint_od: initialData?.tint_od || "",
+    tint_os: initialData?.tint_os || "",
+    coatings: initialData?.coatings || ([] as string[]),
+
     // Notes
-    notes: initialData?.notes || '',
-    observations: initialData?.observations || '',
-    recommendations: initialData?.recommendations || '',
-    
+    notes: initialData?.notes || "",
+    observations: initialData?.observations || "",
+    recommendations: initialData?.recommendations || "",
+
     // Status
-    is_active: initialData?.is_active !== undefined ? initialData.is_active : true,
-    is_current: initialData?.is_current !== undefined ? initialData.is_current : false
+    is_active:
+      initialData?.is_active !== undefined ? initialData.is_active : true,
+    is_current:
+      initialData?.is_current !== undefined ? initialData.is_current : false,
   });
 
   const prescriptionTypes = [
-    { value: 'single_vision', label: 'Visión Simple' },
-    { value: 'bifocal', label: 'Bifocal' },
-    { value: 'trifocal', label: 'Trifocal' },
-    { value: 'progressive', label: 'Progresivo' },
-    { value: 'reading', label: 'Lectura' },
-    { value: 'computer', label: 'Computadora' },
-    { value: 'sports', label: 'Deportivo' }
+    { value: "single_vision", label: "Visión Simple" },
+    { value: "bifocal", label: "Bifocal" },
+    { value: "trifocal", label: "Trifocal" },
+    { value: "progressive", label: "Progresivo" },
+    { value: "reading", label: "Lectura" },
+    { value: "computer", label: "Computadora" },
+    { value: "sports", label: "Deportivo" },
   ];
 
   const lensMaterials = [
-    { value: 'cr39', label: 'CR-39' },
-    { value: 'polycarbonate', label: 'Policarbonato' },
-    { value: 'high_index_1_67', label: 'Alto Índice 1.67' },
-    { value: 'high_index_1_74', label: 'Alto Índice 1.74' },
-    { value: 'trivex', label: 'Trivex' },
-    { value: 'glass', label: 'Vidrio' }
+    { value: "cr39", label: "CR-39" },
+    { value: "polycarbonate", label: "Policarbonato" },
+    { value: "high_index_1_67", label: "Alto Índice 1.67" },
+    { value: "high_index_1_74", label: "Alto Índice 1.74" },
+    { value: "trivex", label: "Trivex" },
+    { value: "glass", label: "Vidrio" },
   ];
 
   const availableCoatings = [
-    { value: 'anti_reflective', label: 'Anti-reflejante' },
-    { value: 'blue_light_filter', label: 'Filtro Luz Azul' },
-    { value: 'uv_protection', label: 'Protección UV' },
-    { value: 'scratch_resistant', label: 'Anti-rayas' },
-    { value: 'anti_fog', label: 'Anti-empañamiento' },
-    { value: 'photochromic', label: 'Fotocromático' },
-    { value: 'polarized', label: 'Polarizado' }
+    { value: "anti_reflective", label: "Anti-reflejante" },
+    { value: "blue_light_filter", label: "Filtro Luz Azul" },
+    { value: "uv_protection", label: "Protección UV" },
+    { value: "scratch_resistant", label: "Anti-rayas" },
+    { value: "anti_fog", label: "Anti-empañamiento" },
+    { value: "photochromic", label: "Fotocromático" },
+    { value: "polarized", label: "Polarizado" },
   ];
 
   const handleCoatingsToggle = (coating: string) => {
     const currentCoatings = formData.coatings || [];
     if (currentCoatings.includes(coating)) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        coatings: currentCoatings.filter(c => c !== coating)
+        coatings: currentCoatings.filter((c: string) => c !== coating),
       }));
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        coatings: [...currentCoatings, coating]
+        coatings: [...currentCoatings, coating],
       }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate that at least one eye has prescription data
     const hasOD = formData.od_sphere || formData.od_cylinder || formData.od_add;
     const hasOS = formData.os_sphere || formData.os_cylinder || formData.os_add;
-    
+
     if (!hasOD && !hasOS) {
-      toast.error('Debe ingresar al menos una receta para OD o OS');
+      toast.error("Debe ingresar al menos una receta para OD o OS");
       return;
     }
 
     setSaving(true);
     try {
-      const url = initialData?.id 
+      const url = initialData?.id
         ? `/api/admin/customers/${customerId}/prescriptions/${initialData.id}`
         : `/api/admin/customers/${customerId}/prescriptions`;
-      
-      const method = initialData?.id ? 'PUT' : 'POST';
+
+      const method = initialData?.id ? "PUT" : "POST";
 
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prescription_date: formData.prescription_date,
           expiration_date: formData.expiration_date || null,
@@ -161,20 +170,30 @@ export default function CreatePrescriptionForm({
           issued_by: formData.issued_by || null,
           issued_by_license: formData.issued_by_license || null,
           od_sphere: formData.od_sphere ? parseFloat(formData.od_sphere) : null,
-          od_cylinder: formData.od_cylinder ? parseFloat(formData.od_cylinder) : null,
+          od_cylinder: formData.od_cylinder
+            ? parseFloat(formData.od_cylinder)
+            : null,
           od_axis: formData.od_axis ? parseInt(formData.od_axis) : null,
           od_add: formData.od_add ? parseFloat(formData.od_add) : null,
           // Calculate monocular PD from binocular PD (divide by 2)
           od_pd: formData.pd ? parseFloat(formData.pd) / 2 : null,
-          od_near_pd: formData.near_pd ? parseFloat(formData.near_pd) / 2 : null,
+          od_near_pd: formData.near_pd
+            ? parseFloat(formData.near_pd) / 2
+            : null,
           os_sphere: formData.os_sphere ? parseFloat(formData.os_sphere) : null,
-          os_cylinder: formData.os_cylinder ? parseFloat(formData.os_cylinder) : null,
+          os_cylinder: formData.os_cylinder
+            ? parseFloat(formData.os_cylinder)
+            : null,
           os_axis: formData.os_axis ? parseInt(formData.os_axis) : null,
           os_add: formData.os_add ? parseFloat(formData.os_add) : null,
           os_pd: formData.pd ? parseFloat(formData.pd) / 2 : null,
-          os_near_pd: formData.near_pd ? parseFloat(formData.near_pd) / 2 : null,
+          os_near_pd: formData.near_pd
+            ? parseFloat(formData.near_pd) / 2
+            : null,
           frame_pd: formData.frame_pd ? parseFloat(formData.frame_pd) : null,
-          height_segmentation: formData.height_segmentation ? parseFloat(formData.height_segmentation) : null,
+          height_segmentation: formData.height_segmentation
+            ? parseFloat(formData.height_segmentation)
+            : null,
           prescription_type: formData.prescription_type || null,
           lens_type: formData.lens_type || null,
           lens_material: formData.lens_material || null,
@@ -187,20 +206,24 @@ export default function CreatePrescriptionForm({
           observations: formData.observations || null,
           recommendations: formData.recommendations || null,
           is_active: formData.is_active,
-          is_current: formData.is_current
-        })
+          is_current: formData.is_current,
+        }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Error al guardar receta');
+        throw new Error(error.error || "Error al guardar receta");
       }
 
-      toast.success(initialData?.id ? 'Receta actualizada exitosamente' : 'Receta creada exitosamente');
+      toast.success(
+        initialData?.id
+          ? "Receta actualizada exitosamente"
+          : "Receta creada exitosamente",
+      );
       onSuccess();
     } catch (error: any) {
-      console.error('Error saving prescription:', error);
-      toast.error(error.message || 'Error al guardar receta');
+      console.error("Error saving prescription:", error);
+      toast.error(error.message || "Error al guardar receta");
     } finally {
       setSaving(false);
     }
@@ -223,7 +246,12 @@ export default function CreatePrescriptionForm({
               <Input
                 type="date"
                 value={formData.prescription_date}
-                onChange={(e) => setFormData(prev => ({ ...prev, prescription_date: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    prescription_date: e.target.value,
+                  }))
+                }
                 required
               />
             </div>
@@ -232,14 +260,24 @@ export default function CreatePrescriptionForm({
               <Input
                 type="date"
                 value={formData.expiration_date}
-                onChange={(e) => setFormData(prev => ({ ...prev, expiration_date: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    expiration_date: e.target.value,
+                  }))
+                }
               />
             </div>
             <div>
               <Label>Número de Receta</Label>
               <Input
                 value={formData.prescription_number}
-                onChange={(e) => setFormData(prev => ({ ...prev, prescription_number: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    prescription_number: e.target.value,
+                  }))
+                }
                 placeholder="Número único de receta"
               />
             </div>
@@ -247,7 +285,12 @@ export default function CreatePrescriptionForm({
               <Label>Emitida por</Label>
               <Input
                 value={formData.issued_by}
-                onChange={(e) => setFormData(prev => ({ ...prev, issued_by: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    issued_by: e.target.value,
+                  }))
+                }
                 placeholder="Nombre del oftalmólogo/optómetra"
               />
             </div>
@@ -255,7 +298,12 @@ export default function CreatePrescriptionForm({
               <Label>Licencia Profesional</Label>
               <Input
                 value={formData.issued_by_license}
-                onChange={(e) => setFormData(prev => ({ ...prev, issued_by_license: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    issued_by_license: e.target.value,
+                  }))
+                }
                 placeholder="Número de licencia"
               />
             </div>
@@ -263,7 +311,9 @@ export default function CreatePrescriptionForm({
               <Label>Tipo de Receta</Label>
               <Select
                 value={formData.prescription_type}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, prescription_type: value }))}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, prescription_type: value }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona tipo" />
@@ -297,7 +347,12 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.25"
                 value={formData.od_sphere}
-                onChange={(e) => setFormData(prev => ({ ...prev, od_sphere: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    od_sphere: e.target.value,
+                  }))
+                }
                 placeholder="Ej: -2.50"
               />
             </div>
@@ -307,7 +362,12 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.25"
                 value={formData.od_cylinder}
-                onChange={(e) => setFormData(prev => ({ ...prev, od_cylinder: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    od_cylinder: e.target.value,
+                  }))
+                }
                 placeholder="Ej: -1.00"
               />
             </div>
@@ -318,7 +378,9 @@ export default function CreatePrescriptionForm({
                 min="0"
                 max="180"
                 value={formData.od_axis}
-                onChange={(e) => setFormData(prev => ({ ...prev, od_axis: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, od_axis: e.target.value }))
+                }
                 placeholder="0-180"
               />
             </div>
@@ -328,7 +390,9 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.25"
                 value={formData.od_add}
-                onChange={(e) => setFormData(prev => ({ ...prev, od_add: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, od_add: e.target.value }))
+                }
                 placeholder="Para lectura"
               />
             </div>
@@ -338,7 +402,9 @@ export default function CreatePrescriptionForm({
               <Label>Prisma OD</Label>
               <Input
                 value={formData.prism_od}
-                onChange={(e) => setFormData(prev => ({ ...prev, prism_od: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, prism_od: e.target.value }))
+                }
                 placeholder="Ej: 2.0 Base Up"
               />
             </div>
@@ -346,7 +412,9 @@ export default function CreatePrescriptionForm({
               <Label>Tinte OD</Label>
               <Input
                 value={formData.tint_od}
-                onChange={(e) => setFormData(prev => ({ ...prev, tint_od: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, tint_od: e.target.value }))
+                }
                 placeholder="Ej: Gris 20%"
               />
             </div>
@@ -370,7 +438,12 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.25"
                 value={formData.os_sphere}
-                onChange={(e) => setFormData(prev => ({ ...prev, os_sphere: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    os_sphere: e.target.value,
+                  }))
+                }
                 placeholder="Ej: -2.50"
               />
             </div>
@@ -380,7 +453,12 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.25"
                 value={formData.os_cylinder}
-                onChange={(e) => setFormData(prev => ({ ...prev, os_cylinder: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    os_cylinder: e.target.value,
+                  }))
+                }
                 placeholder="Ej: -1.00"
               />
             </div>
@@ -391,7 +469,9 @@ export default function CreatePrescriptionForm({
                 min="0"
                 max="180"
                 value={formData.os_axis}
-                onChange={(e) => setFormData(prev => ({ ...prev, os_axis: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, os_axis: e.target.value }))
+                }
                 placeholder="0-180"
               />
             </div>
@@ -401,7 +481,9 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.25"
                 value={formData.os_add}
-                onChange={(e) => setFormData(prev => ({ ...prev, os_add: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, os_add: e.target.value }))
+                }
                 placeholder="Para lectura"
               />
             </div>
@@ -411,7 +493,9 @@ export default function CreatePrescriptionForm({
               <Label>Prisma OS</Label>
               <Input
                 value={formData.prism_os}
-                onChange={(e) => setFormData(prev => ({ ...prev, prism_os: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, prism_os: e.target.value }))
+                }
                 placeholder="Ej: 2.0 Base Up"
               />
             </div>
@@ -419,7 +503,9 @@ export default function CreatePrescriptionForm({
               <Label>Tinte OS</Label>
               <Input
                 value={formData.tint_os}
-                onChange={(e) => setFormData(prev => ({ ...prev, tint_os: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, tint_os: e.target.value }))
+                }
                 placeholder="Ej: Gris 20%"
               />
             </div>
@@ -443,7 +529,9 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.1"
                 value={formData.pd}
-                onChange={(e) => setFormData(prev => ({ ...prev, pd: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, pd: e.target.value }))
+                }
                 placeholder="mm (binocular)"
               />
             </div>
@@ -453,7 +541,9 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.1"
                 value={formData.near_pd}
-                onChange={(e) => setFormData(prev => ({ ...prev, near_pd: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, near_pd: e.target.value }))
+                }
                 placeholder="mm (binocular)"
               />
             </div>
@@ -463,7 +553,9 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.1"
                 value={formData.frame_pd}
-                onChange={(e) => setFormData(prev => ({ ...prev, frame_pd: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, frame_pd: e.target.value }))
+                }
                 placeholder="Distancia entre lentes (mm)"
               />
             </div>
@@ -473,7 +565,12 @@ export default function CreatePrescriptionForm({
                 type="number"
                 step="0.1"
                 value={formData.height_segmentation}
-                onChange={(e) => setFormData(prev => ({ ...prev, height_segmentation: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    height_segmentation: e.target.value,
+                  }))
+                }
                 placeholder="Para bifocal/progresivo (mm)"
               />
             </div>
@@ -492,7 +589,9 @@ export default function CreatePrescriptionForm({
               <Label>Tipo de Lente</Label>
               <Select
                 value={formData.lens_type}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, lens_type: value }))}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, lens_type: value }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona tipo" />
@@ -510,7 +609,9 @@ export default function CreatePrescriptionForm({
               <Label>Material Recomendado</Label>
               <Select
                 value={formData.lens_material}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, lens_material: value }))}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, lens_material: value }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona material" />
@@ -534,9 +635,9 @@ export default function CreatePrescriptionForm({
                   <div
                     key={coating.value}
                     className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      isSelected 
-                        ? 'border-verde-suave bg-verde-suave/10' 
-                        : 'border-gray-200 hover:border-azul-profundo'
+                      isSelected
+                        ? "border-verde-suave bg-verde-suave/10"
+                        : "border-gray-200 hover:border-azul-profundo"
                     }`}
                     onClick={() => handleCoatingsToggle(coating.value)}
                   >
@@ -547,7 +648,9 @@ export default function CreatePrescriptionForm({
                         onChange={() => handleCoatingsToggle(coating.value)}
                         className="mr-2"
                       />
-                      <span className={isSelected ? 'font-medium' : ''}>{coating.label}</span>
+                      <span className={isSelected ? "font-medium" : ""}>
+                        {coating.label}
+                      </span>
                     </div>
                   </div>
                 );
@@ -567,7 +670,12 @@ export default function CreatePrescriptionForm({
             <Label>Observaciones Clínicas</Label>
             <Textarea
               value={formData.observations}
-              onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  observations: e.target.value,
+                }))
+              }
               placeholder="Observaciones del examen..."
               rows={3}
             />
@@ -576,7 +684,12 @@ export default function CreatePrescriptionForm({
             <Label>Recomendaciones</Label>
             <Textarea
               value={formData.recommendations}
-              onChange={(e) => setFormData(prev => ({ ...prev, recommendations: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  recommendations: e.target.value,
+                }))
+              }
               placeholder="Recomendaciones para el paciente..."
               rows={3}
             />
@@ -585,7 +698,9 @@ export default function CreatePrescriptionForm({
             <Label>Notas Generales</Label>
             <Textarea
               value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, notes: e.target.value }))
+              }
               placeholder="Notas adicionales..."
               rows={3}
             />
@@ -602,21 +717,29 @@ export default function CreatePrescriptionForm({
           <div className="flex items-center justify-between">
             <div>
               <Label>Receta Activa</Label>
-              <p className="text-sm text-tierra-media">La receta está activa y puede ser usada</p>
+              <p className="text-sm text-tierra-media">
+                La receta está activa y puede ser usada
+              </p>
             </div>
             <Switch
               checked={formData.is_active}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+              onCheckedChange={(checked) =>
+                setFormData((prev) => ({ ...prev, is_active: checked }))
+              }
             />
           </div>
           <div className="flex items-center justify-between">
             <div>
               <Label>Receta Actual</Label>
-              <p className="text-sm text-tierra-media">Marcar como receta principal del paciente</p>
+              <p className="text-sm text-tierra-media">
+                Marcar como receta principal del paciente
+              </p>
             </div>
             <Switch
               checked={formData.is_current}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_current: checked }))}
+              onCheckedChange={(checked) =>
+                setFormData((prev) => ({ ...prev, is_current: checked }))
+              }
             />
           </div>
         </CardContent>
@@ -636,7 +759,7 @@ export default function CreatePrescriptionForm({
           ) : (
             <>
               <Plus className="h-4 w-4 mr-2" />
-              {initialData?.id ? 'Actualizar Receta' : 'Crear Receta'}
+              {initialData?.id ? "Actualizar Receta" : "Crear Receta"}
             </>
           )}
         </Button>
@@ -644,4 +767,3 @@ export default function CreatePrescriptionForm({
     </form>
   );
 }
-

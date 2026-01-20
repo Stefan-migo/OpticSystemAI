@@ -1,20 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { 
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -31,9 +31,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
   ArrowLeft,
   Download,
   Upload,
@@ -47,10 +47,10 @@ import {
   RefreshCw,
   Settings,
   Eye,
-  Filter
-} from 'lucide-react';
-import Link from 'next/link';
-import { toast } from 'sonner';
+  Filter,
+} from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
 
 interface Product {
   id: string;
@@ -91,24 +91,24 @@ interface ImportResult {
 export default function BulkOperationsPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
-  
+
   // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Bulk operation states
-  const [bulkOperation, setBulkOperation] = useState('');
+  const [bulkOperation, setBulkOperation] = useState("");
   const [bulkUpdates, setBulkUpdates] = useState<any>({});
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importMode, setImportMode] = useState('create');
+  const [importMode, setImportMode] = useState("create");
   const [importResults, setImportResults] = useState<ImportResult | null>(null);
   const [isDeleteDialog, setIsDeleteDialog] = useState(false);
 
@@ -122,20 +122,20 @@ export default function BulkOperationsPage() {
       setLoading(true);
       const params = new URLSearchParams({
         ...(searchTerm && { search: searchTerm }),
-        ...(categoryFilter !== 'all' && { category: categoryFilter }),
-        ...(statusFilter !== 'all' && { status: statusFilter })
+        ...(categoryFilter !== "all" && { category: categoryFilter }),
+        ...(statusFilter !== "all" && { status: statusFilter }),
       });
 
       const response = await fetch(`/api/products?${params}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch products');
+        throw new Error("Failed to fetch products");
       }
 
       const data = await response.json();
       setProducts(data.products || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
-      toast.error('Error al cargar productos');
+      console.error("Error fetching products:", error);
+      toast.error("Error al cargar productos");
     } finally {
       setLoading(false);
     }
@@ -143,73 +143,76 @@ export default function BulkOperationsPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/categories');
+      const response = await fetch("/api/categories");
       if (response.ok) {
         const data = await response.json();
         setCategories(data.categories || []);
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error("Error fetching categories:", error);
     }
   };
 
   const handleSelectProduct = (productId: string) => {
-    setSelectedProducts(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
+    setSelectedProducts((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId],
     );
   };
 
   const handleSelectAll = () => {
     setSelectedProducts(
-      selectedProducts.length === products.length ? [] : products.map(p => p.id)
+      selectedProducts.length === products.length
+        ? []
+        : products.map((p) => p.id),
     );
   };
 
   const handleBulkOperation = async () => {
     if (selectedProducts.length === 0) {
-      toast.error('Selecciona al menos un producto');
+      toast.error("Selecciona al menos un producto");
       return;
     }
 
     if (!bulkOperation) {
-      toast.error('Selecciona una operación');
+      toast.error("Selecciona una operación");
       return;
     }
 
     try {
       setProcessing(true);
-      
-      const response = await fetch('/api/admin/products/bulk', {
-        method: 'POST',
+
+      const response = await fetch("/api/admin/products/bulk", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           operation: bulkOperation,
           product_ids: selectedProducts,
-          updates: bulkUpdates
+          updates: bulkUpdates,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to perform bulk operation');
+        throw new Error("Failed to perform bulk operation");
       }
 
       const result: BulkOperationResult = await response.json();
-      
-      toast.success(`Operación completada: ${result.affected_count} productos afectados`);
+
+      toast.success(
+        `Operación completada: ${result.affected_count} productos afectados`,
+      );
       setShowBulkDialog(false);
       setIsDeleteDialog(false);
       setSelectedProducts([]);
-      setBulkOperation('');
+      setBulkOperation("");
       setBulkUpdates({});
       fetchProducts();
-
     } catch (error) {
-      console.error('Error performing bulk operation:', error);
-      toast.error('Error al realizar la operación masiva');
+      console.error("Error performing bulk operation:", error);
+      toast.error("Error al realizar la operación masiva");
     } finally {
       setProcessing(false);
     }
@@ -218,30 +221,30 @@ export default function BulkOperationsPage() {
   const handleExport = async () => {
     try {
       const params = new URLSearchParams({
-        format: 'csv',
-        ...(categoryFilter !== 'all' && { category_id: categoryFilter }),
-        ...(statusFilter !== 'all' && { status: statusFilter })
+        format: "csv",
+        ...(categoryFilter !== "all" && { category_id: categoryFilter }),
+        ...(statusFilter !== "all" && { status: statusFilter }),
       });
 
       const response = await fetch(`/api/admin/products/bulk?${params}`);
       if (!response.ok) {
-        throw new Error('Failed to export products');
+        throw new Error("Failed to export products");
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `productos-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `productos-${new Date().toISOString().split("T")[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
-      toast.success('Productos exportados exitosamente');
+
+      toast.success("Productos exportados exitosamente");
     } catch (error) {
-      console.error('Error exporting products:', error);
-      toast.error('Error al exportar productos');
+      console.error("Error exporting products:", error);
+      toast.error("Error al exportar productos");
     }
   };
 
@@ -250,64 +253,69 @@ export default function BulkOperationsPage() {
 
     try {
       setProcessing(true);
-      
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('mode', importMode);
 
-      const response = await fetch('/api/admin/products/import', {
-        method: 'POST',
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("mode", importMode);
+
+      const response = await fetch("/api/admin/products/import", {
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to import products');
+        throw new Error("Failed to import products");
       }
 
       const result: ImportResult = await response.json();
       setImportResults(result);
-      
+
       if (result.success) {
-        toast.success(`Importación completada: ${result.summary.created} creados, ${result.summary.updated} actualizados`);
+        toast.success(
+          `Importación completada: ${result.summary.created} creados, ${result.summary.updated} actualizados`,
+        );
         fetchProducts();
       } else {
-        toast.error('Error en la importación');
+        toast.error("Error en la importación");
       }
-
     } catch (error) {
-      console.error('Error importing products:', error);
-      toast.error('Error al importar productos');
+      console.error("Error importing products:", error);
+      toast.error("Error al importar productos");
     } finally {
       setProcessing(false);
     }
   };
 
-  const formatPrice = (amount: number) => 
-    new Intl.NumberFormat('es-AR', { 
-      style: 'currency', 
-      currency: 'ARS',
-      minimumFractionDigits: 0
+  const formatPrice = (amount: number) =>
+    new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+      minimumFractionDigits: 0,
     }).format(amount);
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: any; label: string }> = {
-      active: { variant: 'default', label: 'Activo' },
-      draft: { variant: 'secondary', label: 'Borrador' },
-      archived: { variant: 'outline', label: 'Archivado' }
+      active: { variant: "default", label: "Activo" },
+      draft: { variant: "secondary", label: "Borrador" },
+      archived: { variant: "outline", label: "Archivado" },
     };
 
-    const statusConfig = config[status] || config['draft'];
+    const statusConfig = config[status] || config["draft"];
     return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
   };
 
   const renderBulkOperationForm = () => {
     switch (bulkOperation) {
-      case 'update_status':
+      case "update_status":
         return (
           <div className="space-y-4">
             <div>
               <Label htmlFor="status">Nuevo Estado</Label>
-              <Select onValueChange={(value) => setBulkUpdates({...bulkUpdates, status: value})}>
+              <Select
+                onValueChange={(value) =>
+                  setBulkUpdates({ ...bulkUpdates, status: value })
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
@@ -321,12 +329,16 @@ export default function BulkOperationsPage() {
           </div>
         );
 
-      case 'update_category':
+      case "update_category":
         return (
           <div className="space-y-4">
             <div>
               <Label htmlFor="category">Nueva Categoría</Label>
-              <Select onValueChange={(value) => setBulkUpdates({...bulkUpdates, category_id: value})}>
+              <Select
+                onValueChange={(value) =>
+                  setBulkUpdates({ ...bulkUpdates, category_id: value })
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar categoría" />
                 </SelectTrigger>
@@ -342,12 +354,16 @@ export default function BulkOperationsPage() {
           </div>
         );
 
-      case 'update_pricing':
+      case "update_pricing":
         return (
           <div className="space-y-4">
             <div>
               <Label htmlFor="adjustment_type">Tipo de Ajuste</Label>
-              <Select onValueChange={(value) => setBulkUpdates({...bulkUpdates, adjustment_type: value})}>
+              <Select
+                onValueChange={(value) =>
+                  setBulkUpdates({ ...bulkUpdates, adjustment_type: value })
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Tipo de ajuste" />
                 </SelectTrigger>
@@ -359,24 +375,38 @@ export default function BulkOperationsPage() {
             </div>
             <div>
               <Label htmlFor="price_adjustment">
-                Ajuste {bulkUpdates.adjustment_type === 'percentage' ? '(%)' : '($)'}
+                Ajuste{" "}
+                {bulkUpdates.adjustment_type === "percentage" ? "(%)" : "($)"}
               </Label>
               <Input
                 type="number"
                 step="0.01"
-                placeholder={bulkUpdates.adjustment_type === 'percentage' ? 'ej: 10 para +10%' : 'ej: 500 para +$500'}
-                onChange={(e) => setBulkUpdates({...bulkUpdates, price_adjustment: parseFloat(e.target.value)})}
+                placeholder={
+                  bulkUpdates.adjustment_type === "percentage"
+                    ? "ej: 10 para +10%"
+                    : "ej: 500 para +$500"
+                }
+                onChange={(e) =>
+                  setBulkUpdates({
+                    ...bulkUpdates,
+                    price_adjustment: parseFloat(e.target.value),
+                  })
+                }
               />
             </div>
           </div>
         );
 
-      case 'update_inventory':
+      case "update_inventory":
         return (
           <div className="space-y-4">
             <div>
               <Label htmlFor="inventory_adjustment_type">Tipo de Ajuste</Label>
-              <Select onValueChange={(value) => setBulkUpdates({...bulkUpdates, adjustment_type: value})}>
+              <Select
+                onValueChange={(value) =>
+                  setBulkUpdates({ ...bulkUpdates, adjustment_type: value })
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Tipo de ajuste" />
                 </SelectTrigger>
@@ -388,52 +418,71 @@ export default function BulkOperationsPage() {
             </div>
             <div>
               <Label htmlFor="inventory_adjustment">
-                {bulkUpdates.adjustment_type === 'set' ? 'Nueva Cantidad' : 'Ajuste (+/-)'}
+                {bulkUpdates.adjustment_type === "set"
+                  ? "Nueva Cantidad"
+                  : "Ajuste (+/-)"}
               </Label>
               <Input
                 type="number"
-                placeholder={bulkUpdates.adjustment_type === 'set' ? 'ej: 50' : 'ej: -10 o +20'}
-                onChange={(e) => setBulkUpdates({...bulkUpdates, inventory_adjustment: parseInt(e.target.value)})}
+                placeholder={
+                  bulkUpdates.adjustment_type === "set"
+                    ? "ej: 50"
+                    : "ej: -10 o +20"
+                }
+                onChange={(e) =>
+                  setBulkUpdates({
+                    ...bulkUpdates,
+                    inventory_adjustment: parseInt(e.target.value),
+                  })
+                }
               />
             </div>
           </div>
         );
 
-      case 'delete':
+      case "delete":
         return (
           <div className="space-y-4">
             <div className="flex items-center space-x-2 p-4 bg-red-50 border border-red-200 rounded-lg">
               <AlertTriangle className="h-5 w-5 text-red-600" />
               <div>
-                <p className="font-medium text-red-800">Confirmar eliminación suave</p>
+                <p className="font-medium text-red-800">
+                  Confirmar eliminación suave
+                </p>
                 <p className="text-sm text-red-600">
-                  Los {selectedProducts.length} productos seleccionados serán archivados (eliminación suave).
-                  Esta acción se puede deshacer cambiando el estado a "Activo".
+                  Los {selectedProducts.length} productos seleccionados serán
+                  archivados (eliminación suave). Esta acción se puede deshacer
+                  cambiando el estado a &quot;Activo&quot;.
                 </p>
               </div>
             </div>
           </div>
         );
 
-      case 'hard_delete':
+      case "hard_delete":
         return (
           <div className="space-y-4">
             <div className="flex items-center space-x-2 p-4 bg-red-100 border border-red-300 rounded-lg">
               <AlertTriangle className="h-5 w-5 text-red-700" />
               <div>
-                <p className="font-medium text-red-900">⚠️ ELIMINACIÓN PERMANENTE</p>
+                <p className="font-medium text-red-900">
+                  ⚠️ ELIMINACIÓN PERMANENTE
+                </p>
                 <p className="text-sm text-red-700 font-medium">
-                  Los {selectedProducts.length} productos seleccionados serán ELIMINADOS PERMANENTEMENTE de la base de datos.
+                  Los {selectedProducts.length} productos seleccionados serán
+                  ELIMINADOS PERMANENTEMENTE de la base de datos.
                 </p>
                 <p className="text-sm text-red-600 mt-2">
-                  ⚠️ Esta acción NO se puede deshacer. Todos los datos del producto se perderán para siempre.
+                  ⚠️ Esta acción NO se puede deshacer. Todos los datos del
+                  producto se perderán para siempre.
                 </p>
               </div>
             </div>
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
-                <strong>Recomendación:</strong> Considera usar "Eliminación suave" (archivar) en su lugar, 
-                que permite recuperar los productos si es necesario.
+                <strong>Recomendación:</strong> Considera usar &quot;Eliminación
+                suave&quot; (archivar) en su lugar, que permite recuperar los
+                productos si es necesario.
               </p>
             </div>
           </div>
@@ -452,7 +501,9 @@ export default function BulkOperationsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Operaciones Masivas</h1>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Operaciones Masivas
+            </h1>
             <p className="text-tierra-media">Cargando productos...</p>
           </div>
         </div>
@@ -471,19 +522,21 @@ export default function BulkOperationsPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Operaciones Masivas</h1>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Operaciones Masivas
+            </h1>
             <p className="text-tierra-media">
               Gestiona múltiples productos de forma eficiente
             </p>
           </div>
         </div>
-        
+
         <div className="flex space-x-2">
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
           </Button>
-          
+
           <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -498,7 +551,7 @@ export default function BulkOperationsPage() {
                   Sube un archivo CSV para importar productos masivamente
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="import_mode">Modo de Importación</Label>
@@ -507,13 +560,19 @@ export default function BulkOperationsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="create">Crear - Solo productos nuevos</SelectItem>
-                      <SelectItem value="update">Actualizar - Solo productos existentes</SelectItem>
-                      <SelectItem value="upsert">Crear/Actualizar - Ambos</SelectItem>
+                      <SelectItem value="create">
+                        Crear - Solo productos nuevos
+                      </SelectItem>
+                      <SelectItem value="update">
+                        Actualizar - Solo productos existentes
+                      </SelectItem>
+                      <SelectItem value="upsert">
+                        Crear/Actualizar - Ambos
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="csv_file">Archivo CSV</Label>
                   <Input
@@ -528,29 +587,39 @@ export default function BulkOperationsPage() {
                     }}
                   />
                   <p className="text-sm text-tierra-media mt-1">
-                    Formatos soportados: nombre, descripción, precio, stock, estado, categoría, etc.
+                    Formatos soportados: nombre, descripción, precio, stock,
+                    estado, categoría, etc.
                   </p>
                 </div>
 
                 {importResults && (
                   <div className="mt-4 p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2">Resultados de Importación</h4>
+                    <h4 className="font-medium mb-2">
+                      Resultados de Importación
+                    </h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>Procesados: {importResults.summary.total_processed}</div>
+                      <div>
+                        Procesados: {importResults.summary.total_processed}
+                      </div>
                       <div>Creados: {importResults.summary.created}</div>
                       <div>Actualizados: {importResults.summary.updated}</div>
                       <div>Omitidos: {importResults.summary.skipped}</div>
                     </div>
-                    
+
                     {importResults.results.errors.length > 0 && (
                       <div className="mt-2">
                         <h5 className="font-medium text-red-600">Errores:</h5>
                         <ul className="text-sm text-red-600 list-disc list-inside">
-                          {importResults.results.errors.slice(0, 5).map((error, index) => (
-                            <li key={index}>{error}</li>
-                          ))}
+                          {importResults.results.errors
+                            .slice(0, 5)
+                            .map((error, index) => (
+                              <li key={index}>{error}</li>
+                            ))}
                           {importResults.results.errors.length > 5 && (
-                            <li>... y {importResults.results.errors.length - 5} más</li>
+                            <li>
+                              ... y {importResults.results.errors.length - 5}{" "}
+                              más
+                            </li>
                           )}
                         </ul>
                       </div>
@@ -558,9 +627,12 @@ export default function BulkOperationsPage() {
                   </div>
                 )}
               </div>
-              
+
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowImportDialog(false)}
+                >
                   Cerrar
                 </Button>
               </DialogFooter>
@@ -586,12 +658,12 @@ export default function BulkOperationsPage() {
                   Limpiar selección
                 </Button>
               </div>
-              
+
               <div className="flex space-x-2">
                 <Button
                   variant="destructive"
                   onClick={() => {
-                    setBulkOperation('delete');
+                    setBulkOperation("delete");
                     setIsDeleteDialog(true);
                     setShowBulkDialog(true);
                   }}
@@ -599,88 +671,126 @@ export default function BulkOperationsPage() {
                   <Trash2 className="h-4 w-4 mr-2" />
                   Eliminar
                 </Button>
-                
-                <Dialog open={showBulkDialog} onOpenChange={(open) => {
-                  setShowBulkDialog(open);
-                  if (!open) {
-                    setIsDeleteDialog(false);
-                    setBulkOperation('');
-                    setBulkUpdates({});
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button onClick={() => {
+
+                <Dialog
+                  open={showBulkDialog}
+                  onOpenChange={(open) => {
+                    setShowBulkDialog(open);
+                    if (!open) {
                       setIsDeleteDialog(false);
-                      setBulkOperation('');
+                      setBulkOperation("");
                       setBulkUpdates({});
-                    }}>
+                    }
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      onClick={() => {
+                        setIsDeleteDialog(false);
+                        setBulkOperation("");
+                        setBulkUpdates({});
+                      }}
+                    >
                       <Edit className="h-4 w-4 mr-2" />
                       Operaciones Masivas
                     </Button>
                   </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>
-                      {bulkOperation === 'delete' ? 'Archivar Productos' : 
-                       bulkOperation === 'hard_delete' ? '⚠️ Eliminar Permanentemente' : 
-                       'Operación Masiva'}
-                    </DialogTitle>
-                    <DialogDescription>
-                      {bulkOperation === 'delete' 
-                        ? `Archivar ${selectedProducts.length} productos seleccionados`
-                        : bulkOperation === 'hard_delete'
-                        ? `ELIMINAR PERMANENTEMENTE ${selectedProducts.length} productos seleccionados`
-                        : `Aplicar cambios a ${selectedProducts.length} productos seleccionados`
-                      }
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="space-y-4">
-                    {!isDeleteDialog && (
-                      <div>
-                        <Label htmlFor="operation">Operación</Label>
-                        <Select value={bulkOperation} onValueChange={setBulkOperation}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar operación" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="update_status">Cambiar Estado</SelectItem>
-                            <SelectItem value="update_category">Cambiar Categoría</SelectItem>
-                            <SelectItem value="update_pricing">Ajustar Precios</SelectItem>
-                            <SelectItem value="update_inventory">Ajustar Inventario</SelectItem>
-                            <SelectItem value="duplicate">Duplicar Productos</SelectItem>
-                            <SelectItem value="delete">Archivar Productos (Eliminación Suave)</SelectItem>
-                            <SelectItem value="hard_delete" className="text-red-600 font-medium">⚠️ Eliminar Permanentemente</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    
-                    {bulkOperation && renderBulkOperationForm()}
-                  </div>
-                  
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => {
-                      setShowBulkDialog(false);
-                      setIsDeleteDialog(false);
-                      setBulkOperation('');
-                      setBulkUpdates({});
-                    }}>
-                      Cancelar
-                    </Button>
-                    <Button 
-                      onClick={handleBulkOperation} 
-                      disabled={processing || !bulkOperation}
-                      variant={bulkOperation === 'delete' || bulkOperation === 'hard_delete' ? 'destructive' : 'default'}
-                    >
-                      {processing && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-                      {bulkOperation === 'delete' ? 'Archivar Productos' : 
-                       bulkOperation === 'hard_delete' ? '⚠️ ELIMINAR PERMANENTEMENTE' : 
-                       'Aplicar Cambios'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>
+                        {bulkOperation === "delete"
+                          ? "Archivar Productos"
+                          : bulkOperation === "hard_delete"
+                            ? "⚠️ Eliminar Permanentemente"
+                            : "Operación Masiva"}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {bulkOperation === "delete"
+                          ? `Archivar ${selectedProducts.length} productos seleccionados`
+                          : bulkOperation === "hard_delete"
+                            ? `ELIMINAR PERMANENTEMENTE ${selectedProducts.length} productos seleccionados`
+                            : `Aplicar cambios a ${selectedProducts.length} productos seleccionados`}
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      {!isDeleteDialog && (
+                        <div>
+                          <Label htmlFor="operation">Operación</Label>
+                          <Select
+                            value={bulkOperation}
+                            onValueChange={setBulkOperation}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar operación" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="update_status">
+                                Cambiar Estado
+                              </SelectItem>
+                              <SelectItem value="update_category">
+                                Cambiar Categoría
+                              </SelectItem>
+                              <SelectItem value="update_pricing">
+                                Ajustar Precios
+                              </SelectItem>
+                              <SelectItem value="update_inventory">
+                                Ajustar Inventario
+                              </SelectItem>
+                              <SelectItem value="duplicate">
+                                Duplicar Productos
+                              </SelectItem>
+                              <SelectItem value="delete">
+                                Archivar Productos (Eliminación Suave)
+                              </SelectItem>
+                              <SelectItem
+                                value="hard_delete"
+                                className="text-red-600 font-medium"
+                              >
+                                ⚠️ Eliminar Permanentemente
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {bulkOperation && renderBulkOperationForm()}
+                    </div>
+
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowBulkDialog(false);
+                          setIsDeleteDialog(false);
+                          setBulkOperation("");
+                          setBulkUpdates({});
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleBulkOperation}
+                        disabled={processing || !bulkOperation}
+                        variant={
+                          bulkOperation === "delete" ||
+                          bulkOperation === "hard_delete"
+                            ? "destructive"
+                            : "default"
+                        }
+                      >
+                        {processing && (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        )}
+                        {bulkOperation === "delete"
+                          ? "Archivar Productos"
+                          : bulkOperation === "hard_delete"
+                            ? "⚠️ ELIMINAR PERMANENTEMENTE"
+                            : "Aplicar Cambios"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           </CardContent>
@@ -698,7 +808,7 @@ export default function BulkOperationsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
+
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Categoría" />
@@ -739,11 +849,16 @@ export default function BulkOperationsPage() {
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
-                checked={selectedProducts.length === products.length && products.length > 0}
+                checked={
+                  selectedProducts.length === products.length &&
+                  products.length > 0
+                }
                 onChange={handleSelectAll}
                 className="rounded border-gray-300"
               />
-              <span className="text-sm text-tierra-media">Seleccionar todos</span>
+              <span className="text-sm text-tierra-media">
+                Seleccionar todos
+              </span>
             </div>
           </CardTitle>
         </CardHeader>
@@ -754,7 +869,10 @@ export default function BulkOperationsPage() {
                 <TableHead className="w-12">
                   <input
                     type="checkbox"
-                    checked={selectedProducts.length === products.length && products.length > 0}
+                    checked={
+                      selectedProducts.length === products.length &&
+                      products.length > 0
+                    }
                     onChange={handleSelectAll}
                     className="rounded border-gray-300"
                   />
@@ -779,17 +897,21 @@ export default function BulkOperationsPage() {
                       className="rounded border-gray-300"
                     />
                   </TableCell>
-                  
+
                   <TableCell>
                     <div>
                       <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-tierra-media">{product.slug}</div>
+                      <div className="text-sm text-tierra-media">
+                        {product.slug}
+                      </div>
                       {product.is_featured && (
-                        <Badge variant="outline" className="text-xs">Destacado</Badge>
+                        <Badge variant="outline" className="text-xs">
+                          Destacado
+                        </Badge>
                       )}
                     </div>
                   </TableCell>
-                  
+
                   <TableCell>
                     {product.category ? (
                       <Badge variant="outline">{product.category.name}</Badge>
@@ -797,11 +919,11 @@ export default function BulkOperationsPage() {
                       <span className="text-tierra-media">Sin categoría</span>
                     )}
                   </TableCell>
-                  
+
                   <TableCell className="font-medium">
                     {formatPrice(product.price)}
                   </TableCell>
-                  
+
                   <TableCell>
                     <div className="flex items-center space-x-2">
                       <span>{product.inventory_quantity}</span>
@@ -810,15 +932,13 @@ export default function BulkOperationsPage() {
                       )}
                     </div>
                   </TableCell>
-                  
-                  <TableCell>
-                    {getStatusBadge(product.status)}
-                  </TableCell>
-                  
+
+                  <TableCell>{getStatusBadge(product.status)}</TableCell>
+
                   <TableCell className="text-sm text-tierra-media">
-                    {new Date(product.created_at).toLocaleDateString('es-AR')}
+                    {new Date(product.created_at).toLocaleDateString("es-AR")}
                   </TableCell>
-                  
+
                   <TableCell>
                     <div className="flex space-x-2">
                       <Link href={`/admin/products/${product.id}`}>
@@ -841,8 +961,12 @@ export default function BulkOperationsPage() {
           {products.length === 0 && (
             <div className="text-center py-12">
               <Package className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-azul-profundo mb-2">No se encontraron productos</h3>
-              <p className="text-tierra-media">Ajusta los filtros o agrega nuevos productos.</p>
+              <h3 className="text-lg font-semibold text-azul-profundo mb-2">
+                No se encontraron productos
+              </h3>
+              <p className="text-tierra-media">
+                Ajusta los filtros o agrega nuevos productos.
+              </p>
             </div>
           )}
         </CardContent>

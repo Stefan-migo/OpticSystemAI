@@ -13,16 +13,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { 
-  Search, 
-  SlidersHorizontal, 
-  Grid3X3, 
-  Grid2X2, 
+import {
+  Search,
+  SlidersHorizontal,
+  Grid3X3,
+  Grid2X2,
   Filter,
   X,
   ArrowUpDown,
   Star,
-  TrendingUp
+  TrendingUp,
 } from "lucide-react";
 
 interface Product {
@@ -40,15 +40,27 @@ interface Product {
   stock: number;
   size?: string;
   tags?: string[];
-  lineTheme?: 'alma-terra' | 'ecos' | 'jade-ritual' | 'umbral' | 'utopica' | 'default';
+  lineTheme?:
+    | "alma-terra"
+    | "ecos"
+    | "jade-ritual"
+    | "umbral"
+    | "utopica"
+    | "default";
 }
 
 interface ProductGridProps {
   products: Product[];
   title?: string;
   subtitle?: string;
-  variant?: 'default' | 'elegant' | 'artisanal' | 'glass';
-  lineTheme?: 'alma-terra' | 'ecos' | 'jade-ritual' | 'umbral' | 'utopica' | 'default';
+  variant?: "default" | "elegant" | "artisanal" | "glass";
+  lineTheme?:
+    | "alma-terra"
+    | "ecos"
+    | "jade-ritual"
+    | "umbral"
+    | "utopica"
+    | "default";
   showFilters?: boolean;
   showSearch?: boolean;
   showSorting?: boolean;
@@ -61,27 +73,27 @@ interface ProductGridProps {
 }
 
 const sortOptions = [
-  { value: 'featured', label: 'Destacados', icon: Star },
-  { value: 'name-asc', label: 'Nombre A-Z', icon: ArrowUpDown },
-  { value: 'name-desc', label: 'Nombre Z-A', icon: ArrowUpDown },
-  { value: 'price-asc', label: 'Precio: Menor a Mayor', icon: TrendingUp },
-  { value: 'price-desc', label: 'Precio: Mayor a Menor', icon: TrendingUp },
-  { value: 'rating', label: 'Mejor Valorados', icon: Star },
-  { value: 'newest', label: 'Más Nuevos', icon: Star }
+  { value: "featured", label: "Destacados", icon: Star },
+  { value: "name-asc", label: "Nombre A-Z", icon: ArrowUpDown },
+  { value: "name-desc", label: "Nombre Z-A", icon: ArrowUpDown },
+  { value: "price-asc", label: "Precio: Menor a Mayor", icon: TrendingUp },
+  { value: "price-desc", label: "Precio: Mayor a Menor", icon: TrendingUp },
+  { value: "rating", label: "Mejor Valorados", icon: Star },
+  { value: "newest", label: "Más Nuevos", icon: Star },
 ];
 
 const gridColsClasses = {
-  2: 'grid-cols-1 md:grid-cols-2',
-  3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
-  4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+  2: "grid-cols-1 md:grid-cols-2",
+  3: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
+  4: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
 };
 
 export default function ProductGrid({
   products,
   title,
   subtitle,
-  variant = 'default',
-  lineTheme = 'default',
+  variant = "default",
+  lineTheme = "default",
   showFilters = true,
   showSearch = true,
   showSorting = true,
@@ -90,7 +102,7 @@ export default function ProductGrid({
   onAddToCart,
   onToggleFavorite,
   favoriteProducts = [],
-  className = ""
+  className = "",
 }: ProductGridProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -101,17 +113,18 @@ export default function ProductGrid({
 
   // Get unique categories from products
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(products.map(p => p.category)));
+    const cats = Array.from(new Set(products.map((p) => p.category)));
     return cats.filter(Boolean);
   }, [products]);
 
   // Filter and sort products
   const filteredAndSortedProducts = useMemo(() => {
-    let filtered = products.filter(product => {
+    const filtered = products.filter((product) => {
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        const searchableText = `${product.name} ${product.description} ${product.category}`.toLowerCase();
+        const searchableText =
+          `${product.name} ${product.description} ${product.category}`.toLowerCase();
         if (!searchableText.includes(query)) return false;
       }
 
@@ -175,7 +188,11 @@ export default function ProductGrid({
     setSortBy("featured");
   };
 
-  const hasActiveFilters = searchQuery || selectedCategory !== "all" || selectedPriceRange !== "all" || sortBy !== "featured";
+  const hasActiveFilters =
+    searchQuery ||
+    selectedCategory !== "all" ||
+    selectedPriceRange !== "all" ||
+    sortBy !== "featured";
 
   return (
     <div className={cn("w-full", className)}>
@@ -218,7 +235,8 @@ export default function ProductGrid({
               onClick={() => setShowFiltersPanel(!showFiltersPanel)}
               className={cn(
                 "transition-all duration-300",
-                showFiltersPanel && "bg-brand-primary/10 border-brand-primary text-brand-primary"
+                showFiltersPanel &&
+                  "bg-brand-primary/10 border-brand-primary text-brand-primary",
               )}
             >
               <SlidersHorizontal className="h-4 w-4 mr-2" />
@@ -293,8 +311,13 @@ export default function ProductGrid({
           <div className="flex flex-wrap gap-6">
             {/* Category Filter */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-text-primary">Categoría</label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <label className="text-sm font-medium text-text-primary">
+                Categoría
+              </label>
+              <Select
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+              >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -311,8 +334,13 @@ export default function ProductGrid({
 
             {/* Price Range Filter */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-text-primary">Rango de Precio</label>
-              <Select value={selectedPriceRange} onValueChange={setSelectedPriceRange}>
+              <label className="text-sm font-medium text-text-primary">
+                Rango de Precio
+              </label>
+              <Select
+                value={selectedPriceRange}
+                onValueChange={setSelectedPriceRange}
+              >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -347,16 +375,20 @@ export default function ProductGrid({
       {/* Results Info */}
       <div className="flex justify-between items-center mb-6">
         <p className="text-text-secondary">
-          {filteredAndSortedProducts.length} producto{filteredAndSortedProducts.length !== 1 ? 's' : ''} encontrado{filteredAndSortedProducts.length !== 1 ? 's' : ''}
+          {filteredAndSortedProducts.length} producto
+          {filteredAndSortedProducts.length !== 1 ? "s" : ""} encontrado
+          {filteredAndSortedProducts.length !== 1 ? "s" : ""}
         </p>
-        
+
         {hasActiveFilters && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-text-secondary">Filtros activos:</span>
+            <span className="text-sm text-text-secondary">
+              Filtros activos:
+            </span>
             <div className="flex gap-2">
               {searchQuery && (
                 <Badge variant="secondary" className="text-xs">
-                  Búsqueda: "{searchQuery}"
+                  Búsqueda: &quot;{searchQuery}&quot;
                 </Badge>
               )}
               {selectedCategory !== "all" && (
@@ -391,10 +423,12 @@ export default function ProductGrid({
           )}
         </div>
       ) : (
-        <div className={cn(
-          "grid gap-6 transition-all duration-300",
-          gridColsClasses[gridCols]
-        )}>
+        <div
+          className={cn(
+            "grid gap-6 transition-all duration-300",
+            gridColsClasses[gridCols],
+          )}
+        >
           {filteredAndSortedProducts.map((product) => (
             <ProductCard
               key={product.id}
@@ -420,4 +454,4 @@ export default function ProductGrid({
       )}
     </div>
   );
-} 
+}

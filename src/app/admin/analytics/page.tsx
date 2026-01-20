@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { 
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -18,13 +18,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  BarChart3, 
-  TrendingUp, 
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  BarChart3,
+  TrendingUp,
   TrendingDown,
-  PieChart as PieChartIcon, 
+  PieChart as PieChartIcon,
   Calendar,
   DollarSign,
   Users,
@@ -44,15 +44,15 @@ import {
   Eye,
   Clock,
   CheckCircle,
-  XCircle
-} from 'lucide-react';
-import { PieChart } from '@/components/admin/charts/PieChart';
-import { BarChart } from '@/components/admin/charts/BarChart';
-import { AreaChart } from '@/components/admin/charts/AreaChart';
-import { ColumnChart } from '@/components/admin/charts/ColumnChart';
-import { useBranch } from '@/hooks/useBranch';
-import { getBranchHeader } from '@/lib/utils/branch';
-import { BranchSelector } from '@/components/admin/BranchSelector';
+  XCircle,
+} from "lucide-react";
+import { PieChart } from "@/components/admin/charts/PieChart";
+import { BarChart } from "@/components/admin/charts/BarChart";
+import { AreaChart } from "@/components/admin/charts/AreaChart";
+import { ColumnChart } from "@/components/admin/charts/ColumnChart";
+import { useBranch } from "@/hooks/useBranch";
+import { getBranchHeader } from "@/lib/utils/branch";
+import { BranchSelector } from "@/components/admin/BranchSelector";
 
 interface AnalyticsData {
   kpis: {
@@ -131,17 +131,28 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsPage() {
-  const { currentBranchId, isSuperAdmin, branches, isLoading: branchLoading } = useBranch();
+  const {
+    currentBranchId,
+    isSuperAdmin,
+    branches,
+    isLoading: branchLoading,
+  } = useBranch();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [period, setPeriod] = useState('30');
+  const [period, setPeriod] = useState("30");
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Chart type selectors
-  const [salesChartType, setSalesChartType] = useState<'area' | 'column'>('area');
-  const [workOrdersChartType, setWorkOrdersChartType] = useState<'area' | 'column'>('area');
-  const [quotesChartType, setQuotesChartType] = useState<'area' | 'column'>('area');
+  const [salesChartType, setSalesChartType] = useState<"area" | "column">(
+    "area",
+  );
+  const [workOrdersChartType, setWorkOrdersChartType] = useState<
+    "area" | "column"
+  >("area");
+  const [quotesChartType, setQuotesChartType] = useState<"area" | "column">(
+    "area",
+  );
 
   const isGlobalView = !currentBranchId && isSuperAdmin;
 
@@ -153,37 +164,40 @@ export default function AnalyticsPage() {
     try {
       setLoading(true);
       setRefreshing(true);
-      
+
       const headers: HeadersInit = {
-        ...getBranchHeader(currentBranchId)
+        ...getBranchHeader(currentBranchId),
       };
-      
-      const response = await fetch(`/api/admin/analytics/dashboard?period=${period}`, { headers });
+
+      const response = await fetch(
+        `/api/admin/analytics/dashboard?period=${period}`,
+        { headers },
+      );
       if (!response.ok) {
-        throw new Error('Failed to fetch analytics');
+        throw new Error("Failed to fetch analytics");
       }
 
       const data = await response.json();
       setAnalytics(data.analytics);
       setError(null);
     } catch (err) {
-      console.error('Error fetching analytics:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      console.error("Error fetching analytics:", err);
+      setError(err instanceof Error ? err.message : "Unknown error occurred");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const formatPrice = (amount: number) => 
-    new Intl.NumberFormat('es-CL', { 
-      style: 'currency', 
-      currency: 'CLP',
-      minimumFractionDigits: 0
+  const formatPrice = (amount: number) =>
+    new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      minimumFractionDigits: 0,
     }).format(amount);
 
-  const formatPercentage = (value: number) => 
-    `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  const formatPercentage = (value: number) =>
+    `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 
   const getGrowthIcon = (growth: number) => {
     if (growth > 0) return <ArrowUpRight className="h-4 w-4 text-green-500" />;
@@ -192,43 +206,43 @@ export default function AnalyticsPage() {
   };
 
   const getGrowthColor = (growth: number) => {
-    if (growth > 0) return 'text-green-600';
-    if (growth < 0) return 'text-red-600';
-    return 'text-gray-600';
+    if (growth > 0) return "text-green-600";
+    if (growth < 0) return "text-red-600";
+    return "text-gray-600";
   };
 
   const getPaymentMethodLabel = (method: string) => {
     const labels: Record<string, string> = {
-      cash: 'Efectivo',
-      debit_card: 'Tarjeta Débito',
-      credit_card: 'Tarjeta Crédito',
-      installments: 'Cuotas',
-      transfer: 'Transferencia',
-      other: 'Otro'
+      cash: "Efectivo",
+      debit_card: "Tarjeta Débito",
+      credit_card: "Tarjeta Crédito",
+      installments: "Cuotas",
+      transfer: "Transferencia",
+      other: "Otro",
     };
     return labels[method] || method;
   };
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      draft: 'Borrador',
-      sent: 'Enviado',
-      accepted: 'Aceptado',
-      rejected: 'Rechazado',
-      expired: 'Expirado',
-      converted_to_work: 'Convertido',
-      quote: 'Presupuesto',
-      ordered: 'Ordenado',
-      sent_to_lab: 'Enviado al Lab',
-      received_from_lab: 'Recibido',
-      mounted: 'Montado',
-      quality_check: 'Control Calidad',
-      ready_for_pickup: 'Listo para Retiro',
-      delivered: 'Entregado',
-      cancelled: 'Cancelado',
-      scheduled: 'Agendada',
-      completed: 'Completada',
-      no_show: 'No Asistió'
+      draft: "Borrador",
+      sent: "Enviado",
+      accepted: "Aceptado",
+      rejected: "Rechazado",
+      expired: "Expirado",
+      converted_to_work: "Convertido",
+      quote: "Presupuesto",
+      ordered: "Ordenado",
+      sent_to_lab: "Enviado al Lab",
+      received_from_lab: "Recibido",
+      mounted: "Montado",
+      quality_check: "Control Calidad",
+      ready_for_pickup: "Listo para Retiro",
+      delivered: "Entregado",
+      cancelled: "Cancelado",
+      scheduled: "Agendada",
+      completed: "Completada",
+      no_show: "No Asistió",
     };
     return labels[status] || status;
   };
@@ -238,7 +252,9 @@ export default function AnalyticsPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Analíticas y Reportes</h1>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Analíticas y Reportes
+            </h1>
             <p className="text-tierra-media">Cargando datos analíticos...</p>
           </div>
         </div>
@@ -261,15 +277,21 @@ export default function AnalyticsPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Analíticas y Reportes</h1>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Analíticas y Reportes
+            </h1>
             <p className="text-tierra-media">Error al cargar los datos</p>
           </div>
         </div>
         <Card>
           <CardContent className="text-center py-16">
             <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-red-700 mb-2">Error al cargar analíticas</h3>
-            <p className="text-tierra-media mb-4">{error || 'No se pudieron cargar los datos'}</p>
+            <h3 className="text-lg font-semibold text-red-700 mb-2">
+              Error al cargar analíticas
+            </h3>
+            <p className="text-tierra-media mb-4">
+              {error || "No se pudieron cargar los datos"}
+            </p>
             <Button onClick={fetchAnalytics}>Reintentar</Button>
           </CardContent>
         </Card>
@@ -282,21 +304,18 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">Analíticas y Reportes</h1>
+          <h1 className="text-3xl font-bold text-azul-profundo">
+            Analíticas y Reportes
+          </h1>
           <p className="text-tierra-media">
-            {isGlobalView 
+            {isGlobalView
               ? `Métricas y análisis - Todas las sucursales - Últimos ${analytics.period.days} días`
               : `Métricas y análisis - Últimos ${analytics.period.days} días`}
           </p>
         </div>
-        
+
         <div className="flex gap-2">
-          {isSuperAdmin && (
-            <BranchSelector 
-              branches={branches} 
-              currentBranchId={currentBranchId}
-            />
-          )}
+          {isSuperAdmin && <BranchSelector />}
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Período" />
@@ -308,8 +327,14 @@ export default function AnalyticsPage() {
               <SelectItem value="365">Último año</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={fetchAnalytics} disabled={refreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          <Button
+            variant="outline"
+            onClick={fetchAnalytics}
+            disabled={refreshing}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+            />
             Actualizar
           </Button>
         </div>
@@ -329,7 +354,9 @@ export default function AnalyticsPage() {
                 </p>
                 <div className="flex items-center mt-1">
                   {getGrowthIcon(analytics.kpis.revenueGrowth)}
-                  <span className={`text-sm ml-1 ${getGrowthColor(analytics.kpis.revenueGrowth)}`}>
+                  <span
+                    className={`text-sm ml-1 ${getGrowthColor(analytics.kpis.revenueGrowth)}`}
+                  >
                     {formatPercentage(analytics.kpis.revenueGrowth)}
                   </span>
                 </div>
@@ -342,7 +369,9 @@ export default function AnalyticsPage() {
         <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-tierra-media">Trabajos de Laboratorio</p>
+              <p className="text-sm text-tierra-media">
+                Trabajos de Laboratorio
+              </p>
             </div>
             <div className="flex items-center justify-between">
               <div>
@@ -388,7 +417,8 @@ export default function AnalyticsPage() {
                   {analytics.appointments.total}
                 </p>
                 <p className="text-sm text-tierra-media mt-1">
-                  {analytics.kpis.appointmentCompletionRate.toFixed(1)}% completadas
+                  {analytics.kpis.appointmentCompletionRate.toFixed(1)}%
+                  completadas
                 </p>
               </div>
               <Calendar className="h-8 w-8 text-purple-600" />
@@ -490,18 +520,22 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="flex gap-1">
                     <Button
-                      variant={salesChartType === 'area' ? 'default' : 'outline'}
+                      variant={
+                        salesChartType === "area" ? "default" : "outline"
+                      }
                       size="sm"
-                      onClick={() => setSalesChartType('area')}
+                      onClick={() => setSalesChartType("area")}
                       className="h-7 px-3 text-xs"
                     >
                       <Activity className="h-3 w-3 mr-1" />
                       Área
                     </Button>
                     <Button
-                      variant={salesChartType === 'column' ? 'default' : 'outline'}
+                      variant={
+                        salesChartType === "column" ? "default" : "outline"
+                      }
                       size="sm"
-                      onClick={() => setSalesChartType('column')}
+                      onClick={() => setSalesChartType("column")}
                       className="h-7 px-3 text-xs"
                     >
                       <BarChart3 className="h-3 w-3 mr-1" />
@@ -511,9 +545,9 @@ export default function AnalyticsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {salesChartType === 'area' ? (
-                  <AreaChart 
-                    data={analytics.trends.sales} 
+                {salesChartType === "area" ? (
+                  <AreaChart
+                    data={analytics.trends.sales}
                     title="Evolución de Ingresos"
                     color="#9DC65D"
                     formatValue={formatPrice}
@@ -540,18 +574,22 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="flex gap-1">
                     <Button
-                      variant={workOrdersChartType === 'area' ? 'default' : 'outline'}
+                      variant={
+                        workOrdersChartType === "area" ? "default" : "outline"
+                      }
                       size="sm"
-                      onClick={() => setWorkOrdersChartType('area')}
+                      onClick={() => setWorkOrdersChartType("area")}
                       className="h-7 px-3 text-xs"
                     >
                       <Activity className="h-3 w-3 mr-1" />
                       Área
                     </Button>
                     <Button
-                      variant={workOrdersChartType === 'column' ? 'default' : 'outline'}
+                      variant={
+                        workOrdersChartType === "column" ? "default" : "outline"
+                      }
                       size="sm"
-                      onClick={() => setWorkOrdersChartType('column')}
+                      onClick={() => setWorkOrdersChartType("column")}
                       className="h-7 px-3 text-xs"
                     >
                       <BarChart3 className="h-3 w-3 mr-1" />
@@ -561,9 +599,9 @@ export default function AnalyticsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {workOrdersChartType === 'area' ? (
-                  <AreaChart 
-                    data={analytics.trends.workOrders} 
+                {workOrdersChartType === "area" ? (
+                  <AreaChart
+                    data={analytics.trends.workOrders}
                     title="Trabajos Creados"
                     color="#1E3A8A"
                     showGrid={true}
@@ -591,10 +629,12 @@ export default function AnalyticsPage() {
               <CardContent>
                 {Object.keys(analytics.workOrders.byStatus).length > 0 ? (
                   <PieChart
-                    data={Object.entries(analytics.workOrders.byStatus).map(([status, count]) => ({
-                      label: getStatusLabel(status),
-                      value: count as number
-                    }))}
+                    data={Object.entries(analytics.workOrders.byStatus).map(
+                      ([status, count]) => ({
+                        label: getStatusLabel(status),
+                        value: count as number,
+                      }),
+                    )}
                     title="Distribución por Estado"
                     showLegend={true}
                   />
@@ -617,10 +657,12 @@ export default function AnalyticsPage() {
               <CardContent>
                 {Object.keys(analytics.quotes.byStatus).length > 0 ? (
                   <PieChart
-                    data={Object.entries(analytics.quotes.byStatus).map(([status, count]) => ({
-                      label: getStatusLabel(status),
-                      value: count as number
-                    }))}
+                    data={Object.entries(analytics.quotes.byStatus).map(
+                      ([status, count]) => ({
+                        label: getStatusLabel(status),
+                        value: count as number,
+                      }),
+                    )}
                     title="Distribución por Estado"
                     showLegend={true}
                   />
@@ -683,8 +725,8 @@ export default function AnalyticsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <AreaChart 
-                  data={analytics.trends.workOrders} 
+                <AreaChart
+                  data={analytics.trends.workOrders}
                   title="Trabajos Creados por Día"
                   color="#1E3A8A"
                   showGrid={true}
@@ -733,7 +775,9 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-tierra-media mb-2">Valor Promedio</p>
+                  <p className="text-sm text-tierra-media mb-2">
+                    Valor Promedio
+                  </p>
                   <p className="text-xl font-bold text-azul-profundo">
                     {formatPrice(analytics.kpis.avgQuoteValue)}
                   </p>
@@ -750,8 +794,8 @@ export default function AnalyticsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <AreaChart 
-                  data={analytics.trends.quotes} 
+                <AreaChart
+                  data={analytics.trends.quotes}
                   title="Presupuestos Creados por Día"
                   color="#D4A853"
                   showGrid={true}
@@ -774,10 +818,10 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 {analytics.products.categoryRevenue.length > 0 ? (
-                  <BarChart 
-                    data={analytics.products.categoryRevenue.map(cat => ({
+                  <BarChart
+                    data={analytics.products.categoryRevenue.map((cat) => ({
                       label: cat.category,
-                      value: cat.revenue
+                      value: cat.revenue,
                     }))}
                     title="Categorías Más Rentables"
                     color="#9DC65D"
@@ -803,9 +847,9 @@ export default function AnalyticsPage() {
               <CardContent>
                 {analytics.paymentMethods.length > 0 ? (
                   <PieChart
-                    data={analytics.paymentMethods.map(pm => ({
+                    data={analytics.paymentMethods.map((pm) => ({
                       label: getPaymentMethodLabel(pm.method),
-                      value: pm.revenue
+                      value: pm.revenue,
                     }))}
                     title="Distribución de Pagos"
                     showLegend={true}
@@ -832,13 +876,17 @@ export default function AnalyticsPage() {
                     <p className="text-2xl font-bold text-verde-suave">
                       {formatPrice(analytics.kpis.totalRevenue)}
                     </p>
-                    <p className="text-sm text-tierra-media">Ingresos Totales</p>
+                    <p className="text-sm text-tierra-media">
+                      Ingresos Totales
+                    </p>
                   </div>
                   <div className="text-center p-4 bg-azul-profundo/10 rounded-lg border border-azul-profundo/20">
                     <p className="text-2xl font-bold text-azul-profundo">
                       {formatPrice(analytics.kpis.avgOrderValue)}
                     </p>
-                    <p className="text-sm text-tierra-media">Ticket Promedio POS</p>
+                    <p className="text-sm text-tierra-media">
+                      Ticket Promedio POS
+                    </p>
                   </div>
                   <div className="text-center p-4 bg-dorado/10 rounded-lg border border-dorado/20">
                     <p className="text-2xl font-bold text-dorado">
@@ -847,7 +895,9 @@ export default function AnalyticsPage() {
                     <p className="text-sm text-tierra-media">Ventas POS</p>
                   </div>
                   <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-                    <p className={`text-2xl font-bold ${analytics.kpis.revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p
+                      className={`text-2xl font-bold ${analytics.kpis.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
                       {formatPercentage(analytics.kpis.revenueGrowth)}
                     </p>
                     <p className="text-sm text-tierra-media">Crecimiento</p>
@@ -870,11 +920,13 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 {analytics.products.topProducts.length > 0 ? (
-                  <BarChart 
-                    data={analytics.products.topProducts.slice(0, 8).map(prod => ({
-                      label: prod.name,
-                      value: prod.revenue
-                    }))}
+                  <BarChart
+                    data={analytics.products.topProducts
+                      .slice(0, 8)
+                      .map((prod) => ({
+                        label: prod.name,
+                        value: prod.revenue,
+                      }))}
                     title="Por Ingresos"
                     color="#D4A853"
                     horizontal={true}
@@ -907,24 +959,29 @@ export default function AnalyticsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {analytics.products.topProducts.slice(0, 8).map((product) => (
-                        <TableRow key={product.id}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium truncate max-w-[150px]" title={product.name}>
-                                {product.name}
+                      {analytics.products.topProducts
+                        .slice(0, 8)
+                        .map((product) => (
+                          <TableRow key={product.id}>
+                            <TableCell>
+                              <div>
+                                <div
+                                  className="font-medium truncate max-w-[150px]"
+                                  title={product.name}
+                                >
+                                  {product.name}
+                                </div>
+                                <div className="text-sm text-tierra-media">
+                                  {product.category}
+                                </div>
                               </div>
-                              <div className="text-sm text-tierra-media">
-                                {product.category}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-medium text-verde-suave">
-                            {formatPrice(product.revenue)}
-                          </TableCell>
-                          <TableCell>{product.quantity} unidades</TableCell>
-                        </TableRow>
-                      ))}
+                            </TableCell>
+                            <TableCell className="font-medium text-verde-suave">
+                              {formatPrice(product.revenue)}
+                            </TableCell>
+                            <TableCell>{product.quantity} unidades</TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 ) : (

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -13,8 +13,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { 
+} from "@/components/ui/table";
+import {
   ArrowLeft,
   User,
   Mail,
@@ -39,19 +39,19 @@ import {
   Plus,
   X,
   Crown,
-  Calendar as CalendarIcon
-} from 'lucide-react';
-import Link from 'next/link';
-import { 
+  Calendar as CalendarIcon,
+} from "lucide-react";
+import Link from "next/link";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import CreatePrescriptionForm from '@/components/admin/CreatePrescriptionForm';
-import CreateAppointmentForm from '@/components/admin/CreateAppointmentForm';
-import CreateQuoteForm from '@/components/admin/CreateQuoteForm';
+} from "@/components/ui/dialog";
+import CreatePrescriptionForm from "@/components/admin/CreatePrescriptionForm";
+import CreateAppointmentForm from "@/components/admin/CreateAppointmentForm";
+import CreateQuoteForm from "@/components/admin/CreateQuoteForm";
 
 interface Customer {
   id: string;
@@ -190,15 +190,17 @@ export default function CustomerDetailPage() {
   const router = useRouter();
   const params = useParams();
   const customerId = params.id as string;
-  
+
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [showCreatePrescription, setShowCreatePrescription] = useState(false);
-  const [editingPrescription, setEditingPrescription] = useState<Prescription | null>(null);
+  const [editingPrescription, setEditingPrescription] =
+    useState<Prescription | null>(null);
   const [showCreateAppointment, setShowCreateAppointment] = useState(false);
-  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [editingAppointment, setEditingAppointment] =
+    useState<Appointment | null>(null);
   const [showCreateQuote, setShowCreateQuote] = useState(false);
 
   useEffect(() => {
@@ -212,37 +214,65 @@ export default function CustomerDetailPage() {
       setLoading(true);
       const response = await fetch(`/api/admin/customers/${customerId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch customer');
+        throw new Error("Failed to fetch customer");
       }
 
       const data = await response.json();
       setCustomer(data.customer);
       setError(null);
     } catch (err) {
-      console.error('Error fetching customer:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      console.error("Error fetching customer:", err);
+      setError(err instanceof Error ? err.message : "Unknown error occurred");
     } finally {
       setLoading(false);
     }
   };
 
-  const formatPrice = (amount: number) => 
-    new Intl.NumberFormat('es-CL', { 
-      style: 'currency', 
-      currency: 'CLP',
-      minimumFractionDigits: 0
+  const formatPrice = (amount: number) =>
+    new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      minimumFractionDigits: 0,
     }).format(amount);
 
   const getSegmentBadge = (segment: string) => {
-    const variants: Record<string, { variant: any; label: string; icon: any; color: string }> = {
-      'new': { variant: 'secondary', label: 'Nuevo', icon: Star, color: 'text-yellow-600' },
-      'first-time': { variant: 'outline', label: 'Primera Compra', icon: Package, color: 'text-blue-600' },
-      'regular': { variant: 'default', label: 'Regular', icon: CheckCircle, color: 'text-green-600' },
-      'vip': { variant: 'secondary', label: 'VIP', icon: Crown, color: 'text-purple-600' },
-      'at-risk': { variant: 'destructive', label: 'En Riesgo', icon: AlertTriangle, color: 'text-red-600' }
+    const variants: Record<
+      string,
+      { variant: any; label: string; icon: any; color: string }
+    > = {
+      new: {
+        variant: "secondary",
+        label: "Nuevo",
+        icon: Star,
+        color: "text-yellow-600",
+      },
+      "first-time": {
+        variant: "outline",
+        label: "Primera Compra",
+        icon: Package,
+        color: "text-blue-600",
+      },
+      regular: {
+        variant: "default",
+        label: "Regular",
+        icon: CheckCircle,
+        color: "text-green-600",
+      },
+      vip: {
+        variant: "secondary",
+        label: "VIP",
+        icon: Crown,
+        color: "text-purple-600",
+      },
+      "at-risk": {
+        variant: "destructive",
+        label: "En Riesgo",
+        icon: AlertTriangle,
+        color: "text-red-600",
+      },
     };
 
-    const config = variants[segment] || variants['new'];
+    const config = variants[segment] || variants["new"];
     const Icon = config.icon;
 
     return (
@@ -253,9 +283,8 @@ export default function CustomerDetailPage() {
     );
   };
 
-
   const toggleOrderExpansion = (orderId: string) => {
-    setExpandedOrders(prev => {
+    setExpandedOrders((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(orderId)) {
         newSet.delete(orderId);
@@ -268,15 +297,18 @@ export default function CustomerDetailPage() {
 
   const getOrderStatusBadge = (status: string) => {
     const config: Record<string, { variant: any; label: string }> = {
-      pending: { variant: 'outline', label: 'Pendiente' },
-      processing: { variant: 'secondary', label: 'Procesando' },
-      shipped: { variant: 'default', label: 'Enviado' },
-      delivered: { variant: 'default', label: 'Entregado' },
-      cancelled: { variant: 'destructive', label: 'Cancelado' },
-      refunded: { variant: 'destructive', label: 'Reembolsado' }
+      pending: { variant: "outline", label: "Pendiente" },
+      processing: { variant: "secondary", label: "Procesando" },
+      shipped: { variant: "default", label: "Enviado" },
+      delivered: { variant: "default", label: "Entregado" },
+      cancelled: { variant: "destructive", label: "Cancelado" },
+      refunded: { variant: "destructive", label: "Reembolsado" },
     };
 
-    const statusConfig = config[status] || { variant: 'outline', label: status };
+    const statusConfig = config[status] || {
+      variant: "outline",
+      label: status,
+    };
     return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
   };
 
@@ -288,8 +320,12 @@ export default function CustomerDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Cargando cliente...</h1>
-            <p className="text-tierra-media">Obteniendo información del cliente</p>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Cargando cliente...
+            </h1>
+            <p className="text-tierra-media">
+              Obteniendo información del cliente
+            </p>
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -315,14 +351,20 @@ export default function CustomerDetailPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-azul-profundo">Error</h1>
-            <p className="text-tierra-media">No se pudo cargar la información del cliente</p>
+            <p className="text-tierra-media">
+              No se pudo cargar la información del cliente
+            </p>
           </div>
         </div>
         <Card>
           <CardContent className="text-center py-16">
             <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-red-700 mb-2">Error al cargar cliente</h3>
-            <p className="text-tierra-media mb-4">{error || 'Cliente no encontrado'}</p>
+            <h3 className="text-lg font-semibold text-red-700 mb-2">
+              Error al cargar cliente
+            </h3>
+            <p className="text-tierra-media mb-4">
+              {error || "Cliente no encontrado"}
+            </p>
             <Button onClick={fetchCustomer}>Reintentar</Button>
           </CardContent>
         </Card>
@@ -330,9 +372,10 @@ export default function CustomerDetailPage() {
     );
   }
 
-  const customerName = customer.first_name && customer.last_name 
-    ? `${customer.first_name} ${customer.last_name}`
-    : 'Sin nombre';
+  const customerName =
+    customer.first_name && customer.last_name
+      ? `${customer.first_name} ${customer.last_name}`
+      : "Sin nombre";
 
   return (
     <div className="space-y-6">
@@ -343,13 +386,16 @@ export default function CustomerDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">{customerName}</h1>
-            <p className="text-tierra-media">{customer.email || 'Sin email'}</p>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              {customerName}
+            </h1>
+            <p className="text-tierra-media">{customer.email || "Sin email"}</p>
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-2">
-          {customer.analytics?.segment && getSegmentBadge(customer.analytics.segment)}
+          {customer.analytics?.segment &&
+            getSegmentBadge(customer.analytics.segment)}
           <Link href={`/admin/customers/${customer.id}/edit`}>
             <Button>
               <Edit className="h-4 w-4 mr-2" />
@@ -410,7 +456,7 @@ export default function CustomerDetailPage() {
               <div className="ml-4">
                 <p className="text-sm text-tierra-media">Cliente Desde</p>
                 <p className="text-lg font-bold text-red-500">
-                  {new Date(customer.created_at).toLocaleDateString('es-CL')}
+                  {new Date(customer.created_at).toLocaleDateString("es-CL")}
                 </p>
               </div>
             </div>
@@ -443,11 +489,15 @@ export default function CustomerDetailPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-tierra-media">Nombre</p>
-                    <p className="font-medium">{customer.first_name || 'No especificado'}</p>
+                    <p className="font-medium">
+                      {customer.first_name || "No especificado"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-tierra-media">Apellido</p>
-                    <p className="font-medium">{customer.last_name || 'No especificado'}</p>
+                    <p className="font-medium">
+                      {customer.last_name || "No especificado"}
+                    </p>
                   </div>
                 </div>
 
@@ -457,12 +507,12 @@ export default function CustomerDetailPage() {
                     <p className="font-medium">{customer.rut}</p>
                   </div>
                 )}
-                
+
                 <div>
                   <p className="text-sm text-tierra-media">Email</p>
                   <p className="font-medium">{customer.email}</p>
                 </div>
-                
+
                 {customer.phone && (
                   <div>
                     <p className="text-sm text-tierra-media">Teléfono</p>
@@ -472,44 +522,71 @@ export default function CustomerDetailPage() {
 
                 {customer.date_of_birth && (
                   <div>
-                    <p className="text-sm text-tierra-media">Fecha de Nacimiento</p>
-                    <p className="font-medium">{new Date(customer.date_of_birth).toLocaleDateString('es-CL')}</p>
+                    <p className="text-sm text-tierra-media">
+                      Fecha de Nacimiento
+                    </p>
+                    <p className="font-medium">
+                      {new Date(customer.date_of_birth).toLocaleDateString(
+                        "es-CL",
+                      )}
+                    </p>
                   </div>
                 )}
 
                 {customer.last_eye_exam_date && (
                   <div>
-                    <p className="text-sm text-tierra-media">Último Examen de la Vista</p>
-                    <p className="font-medium">{new Date(customer.last_eye_exam_date).toLocaleDateString('es-CL')}</p>
+                    <p className="text-sm text-tierra-media">
+                      Último Examen de la Vista
+                    </p>
+                    <p className="font-medium">
+                      {new Date(customer.last_eye_exam_date).toLocaleDateString(
+                        "es-CL",
+                      )}
+                    </p>
                   </div>
                 )}
 
                 {customer.next_eye_exam_due && (
                   <div>
-                    <p className="text-sm text-tierra-media">Próximo Examen Recomendado</p>
+                    <p className="text-sm text-tierra-media">
+                      Próximo Examen Recomendado
+                    </p>
                     <p className="font-medium text-azul-profundo">
-                      {new Date(customer.next_eye_exam_due).toLocaleDateString('es-CL')}
+                      {new Date(customer.next_eye_exam_due).toLocaleDateString(
+                        "es-CL",
+                      )}
                     </p>
                   </div>
                 )}
 
-                {(customer.medical_conditions && customer.medical_conditions.length > 0) && (
-                  <div>
-                    <p className="text-sm text-tierra-media">Condiciones Médicas</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {customer.medical_conditions.map((condition, idx) => (
-                        <Badge key={idx} variant="outline">{condition}</Badge>
-                      ))}
+                {customer.medical_conditions &&
+                  customer.medical_conditions.length > 0 && (
+                    <div>
+                      <p className="text-sm text-tierra-media">
+                        Condiciones Médicas
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {customer.medical_conditions.map((condition, idx) => (
+                          <Badge key={idx} variant="outline">
+                            {condition}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {(customer.allergies && customer.allergies.length > 0) && (
+                {customer.allergies && customer.allergies.length > 0 && (
                   <div>
                     <p className="text-sm text-tierra-media">Alergias</p>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {customer.allergies.map((allergy, idx) => (
-                        <Badge key={idx} variant="outline" className="bg-red-50 text-red-700">{allergy}</Badge>
+                        <Badge
+                          key={idx}
+                          variant="outline"
+                          className="bg-red-50 text-red-700"
+                        >
+                          {allergy}
+                        </Badge>
                       ))}
                     </div>
                   </div>
@@ -517,18 +594,32 @@ export default function CustomerDetailPage() {
 
                 {customer.emergency_contact_name && (
                   <div>
-                    <p className="text-sm text-tierra-media">Contacto de Emergencia</p>
-                    <p className="font-medium">{customer.emergency_contact_name}</p>
+                    <p className="text-sm text-tierra-media">
+                      Contacto de Emergencia
+                    </p>
+                    <p className="font-medium">
+                      {customer.emergency_contact_name}
+                    </p>
                     {customer.emergency_contact_phone && (
-                      <p className="text-sm text-tierra-media">{customer.emergency_contact_phone}</p>
+                      <p className="text-sm text-tierra-media">
+                        {customer.emergency_contact_phone}
+                      </p>
                     )}
                   </div>
                 )}
 
                 <div>
                   <p className="text-sm text-tierra-media">Estado</p>
-                  <Badge variant={customer.is_active_customer !== false ? "default" : "outline"}>
-                    {customer.is_active_customer !== false ? "Cliente Activo" : "Cliente Inactivo"}
+                  <Badge
+                    variant={
+                      customer.is_active_customer !== false
+                        ? "default"
+                        : "outline"
+                    }
+                  >
+                    {customer.is_active_customer !== false
+                      ? "Cliente Activo"
+                      : "Cliente Inactivo"}
                   </Badge>
                 </div>
               </CardContent>
@@ -552,31 +643,43 @@ export default function CustomerDetailPage() {
                         <p className="font-medium">{customer.address_line_2}</p>
                       )}
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-tierra-media">Ciudad</p>
-                        <p className="font-medium">{customer.city || 'No especificado'}</p>
+                        <p className="font-medium">
+                          {customer.city || "No especificado"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-tierra-media">Provincia</p>
-                        <p className="font-medium">{customer.state || 'No especificado'}</p>
+                        <p className="font-medium">
+                          {customer.state || "No especificado"}
+                        </p>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm text-tierra-media">Código Postal</p>
-                        <p className="font-medium">{customer.postal_code || 'No especificado'}</p>
+                        <p className="text-sm text-tierra-media">
+                          Código Postal
+                        </p>
+                        <p className="font-medium">
+                          {customer.postal_code || "No especificado"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-tierra-media">País</p>
-                        <p className="font-medium">{customer.country || 'Chile'}</p>
+                        <p className="font-medium">
+                          {customer.country || "Chile"}
+                        </p>
                       </div>
                     </div>
                   </>
                 ) : (
-                  <p className="text-tierra-media">No hay dirección registrada</p>
+                  <p className="text-tierra-media">
+                    No hay dirección registrada
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -592,26 +695,35 @@ export default function CustomerDetailPage() {
                     Pedidos Recientes
                   </div>
                   <Link href={`/admin/customers/${customer.id}?tab=orders`}>
-                    <Button variant="outline" size="sm">Ver todos</Button>
+                    <Button variant="outline" size="sm">
+                      Ver todos
+                    </Button>
                   </Link>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {customer.orders.slice(0, 5).map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
                       <div className="flex items-center space-x-3">
                         <div>
                           <p className="font-medium">#{order.order_number}</p>
                           <p className="text-sm text-tierra-media">
-                            {new Date(order.created_at).toLocaleDateString('es-CL')}
+                            {new Date(order.created_at).toLocaleDateString(
+                              "es-CL",
+                            )}
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         <div className="text-right">
-                          <p className="font-medium">{formatPrice(order.total_amount)}</p>
+                          <p className="font-medium">
+                            {formatPrice(order.total_amount)}
+                          </p>
                           {getOrderStatusBadge(order.status)}
                         </div>
                         <Link href={`/admin/orders/${order.id}`}>
@@ -634,10 +746,12 @@ export default function CustomerDetailPage() {
               <Eye className="h-5 w-5 mr-2" />
               Recetas Ópticas ({customer.prescriptions?.length || 0})
             </CardTitle>
-            <Button onClick={() => {
-              setEditingPrescription(null);
-              setShowCreatePrescription(true);
-            }}>
+            <Button
+              onClick={() => {
+                setEditingPrescription(null);
+                setShowCreatePrescription(true);
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Nueva Receta
             </Button>
@@ -646,17 +760,31 @@ export default function CustomerDetailPage() {
           {customer.prescriptions && customer.prescriptions.length > 0 ? (
             <div className="space-y-4">
               {customer.prescriptions.map((prescription) => (
-                <Card key={prescription.id} className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                <Card
+                  key={prescription.id}
+                  className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
+                >
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="text-lg">
-                          Receta #{prescription.prescription_number || prescription.id.slice(0, 8)}
+                          Receta #
+                          {prescription.prescription_number ||
+                            prescription.id.slice(0, 8)}
                         </CardTitle>
                         <p className="text-sm text-tierra-media mt-1">
-                          Fecha: {new Date(prescription.prescription_date).toLocaleDateString('es-CL')}
+                          Fecha:{" "}
+                          {new Date(
+                            prescription.prescription_date,
+                          ).toLocaleDateString("es-CL")}
                           {prescription.expiration_date && (
-                            <> • Vence: {new Date(prescription.expiration_date).toLocaleDateString('es-CL')}</>
+                            <>
+                              {" "}
+                              • Vence:{" "}
+                              {new Date(
+                                prescription.expiration_date,
+                              ).toLocaleDateString("es-CL")}
+                            </>
                           )}
                         </p>
                       </div>
@@ -687,65 +815,119 @@ export default function CustomerDetailPage() {
                     <div className="grid grid-cols-2 gap-6">
                       {/* Right Eye (OD) */}
                       <div className="border-r pr-6">
-                        <h4 className="font-semibold mb-3 text-azul-profundo">Ojo Derecho (OD)</h4>
+                        <h4 className="font-semibold mb-3 text-azul-profundo">
+                          Ojo Derecho (OD)
+                        </h4>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
                             <span className="text-tierra-media">Esfera:</span>
-                            <p className="font-medium">{prescription.od_sphere !== null ? `${prescription.od_sphere > 0 ? '+' : ''}${prescription.od_sphere}` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.od_sphere !== null &&
+                              prescription.od_sphere !== undefined
+                                ? `${prescription.od_sphere > 0 ? "+" : ""}${prescription.od_sphere}`
+                                : "-"}
+                            </p>
                           </div>
                           <div>
                             <span className="text-tierra-media">Cilindro:</span>
-                            <p className="font-medium">{prescription.od_cylinder !== null ? `${prescription.od_cylinder > 0 ? '+' : ''}${prescription.od_cylinder}` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.od_cylinder !== null &&
+                              prescription.od_cylinder !== undefined
+                                ? `${prescription.od_cylinder > 0 ? "+" : ""}${prescription.od_cylinder}`
+                                : "-"}
+                            </p>
                           </div>
                           <div>
                             <span className="text-tierra-media">Eje:</span>
-                            <p className="font-medium">{prescription.od_axis !== null ? `${prescription.od_axis}°` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.od_axis !== null
+                                ? `${prescription.od_axis}°`
+                                : "-"}
+                            </p>
                           </div>
                           <div>
                             <span className="text-tierra-media">ADD:</span>
-                            <p className="font-medium">{prescription.od_add !== null ? `+${prescription.od_add}` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.od_add !== null
+                                ? `+${prescription.od_add}`
+                                : "-"}
+                            </p>
                           </div>
                           <div>
                             <span className="text-tierra-media">PD:</span>
-                            <p className="font-medium">{prescription.od_pd !== null ? `${prescription.od_pd} mm` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.od_pd !== null
+                                ? `${prescription.od_pd} mm`
+                                : "-"}
+                            </p>
                           </div>
                         </div>
                       </div>
 
                       {/* Left Eye (OS) */}
                       <div>
-                        <h4 className="font-semibold mb-3 text-azul-profundo">Ojo Izquierdo (OS)</h4>
+                        <h4 className="font-semibold mb-3 text-azul-profundo">
+                          Ojo Izquierdo (OS)
+                        </h4>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
                             <span className="text-tierra-media">Esfera:</span>
-                            <p className="font-medium">{prescription.os_sphere !== null ? `${prescription.os_sphere > 0 ? '+' : ''}${prescription.os_sphere}` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.os_sphere !== null &&
+                              prescription.os_sphere !== undefined
+                                ? `${prescription.os_sphere > 0 ? "+" : ""}${prescription.os_sphere}`
+                                : "-"}
+                            </p>
                           </div>
                           <div>
                             <span className="text-tierra-media">Cilindro:</span>
-                            <p className="font-medium">{prescription.os_cylinder !== null ? `${prescription.os_cylinder > 0 ? '+' : ''}${prescription.os_cylinder}` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.os_cylinder !== null &&
+                              prescription.os_cylinder !== undefined
+                                ? `${prescription.os_cylinder > 0 ? "+" : ""}${prescription.os_cylinder}`
+                                : "-"}
+                            </p>
                           </div>
                           <div>
                             <span className="text-tierra-media">Eje:</span>
-                            <p className="font-medium">{prescription.os_axis !== null ? `${prescription.os_axis}°` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.os_axis !== null
+                                ? `${prescription.os_axis}°`
+                                : "-"}
+                            </p>
                           </div>
                           <div>
                             <span className="text-tierra-media">ADD:</span>
-                            <p className="font-medium">{prescription.os_add !== null ? `+${prescription.os_add}` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.os_add !== null
+                                ? `+${prescription.os_add}`
+                                : "-"}
+                            </p>
                           </div>
                           <div>
                             <span className="text-tierra-media">PD:</span>
-                            <p className="font-medium">{prescription.os_pd !== null ? `${prescription.os_pd} mm` : '-'}</p>
+                            <p className="font-medium">
+                              {prescription.os_pd !== null
+                                ? `${prescription.os_pd} mm`
+                                : "-"}
+                            </p>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {(prescription.issued_by || prescription.prescription_type || prescription.notes) && (
+                    {(prescription.issued_by ||
+                      prescription.prescription_type ||
+                      prescription.notes) && (
                       <div className="mt-4 pt-4 border-t space-y-2">
                         {prescription.issued_by && (
                           <p className="text-sm">
-                            <span className="text-tierra-media">Emitida por:</span>{' '}
-                            <span className="font-medium">{prescription.issued_by}</span>
+                            <span className="text-tierra-media">
+                              Emitida por:
+                            </span>{" "}
+                            <span className="font-medium">
+                              {prescription.issued_by}
+                            </span>
                             {prescription.issued_by_license && (
                               <> ({prescription.issued_by_license})</>
                             )}
@@ -753,13 +935,15 @@ export default function CustomerDetailPage() {
                         )}
                         {prescription.prescription_type && (
                           <p className="text-sm">
-                            <span className="text-tierra-media">Tipo:</span>{' '}
-                            <Badge variant="outline">{prescription.prescription_type}</Badge>
+                            <span className="text-tierra-media">Tipo:</span>{" "}
+                            <Badge variant="outline">
+                              {prescription.prescription_type}
+                            </Badge>
                           </p>
                         )}
                         {prescription.notes && (
                           <p className="text-sm">
-                            <span className="text-tierra-media">Notas:</span>{' '}
+                            <span className="text-tierra-media">Notas:</span>{" "}
                             <span>{prescription.notes}</span>
                           </p>
                         )}
@@ -773,12 +957,18 @@ export default function CustomerDetailPage() {
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardContent className="text-center py-12">
                 <Eye className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin recetas</h3>
-                <p className="text-tierra-media mb-4">Este cliente aún no tiene recetas registradas.</p>
-                <Button onClick={() => {
-                  setEditingPrescription(null);
-                  setShowCreatePrescription(true);
-                }}>
+                <h3 className="text-lg font-semibold text-azul-profundo mb-2">
+                  Sin recetas
+                </h3>
+                <p className="text-tierra-media mb-4">
+                  Este cliente aún no tiene recetas registradas.
+                </p>
+                <Button
+                  onClick={() => {
+                    setEditingPrescription(null);
+                    setShowCreatePrescription(true);
+                  }}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Agregar Primera Receta
                 </Button>
@@ -793,10 +983,12 @@ export default function CustomerDetailPage() {
               <CalendarIcon className="h-5 w-5 mr-2" />
               Citas y Agendas ({customer.appointments?.length || 0})
             </CardTitle>
-            <Button onClick={() => {
-              setEditingAppointment(null);
-              setShowCreateAppointment(true);
-            }}>
+            <Button
+              onClick={() => {
+                setEditingAppointment(null);
+                setShowCreateAppointment(true);
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Nueva Cita
             </Button>
@@ -805,51 +997,84 @@ export default function CustomerDetailPage() {
           {customer.appointments && customer.appointments.length > 0 ? (
             <div className="space-y-4">
               {customer.appointments.map((appointment) => {
-                const appointmentDate = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
+                const appointmentDate = new Date(
+                  `${appointment.appointment_date}T${appointment.appointment_time}`,
+                );
                 const isPast = appointmentDate < new Date();
                 const statusColors: Record<string, string> = {
-                  scheduled: 'bg-blue-100 text-blue-800',
-                  confirmed: 'bg-green-100 text-green-800',
-                  completed: 'bg-gray-100 text-gray-800',
-                  cancelled: 'bg-red-100 text-red-800',
-                  no_show: 'bg-orange-100 text-orange-800'
+                  scheduled: "bg-blue-100 text-blue-800",
+                  confirmed: "bg-green-100 text-green-800",
+                  completed: "bg-gray-100 text-gray-800",
+                  cancelled: "bg-red-100 text-red-800",
+                  no_show: "bg-orange-100 text-orange-800",
                 };
 
                 return (
-                  <Card key={appointment.id} className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                  <Card
+                    key={appointment.id}
+                    className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
+                  >
                     <CardHeader>
                       <div className="flex justify-between items-start">
                         <div>
                           <CardTitle className="text-lg">
-                            {appointment.appointment_type === 'eye_exam' && 'Examen de la Vista'}
-                            {appointment.appointment_type === 'consultation' && 'Consulta'}
-                            {appointment.appointment_type === 'fitting' && 'Ajuste de Lentes'}
-                            {appointment.appointment_type === 'delivery' && 'Entrega de Lentes'}
-                            {appointment.appointment_type === 'repair' && 'Reparación'}
-                            {appointment.appointment_type === 'follow_up' && 'Seguimiento'}
-                            {appointment.appointment_type === 'emergency' && 'Emergencia'}
-                            {!['eye_exam', 'consultation', 'fitting', 'delivery', 'repair', 'follow_up', 'emergency'].includes(appointment.appointment_type) && 'Cita'}
+                            {appointment.appointment_type === "eye_exam" &&
+                              "Examen de la Vista"}
+                            {appointment.appointment_type === "consultation" &&
+                              "Consulta"}
+                            {appointment.appointment_type === "fitting" &&
+                              "Ajuste de Lentes"}
+                            {appointment.appointment_type === "delivery" &&
+                              "Entrega de Lentes"}
+                            {appointment.appointment_type === "repair" &&
+                              "Reparación"}
+                            {appointment.appointment_type === "follow_up" &&
+                              "Seguimiento"}
+                            {appointment.appointment_type === "emergency" &&
+                              "Emergencia"}
+                            {![
+                              "eye_exam",
+                              "consultation",
+                              "fitting",
+                              "delivery",
+                              "repair",
+                              "follow_up",
+                              "emergency",
+                            ].includes(appointment.appointment_type) && "Cita"}
                           </CardTitle>
                           <div className="flex items-center gap-4 mt-2 text-sm text-tierra-media">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
-                              {appointmentDate.toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                              {appointmentDate.toLocaleDateString("es-CL", {
+                                weekday: "long",
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              })}
                             </div>
                             <div className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
-                              {appointmentDate.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                              {appointmentDate.toLocaleTimeString("es-CL", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
                             </div>
                             <div>
                               Duración: {appointment.duration_minutes} min
                             </div>
                           </div>
                         </div>
-                        <Badge className={statusColors[appointment.status] || 'bg-gray-100 text-gray-800'}>
-                          {appointment.status === 'scheduled' && 'Programada'}
-                          {appointment.status === 'confirmed' && 'Confirmada'}
-                          {appointment.status === 'completed' && 'Completada'}
-                          {appointment.status === 'cancelled' && 'Cancelada'}
-                          {appointment.status === 'no_show' && 'No asistió'}
+                        <Badge
+                          className={
+                            statusColors[appointment.status] ||
+                            "bg-gray-100 text-gray-800"
+                          }
+                        >
+                          {appointment.status === "scheduled" && "Programada"}
+                          {appointment.status === "confirmed" && "Confirmada"}
+                          {appointment.status === "completed" && "Completada"}
+                          {appointment.status === "cancelled" && "Cancelada"}
+                          {appointment.status === "no_show" && "No asistió"}
                         </Badge>
                       </div>
                     </CardHeader>
@@ -868,18 +1093,25 @@ export default function CustomerDetailPage() {
                       )}
                       {appointment.outcome && (
                         <div className="mb-3">
-                          <p className="text-sm text-tierra-media">Resultado:</p>
+                          <p className="text-sm text-tierra-media">
+                            Resultado:
+                          </p>
                           <p>{appointment.outcome}</p>
                         </div>
                       )}
-                      {appointment.follow_up_required && appointment.follow_up_date && (
-                        <div className="mt-3 pt-3 border-t">
-                          <p className="text-sm text-tierra-media">Seguimiento requerido:</p>
-                          <p className="font-medium text-azul-profundo">
-                            {new Date(appointment.follow_up_date).toLocaleDateString('es-CL')}
-                          </p>
-                        </div>
-                      )}
+                      {appointment.follow_up_required &&
+                        appointment.follow_up_date && (
+                          <div className="mt-3 pt-3 border-t">
+                            <p className="text-sm text-tierra-media">
+                              Seguimiento requerido:
+                            </p>
+                            <p className="font-medium text-azul-profundo">
+                              {new Date(
+                                appointment.follow_up_date,
+                              ).toLocaleDateString("es-CL")}
+                            </p>
+                          </div>
+                        )}
                       <div className="mt-4 pt-4 border-t flex justify-end">
                         <Button
                           variant="outline"
@@ -902,12 +1134,18 @@ export default function CustomerDetailPage() {
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardContent className="text-center py-12">
                 <CalendarIcon className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin citas</h3>
-                <p className="text-tierra-media mb-4">Este cliente aún no tiene citas programadas.</p>
-                <Button onClick={() => {
-                  setEditingAppointment(null);
-                  setShowCreateAppointment(true);
-                }}>
+                <h3 className="text-lg font-semibold text-azul-profundo mb-2">
+                  Sin citas
+                </h3>
+                <p className="text-tierra-media mb-4">
+                  Este cliente aún no tiene citas programadas.
+                </p>
+                <Button
+                  onClick={() => {
+                    setEditingAppointment(null);
+                    setShowCreateAppointment(true);
+                  }}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Agendar Primera Cita
                 </Button>
@@ -932,20 +1170,36 @@ export default function CustomerDetailPage() {
             <div className="space-y-4">
               {customer.quotes.map((quote) => {
                 const getStatusBadge = (status: string) => {
-                  const config: Record<string, { variant: any; label: string }> = {
-                    draft: { variant: 'outline', label: 'Borrador' },
-                    sent: { variant: 'default', label: 'Enviado' },
-                    accepted: { variant: 'default', label: 'Aceptado' },
-                    rejected: { variant: 'destructive', label: 'Rechazado' },
-                    expired: { variant: 'outline', label: 'Expirado' },
-                    converted_to_work: { variant: 'secondary', label: 'Convertido' }
+                  const config: Record<
+                    string,
+                    { variant: any; label: string }
+                  > = {
+                    draft: { variant: "outline", label: "Borrador" },
+                    sent: { variant: "default", label: "Enviado" },
+                    accepted: { variant: "default", label: "Aceptado" },
+                    rejected: { variant: "destructive", label: "Rechazado" },
+                    expired: { variant: "outline", label: "Expirado" },
+                    converted_to_work: {
+                      variant: "secondary",
+                      label: "Convertido",
+                    },
                   };
-                  const statusConfig = config[status] || { variant: 'outline', label: status };
-                  return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
+                  const statusConfig = config[status] || {
+                    variant: "outline",
+                    label: status,
+                  };
+                  return (
+                    <Badge variant={statusConfig.variant}>
+                      {statusConfig.label}
+                    </Badge>
+                  );
                 };
 
                 return (
-                  <Card key={quote.id} className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                  <Card
+                    key={quote.id}
+                    className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
+                  >
                     <CardHeader>
                       <div className="flex justify-between items-start">
                         <div>
@@ -953,16 +1207,27 @@ export default function CustomerDetailPage() {
                             Presupuesto {quote.quote_number}
                           </CardTitle>
                           <p className="text-sm text-tierra-media mt-1">
-                            Fecha: {new Date(quote.quote_date).toLocaleDateString('es-CL')}
+                            Fecha:{" "}
+                            {new Date(quote.quote_date).toLocaleDateString(
+                              "es-CL",
+                            )}
                             {quote.expiration_date && (
-                              <> • Vence: {new Date(quote.expiration_date).toLocaleDateString('es-CL')}</>
+                              <>
+                                {" "}
+                                • Vence:{" "}
+                                {new Date(
+                                  quote.expiration_date,
+                                ).toLocaleDateString("es-CL")}
+                              </>
                             )}
                           </p>
                         </div>
                         <div className="flex gap-2 items-center">
                           {getStatusBadge(quote.status)}
                           {quote.converted_to_work_order_id && (
-                            <Link href={`/admin/work-orders/${quote.converted_to_work_order_id}`}>
+                            <Link
+                              href={`/admin/work-orders/${quote.converted_to_work_order_id}`}
+                            >
                               <Button variant="outline" size="sm">
                                 Ver Trabajo
                               </Button>
@@ -979,36 +1244,97 @@ export default function CustomerDetailPage() {
                     <CardContent>
                       <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-sm text-tierra-media mb-2">Detalles del Presupuesto</p>
+                          <p className="text-sm text-tierra-media mb-2">
+                            Detalles del Presupuesto
+                          </p>
                           <div className="space-y-1 text-sm">
                             {quote.frame_name && (
-                              <p><span className="text-tierra-media">Marco:</span> <span className="font-medium">{quote.frame_name}</span></p>
+                              <p>
+                                <span className="text-tierra-media">
+                                  Marco:
+                                </span>{" "}
+                                <span className="font-medium">
+                                  {quote.frame_name}
+                                </span>
+                              </p>
                             )}
                             {quote.lens_type && (
-                              <p><span className="text-tierra-media">Tipo de lente:</span> <span className="font-medium">{quote.lens_type}</span></p>
+                              <p>
+                                <span className="text-tierra-media">
+                                  Tipo de lente:
+                                </span>{" "}
+                                <span className="font-medium">
+                                  {quote.lens_type}
+                                </span>
+                              </p>
                             )}
                             {quote.lens_material && (
-                              <p><span className="text-tierra-media">Material:</span> <span className="font-medium">{quote.lens_material}</span></p>
+                              <p>
+                                <span className="text-tierra-media">
+                                  Material:
+                                </span>{" "}
+                                <span className="font-medium">
+                                  {quote.lens_material}
+                                </span>
+                              </p>
                             )}
                           </div>
                         </div>
                         <div>
-                          <p className="text-sm text-tierra-media mb-2">Información de Precio</p>
+                          <p className="text-sm text-tierra-media mb-2">
+                            Información de Precio
+                          </p>
                           <div className="space-y-1 text-sm">
                             {quote.frame_price && quote.frame_price > 0 && (
-                              <p><span className="text-tierra-media">Marco:</span> <span className="font-medium">{formatPrice(quote.frame_price)}</span></p>
+                              <p>
+                                <span className="text-tierra-media">
+                                  Marco:
+                                </span>{" "}
+                                <span className="font-medium">
+                                  {formatPrice(quote.frame_price)}
+                                </span>
+                              </p>
                             )}
                             {quote.lens_cost && quote.lens_cost > 0 && (
-                              <p><span className="text-tierra-media">Lente:</span> <span className="font-medium">{formatPrice(quote.lens_cost)}</span></p>
+                              <p>
+                                <span className="text-tierra-media">
+                                  Lente:
+                                </span>{" "}
+                                <span className="font-medium">
+                                  {formatPrice(quote.lens_cost)}
+                                </span>
+                              </p>
                             )}
-                            {quote.treatments_cost && quote.treatments_cost > 0 && (
-                              <p><span className="text-tierra-media">Tratamientos:</span> <span className="font-medium">{formatPrice(quote.treatments_cost)}</span></p>
-                            )}
+                            {quote.treatments_cost &&
+                              quote.treatments_cost > 0 && (
+                                <p>
+                                  <span className="text-tierra-media">
+                                    Tratamientos:
+                                  </span>{" "}
+                                  <span className="font-medium">
+                                    {formatPrice(quote.treatments_cost)}
+                                  </span>
+                                </p>
+                              )}
                             {quote.labor_cost && quote.labor_cost > 0 && (
-                              <p><span className="text-tierra-media">Mano de obra:</span> <span className="font-medium">{formatPrice(quote.labor_cost)}</span></p>
+                              <p>
+                                <span className="text-tierra-media">
+                                  Mano de obra:
+                                </span>{" "}
+                                <span className="font-medium">
+                                  {formatPrice(quote.labor_cost)}
+                                </span>
+                              </p>
                             )}
                             {quote.total_amount && (
-                              <p className="pt-2 border-t"><span className="text-tierra-media">Total:</span> <span className="font-medium text-verde-suave text-base">{formatPrice(quote.total_amount)}</span></p>
+                              <p className="pt-2 border-t">
+                                <span className="text-tierra-media">
+                                  Total:
+                                </span>{" "}
+                                <span className="font-medium text-verde-suave text-base">
+                                  {formatPrice(quote.total_amount)}
+                                </span>
+                              </p>
                             )}
                           </div>
                         </div>
@@ -1022,8 +1348,12 @@ export default function CustomerDetailPage() {
             <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
               <CardContent className="text-center py-12">
                 <FileText className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-azul-profundo mb-2">Sin presupuestos</h3>
-                <p className="text-tierra-media mb-4">Este cliente aún no tiene presupuestos registrados.</p>
+                <h3 className="text-lg font-semibold text-azul-profundo mb-2">
+                  Sin presupuestos
+                </h3>
+                <p className="text-tierra-media mb-4">
+                  Este cliente aún no tiene presupuestos registrados.
+                </p>
                 <Button onClick={() => setShowCreateQuote(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Crear Primer Presupuesto
@@ -1047,11 +1377,11 @@ export default function CustomerDetailPage() {
                 <div className="space-y-4">
                   {customer.lensPurchases.map((purchase) => {
                     const statusColors: Record<string, string> = {
-                      ordered: 'bg-blue-100 text-blue-800',
-                      in_progress: 'bg-yellow-100 text-yellow-800',
-                      ready: 'bg-green-100 text-green-800',
-                      delivered: 'bg-gray-100 text-gray-800',
-                      cancelled: 'bg-red-100 text-red-800'
+                      ordered: "bg-blue-100 text-blue-800",
+                      in_progress: "bg-yellow-100 text-yellow-800",
+                      ready: "bg-green-100 text-green-800",
+                      delivered: "bg-gray-100 text-gray-800",
+                      cancelled: "bg-red-100 text-red-800",
                     };
 
                     return (
@@ -1059,45 +1389,110 @@ export default function CustomerDetailPage() {
                         <CardHeader>
                           <div className="flex justify-between items-start">
                             <div>
-                              <CardTitle className="text-lg">{purchase.product_name}</CardTitle>
+                              <CardTitle className="text-lg">
+                                {purchase.product_name}
+                              </CardTitle>
                               <p className="text-sm text-tierra-media mt-1">
-                                Fecha de compra: {new Date(purchase.purchase_date).toLocaleDateString('es-CL')}
+                                Fecha de compra:{" "}
+                                {new Date(
+                                  purchase.purchase_date,
+                                ).toLocaleDateString("es-CL")}
                                 {purchase.delivery_date && (
-                                  <> • Entregado: {new Date(purchase.delivery_date).toLocaleDateString('es-CL')}</>
+                                  <>
+                                    {" "}
+                                    • Entregado:{" "}
+                                    {new Date(
+                                      purchase.delivery_date,
+                                    ).toLocaleDateString("es-CL")}
+                                  </>
                                 )}
                               </p>
                             </div>
-                            <Badge className={statusColors[purchase.status] || 'bg-gray-100 text-gray-800'}>
-                              {purchase.status === 'ordered' && 'Ordenado'}
-                              {purchase.status === 'in_progress' && 'En Proceso'}
-                              {purchase.status === 'ready' && 'Listo'}
-                              {purchase.status === 'delivered' && 'Entregado'}
-                              {purchase.status === 'cancelled' && 'Cancelado'}
+                            <Badge
+                              className={
+                                statusColors[purchase.status] ||
+                                "bg-gray-100 text-gray-800"
+                              }
+                            >
+                              {purchase.status === "ordered" && "Ordenado"}
+                              {purchase.status === "in_progress" &&
+                                "En Proceso"}
+                              {purchase.status === "ready" && "Listo"}
+                              {purchase.status === "delivered" && "Entregado"}
+                              {purchase.status === "cancelled" && "Cancelado"}
                             </Badge>
                           </div>
                         </CardHeader>
                         <CardContent>
                           <div className="grid grid-cols-2 gap-6">
                             <div>
-                              <p className="text-sm text-tierra-media mb-2">Detalles del Producto</p>
+                              <p className="text-sm text-tierra-media mb-2">
+                                Detalles del Producto
+                              </p>
                               <div className="space-y-1 text-sm">
-                                <p><span className="text-tierra-media">Tipo:</span> <span className="font-medium">{purchase.product_type}</span></p>
-                                <p><span className="text-tierra-media">Cantidad:</span> <span className="font-medium">{purchase.quantity}</span></p>
+                                <p>
+                                  <span className="text-tierra-media">
+                                    Tipo:
+                                  </span>{" "}
+                                  <span className="font-medium">
+                                    {purchase.product_type}
+                                  </span>
+                                </p>
+                                <p>
+                                  <span className="text-tierra-media">
+                                    Cantidad:
+                                  </span>{" "}
+                                  <span className="font-medium">
+                                    {purchase.quantity}
+                                  </span>
+                                </p>
                                 {purchase.lens_type && (
-                                  <p><span className="text-tierra-media">Tipo de lente:</span> <span className="font-medium">{purchase.lens_type}</span></p>
+                                  <p>
+                                    <span className="text-tierra-media">
+                                      Tipo de lente:
+                                    </span>{" "}
+                                    <span className="font-medium">
+                                      {purchase.lens_type}
+                                    </span>
+                                  </p>
                                 )}
                                 {purchase.frame_brand && (
-                                  <p><span className="text-tierra-media">Marca:</span> <span className="font-medium">{purchase.frame_brand}</span></p>
+                                  <p>
+                                    <span className="text-tierra-media">
+                                      Marca:
+                                    </span>{" "}
+                                    <span className="font-medium">
+                                      {purchase.frame_brand}
+                                    </span>
+                                  </p>
                                 )}
                               </div>
                             </div>
                             <div>
-                              <p className="text-sm text-tierra-media mb-2">Información de Compra</p>
+                              <p className="text-sm text-tierra-media mb-2">
+                                Información de Compra
+                              </p>
                               <div className="space-y-1 text-sm">
-                                <p><span className="text-tierra-media">Precio unitario:</span> <span className="font-medium">{formatPrice(purchase.unit_price)}</span></p>
-                                <p><span className="text-tierra-media">Total:</span> <span className="font-medium text-verde-suave">{formatPrice(purchase.total_price)}</span></p>
+                                <p>
+                                  <span className="text-tierra-media">
+                                    Precio unitario:
+                                  </span>{" "}
+                                  <span className="font-medium">
+                                    {formatPrice(purchase.unit_price)}
+                                  </span>
+                                </p>
+                                <p>
+                                  <span className="text-tierra-media">
+                                    Total:
+                                  </span>{" "}
+                                  <span className="font-medium text-verde-suave">
+                                    {formatPrice(purchase.total_price)}
+                                  </span>
+                                </p>
                                 {purchase.prescription_id && (
-                                  <p className="text-xs text-tierra-media">Con receta asociada</p>
+                                  <p className="text-xs text-tierra-media">
+                                    Con receta asociada
+                                  </p>
                                 )}
                               </div>
                             </div>
@@ -1110,7 +1505,9 @@ export default function CustomerDetailPage() {
               ) : (
                 <div className="text-center py-8">
                   <ShoppingBag className="h-10 w-10 text-tierra-media mx-auto mb-3 opacity-50" />
-                  <p className="text-sm text-tierra-media">Sin compras de lentes o armazones</p>
+                  <p className="text-sm text-tierra-media">
+                    Sin compras de lentes o armazones
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -1140,7 +1537,10 @@ export default function CustomerDetailPage() {
                   <TableBody>
                     {customer.orders.map((order: any) => (
                       <>
-                        <TableRow key={order.id} className="hover:bg-[#AE000010]">
+                        <TableRow
+                          key={order.id}
+                          className="hover:bg-[#AE000010]"
+                        >
                           <TableCell>
                             <div className="flex items-center space-x-2">
                               <Button
@@ -1149,42 +1549,56 @@ export default function CustomerDetailPage() {
                                 onClick={() => toggleOrderExpansion(order.id)}
                                 className="h-6 w-6 p-0"
                               >
-                                {expandedOrders.has(order.id) ? '−' : '+'}
+                                {expandedOrders.has(order.id) ? "−" : "+"}
                               </Button>
                               <div>
-                                <p className="font-medium">#{order.order_number}</p>
+                                <p className="font-medium">
+                                  #{order.order_number}
+                                </p>
                                 <p className="text-sm text-tierra-media">
                                   {order.order_items?.length || 0} productos
                                 </p>
                               </div>
                             </div>
                           </TableCell>
-                          
+
                           <TableCell>
-                            {new Date(order.created_at).toLocaleDateString('es-CL', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            })}
+                            {new Date(order.created_at).toLocaleDateString(
+                              "es-CL",
+                              {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              },
+                            )}
                           </TableCell>
-                          
+
                           <TableCell>
                             {getOrderStatusBadge(order.status)}
                           </TableCell>
-                          
+
                           <TableCell>
-                            <Badge variant={order.payment_status === 'paid' ? 'default' : 'outline'}>
-                              {order.payment_status === 'paid' ? 'Pagado' : 
-                               order.payment_status === 'pending' ? 'Pendiente' :
-                               order.payment_status === 'failed' ? 'Fallido' :
-                               order.payment_status}
+                            <Badge
+                              variant={
+                                order.payment_status === "paid"
+                                  ? "default"
+                                  : "outline"
+                              }
+                            >
+                              {order.payment_status === "paid"
+                                ? "Pagado"
+                                : order.payment_status === "pending"
+                                  ? "Pendiente"
+                                  : order.payment_status === "failed"
+                                    ? "Fallido"
+                                    : order.payment_status}
                             </Badge>
                           </TableCell>
-                          
+
                           <TableCell className="font-medium text-verde-suave">
                             {formatPrice(order.total_amount)}
                           </TableCell>
-                          
+
                           <TableCell>
                             <Link href={`/admin/orders/${order.id}`}>
                               <Button variant="outline" size="sm">
@@ -1193,48 +1607,64 @@ export default function CustomerDetailPage() {
                             </Link>
                           </TableCell>
                         </TableRow>
-                        
+
                         {/* Expanded Order Items */}
-                        {expandedOrders.has(order.id) && order.order_items && order.order_items.length > 0 && (
-                          <TableRow key={`${order.id}-items`}>
-                            <TableCell colSpan={6} className="bg-gray-50 p-4">
-                              <div className="space-y-2">
-                                <p className="text-sm font-medium text-azul-profundo mb-3">Productos del Pedido:</p>
-                                {order.order_items.map((item: any, idx: number) => {
-                                  const product = item.products || item.product;
-                                  return (
-                                    <div key={idx} className="flex items-center justify-between p-2 bg-white rounded border">
-                                      <div className="flex items-center space-x-3">
-                                        {product?.featured_image ? (
-                                          <img 
-                                            src={product.featured_image} 
-                                            alt={product.name || item.product_name}
-                                            className="w-10 h-10 object-cover rounded"
-                                          />
-                                        ) : (
-                                          <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
-                                            <Package className="h-5 w-5 text-gray-400" />
+                        {expandedOrders.has(order.id) &&
+                          order.order_items &&
+                          order.order_items.length > 0 && (
+                            <TableRow key={`${order.id}-items`}>
+                              <TableCell colSpan={6} className="bg-gray-50 p-4">
+                                <div className="space-y-2">
+                                  <p className="text-sm font-medium text-azul-profundo mb-3">
+                                    Productos del Pedido:
+                                  </p>
+                                  {order.order_items.map(
+                                    (item: any, idx: number) => {
+                                      const product =
+                                        item.products || item.product;
+                                      return (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center justify-between p-2 bg-white rounded border"
+                                        >
+                                          <div className="flex items-center space-x-3">
+                                            {product?.featured_image ? (
+                                              <img
+                                                src={product.featured_image}
+                                                alt={
+                                                  product.name ||
+                                                  item.product_name
+                                                }
+                                                className="w-10 h-10 object-cover rounded"
+                                              />
+                                            ) : (
+                                              <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
+                                                <Package className="h-5 w-5 text-gray-400" />
+                                              </div>
+                                            )}
+                                            <div>
+                                              <p className="text-sm font-medium">
+                                                {product?.name ||
+                                                  item.product_name ||
+                                                  "Producto"}
+                                              </p>
+                                              <p className="text-xs text-tierra-media">
+                                                Cantidad: {item.quantity} ×{" "}
+                                                {formatPrice(item.unit_price)}
+                                              </p>
+                                            </div>
                                           </div>
-                                        )}
-                                        <div>
-                                          <p className="text-sm font-medium">
-                                            {product?.name || item.product_name || 'Producto'}
-                                          </p>
-                                          <p className="text-xs text-tierra-media">
-                                            Cantidad: {item.quantity} × {formatPrice(item.unit_price)}
+                                          <p className="text-sm font-medium text-verde-suave">
+                                            {formatPrice(item.total_price)}
                                           </p>
                                         </div>
-                                      </div>
-                                      <p className="text-sm font-medium text-verde-suave">
-                                        {formatPrice(item.total_price)}
-                                      </p>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
+                                      );
+                                    },
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
                       </>
                     ))}
                   </TableBody>
@@ -1242,7 +1672,9 @@ export default function CustomerDetailPage() {
               ) : (
                 <div className="text-center py-8">
                   <Package className="h-10 w-10 text-tierra-media mx-auto mb-3 opacity-50" />
-                  <p className="text-sm text-tierra-media">Sin pedidos registrados</p>
+                  <p className="text-sm text-tierra-media">
+                    Sin pedidos registrados
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -1259,9 +1691,10 @@ export default function CustomerDetailPage() {
                   Sin Datos de Analíticas
                 </h3>
                 <p className="text-tierra-media mb-6 max-w-md mx-auto">
-                  Este cliente aún no ha realizado ningún pedido. Las analíticas estarán disponibles una vez que realice su primera compra.
+                  Este cliente aún no ha realizado ningún pedido. Las analíticas
+                  estarán disponibles una vez que realice su primera compra.
                 </p>
-                <Button onClick={() => router.push('/admin/orders/new')}>
+                <Button onClick={() => router.push("/admin/orders/new")}>
                   <Package className="h-4 w-4 mr-2" />
                   Crear Pedido Manual
                 </Button>
@@ -1274,148 +1707,196 @@ export default function CustomerDetailPage() {
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Favorite Products */}
-                {customer.analytics?.favoriteProducts && customer.analytics.favoriteProducts.length > 0 && (
-              <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Heart className="h-5 w-5 mr-2" />
-                    Productos Favoritos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {customer.analytics.favoriteProducts.slice(0, 5).map((item: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-[#AE000010] transition-colors">
-                        <div className="flex items-center space-x-3">
-                          {item.product?.featured_image ? (
-                            <img 
-                              src={item.product.featured_image} 
-                              alt={item.product.name || 'Product'}
-                              className="w-12 h-12 object-cover rounded border border-gray-200"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-gray-100 rounded border border-gray-200 flex items-center justify-center">
-                              <Package className="h-6 w-6 text-gray-400" />
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-medium">{item.product?.name || 'Producto'}</p>
-                            <p className="text-sm text-tierra-media">
-                              {item.quantity} {item.quantity === 1 ? 'unidad' : 'unidades'} compradas
-                            </p>
-                          </div>
+                {customer.analytics?.favoriteProducts &&
+                  customer.analytics.favoriteProducts.length > 0 && (
+                    <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                      <CardHeader>
+                        <CardTitle className="flex items-center">
+                          <Heart className="h-5 w-5 mr-2" />
+                          Productos Favoritos
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {customer.analytics.favoriteProducts
+                            .slice(0, 5)
+                            .map((item: any, index: number) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-[#AE000010] transition-colors"
+                              >
+                                <div className="flex items-center space-x-3">
+                                  {item.product?.featured_image ? (
+                                    <img
+                                      src={item.product.featured_image}
+                                      alt={item.product.name || "Product"}
+                                      className="w-12 h-12 object-cover rounded border border-gray-200"
+                                    />
+                                  ) : (
+                                    <div className="w-12 h-12 bg-gray-100 rounded border border-gray-200 flex items-center justify-center">
+                                      <Package className="h-6 w-6 text-gray-400" />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="font-medium">
+                                      {item.product?.name || "Producto"}
+                                    </p>
+                                    <p className="text-sm text-tierra-media">
+                                      {item.quantity}{" "}
+                                      {item.quantity === 1
+                                        ? "unidad"
+                                        : "unidades"}{" "}
+                                      compradas
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-medium text-verde-suave">
+                                    {formatPrice(item.totalSpent)}
+                                  </p>
+                                  <p className="text-xs text-tierra-media">
+                                    {formatPrice(
+                                      item.totalSpent / item.quantity,
+                                    )}{" "}
+                                    por unidad
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
                         </div>
-                        <div className="text-right">
-                          <p className="font-medium text-verde-suave">{formatPrice(item.totalSpent)}</p>
-                          <p className="text-xs text-tierra-media">
-                            {formatPrice(item.totalSpent / item.quantity)} por unidad
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                      </CardContent>
+                    </Card>
+                  )}
 
-            {/* Order Status Distribution */}
-            {customer.analytics?.orderStatusCounts && (
-              <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Activity className="h-5 w-5 mr-2" />
-                    Distribución de Estados
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {Object.entries(customer.analytics.orderStatusCounts).map(([status, count]) => (
-                      <div key={status} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          {getOrderStatusBadge(status)}
-                        </div>
-                        <span className="font-medium">{count} pedidos</span>
+                {/* Order Status Distribution */}
+                {customer.analytics?.orderStatusCounts && (
+                  <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Activity className="h-5 w-5 mr-2" />
+                        Distribución de Estados
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {Object.entries(
+                          customer.analytics.orderStatusCounts,
+                        ).map(([status, count]) => (
+                          <div
+                            key={status}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex items-center space-x-2">
+                              {getOrderStatusBadge(status)}
+                            </div>
+                            <span className="font-medium">{count} pedidos</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
 
               {/* Monthly Spending Chart */}
-          {customer.analytics?.monthlySpending && customer.analytics.monthlySpending.length > 0 && (
-            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <TrendingUp className="h-5 w-5 mr-2" />
-                    Tendencia de Gastos (Últimos 12 meses)
-                  </div>
-                  <div className="text-sm font-normal text-tierra-media">
-                    Total: {formatPrice(customer.analytics.totalSpent)}
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                  {customer.analytics.monthlySpending.map((month: any, index: number) => (
-                    <div 
-                      key={index} 
-                      className={`text-center p-3 border rounded-lg transition-all hover:shadow-md ${
-                        month.amount > 0 ? 'bg-verde-suave/10 border-verde-suave/30' : 'bg-gray-50'
-                      }`}
-                    >
-                      <p className="text-xs font-medium text-tierra-media mb-1">{month.month}</p>
-                      <p className="font-bold text-sm text-azul-profundo">{formatPrice(month.amount)}</p>
-                      <p className="text-xs text-tierra-media mt-1">
-                        {month.orders} {month.orders === 1 ? 'pedido' : 'pedidos'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Summary Stats */}
-                <div className="mt-6 pt-4 border-t grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-xs text-tierra-media">Promedio Mensual</p>
-                    <p className="font-bold text-lg text-azul-profundo">
-                      {formatPrice(customer.analytics.totalSpent / 12)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-tierra-media">Mejor Mes</p>
-                    <p className="font-bold text-lg text-verde-suave">
-                      {formatPrice(Math.max(...customer.analytics.monthlySpending.map((m: any) => m.amount)))}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-tierra-media">Meses Activos</p>
-                    <p className="font-bold text-lg text-dorado">
-                      {customer.analytics.monthlySpending.filter((m: any) => m.amount > 0).length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              {customer.analytics?.monthlySpending &&
+                customer.analytics.monthlySpending.length > 0 && (
+                  <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <TrendingUp className="h-5 w-5 mr-2" />
+                          Tendencia de Gastos (Últimos 12 meses)
+                        </div>
+                        <div className="text-sm font-normal text-tierra-media">
+                          Total: {formatPrice(customer.analytics.totalSpent)}
+                        </div>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        {customer.analytics.monthlySpending.map(
+                          (month: any, index: number) => (
+                            <div
+                              key={index}
+                              className={`text-center p-3 border rounded-lg transition-all hover:shadow-md ${
+                                month.amount > 0
+                                  ? "bg-verde-suave/10 border-verde-suave/30"
+                                  : "bg-gray-50"
+                              }`}
+                            >
+                              <p className="text-xs font-medium text-tierra-media mb-1">
+                                {month.month}
+                              </p>
+                              <p className="font-bold text-sm text-azul-profundo">
+                                {formatPrice(month.amount)}
+                              </p>
+                              <p className="text-xs text-tierra-media mt-1">
+                                {month.orders}{" "}
+                                {month.orders === 1 ? "pedido" : "pedidos"}
+                              </p>
+                            </div>
+                          ),
+                        )}
+                      </div>
+
+                      {/* Summary Stats */}
+                      <div className="mt-6 pt-4 border-t grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <p className="text-xs text-tierra-media">
+                            Promedio Mensual
+                          </p>
+                          <p className="font-bold text-lg text-azul-profundo">
+                            {formatPrice(customer.analytics.totalSpent / 12)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-tierra-media">Mejor Mes</p>
+                          <p className="font-bold text-lg text-verde-suave">
+                            {formatPrice(
+                              Math.max(
+                                ...customer.analytics.monthlySpending.map(
+                                  (m: any) => m.amount,
+                                ),
+                              ),
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-tierra-media">
+                            Meses Activos
+                          </p>
+                          <p className="font-bold text-lg text-dorado">
+                            {
+                              customer.analytics.monthlySpending.filter(
+                                (m: any) => m.amount > 0,
+                              ).length
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
             </>
           )}
         </TabsContent>
-
       </Tabs>
 
       {/* Create/Edit Prescription Dialog */}
-      <Dialog open={showCreatePrescription} onOpenChange={setShowCreatePrescription}>
+      <Dialog
+        open={showCreatePrescription}
+        onOpenChange={setShowCreatePrescription}
+      >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingPrescription ? 'Editar Receta' : 'Nueva Receta'}
+              {editingPrescription ? "Editar Receta" : "Nueva Receta"}
             </DialogTitle>
             <DialogDescription>
-              {editingPrescription 
-                ? 'Modifica los datos de la receta oftalmológica'
-                : 'Crea una nueva receta oftalmológica para este cliente'}
+              {editingPrescription
+                ? "Modifica los datos de la receta oftalmológica"
+                : "Crea una nueva receta oftalmológica para este cliente"}
             </DialogDescription>
           </DialogHeader>
           <CreatePrescriptionForm
@@ -1435,16 +1916,19 @@ export default function CustomerDetailPage() {
       </Dialog>
 
       {/* Create/Edit Appointment Dialog */}
-      <Dialog open={showCreateAppointment} onOpenChange={setShowCreateAppointment}>
+      <Dialog
+        open={showCreateAppointment}
+        onOpenChange={setShowCreateAppointment}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingAppointment ? 'Editar Cita' : 'Nueva Cita'}
+              {editingAppointment ? "Editar Cita" : "Nueva Cita"}
             </DialogTitle>
             <DialogDescription>
-              {editingAppointment 
-                ? 'Modifica los detalles de la cita'
-                : 'Crea una nueva cita para este cliente'}
+              {editingAppointment
+                ? "Modifica los detalles de la cita"
+                : "Crea una nueva cita para este cliente"}
             </DialogDescription>
           </DialogHeader>
           <CreateAppointmentForm
@@ -1472,7 +1956,7 @@ export default function CustomerDetailPage() {
               Crea un presupuesto para este cliente
             </DialogDescription>
           </DialogHeader>
-          <CreateQuoteForm 
+          <CreateQuoteForm
             onSuccess={() => {
               setShowCreateQuote(false);
               fetchCustomer();

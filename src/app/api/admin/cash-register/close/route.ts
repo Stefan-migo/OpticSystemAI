@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
     if (ordersError) {
       logger.error("Error fetching orders for closure:", {
         error: ordersError,
-        closureDate,
+        closureDate: closure_date,
         branchId: branchContext.branchId,
       });
       return NextResponse.json(
@@ -408,7 +408,7 @@ export async function POST(request: NextRequest) {
     if (closureError) {
       logger.error("Error creating cash register closure:", {
         error: closureError,
-        closureDate,
+        closureDate: closure_date,
         branchId: branchContext.branchId,
       });
       return NextResponse.json(

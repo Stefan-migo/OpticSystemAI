@@ -7,10 +7,10 @@ const supabase = createServiceRoleClient();
 // GET - Fetch options for a specific field key
 export async function GET(
   request: NextRequest,
-  { params }: { params: { fieldKey: string } },
+  { params }: { params: Promise<{ fieldKey: string }> },
 ) {
+  const { fieldKey } = await params;
   try {
-    const { fieldKey } = params;
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get("include_inactive") === "true";
 

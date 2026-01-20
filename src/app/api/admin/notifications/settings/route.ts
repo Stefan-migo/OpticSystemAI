@@ -133,7 +133,7 @@ export async function PUT(request: NextRequest) {
     if (error) {
       logger.error("Error updating notification setting:", {
         error,
-        notificationType,
+        notificationType: notification_type,
       });
       return NextResponse.json(
         { error: "Failed to update setting" },

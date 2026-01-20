@@ -21,13 +21,33 @@ import { HealthStatus } from "../hooks/useSystemHealth";
 interface SystemOverviewProps {
   healthStatus: HealthStatus | null;
   onTabChange: (tab: string) => void;
-  getHealthStatusBadge: (status: string) => React.ReactNode;
 }
+
+const getHealthStatusBadge = (status: string) => {
+  const config: Record<string, { variant: any; label: string; icon: any }> = {
+    healthy: { variant: "default", label: "Saludable", icon: CheckCircle },
+    warning: {
+      variant: "secondary",
+      label: "Advertencias",
+      icon: AlertTriangle,
+    },
+    critical: { variant: "destructive", label: "Crítico", icon: XCircle },
+  };
+
+  const statusConfig = config[status] || config["healthy"];
+  const Icon = statusConfig.icon;
+
+  return (
+    <Badge variant={statusConfig.variant} className="flex items-center gap-1">
+      <Icon className="h-3 w-3" />
+      {statusConfig.label}
+    </Badge>
+  );
+};
 
 export default function SystemOverview({
   healthStatus,
   onTabChange,
-  getHealthStatusBadge,
 }: SystemOverviewProps) {
   return (
     <div className="space-y-6">

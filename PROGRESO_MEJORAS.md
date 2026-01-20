@@ -213,17 +213,17 @@
 
 ### Tarea 2.2: Refactorizar Products Page
 
-- **Estado:** 🔴 No Iniciada
+- **Estado:** 🟡 En Progreso
 - **Prioridad:** 🔴 ALTA
 - **Tiempo Estimado:** 1.5 semanas
 - **Líneas Iniciales:** 1,971
 - **Líneas Objetivo:** < 300 (página principal)
-- **Progreso:** 0/9 pasos
+- **Progreso:** 4/9 pasos
 - **Notas:**
-  - [ ] Análisis y planificación
-  - [ ] Instalar React Query
-  - [ ] Crear hooks de datos
-  - [ ] Extraer ProductList
+  - [x] Análisis y planificación
+  - [x] Instalar React Query
+  - [x] Crear hooks de datos (useProducts, useProductStats, useCategories, useProductFilters)
+  - [x] Extraer ProductStats component
   - [ ] Extraer ProductFilters
   - [ ] Extraer ProductActions
   - [ ] Extraer vistas Table/Grid

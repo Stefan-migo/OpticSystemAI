@@ -78,7 +78,9 @@ export function useSystemConfig() {
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,
-    updateConfig: updateMutation.mutateAsync,
+    updateConfig: async (key: string, value: any) => {
+      await updateMutation.mutateAsync({ configKey: key, newValue: value });
+    },
     isUpdating: updateMutation.isPending,
   };
 }

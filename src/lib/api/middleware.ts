@@ -290,26 +290,68 @@ export function withSecurityHeaders(response: NextResponse): NextResponse {
   // Referrer policy
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 
-  // Content Security Policy (basic)
+  // Permissions Policy (formerly Feature-Policy)
+  // Restrict access to browser features
+  const permissionsPolicy = [
+    "geolocation=()",
+    "microphone=()",
+    "camera=()",
+    "payment=(self)",
+    "usb=()",
+    "magnetometer=()",
+    "gyroscope=()",
+    "accelerometer=()",
+  ].join(", ");
+  response.headers.set("Permissions-Policy", permissionsPolicy);
+
+  // Content Security Policy (improved - removed unsafe-eval)
+  // Note: unsafe-inline for styles is required for Next.js CSS-in-JS
+  // In the future, consider using nonces or hashes for better security
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://www.google.com",
+    // Scripts: removed unsafe-eval, kept unsafe-inline for Next.js (consider nonces in future)
+    "script-src 'self' 'unsafe-inline' https://sdk.mercadopago.com https://www.google.com https://www.googletagmanager.com",
+    // Styles: unsafe-inline required for Next.js CSS-in-JS
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https: http:",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    // Images: allow data URIs and HTTPS sources
+    "img-src 'self' data: https: blob:",
+    // Connect: allow API calls and WebSocket connections
     "connect-src 'self' https: wss:",
-    "frame-src 'self' https://www.mercadopago.com",
+    // Frames: allow MercadoPago and other trusted iframes
+    "frame-src 'self' https://www.mercadopago.com https://www.google.com",
+    // Media: allow audio/video from trusted sources
+    "media-src 'self' https:",
+    // Object: restrict object/embed tags
+    "object-src 'none'",
+    // Base URI: prevent base tag injection
+    "base-uri 'self'",
+    // Form action: restrict form submissions
+    "form-action 'self'",
+    // Upgrade insecure requests in production
+    ...(process.env.NODE_ENV === "production"
+      ? ["upgrade-insecure-requests"]
+      : []),
   ].join("; ");
 
   response.headers.set("Content-Security-Policy", csp);
 
-  // Strict Transport Security (HTTPS only)
+  // Strict Transport Security (HSTS) - only in production
   if (process.env.NODE_ENV === "production") {
     response.headers.set(
       "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains",
+      "max-age=31536000; includeSubDomains; preload",
     );
   }
+
+  // Cross-Origin Opener Policy (COOP)
+  response.headers.set(
+    "Cross-Origin-Opener-Policy",
+    "same-origin-allow-popups",
+  );
+
+  // Cross-Origin Resource Policy (CORP)
+  response.headers.set("Cross-Origin-Resource-Policy", "same-origin");
 
   return response;
 }

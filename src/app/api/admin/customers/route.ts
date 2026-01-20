@@ -6,6 +6,7 @@ import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
 import { RateLimitError, ValidationError } from "@/lib/api/errors";
+import { z } from "zod";
 import {
   createCustomerSchema,
   searchCustomerSchema,
@@ -233,7 +234,15 @@ export async function POST(request: NextRequest) {
         let body: any;
         try {
           body = await request.json();
+          logger.debug("Request body parsed successfully", {
+            bodyKeys: Object.keys(body || {}),
+            bodyType: typeof body,
+          });
         } catch (error) {
+          logger.error(
+            "Failed to parse request body",
+            error instanceof Error ? error : new Error(String(error)),
+          );
           return NextResponse.json(
             { error: "Invalid JSON in request body" },
             { status: 400 },
@@ -246,16 +255,53 @@ export async function POST(request: NextRequest) {
 
         if (isCustomerCreation) {
           logger.info("Customers API POST called (create new customer)");
-          logger.debug("Create customer data received", { body });
+          logger.debug("Create customer data received", {
+            bodyKeys: Object.keys(body || {}),
+            hasFirstName: !!body.first_name,
+            hasLastName: !!body.last_name,
+          });
 
           // Validate request body with Zod (body already parsed)
           let validatedBody;
           try {
+            logger.debug("Starting Zod validation");
             validatedBody = validateBody(body, createCustomerSchema);
-          } catch (error) {
+            logger.debug("Zod validation successful", {
+              validatedKeys: Object.keys(validatedBody || {}),
+            });
+          } catch (error: unknown) {
+            logger.error(
+              "Validation error caught",
+              error instanceof Error ? error : new Error(String(error)),
+            );
             if (error instanceof ValidationError) {
+              logger.debug(
+                "ValidationError detected, returning error response",
+              );
               return validationErrorResponse(error);
             }
+            // For ZodError that wasn't caught as ValidationError
+            if (error instanceof z.ZodError) {
+              logger.warn("ZodError not wrapped in ValidationError", {
+                errors: error.errors,
+              });
+              const errors = error.errors.map((err: z.ZodIssue) => ({
+                field: err.path.join("."),
+                message: err.message,
+              }));
+              return NextResponse.json(
+                {
+                  error: "Validation failed",
+                  details: errors,
+                },
+                { status: 400 },
+              );
+            }
+            // Log and re-throw unexpected errors
+            logger.error(
+              "Unexpected error in validation",
+              error instanceof Error ? error : new Error(String(error)),
+            );
             throw error;
           }
 

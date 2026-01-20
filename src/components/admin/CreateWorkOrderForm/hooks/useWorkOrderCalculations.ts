@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { calculatePriceWithTax } from "@/lib/utils/tax";
-import {
-  getTaxPercentage,
-  getQuoteTaxInclusionSettings,
-} from "@/lib/utils/tax-config";
+import { getTaxPercentage } from "@/lib/utils/tax-config";
 import { getBranchHeader } from "@/lib/utils/branch";
 import type { WorkOrderFormData } from "./useWorkOrderForm";
 

@@ -6,20 +6,20 @@ import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useBranch } from "@/hooks/useBranch";
 import { getBranchHeader } from "@/lib/utils/branch";
-import CustomerSelector from "./CustomerSelector";
-import PrescriptionSelector from "./PrescriptionSelector";
-import FrameSelector from "./FrameSelector";
-import LensConfiguration from "./LensConfiguration";
-import LabInfoSection from "./LabInfoSection";
-import PricingSection from "./PricingSection";
-import StatusSection from "./StatusSection";
-import NotesSection from "./NotesSection";
+import CustomerSelector from "./CreateWorkOrderForm/CustomerSelector";
+import PrescriptionSelector from "./CreateWorkOrderForm/PrescriptionSelector";
+import FrameSelector from "./CreateWorkOrderForm/FrameSelector";
+import LensConfiguration from "./CreateWorkOrderForm/LensConfiguration";
+import LabInfoSection from "./CreateWorkOrderForm/LabInfoSection";
+import PricingSection from "./CreateWorkOrderForm/PricingSection";
+import StatusSection from "./CreateWorkOrderForm/StatusSection";
+import NotesSection from "./CreateWorkOrderForm/NotesSection";
 import {
   useWorkOrderForm,
   type WorkOrderFormData,
-} from "./hooks/useWorkOrderForm";
-import { useWorkOrderCalculations } from "./hooks/useWorkOrderCalculations";
-import { useWorkOrderValidation } from "./hooks/useWorkOrderValidation";
+} from "./CreateWorkOrderForm/hooks/useWorkOrderForm";
+import { useWorkOrderCalculations } from "./CreateWorkOrderForm/hooks/useWorkOrderCalculations";
+import { useWorkOrderValidation } from "./CreateWorkOrderForm/hooks/useWorkOrderValidation";
 
 interface CreateWorkOrderFormProps {
   onSuccess: () => void;
@@ -340,8 +340,6 @@ export default function CreateWorkOrderForm({
           updateField("payment_method", method)
         }
         onDepositChange={handleDepositChange}
-        taxPercentage={taxPercentage}
-        quoteSettings={quoteSettings}
       />
 
       <StatusSection

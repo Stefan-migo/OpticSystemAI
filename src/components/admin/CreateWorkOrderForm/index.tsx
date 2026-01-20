@@ -340,8 +340,6 @@ export default function CreateWorkOrderForm({
           updateField("payment_method", method)
         }
         onDepositChange={handleDepositChange}
-        taxPercentage={taxPercentage}
-        quoteSettings={quoteSettings}
       />
 
       <StatusSection

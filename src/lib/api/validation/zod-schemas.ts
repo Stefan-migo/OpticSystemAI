@@ -75,9 +75,9 @@ export const uuidSchema = z.string().uuid("Debe ser un UUID válido");
  * Schema para validar UUID opcional
  */
 export const uuidOptionalSchema = z
-  .string()
-  .uuid("Debe ser un UUID válido")
-  .optional();
+  .union([z.string().uuid("Debe ser un UUID válido"), z.null(), z.undefined()])
+  .optional()
+  .nullable();
 
 /**
  * Schema para validar URL
@@ -91,34 +91,68 @@ export const urlSchema = z
  * Schema para validar URL opcional
  */
 export const urlOptionalSchema = z
-  .string()
-  .url("Debe ser una URL válida")
-  .max(2048, "La URL es demasiado larga")
+  .union([
+    z
+      .string()
+      .url("Debe ser una URL válida")
+      .max(2048, "La URL es demasiado larga"),
+    z.literal(""),
+    z.null(),
+    z.undefined(),
+  ])
   .optional()
-  .or(z.literal(""));
+  .nullable()
+  .transform((val) => {
+    if (!val || val === "") return null;
+    return val;
+  });
 
 /**
  * Schema para validar precio (número positivo)
+ * Acepta número o string que se convierte a número
  */
-export const priceSchema = z
-  .number()
-  .positive("El precio debe ser un número positivo")
-  .finite("El precio debe ser un número finito")
-  .or(
-    z.string().transform((val) => {
-      const num = parseFloat(val);
-      if (isNaN(num) || num < 0) {
-        throw new z.ZodError([
-          {
-            code: "custom",
-            path: [],
-            message: "El precio debe ser un número positivo",
-          },
-        ]);
-      }
-      return num;
-    }),
-  );
+export const priceSchema = z.preprocess(
+  (val) => {
+    if (typeof val === "number") return val;
+    if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (trimmed === "") return undefined;
+      const num = parseFloat(trimmed);
+      return isNaN(num) ? undefined : num;
+    }
+    return val;
+  },
+  z
+    .number({
+      required_error: "El precio es requerido",
+      invalid_type_error: "El precio debe ser un número",
+    })
+    .positive("El precio debe ser un número positivo")
+    .finite("El precio debe ser un número finito"),
+);
+
+/**
+ * Schema para validar precio que permite 0 (no negativo)
+ * Útil para costos que pueden ser 0
+ */
+export const priceNonNegativeSchema = z.preprocess(
+  (val) => {
+    if (typeof val === "number") return val;
+    if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (trimmed === "") return 0;
+      const num = parseFloat(trimmed);
+      return isNaN(num) ? 0 : num;
+    }
+    return val;
+  },
+  z
+    .number({
+      invalid_type_error: "El precio debe ser un número",
+    })
+    .nonnegative("El precio debe ser un número no negativo")
+    .finite("El precio debe ser un número finito"),
+);
 
 /**
  * Schema para validar precio opcional
@@ -224,8 +258,17 @@ export const dateISOOptionalSchema = z
     z.null(),
     z.undefined(),
   ])
+  .nullable()
   .optional()
-  .nullable();
+  .transform((val) => {
+    if (!val || val === null || val === undefined) return null;
+    if (val instanceof Date) return val.toISOString();
+    if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      // Convert YYYY-MM-DD to ISO string
+      return new Date(val + "T00:00:00.000Z").toISOString();
+    }
+    return val;
+  });
 
 /**
  * Schema para validar paginación
@@ -403,7 +446,14 @@ export const productBaseSchema = z.object({
   category_id: uuidOptionalSchema,
   branch_id: uuidOptionalSchema,
   featured_image: urlOptionalSchema,
-  gallery: z.array(urlSchema).optional(),
+  gallery: z
+    .array(urlSchema)
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (!val || val.length === 0) return [];
+      return val.filter((url) => url && url !== "");
+    }),
   tags: z.array(z.string()).optional(),
   product_type: z
     .enum(["frame", "lens", "accessory", "other"])
@@ -474,13 +524,45 @@ export const searchProductSchema = searchSchema.extend({
 // ============================================================================
 
 /**
+ * Schema para precio que permite negativos (para descuentos)
+ */
+const priceAllowNegativeSchema = z.preprocess(
+  (val) => {
+    if (typeof val === "number") return val;
+    if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (trimmed === "") return undefined;
+      const num = parseFloat(trimmed);
+      return isNaN(num) ? undefined : num;
+    }
+    return val;
+  },
+  z
+    .number({
+      required_error: "El precio es requerido",
+      invalid_type_error: "El precio debe ser un número",
+    })
+    .finite("El precio debe ser un número finito"),
+);
+
+/**
  * Schema para item de venta POS
+ * Permite product_id null para servicios, descuentos, etc.
+ * Permite precios negativos para descuentos
  */
 const posSaleItemSchema = z.object({
-  product_id: uuidSchema,
+  product_id: z
+    .union([
+      uuidSchema,
+      z.string().min(1), // Allow non-UUID strings for special items (e.g., "discount-xxx")
+      z.null(),
+      z.undefined(),
+    ])
+    .optional()
+    .nullable(),
   quantity: quantitySchema,
-  unit_price: priceSchema,
-  total_price: priceOptionalSchema.nullable(),
+  unit_price: priceAllowNegativeSchema, // Allow negative prices for discounts
+  total_price: priceAllowNegativeSchema.optional().nullable(), // Allow negative prices for discounts
   product_name: z.string().min(1).max(255).trim(),
 });
 
@@ -490,7 +572,7 @@ const posSaleItemSchema = z.object({
 export const processSaleSchema = z
   .object({
     email: emailSchema.optional().nullable(),
-    customer_id: uuidOptionalSchema,
+    customer_id: uuidSchema, // Required for work order creation
     customer_name: z.string().max(200).trim().optional(),
     payment_method_type: z.enum(["cash", "card", "credit", "installments"]),
     payment_status: z
@@ -502,12 +584,12 @@ export const processSaleSchema = z
       .default("delivered")
       .optional(),
     subtotal: priceSchema,
-    tax_amount: priceSchema.default(0).optional(),
+    tax_amount: priceNonNegativeSchema.default(0).optional(),
     total_amount: priceSchema,
     currency: z.string().max(10).default("CLP").optional(),
     installments_count: z.number().int().positive().default(1).optional(),
     sii_invoice_type: z
-      .enum(["none", "invoice", "credit_note", "debit_note"])
+      .enum(["none", "invoice", "credit_note", "debit_note", "boleta"])
       .default("none")
       .optional(),
     sii_rut: rutOptionalSchema,
@@ -569,17 +651,24 @@ export const createWorkOrderSchema = z.object({
   lab_order_number: z.string().max(100).trim().optional().nullable(),
   lab_estimated_delivery_date: dateISOOptionalSchema,
   status: z
-    .enum(["quote", "pending", "in_progress", "completed", "cancelled"])
+    .enum([
+      "quote",
+      "pending",
+      "in_progress",
+      "completed",
+      "cancelled",
+      "ordered",
+    ])
     .default("quote")
     .optional(),
-  frame_cost: priceSchema.default(0).optional(),
-  lens_cost: priceSchema.default(0).optional(),
-  treatments_cost: priceSchema.default(0).optional(),
-  labor_cost: priceSchema.default(0).optional(),
-  lab_cost: priceSchema.default(0).optional(),
-  subtotal: priceSchema.default(0).optional(),
-  tax_amount: priceSchema.default(0).optional(),
-  discount_amount: priceSchema.default(0).optional(),
+  frame_cost: priceNonNegativeSchema.default(0).optional(),
+  lens_cost: priceNonNegativeSchema.default(0).optional(),
+  treatments_cost: priceNonNegativeSchema.default(0).optional(),
+  labor_cost: priceNonNegativeSchema.default(0).optional(),
+  lab_cost: priceNonNegativeSchema.default(0).optional(),
+  subtotal: priceNonNegativeSchema.default(0).optional(),
+  tax_amount: priceNonNegativeSchema.default(0).optional(),
+  discount_amount: priceNonNegativeSchema.default(0).optional(),
   total_amount: priceSchema,
   currency: z.string().max(10).default("CLP").optional(),
   payment_status: z
@@ -587,7 +676,7 @@ export const createWorkOrderSchema = z.object({
     .default("pending")
     .optional(),
   payment_method: z.string().max(50).trim().optional().nullable(),
-  deposit_amount: priceSchema.default(0).optional(),
+  deposit_amount: priceNonNegativeSchema.default(0).optional(),
   balance_amount: priceSchema.optional(),
   pos_order_id: uuidOptionalSchema,
   internal_notes: z.string().max(5000).trim().optional().nullable(),
@@ -613,20 +702,20 @@ export const createQuoteSchema = z.object({
   frame_color: z.string().max(100).trim().optional().nullable(),
   frame_size: z.string().max(50).trim().optional().nullable(),
   frame_sku: z.string().max(100).trim().optional().nullable(),
-  frame_price: priceSchema.default(0).optional(),
+  frame_price: priceNonNegativeSchema.default(0).optional(),
   lens_type: z.string().max(100).trim().optional().nullable(),
   lens_material: z.string().max(100).trim().optional().nullable(),
   lens_index: z.number().positive().optional().nullable(),
   lens_treatments: z.array(z.string()).optional(),
   lens_tint_color: z.string().max(100).trim().optional().nullable(),
   lens_tint_percentage: z.number().min(0).max(100).optional().nullable(),
-  frame_cost: priceSchema.default(0).optional(),
-  lens_cost: priceSchema.default(0).optional(),
-  treatments_cost: priceSchema.default(0).optional(),
-  labor_cost: priceSchema.default(0).optional(),
-  subtotal: priceSchema.default(0).optional(),
-  tax_amount: priceSchema.default(0).optional(),
-  discount_amount: priceSchema.default(0).optional(),
+  frame_cost: priceNonNegativeSchema.default(0).optional(),
+  lens_cost: priceNonNegativeSchema.default(0).optional(),
+  treatments_cost: priceNonNegativeSchema.default(0).optional(),
+  labor_cost: priceNonNegativeSchema.default(0).optional(),
+  subtotal: priceNonNegativeSchema.default(0).optional(),
+  tax_amount: priceNonNegativeSchema.default(0).optional(),
+  discount_amount: priceNonNegativeSchema.default(0).optional(),
   discount_percentage: z.number().min(0).max(100).default(0).optional(),
   total_amount: priceSchema,
   currency: z.string().max(10).default("CLP").optional(),
@@ -646,22 +735,64 @@ export const createQuoteSchema = z.object({
 // ============================================================================
 
 /**
- * Schema para crear una cita
+ * Schema para datos de cliente invitado (guest customer)
  */
-export const createAppointmentSchema = z.object({
-  customer_id: uuidSchema,
-  appointment_type: z
-    .string()
-    .min(1, "El tipo de cita es requerido")
-    .max(100)
-    .trim(),
-  appointment_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe estar en formato YYYY-MM-DD"),
-  appointment_time: z
-    .string()
-    .regex(/^\d{2}:\d{2}:\d{2}$/, "La hora debe estar en formato HH:MM:SS"),
-  duration_minutes: z.number().int().positive().default(30).optional(),
-  notes: z.string().max(5000).trim().optional().nullable(),
-  branch_id: uuidOptionalSchema,
+const guestCustomerSchema = z.object({
+  first_name: z.string().min(1, "El nombre es requerido").max(100).trim(),
+  last_name: z.string().min(1, "El apellido es requerido").max(100).trim(),
+  rut: z.string().max(20).trim().optional().nullable(),
+  email: emailSchema.optional().nullable(),
+  phone: z.string().max(20).trim().optional().nullable(),
 });
+
+/**
+ * Schema para crear una cita
+ * Permite customer_id (cliente registrado) o guest_customer (cliente invitado)
+ */
+export const createAppointmentSchema = z
+  .object({
+    customer_id: uuidOptionalSchema, // Opcional si hay guest_customer
+    guest_customer: guestCustomerSchema.optional().nullable(), // Opcional si hay customer_id
+    appointment_type: z
+      .string()
+      .min(1, "El tipo de cita es requerido")
+      .max(100)
+      .trim(),
+    appointment_date: z
+      .string()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}$/,
+        "La fecha debe estar en formato YYYY-MM-DD",
+      ),
+    appointment_time: z
+      .string()
+      .regex(/^\d{2}:\d{2}:\d{2}$/, "La hora debe estar en formato HH:MM:SS"),
+    duration_minutes: z.number().int().positive().default(30).optional(),
+    notes: z.string().max(5000).trim().optional().nullable(),
+    branch_id: uuidOptionalSchema,
+    // Campos adicionales que pueden venir del formulario
+    status: z
+      .enum(["scheduled", "confirmed", "completed", "cancelled", "no_show"])
+      .optional(),
+    assigned_to: uuidOptionalSchema,
+    reason: z.string().max(500).trim().optional().nullable(),
+    follow_up_required: z.boolean().optional(),
+    follow_up_date: dateISOOptionalSchema,
+    prescription_id: uuidOptionalSchema,
+    order_id: uuidOptionalSchema,
+    cancellation_reason: z.string().max(500).trim().optional().nullable(),
+  })
+  .refine(
+    (data) => {
+      // Al menos uno de customer_id o guest_customer debe estar presente
+      return (
+        (data.customer_id !== null && data.customer_id !== undefined) ||
+        (data.guest_customer !== null && data.guest_customer !== undefined)
+      );
+    },
+    {
+      message:
+        "Debe proporcionar un customer_id (cliente registrado) o guest_customer (cliente invitado)",
+      path: ["customer_id"],
+    },
+  );

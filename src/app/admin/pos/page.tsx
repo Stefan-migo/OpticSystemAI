@@ -1175,8 +1175,16 @@ export default function POSPage() {
     setProcessingPayment(true);
 
     try {
+      // Validate customer is selected (required for work order)
+      if (!selectedCustomer?.id) {
+        toast.error("Debe seleccionar un cliente para procesar la venta");
+        setProcessingPayment(false);
+        return;
+      }
+
       const orderData = {
         is_pos_sale: true,
+        customer_id: selectedCustomer.id, // Required for work order creation
         email: selectedCustomer?.email || "venta@pos.local",
         payment_method_type: paymentMethod,
         payment_status: paymentMethod === "cash" ? "paid" : "pending",
@@ -1224,11 +1232,17 @@ export default function POSPage() {
 
       const result = await response.json();
 
-      toast.success(`Venta procesada: ${result.order.order_number}`);
+      // Support both work_order and order for backward compatibility
+      const orderNumber =
+        result.work_order?.work_order_number || result.order?.order_number;
+      toast.success(`Venta procesada: ${orderNumber}`);
 
       // Print receipt (if printer available)
-      if (result.order.sii_invoice_number) {
-        toast.info(`Factura: ${result.order.sii_invoice_number}`);
+      const invoiceNumber =
+        result.work_order?.sii_invoice_number ||
+        result.order?.sii_invoice_number;
+      if (invoiceNumber) {
+        toast.info(`Factura: ${invoiceNumber}`);
       }
 
       // Clear cart and reset

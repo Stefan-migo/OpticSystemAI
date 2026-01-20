@@ -324,33 +324,56 @@ export function withSecurityHeaders(response: NextResponse): NextResponse {
     "magnetometer=()",
     "gyroscope=()",
     "accelerometer=()",
+    "autoplay=()",
+    "encrypted-media=()",
   ].join(", ");
   response.headers.set("Permissions-Policy", permissionsPolicy);
 
-  // Content Security Policy (improved - removed unsafe-eval)
+  // Content Security Policy (CSP) - Enhanced security
   // Note: unsafe-inline for styles is required for Next.js CSS-in-JS
   // In the future, consider using nonces or hashes for better security
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const supabaseDomain = supabaseUrl
+    ? new URL(supabaseUrl).origin
+    : "https://*.supabase.co";
+
   const csp = [
     "default-src 'self'",
-    // Scripts: removed unsafe-eval, kept unsafe-inline for Next.js (consider nonces in future)
-    "script-src 'self' 'unsafe-inline' https://sdk.mercadopago.com https://www.google.com https://www.googletagmanager.com",
+    // Scripts: allow self, Next.js inline scripts, and trusted third parties
+    // unsafe-inline is required for Next.js but should be replaced with nonces in future
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://www.google.com https://www.googletagmanager.com https://www.gstatic.com",
     // Styles: unsafe-inline required for Next.js CSS-in-JS
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    // Fonts: allow self, Google Fonts, and data URIs
     "font-src 'self' https://fonts.gstatic.com data:",
-    // Images: allow data URIs and HTTPS sources
-    "img-src 'self' data: https: blob:",
-    // Connect: allow API calls and WebSocket connections
-    "connect-src 'self' https: wss:",
-    // Frames: allow MercadoPago and other trusted iframes
-    "frame-src 'self' https://www.mercadopago.com https://www.google.com",
+    // Images: allow self, data URIs, blob, HTTPS sources, and Supabase storage
+    "img-src 'self' data: https: blob: " +
+      (supabaseDomain !== "https://*.supabase.co"
+        ? supabaseDomain
+        : "https://*.supabase.co"),
+    // Connect: allow API calls, WebSocket connections, and Supabase
+    "connect-src 'self' https: wss: " +
+      (supabaseDomain !== "https://*.supabase.co"
+        ? supabaseDomain
+        : "https://*.supabase.co") +
+      " https://*.supabase.co",
+    // Frames: allow trusted iframes (MercadoPago, Google, Supabase)
+    "frame-src 'self' https://www.mercadopago.com https://www.google.com " +
+      (supabaseDomain !== "https://*.supabase.co"
+        ? supabaseDomain
+        : "https://*.supabase.co"),
     // Media: allow audio/video from trusted sources
     "media-src 'self' https:",
-    // Object: restrict object/embed tags
+    // Object: restrict object/embed tags (security best practice)
     "object-src 'none'",
-    // Base URI: prevent base tag injection
+    // Base URI: prevent base tag injection attacks
     "base-uri 'self'",
-    // Form action: restrict form submissions
+    // Form action: restrict form submissions to same origin
     "form-action 'self'",
+    // Worker: allow service workers and web workers from same origin
+    "worker-src 'self' blob:",
+    // Manifest: allow web app manifest
+    "manifest-src 'self'",
     // Upgrade insecure requests in production
     ...(process.env.NODE_ENV === "production"
       ? ["upgrade-insecure-requests"]

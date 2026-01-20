@@ -1,10 +1,31 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, Tag, AlertTriangle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Package,
+  Tag,
+  AlertTriangle,
+  Plus,
+  Edit,
+  Trash2,
+  X,
+  CheckCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useBranch } from "@/hooks/useBranch";
 import { BranchSelector } from "@/components/admin/BranchSelector";
@@ -17,6 +38,7 @@ import ProductFilters from "./components/ProductFilters";
 import ProductActions from "./components/ProductActions";
 import ProductList from "./components/ProductList";
 import ProductPagination from "./components/ProductPagination";
+import QuickActions from "./components/QuickActions";
 
 export default function ProductsPage() {
   const { currentBranchId, isSuperAdmin, branches } = useBranch();
@@ -67,6 +89,8 @@ export default function ProductsPage() {
     itemsPerPage,
     categoryFilter: filters.categoryFilter,
     statusFilter: filters.statusFilter,
+    searchTerm: filters.searchTerm,
+    showLowStockOnly: filters.showLowStockOnly,
     currentBranchId,
     isGlobalView,
     isSuperAdmin,
@@ -75,8 +99,8 @@ export default function ProductsPage() {
   // Calculate total pages
   const totalPages = Math.ceil(total / itemsPerPage);
 
-  // Apply client-side filters (search and low stock)
-  const filteredProducts = applyFilters(products);
+  // Products are already filtered on the server, no need for client-side filtering
+  const filteredProducts = products;
 
   // Selection for bulk operations
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
@@ -113,7 +137,12 @@ export default function ProductsPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters.categoryFilter, filters.statusFilter]);
+  }, [
+    filters.categoryFilter,
+    filters.statusFilter,
+    filters.searchTerm,
+    filters.showLowStockOnly,
+  ]);
 
   // Save view mode to localStorage
   const handleViewModeChange = (mode: "grid" | "table") => {
@@ -611,8 +640,8 @@ export default function ProductsPage() {
             getStatusBadge={getStatusBadge}
           />
 
-          {/* Pagination */}
-          {totalPages > 1 && (
+          {/* Pagination - Show if there are products or if totalPages > 1 */}
+          {(total > 0 || totalPages > 1) && (
             <ProductPagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -622,17 +651,193 @@ export default function ProductsPage() {
               onItemsPerPageChange={handleItemsPerPageChange}
             />
           )}
+
+          {/* Quick Actions */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold text-azul-profundo mb-4">
+                Acciones Rápidas
+              </h3>
+              <QuickActions
+                onShowLowStock={() => {
+                  updateFilter("showLowStockOnly", true);
+                  setCurrentPage(1);
+                }}
+                onJsonExport={handleJsonExport}
+                onJsonImport={() => setShowJsonImportDialog(true)}
+                onShowCategories={() => setCategoriesTabActive(true)}
+                hasLowStock={stats.lowStockCount > 0}
+                lowStockCount={stats.lowStockCount}
+              />
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-6 mt-6">
-          {/* Categories Management - TODO: Extract to CategoriesManager component */}
+          {/* Categories Management */}
           <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-            <CardContent className="p-4">
-              <p className="text-tierra-media">
-                Gestión de categorías - Por extraer a componente separado
-              </p>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-azul-profundo">
+                  Gestión de Categorías
+                </CardTitle>
+                <Button onClick={openCreateCategoryDialog}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Categoría
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {categoriesLoading ? (
+                <div className="text-center py-12">
+                  <Package className="h-12 w-12 text-tierra-media mx-auto mb-4 animate-pulse" />
+                  <p className="text-tierra-media">Cargando categorías...</p>
+                </div>
+              ) : categories.length === 0 ? (
+                <div className="text-center py-12">
+                  <Tag className="h-16 w-16 text-tierra-media mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-azul-profundo mb-2">
+                    No hay categorías
+                  </h3>
+                  <p className="text-tierra-media mb-6">
+                    Crea categorías para organizar tus productos
+                  </p>
+                  <Button onClick={openCreateCategoryDialog}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Primera Categoría
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {categories.map((category) => (
+                    <Card
+                      key={category.id}
+                      className="bg-admin-bg-secondary"
+                      style={{ backgroundColor: "var(--admin-border-primary)" }}
+                    >
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg text-azul-profundo">
+                              {category.name}
+                            </CardTitle>
+                            <p className="text-sm text-tierra-media mt-1">
+                              {category.slug}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditCategoryDialog(category)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteCategory(category)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {category.description && (
+                          <p className="text-sm text-gray-600 line-clamp-3">
+                            {category.description}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Category Create/Edit Dialog */}
+          <Dialog
+            open={categoryDialogOpen}
+            onOpenChange={setCategoryDialogOpen}
+          >
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingCategory ? "Editar Categoría" : "Nueva Categoría"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingCategory
+                    ? "Modifica los datos de la categoría"
+                    : "Crea una nueva categoría para organizar tus productos"}
+                </DialogDescription>
+              </DialogHeader>
+
+              <form onSubmit={handleCategorySubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="category-name">Nombre *</Label>
+                  <Input
+                    id="category-name"
+                    value={categoryFormData.name}
+                    onChange={(e) =>
+                      handleCategoryInputChange("name", e.target.value)
+                    }
+                    placeholder="Ej: Lentes de Sol"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="category-slug">Slug</Label>
+                  <Input
+                    id="category-slug"
+                    value={categoryFormData.slug}
+                    onChange={(e) =>
+                      handleCategoryInputChange("slug", e.target.value)
+                    }
+                    placeholder="lentes-de-sol"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    URL amigable (se genera automáticamente)
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="category-description">Descripción</Label>
+                  <Textarea
+                    id="category-description"
+                    value={categoryFormData.description}
+                    onChange={(e) =>
+                      handleCategoryInputChange("description", e.target.value)
+                    }
+                    placeholder="Descripción opcional de la categoría"
+                    rows={3}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCategoryDialogOpen(false)}
+                    disabled={categoryFormLoading}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={categoryFormLoading}>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {categoryFormLoading
+                      ? "Guardando..."
+                      : editingCategory
+                        ? "Actualizar"
+                        : "Crear"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
 

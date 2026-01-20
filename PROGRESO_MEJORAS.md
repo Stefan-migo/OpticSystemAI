@@ -190,18 +190,18 @@
 
 ### Tarea 2.1: Refactorizar CreateWorkOrderForm
 
-- **Estado:** 🔴 No Iniciada
+- **Estado:** 🟡 En Progreso
 - **Prioridad:** 🔴 ALTA
 - **Tiempo Estimado:** 1 semana
 - **Líneas Iniciales:** 1,286
 - **Líneas Objetivo:** < 200 (orchestrator)
-- **Progreso:** 0/10 pasos
+- **Progreso:** 3/10 pasos
 - **Notas:**
-  - [ ] Análisis y planificación
-  - [ ] Crear estructura de carpetas
-  - [ ] Extraer CustomerSelector
-  - [ ] Extraer PrescriptionSelector
-  - [ ] Extraer FrameSelector
+  - [x] Análisis y planificación
+  - [x] Crear estructura de carpetas
+  - [x] Extraer CustomerSelector
+  - [x] Extraer PrescriptionSelector
+  - [x] Extraer FrameSelector
   - [ ] Extraer LensConfiguration
   - [ ] Extraer PricingSection
   - [ ] Crear hooks personalizados

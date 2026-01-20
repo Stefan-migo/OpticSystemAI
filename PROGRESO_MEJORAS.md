@@ -195,17 +195,18 @@
 - **Tiempo Estimado:** 1 semana
 - **Líneas Iniciales:** 1,286
 - **Líneas Objetivo:** < 200 (orchestrator)
-- **Progreso:** 3/10 pasos
+- **Progreso:** 9/10 pasos
+- **Líneas Actuales:** 376 (orchestrator) + componentes extraídos
 - **Notas:**
   - [x] Análisis y planificación
   - [x] Crear estructura de carpetas
   - [x] Extraer CustomerSelector
   - [x] Extraer PrescriptionSelector
   - [x] Extraer FrameSelector
-  - [ ] Extraer LensConfiguration
-  - [ ] Extraer PricingSection
-  - [ ] Crear hooks personalizados
-  - [ ] Refactorizar orchestrator
+  - [x] Extraer LensConfiguration
+  - [x] Extraer PricingSection
+  - [x] Crear hooks personalizados
+  - [x] Refactorizar orchestrator
   - [ ] Verificación final
 
 ### Tarea 2.2: Refactorizar Products Page

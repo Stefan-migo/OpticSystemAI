@@ -5,16 +5,44 @@ import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
-import { RateLimitError } from "@/lib/api/errors";
+import { RateLimitError, ValidationError } from "@/lib/api/errors";
+import {
+  createCustomerSchema,
+  searchCustomerSchema,
+  paginationSchema,
+} from "@/lib/api/validation/zod-schemas";
+import {
+  parseAndValidateBody,
+  parseAndValidateQuery,
+  validationErrorResponse,
+} from "@/lib/api/validation/zod-helpers";
 
 export async function GET(request: NextRequest) {
   try {
     logger.info("Customers API GET called");
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search") || "";
-    const status = searchParams.get("status") || "";
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+
+    // Validate query parameters with Zod
+    let queryParams;
+    try {
+      // Combine pagination and search schemas
+      const combinedSchema = paginationSchema.merge(searchCustomerSchema);
+      queryParams = parseAndValidateQuery(request, combinedSchema);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return validationErrorResponse(error);
+      }
+      throw error;
+    }
+
+    const search = queryParams.q || queryParams.search || "";
+    const status =
+      queryParams.is_active !== undefined
+        ? queryParams.is_active
+          ? "active"
+          : "inactive"
+        : "";
+    const page = queryParams.page || 1;
+    const limit = queryParams.limit || 20;
     const offset = (page - 1) * limit;
 
     logger.debug("Query params", { search, status, page, limit });
@@ -201,7 +229,15 @@ export async function POST(request: NextRequest) {
         logger.debug("Admin access confirmed", { email: user.email });
 
         // Get request body to determine action
-        const body = await request.json();
+        let body: any;
+        try {
+          body = await request.json();
+        } catch (error) {
+          return NextResponse.json(
+            { error: "Invalid JSON in request body" },
+            { status: 400 },
+          );
+        }
 
         // Check if this is a customer creation request (has first_name or last_name)
         // Analytics requests have empty body or only summary-related fields
@@ -211,6 +247,20 @@ export async function POST(request: NextRequest) {
           logger.info("Customers API POST called (create new customer)");
           logger.debug("Create customer data received", { body });
 
+          // Validate request body with Zod
+          let validatedBody;
+          try {
+            validatedBody = await parseAndValidateBody(
+              request,
+              createCustomerSchema,
+            );
+          } catch (error) {
+            if (error instanceof ValidationError) {
+              return validationErrorResponse(error);
+            }
+            throw error;
+          }
+
           // Get branch context
           const branchContext = await getBranchContext(request, user.id);
 
@@ -218,19 +268,11 @@ export async function POST(request: NextRequest) {
             branchId: branchContext.branchId,
             isGlobalView: branchContext.isGlobalView,
             isSuperAdmin: branchContext.isSuperAdmin,
-            bodyBranchId: body.branch_id,
+            bodyBranchId: validatedBody.branch_id,
           });
 
-          // Validate required fields
-          if (!body.first_name && !body.last_name) {
-            return NextResponse.json(
-              { error: "At least first name or last name is required" },
-              { status: 400 },
-            );
-          }
-
           // Determine customer branch_id
-          // Priority: 1) branchContext.branchId (from header - selected branch), 2) body.branch_id (explicit), 3) error
+          // Priority: 1) branchContext.branchId (from header - selected branch), 2) validatedBody.branch_id (explicit), 3) error
           let customerBranchId: string | null = null;
 
           // First, try to use branch from context (header) - this is the selected branch
@@ -239,9 +281,9 @@ export async function POST(request: NextRequest) {
             logger.debug("Using branch_id from context (selected branch)", {
               branchId: customerBranchId,
             });
-          } else if (body.branch_id) {
+          } else if (validatedBody.branch_id) {
             // If no branch in context but provided in body (super admin in global view)
-            customerBranchId = body.branch_id;
+            customerBranchId = validatedBody.branch_id;
             logger.debug("Using branch_id from request body", {
               branchId: customerBranchId,
             });
@@ -277,9 +319,9 @@ export async function POST(request: NextRequest) {
             .select("id")
             .eq("branch_id", customerBranchId);
 
-          if (body.email?.trim()) {
+          if (validatedBody.email) {
             const { data: existingByEmail } = await existingCustomerQuery
-              .eq("email", body.email.trim())
+              .eq("email", validatedBody.email)
               .maybeSingle();
 
             if (existingByEmail) {
@@ -293,9 +335,9 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          if (body.rut?.trim()) {
+          if (validatedBody.rut) {
             const { data: existingByRut } = await existingCustomerQuery
-              .eq("rut", body.rut.trim())
+              .eq("rut", validatedBody.rut)
               .maybeSingle();
 
             if (existingByRut) {
@@ -309,35 +351,43 @@ export async function POST(request: NextRequest) {
           }
 
           // Create customer data (NO auth user creation - customers don't need authentication)
+          // Usar datos validados por Zod
           const customerData = {
             branch_id: customerBranchId,
-            first_name: body.first_name || null,
-            last_name: body.last_name || null,
-            email: body.email?.trim() || null,
-            phone: body.phone?.trim() || null,
-            rut: body.rut?.trim() || null,
-            date_of_birth: body.date_of_birth || null,
-            gender: body.gender || null,
-            address_line_1: body.address_line_1 || null,
-            address_line_2: body.address_line_2 || null,
-            city: body.city || null,
-            state: body.state || null,
-            postal_code: body.postal_code || null,
-            country: body.country || "Chile",
-            medical_conditions: body.medical_conditions || null,
-            allergies: body.allergies || null,
-            medications: body.medications || null,
-            medical_notes: body.medical_notes || null,
-            last_eye_exam_date: body.last_eye_exam_date || null,
-            next_eye_exam_due: body.next_eye_exam_due || null,
-            preferred_contact_method: body.preferred_contact_method || null,
-            emergency_contact_name: body.emergency_contact_name || null,
-            emergency_contact_phone: body.emergency_contact_phone || null,
-            insurance_provider: body.insurance_provider || null,
-            insurance_policy_number: body.insurance_policy_number || null,
-            notes: body.notes || null,
-            tags: body.tags || null,
-            is_active: body.is_active !== undefined ? body.is_active : true,
+            first_name: validatedBody.first_name || null,
+            last_name: validatedBody.last_name || null,
+            email: validatedBody.email || null,
+            phone: validatedBody.phone || null,
+            rut: validatedBody.rut || null,
+            date_of_birth: validatedBody.date_of_birth || null,
+            gender: validatedBody.gender || null,
+            address_line_1: validatedBody.address_line_1 || null,
+            address_line_2: validatedBody.address_line_2 || null,
+            city: validatedBody.city || null,
+            state: validatedBody.state || null,
+            postal_code: validatedBody.postal_code || null,
+            country: validatedBody.country || "Chile",
+            medical_conditions: validatedBody.medical_conditions || null,
+            allergies: validatedBody.allergies || null,
+            medications: validatedBody.medications || null,
+            medical_notes: validatedBody.medical_notes || null,
+            last_eye_exam_date: validatedBody.last_eye_exam_date || null,
+            next_eye_exam_due: validatedBody.next_eye_exam_due || null,
+            preferred_contact_method:
+              validatedBody.preferred_contact_method || null,
+            emergency_contact_name:
+              validatedBody.emergency_contact_name || null,
+            emergency_contact_phone:
+              validatedBody.emergency_contact_phone || null,
+            insurance_provider: validatedBody.insurance_provider || null,
+            insurance_policy_number:
+              validatedBody.insurance_policy_number || null,
+            notes: validatedBody.notes || null,
+            tags: validatedBody.tags || null,
+            is_active:
+              validatedBody.is_active !== undefined
+                ? validatedBody.is_active
+                : true,
             created_by: user.id,
           };
 
@@ -371,12 +421,12 @@ export async function POST(request: NextRequest) {
 
           // Create notification for new customer (non-blocking)
           const customerName =
-            `${body.first_name || ""} ${body.last_name || ""}`.trim() ||
+            `${validatedBody.first_name || ""} ${validatedBody.last_name || ""}`.trim() ||
             "Cliente";
           NotificationService.notifyNewCustomer(
             newCustomer.id,
             customerName,
-            body.email?.trim() || undefined,
+            validatedBody.email || undefined,
           ).catch((err) => logger.error("Error creating notification", err));
 
           return NextResponse.json({

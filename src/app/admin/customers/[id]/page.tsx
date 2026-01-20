@@ -49,9 +49,44 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import CreatePrescriptionForm from "@/components/admin/CreatePrescriptionForm";
-import CreateAppointmentForm from "@/components/admin/CreateAppointmentForm";
-import CreateQuoteForm from "@/components/admin/CreateQuoteForm";
+import dynamic from "next/dynamic";
+
+// Lazy load large form components to reduce initial bundle size
+const CreatePrescriptionForm = dynamic(
+  () => import("@/components/admin/CreatePrescriptionForm"),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-azul-profundo"></div>
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+const CreateAppointmentForm = dynamic(
+  () => import("@/components/admin/CreateAppointmentForm"),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-azul-profundo"></div>
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+const CreateQuoteForm = dynamic(
+  () => import("@/components/admin/CreateQuoteForm"),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-azul-profundo"></div>
+      </div>
+    ),
+    ssr: false,
+  },
+);
 
 interface Customer {
   id: string;

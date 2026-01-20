@@ -32,9 +32,39 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import AppointmentCalendar from "@/components/admin/AppointmentCalendar";
-import CreateAppointmentForm from "@/components/admin/CreateAppointmentForm";
+import dynamic from "next/dynamic";
 import { useBranch } from "@/hooks/useBranch";
+
+// Lazy load large components to reduce initial bundle size
+const AppointmentCalendar = dynamic(
+  () => import("@/components/admin/AppointmentCalendar"),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-azul-profundo mx-auto"></div>
+          <p className="text-tierra-media">Cargando calendario...</p>
+        </div>
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+const CreateAppointmentForm = dynamic(
+  () => import("@/components/admin/CreateAppointmentForm"),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-azul-profundo mx-auto"></div>
+          <p className="text-tierra-media">Cargando formulario...</p>
+        </div>
+      </div>
+    ),
+    ssr: false,
+  },
+);
 import { Building2 } from "lucide-react";
 import {
   Dialog,

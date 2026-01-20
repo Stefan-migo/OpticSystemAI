@@ -1,26 +1,26 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { 
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { 
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { 
+} from "@/components/ui/table";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -28,9 +28,9 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { 
-  Search, 
+} from "@/components/ui/dialog";
+import {
+  Search,
   Plus,
   Eye,
   FileText,
@@ -45,14 +45,30 @@ import {
   Send,
   RefreshCw,
   Settings,
-  Trash2
-} from 'lucide-react';
-import { toast } from 'sonner';
-import Link from 'next/link';
-import CreateQuoteForm from '@/components/admin/CreateQuoteForm';
-import { useBranch } from '@/hooks/useBranch';
-import { BranchSelector } from '@/components/admin/BranchSelector';
-import { getBranchHeader } from '@/lib/utils/branch';
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useBranch } from "@/hooks/useBranch";
+
+// Lazy load CreateQuoteForm to reduce initial bundle size
+const CreateQuoteForm = dynamic(
+  () => import("@/components/admin/CreateQuoteForm"),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-azul-profundo mx-auto"></div>
+          <p className="text-tierra-media">Cargando formulario...</p>
+        </div>
+      </div>
+    ),
+    ssr: false,
+  },
+);
+import { BranchSelector } from "@/components/admin/BranchSelector";
+import { getBranchHeader } from "@/lib/utils/branch";
 
 interface Quote {
   id: string;
@@ -80,11 +96,11 @@ export default function QuotesPage() {
   // Branch context
   const { currentBranchId, isSuperAdmin, branches } = useBranch();
   const isGlobalView = !currentBranchId && isSuperAdmin;
-  
+
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showCreateQuote, setShowCreateQuote] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -104,21 +120,21 @@ export default function QuotesPage() {
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: quotesPerPage.toString(),
-        ...(statusFilter !== 'all' && { status: statusFilter })
+        ...(statusFilter !== "all" && { status: statusFilter }),
       });
 
       const headers: HeadersInit = {};
       if (isGlobalView && isSuperAdmin) {
-        headers['x-branch-id'] = 'global';
+        headers["x-branch-id"] = "global";
       } else if (currentBranchId) {
-        headers['x-branch-id'] = currentBranchId;
+        headers["x-branch-id"] = currentBranchId;
       }
 
       const response = await fetch(`/api/admin/quotes?${params}`, {
-        headers
+        headers,
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch quotes');
+        throw new Error("Failed to fetch quotes");
       }
 
       const data = await response.json();
@@ -126,34 +142,42 @@ export default function QuotesPage() {
       setTotalPages(data.pagination?.totalPages || 1);
       setTotalQuotes(data.pagination?.total || 0);
     } catch (error) {
-      console.error('Error fetching quotes:', error);
-      toast.error('Error al cargar presupuestos');
+      console.error("Error fetching quotes:", error);
+      toast.error("Error al cargar presupuestos");
     } finally {
       setLoading(false);
     }
   };
 
-  const formatPrice = (amount: number) => 
-    new Intl.NumberFormat('es-CL', { 
-      style: 'currency', 
-      currency: 'CLP',
-      minimumFractionDigits: 0
+  const formatPrice = (amount: number) =>
+    new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      minimumFractionDigits: 0,
     }).format(amount);
 
   const getStatusBadge = (status: string, isConverted: boolean = false) => {
     // Always show the current status (which should be 'accepted' when converted)
     const displayStatus = status;
-    
+
     const config: Record<string, { variant: any; label: string; icon: any }> = {
-      draft: { variant: 'outline', label: 'Borrador', icon: FileText },
-      sent: { variant: 'secondary', label: 'Enviado', icon: Send },
-      accepted: { variant: 'default', label: 'Aceptado', icon: CheckCircle },
-      rejected: { variant: 'destructive', label: 'Rechazado', icon: XCircle },
-      expired: { variant: 'outline', label: 'Expirado', icon: Clock },
-      converted_to_work: { variant: 'default', label: 'Convertido', icon: RefreshCw }
+      draft: { variant: "outline", label: "Borrador", icon: FileText },
+      sent: { variant: "secondary", label: "Enviado", icon: Send },
+      accepted: { variant: "default", label: "Aceptado", icon: CheckCircle },
+      rejected: { variant: "destructive", label: "Rechazado", icon: XCircle },
+      expired: { variant: "outline", label: "Expirado", icon: Clock },
+      converted_to_work: {
+        variant: "default",
+        label: "Convertido",
+        icon: RefreshCw,
+      },
     };
 
-    const statusConfig = config[displayStatus] || { variant: 'outline', label: displayStatus, icon: FileText };
+    const statusConfig = config[displayStatus] || {
+      variant: "outline",
+      label: displayStatus,
+      icon: FileText,
+    };
     const Icon = statusConfig.icon;
 
     return (
@@ -164,13 +188,15 @@ export default function QuotesPage() {
     );
   };
 
-  const filteredQuotes = quotes.filter(quote => {
+  const filteredQuotes = quotes.filter((quote) => {
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       return (
         quote.quote_number.toLowerCase().includes(searchLower) ||
         quote.customer?.email?.toLowerCase().includes(searchLower) ||
-        `${quote.customer?.first_name || ''} ${quote.customer?.last_name || ''}`.toLowerCase().includes(searchLower) ||
+        `${quote.customer?.first_name || ""} ${quote.customer?.last_name || ""}`
+          .toLowerCase()
+          .includes(searchLower) ||
         quote.frame_name?.toLowerCase().includes(searchLower)
       );
     }
@@ -193,22 +219,22 @@ export default function QuotesPage() {
     setDeleting(true);
     try {
       const response = await fetch(`/api/admin/quotes/${quoteToDelete}`, {
-        method: 'DELETE',
-        credentials: 'include'
+        method: "DELETE",
+        credentials: "include",
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Error al eliminar presupuesto');
+        throw new Error(error.error || "Error al eliminar presupuesto");
       }
 
-      toast.success('Presupuesto eliminado exitosamente');
+      toast.success("Presupuesto eliminado exitosamente");
       setDeleteDialogOpen(false);
       setQuoteToDelete(null);
       fetchQuotes();
     } catch (error: any) {
-      console.error('Error deleting quote:', error);
-      toast.error(error.message || 'Error al eliminar presupuesto');
+      console.error("Error deleting quote:", error);
+      toast.error(error.message || "Error al eliminar presupuesto");
     } finally {
       setDeleting(false);
     }
@@ -219,17 +245,17 @@ export default function QuotesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">Presupuestos</h1>
+          <h1 className="text-3xl font-bold text-azul-profundo">
+            Presupuestos
+          </h1>
           <p className="text-tierra-media">
-            {isGlobalView 
-              ? 'Gestiona presupuestos de todas las sucursales' 
-              : 'Gestiona presupuestos para trabajos de lentes'}
+            {isGlobalView
+              ? "Gestiona presupuestos de todas las sucursales"
+              : "Gestiona presupuestos para trabajos de lentes"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isSuperAdmin && (
-            <BranchSelector />
-          )}
+          {isSuperAdmin && <BranchSelector />}
           <Link href="/admin/quotes/settings">
             <Button variant="outline">
               <Settings className="h-4 w-4 mr-2" />
@@ -290,9 +316,13 @@ export default function QuotesPage() {
           ) : filteredQuotes.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-azul-profundo mb-2">No hay presupuestos</h3>
+              <h3 className="text-lg font-semibold text-azul-profundo mb-2">
+                No hay presupuestos
+              </h3>
               <p className="text-tierra-media mb-4">
-                {searchTerm ? 'No se encontraron presupuestos que coincidan con la búsqueda' : 'Comienza creando tu primer presupuesto'}
+                {searchTerm
+                  ? "No se encontraron presupuestos que coincidan con la búsqueda"
+                  : "Comienza creando tu primer presupuesto"}
               </p>
               {!searchTerm && (
                 <Button onClick={() => setShowCreateQuote(true)}>
@@ -320,20 +350,29 @@ export default function QuotesPage() {
                 <TableBody>
                   {filteredQuotes.map((quote) => (
                     <TableRow key={quote.id}>
-                      <TableCell className="font-medium">{quote.quote_number}</TableCell>
+                      <TableCell className="font-medium">
+                        {quote.quote_number}
+                      </TableCell>
                       <TableCell>
                         <div>
                           <div className="font-medium">
-                            {quote.customer?.first_name || ''} {quote.customer?.last_name || ''}
+                            {quote.customer?.first_name || ""}{" "}
+                            {quote.customer?.last_name || ""}
                           </div>
-                          <div className="text-sm text-tierra-media">{quote.customer?.email}</div>
+                          <div className="text-sm text-tierra-media">
+                            {quote.customer?.email}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell>{quote.frame_name || '-'}</TableCell>
+                      <TableCell>{quote.frame_name || "-"}</TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{quote.lens_type || '-'}</div>
-                          <div className="text-sm text-tierra-media">{quote.lens_material || ''}</div>
+                          <div className="font-medium">
+                            {quote.lens_type || "-"}
+                          </div>
+                          <div className="text-sm text-tierra-media">
+                            {quote.lens_material || ""}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold text-verde-suave">
@@ -341,50 +380,78 @@ export default function QuotesPage() {
                       </TableCell>
                       <TableCell>
                         {(() => {
-                          const isConverted = quote.status === 'accepted' && !!quote.converted_to_work_order_id;
+                          const isConverted =
+                            quote.status === "accepted" &&
+                            !!quote.converted_to_work_order_id;
                           // Always show the current status (which should be 'accepted' when converted)
                           const displayStatus = quote.status;
-                          
+
                           return (
                             <Select
                               value={displayStatus}
                               disabled={isConverted}
                               onValueChange={async (newStatus) => {
                                 if (isConverted) {
-                                  toast.error('No se puede cambiar el estado de un presupuesto convertido');
+                                  toast.error(
+                                    "No se puede cambiar el estado de un presupuesto convertido",
+                                  );
                                   return;
                                 }
-                                
+
                                 try {
-                                  const response = await fetch(`/api/admin/quotes/${quote.id}/status`, {
-                                    method: 'PUT',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    credentials: 'include',
-                                    body: JSON.stringify({ status: newStatus })
-                                  });
+                                  const response = await fetch(
+                                    `/api/admin/quotes/${quote.id}/status`,
+                                    {
+                                      method: "PUT",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      credentials: "include",
+                                      body: JSON.stringify({
+                                        status: newStatus,
+                                      }),
+                                    },
+                                  );
 
                                   if (!response.ok) {
-                                    const errorData = await response.json().catch(() => ({}));
-                                    throw new Error(errorData.error || 'Failed to update status');
+                                    const errorData = await response
+                                      .json()
+                                      .catch(() => ({}));
+                                    throw new Error(
+                                      errorData.error ||
+                                        "Failed to update status",
+                                    );
                                   }
 
                                   const result = await response.json();
-                                  
+
                                   // Update local state
-                                  setQuotes(prev => prev.map(q => 
-                                    q.id === quote.id ? { ...q, status: newStatus } : q
-                                  ));
-                                  toast.success('Estado actualizado');
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === quote.id
+                                        ? { ...q, status: newStatus }
+                                        : q,
+                                    ),
+                                  );
+                                  toast.success("Estado actualizado");
                                 } catch (error) {
-                                  console.error('Error updating status:', error);
-                                  const errorMessage = error instanceof Error ? error.message : 'Error al actualizar estado';
+                                  console.error(
+                                    "Error updating status:",
+                                    error,
+                                  );
+                                  const errorMessage =
+                                    error instanceof Error
+                                      ? error.message
+                                      : "Error al actualizar estado";
                                   toast.error(errorMessage);
                                 }
                               }}
                             >
                               <SelectTrigger className="w-auto border-0 p-0 h-auto bg-transparent hover:bg-transparent focus:ring-0 focus:ring-offset-0 shadow-none [&>svg]:hidden [&_svg]:hidden [&_[data-radix-select-icon]]:hidden">
                                 <SelectValue asChild>
-                                  <div className={`cursor-pointer ${isConverted ? 'cursor-not-allowed opacity-75' : ''}`}>
+                                  <div
+                                    className={`cursor-pointer ${isConverted ? "cursor-not-allowed opacity-75" : ""}`}
+                                  >
                                     {getStatusBadge(displayStatus, isConverted)}
                                   </div>
                                 </SelectValue>
@@ -427,7 +494,10 @@ export default function QuotesPage() {
                       </TableCell>
                       <TableCell>
                         {quote.converted_to_work_order_id ? (
-                          <Badge variant="default" className="flex items-center gap-1 bg-green-600">
+                          <Badge
+                            variant="default"
+                            className="flex items-center gap-1 bg-green-600"
+                          >
                             <RefreshCw className="h-3 w-3" />
                             Convertido
                           </Badge>
@@ -437,14 +507,23 @@ export default function QuotesPage() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div>{new Date(quote.quote_date).toLocaleDateString('es-CL')}</div>
+                          <div>
+                            {new Date(quote.quote_date).toLocaleDateString(
+                              "es-CL",
+                            )}
+                          </div>
                           {quote.expiration_date && (
-                            <div className={`text-xs ${
-                              new Date(quote.expiration_date) < new Date() 
-                                ? 'text-red-500' 
-                                : 'text-tierra-media'
-                            }`}>
-                              Exp: {new Date(quote.expiration_date).toLocaleDateString('es-CL')}
+                            <div
+                              className={`text-xs ${
+                                new Date(quote.expiration_date) < new Date()
+                                  ? "text-red-500"
+                                  : "text-tierra-media"
+                              }`}
+                            >
+                              Exp:{" "}
+                              {new Date(
+                                quote.expiration_date,
+                              ).toLocaleDateString("es-CL")}
                             </div>
                           )}
                         </div>
@@ -457,8 +536,8 @@ export default function QuotesPage() {
                               Ver
                             </Button>
                           </Link>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => handleDeleteClick(quote.id)}
                             disabled={!!quote.converted_to_work_order_id}
@@ -483,7 +562,7 @@ export default function QuotesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -491,7 +570,9 @@ export default function QuotesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
                       disabled={currentPage === totalPages}
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -513,7 +594,7 @@ export default function QuotesPage() {
               Crea un presupuesto para un trabajo de lentes
             </DialogDescription>
           </DialogHeader>
-          <CreateQuoteForm 
+          <CreateQuoteForm
             onSuccess={handleQuoteCreated}
             onCancel={() => setShowCreateQuote(false)}
           />
@@ -526,12 +607,13 @@ export default function QuotesPage() {
           <DialogHeader>
             <DialogTitle>¿Eliminar presupuesto?</DialogTitle>
             <DialogDescription>
-              Esta acción no se puede deshacer. El presupuesto será eliminado permanentemente.
+              Esta acción no se puede deshacer. El presupuesto será eliminado
+              permanentemente.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setDeleteDialogOpen(false);
                 setQuoteToDelete(null);
@@ -540,8 +622,8 @@ export default function QuotesPage() {
             >
               Cancelar
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={deleting}
             >
@@ -563,4 +645,3 @@ export default function QuotesPage() {
     </div>
   );
 }
-

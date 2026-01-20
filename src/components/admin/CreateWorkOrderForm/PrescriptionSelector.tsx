@@ -127,31 +127,32 @@ export default function PrescriptionSelector({
             </div>
           ) : (
             <div className="flex gap-2">
-              <Select
-                value={selectedPrescription?.id || ""}
-                onValueChange={(value) => {
-                  const prescription = prescriptions.find(
-                    (p) => p.id === value,
-                  );
-                  if (prescription) {
-                    onSelect(prescription);
-                  }
-                }}
-                className="flex-1"
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una receta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {prescriptions.map((prescription) => (
-                    <SelectItem key={prescription.id} value={prescription.id}>
-                      {prescription.prescription_date} -{" "}
-                      {prescription.prescription_type || "Sin tipo"}
-                      {prescription.is_current && " (Actual)"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex-1">
+                <Select
+                  value={selectedPrescription?.id || ""}
+                  onValueChange={(value) => {
+                    const prescription = prescriptions.find(
+                      (p) => p.id === value,
+                    );
+                    if (prescription) {
+                      onSelect(prescription);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una receta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prescriptions.map((prescription) => (
+                      <SelectItem key={prescription.id} value={prescription.id}>
+                        {prescription.prescription_date} -{" "}
+                        {prescription.prescription_type || "Sin tipo"}
+                        {prescription.is_current && " (Actual)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
                 type="button"
                 variant="outline"

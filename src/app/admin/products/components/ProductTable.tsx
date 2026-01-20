@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ interface ProductTableProps {
   getStatusBadge: (status: string) => React.ReactNode;
 }
 
-export default function ProductTable({
+function ProductTableComponent({
   products,
   selectedProducts,
   onSelectProduct,
@@ -179,3 +180,6 @@ export default function ProductTable({
     </Card>
   );
 }
+
+// Memoize ProductTable to prevent unnecessary re-renders
+export default memo(ProductTableComponent);

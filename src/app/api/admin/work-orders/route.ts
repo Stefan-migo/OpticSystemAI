@@ -44,10 +44,21 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    // Build base query with branch filter
+    // Build base query with branch filter and relations using Supabase nested selects
+    // This avoids N+1 queries by fetching related data in a single query
     let query = supabase
       .from("lab_work_orders")
-      .select("*", { count: "exact" })
+      .select(
+        `
+        *,
+        customer:customers!lab_work_orders_customer_id_fkey(id, first_name, last_name, email, phone),
+        prescription:prescriptions!lab_work_orders_prescription_id_fkey(*),
+        quote:quotes!lab_work_orders_quote_id_fkey(*),
+        frame_product:products!lab_work_orders_frame_product_id_fkey(id, name, price, frame_brand, frame_model),
+        assigned_staff:profiles!lab_work_orders_assigned_to_fkey(id, first_name, last_name)
+      `,
+        { count: "exact" },
+      )
       .order("created_at", { ascending: false });
 
     // Apply branch filter
@@ -81,92 +92,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch related data separately if work orders exist
-    let workOrdersWithRelations = workOrders || [];
-    if (workOrdersWithRelations.length > 0) {
-      // Fetch customers (from customers table, not profiles)
-      const customerIds = [
-        ...new Set(
-          workOrdersWithRelations.map((wo) => wo.customer_id).filter(Boolean),
-        ),
-      ];
-      const { data: customers } = await supabase
-        .from("customers")
-        .select("id, first_name, last_name, email, phone")
-        .in("id", customerIds);
-
-      // Fetch prescriptions
-      const prescriptionIds = [
-        ...new Set(
-          workOrdersWithRelations
-            .map((wo) => wo.prescription_id)
-            .filter(Boolean),
-        ),
-      ];
-      const { data: prescriptions } =
-        prescriptionIds.length > 0
-          ? await supabase
-              .from("prescriptions")
-              .select("*")
-              .in("id", prescriptionIds)
-          : { data: [] };
-
-      // Fetch quotes
-      const quoteIds = [
-        ...new Set(
-          workOrdersWithRelations.map((wo) => wo.quote_id).filter(Boolean),
-        ),
-      ];
-      const { data: quotes } =
-        quoteIds.length > 0
-          ? await supabase.from("quotes").select("*").in("id", quoteIds)
-          : { data: [] };
-
-      // Fetch products
-      const productIds = [
-        ...new Set(
-          workOrdersWithRelations
-            .map((wo) => wo.frame_product_id)
-            .filter(Boolean),
-        ),
-      ];
-      const { data: products } =
-        productIds.length > 0
-          ? await supabase
-              .from("products")
-              .select("id, name, price, frame_brand, frame_model")
-              .in("id", productIds)
-          : { data: [] };
-
-      // Fetch assigned staff
-      const staffIds = [
-        ...new Set(
-          workOrdersWithRelations.map((wo) => wo.assigned_to).filter(Boolean),
-        ),
-      ];
-      const { data: staff } =
-        staffIds.length > 0
-          ? await supabase
-              .from("profiles")
-              .select("id, first_name, last_name")
-              .in("id", staffIds)
-          : { data: [] };
-
-      // Map relations to work orders
-      workOrdersWithRelations = workOrdersWithRelations.map((workOrder) => ({
-        ...workOrder,
-        customer:
-          customers?.find((c) => c.id === workOrder.customer_id) || null,
-        prescription:
-          prescriptions?.find((p) => p.id === workOrder.prescription_id) ||
-          null,
-        quote: quotes?.find((q) => q.id === workOrder.quote_id) || null,
-        frame_product:
-          products?.find((p) => p.id === workOrder.frame_product_id) || null,
-        assigned_staff:
-          staff?.find((s) => s.id === workOrder.assigned_to) || null,
-      }));
-    }
+    // Relations are now included in the query above, so no need for separate queries
+    // This eliminates N+1 queries by fetching all related data in a single query
+    const workOrdersWithRelations = workOrders || [];
 
     return NextResponse.json({
       workOrders: workOrdersWithRelations,

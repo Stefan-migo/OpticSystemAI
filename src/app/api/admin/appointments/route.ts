@@ -58,11 +58,23 @@ export async function GET(request: NextRequest) {
     // Otherwise use the branch context
     const branchIdToFilter = requestedBranchId || branchContext.branchId;
 
-    // First, fetch basic appointment data (including guest customer fields)
+    // Fetch appointment data with relations using Supabase nested selects
+    // This avoids N+1 queries by fetching related data in a single query
     let query = supabase
       .from("appointments")
       .select(
-        "*, guest_first_name, guest_last_name, guest_rut, guest_email, guest_phone",
+        `
+        *,
+        guest_first_name,
+        guest_last_name,
+        guest_rut,
+        guest_email,
+        guest_phone,
+        customer:profiles!appointments_customer_id_fkey(id, first_name, last_name, email, phone),
+        assigned_staff:profiles!appointments_assigned_to_fkey(id, first_name, last_name),
+        prescription:prescriptions!appointments_prescription_id_fkey(id, prescription_date, prescription_type),
+        order:orders!appointments_order_id_fkey(id, order_number)
+      `,
       )
       .order("appointment_date", { ascending: true })
       .order("appointment_time", { ascending: true });
@@ -118,68 +130,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch related data manually
-    const customerIds = [
-      ...new Set(appointments.map((a) => a.customer_id).filter(Boolean)),
-    ];
-    const staffIds = [
-      ...new Set(appointments.map((a) => a.assigned_to).filter(Boolean)),
-    ];
-    const prescriptionIds = [
-      ...new Set(appointments.map((a) => a.prescription_id).filter(Boolean)),
-    ];
-    const orderIds = [
-      ...new Set(appointments.map((a) => a.order_id).filter(Boolean)),
-    ];
-
-    // Fetch customers
-    const { data: customers } =
-      customerIds.length > 0
-        ? await supabase
-            .from("profiles")
-            .select("id, first_name, last_name, email, phone")
-            .in("id", customerIds)
-        : { data: [] };
-
-    // Fetch staff
-    const { data: staff } =
-      staffIds.length > 0
-        ? await supabase
-            .from("profiles")
-            .select("id, first_name, last_name")
-            .in("id", staffIds)
-        : { data: [] };
-
-    // Fetch prescriptions
-    const { data: prescriptions } =
-      prescriptionIds.length > 0
-        ? await supabase
-            .from("prescriptions")
-            .select("id, prescription_date, prescription_type")
-            .in("id", prescriptionIds)
-        : { data: [] };
-
-    // Fetch orders
-    const { data: orders } =
-      orderIds.length > 0
-        ? await supabase
-            .from("orders")
-            .select("id, order_number")
-            .in("id", orderIds)
-        : { data: [] };
-
-    // Map appointments with related data
-    const appointmentsWithRelations = appointments.map((appointment) => ({
-      ...appointment,
-      customer:
-        customers?.find((c) => c.id === appointment.customer_id) || null,
-      assigned_staff:
-        staff?.find((s) => s.id === appointment.assigned_to) || null,
-      prescription:
-        prescriptions?.find((p) => p.id === appointment.prescription_id) ||
-        null,
-      order: orders?.find((o) => o.id === appointment.order_id) || null,
-    }));
+    // Relations are now included in the query above, so no need for separate queries
+    // This eliminates N+1 queries by fetching all related data in a single query
+    const appointmentsWithRelations = appointments;
 
     return NextResponse.json({
       appointments: appointmentsWithRelations,

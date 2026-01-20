@@ -15,6 +15,7 @@ import { ValidationError } from "@/lib/api/errors";
 import { createAppointmentSchema } from "@/lib/api/validation/zod-schemas";
 import {
   parseAndValidateBody,
+  validateBody,
   validationErrorResponse,
 } from "@/lib/api/validation/zod-helpers";
 
@@ -247,13 +248,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate request body with Zod
+    // Validate request body with Zod (body already parsed)
     let validatedBody;
     try {
-      validatedBody = await parseAndValidateBody(
-        request,
-        createAppointmentSchema,
-      );
+      validatedBody = validateBody(body, createAppointmentSchema);
     } catch (error) {
       if (error instanceof ValidationError) {
         return validationErrorResponse(error);

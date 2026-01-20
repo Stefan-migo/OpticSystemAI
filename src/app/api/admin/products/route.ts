@@ -13,6 +13,7 @@ import {
 import {
   parseAndValidateBody,
   parseAndValidateQuery,
+  validateBody,
   validationErrorResponse,
 } from "@/lib/api/validation/zod-helpers";
 
@@ -255,13 +256,10 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Validate request body with Zod (only fields in schema)
+        // Validate request body with Zod (body already parsed)
         let validatedBody;
         try {
-          validatedBody = await parseAndValidateBody(
-            request,
-            createProductSchema,
-          );
+          validatedBody = validateBody(body, createProductSchema);
         } catch (error) {
           if (error instanceof ValidationError) {
             return validationErrorResponse(error);

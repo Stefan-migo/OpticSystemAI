@@ -14,6 +14,7 @@ import {
 import {
   parseAndValidateBody,
   parseAndValidateQuery,
+  validateBody,
   validationErrorResponse,
 } from "@/lib/api/validation/zod-helpers";
 
@@ -247,13 +248,10 @@ export async function POST(request: NextRequest) {
           logger.info("Customers API POST called (create new customer)");
           logger.debug("Create customer data received", { body });
 
-          // Validate request body with Zod
+          // Validate request body with Zod (body already parsed)
           let validatedBody;
           try {
-            validatedBody = await parseAndValidateBody(
-              request,
-              createCustomerSchema,
-            );
+            validatedBody = validateBody(body, createCustomerSchema);
           } catch (error) {
             if (error instanceof ValidationError) {
               return validationErrorResponse(error);

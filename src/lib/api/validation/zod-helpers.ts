@@ -11,20 +11,19 @@ import { logger } from "@/lib/logger";
  */
 
 /**
- * Valida y parsea el body de una request usando un schema Zod
+ * Valida un objeto usando un schema Zod (para cuando el body ya fue parseado)
  *
- * @param request - NextRequest object
+ * @param body - Objeto ya parseado
  * @param schema - Zod schema para validar el body
  * @returns Datos validados y parseados
  * @throws ValidationError si la validación falla
  */
-export async function parseAndValidateBody<T extends z.ZodTypeAny>(
-  request: NextRequest,
+export function validateBody<T extends z.ZodTypeAny>(
+  body: unknown,
   schema: T,
-): Promise<z.infer<T>> {
+): z.infer<T> {
   try {
-    const body = await request.json();
-    const validated = await schema.parseAsync(body);
+    const validated = schema.parse(body);
     return validated;
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -44,6 +43,30 @@ export async function parseAndValidateBody<T extends z.ZodTypeAny>(
         `Validation failed: ${errors.map((e) => `${e.field}: ${e.message}`).join(", ")}`,
         errors,
       );
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Valida y parsea el body de una request usando un schema Zod
+ *
+ * @param request - NextRequest object
+ * @param schema - Zod schema para validar el body
+ * @returns Datos validados y parseados
+ * @throws ValidationError si la validación falla
+ */
+export async function parseAndValidateBody<T extends z.ZodTypeAny>(
+  request: NextRequest,
+  schema: T,
+): Promise<z.infer<T>> {
+  try {
+    const body = await request.json();
+    return validateBody(body, schema);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
     }
 
     if (error instanceof SyntaxError) {

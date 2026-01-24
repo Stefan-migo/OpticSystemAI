@@ -1,4 +1,5 @@
 # Plan de Mejoras Estructurales - OpticSystemAI
+
 ## Proceso Sistemático, Minucioso y Quirúrgico
 
 **Fecha de Creación:** 2025-01-27  
@@ -14,15 +15,18 @@
 
 1. [Filosofía del Plan](#filosofía-del-plan)
 2. [Metodología de Trabajo](#metodología-de-trabajo)
-3. [Fase 0: Preparación y Configuración](#fase-0-preparación-y-configuración)
-4. [Fase 1: Estabilización Crítica](#fase-1-estabilización-crítica)
-5. [Fase 2: Refactorización de Componentes](#fase-2-refactorización-de-componentes)
-6. [Fase 3: Mejoras de Seguridad](#fase-3-mejoras-de-seguridad)
-7. [Fase 4: Optimización de Performance](#fase-4-optimización-de-performance)
-8. [Fase 5: Mejoras de Mantenibilidad](#fase-5-mejoras-de-mantenibilidad)
-9. [Fase 6: Testing y Calidad](#fase-6-testing-y-calidad)
-10. [Checklist de Verificación](#checklist-de-verificación)
-11. [Procedimientos de Rollback](#procedimientos-de-rollback)
+3. [Roadmap Estratégico Híbrido](#roadmap-estratégico-híbrido)
+4. [Fase 0: Preparación y Configuración](#fase-0-preparación-y-configuración)
+5. [Fase 1: Estabilización Crítica](#fase-1-estabilización-crítica)
+6. [Fase 2: Refactorización de Componentes](#fase-2-refactorización-de-componentes)
+7. [Fase 3: Mejoras de Seguridad](#fase-3-mejoras-de-seguridad)
+8. [Fase 4: Optimización de Performance](#fase-4-optimización-de-performance)
+9. [Fase 5: Mejoras de Mantenibilidad](#fase-5-mejoras-de-mantenibilidad)
+10. [Fase 6: Testing y Calidad](#fase-6-testing-y-calidad)
+11. [Fase SaaS 0: Arquitectura Multi-Tenancy](#fase-saas-0-arquitectura-multi-tenancy)
+12. [Fase SaaS 1: Billing y Suscripciones](#fase-saas-1-billing-y-suscripciones)
+13. [Checklist de Verificación](#checklist-de-verificación)
+14. [Procedimientos de Rollback](#procedimientos-de-rollback)
 
 ---
 
@@ -31,6 +35,7 @@
 ### Comandos Esenciales
 
 #### Iniciar una Fase
+
 ```bash
 git checkout main
 git pull origin main
@@ -38,6 +43,7 @@ git checkout -b phase-X-nombre-fase
 ```
 
 #### Trabajar en la Fase
+
 ```bash
 # Hacer cambios y commits
 git add .
@@ -46,6 +52,7 @@ git push origin phase-X-nombre-fase  # Opcional pero recomendado
 ```
 
 #### Finalizar una Fase
+
 ```bash
 # Verificar todo funciona
 npm run type-check && npm run lint && npm run build
@@ -69,6 +76,8 @@ git push origin --delete phase-X-nombre-fase
 - `phase-4-performance` - Optimización de performance
 - `phase-5-maintainability` - Mejoras de mantenibilidad
 - `phase-6-testing` - Testing y calidad
+- `phase-saas-0-multitenancy` - Arquitectura Multi-Tenancy
+- `phase-saas-1-billing` - Billing y Suscripciones
 
 ---
 
@@ -102,21 +111,42 @@ Para mantener `main` estable y permitir revisión antes de mergear, trabajaremos
 
 ```
 main (siempre estable)
-├── phase-0-preparation
-├── phase-1-stabilization
-├── phase-2-refactoring
-├── phase-3-security
-├── phase-4-performance
-├── phase-5-maintainability
-└── phase-6-testing
+├── phase-0-preparation ✅ COMPLETADA
+├── phase-1-stabilization ✅ COMPLETADA
+├── phase-2-refactoring ✅ COMPLETADA
+├── phase-3-security ✅ COMPLETADA
+├── phase-4-performance ✅ COMPLETADA
+├── phase-5-maintainability ⏳ PRÓXIMA (1 semana)
+├── phase-6-testing ⏳ PENDIENTE (2-3 semanas)
+├── phase-saas-0-multitenancy ⏳ PARALELO (3 semanas)
+└── phase-saas-1-billing ⏳ PARALELO (2 semanas)
 ```
 
 **Reglas de Branching:**
+
 - ✅ Cada fase tiene su propio branch
 - ✅ Commits frecuentes dentro de cada branch
 - ✅ Merge a `main` solo después de verificar toda la fase
 - ✅ `main` siempre debe estar en estado funcional
 - ✅ Si una fase falla, se puede revertir fácilmente
+- ✅ Fases de mantenibilidad y Testing se ejecutan ANTES de SaaS
+- ✅ Fases SaaS 0 y SaaS 1 pueden ejecutarse en paralelo DESPUÉS de fase 5
+
+**Estrategia de Ejecución Recomendada:**
+
+```
+Orden Secuencial (Recomendado para máxima estabilidad):
+Semana 1: Phase 5 (Mantenibilidad rápida)
+Semana 2-4: Phase SaaS 0 (Arquitectura Multi-Tenant)
+Semana 3-4: Phase 6 (Tests - validando multi-tenancy)
+Semana 5-6: Phase SaaS 1 (Billing)
+
+Beneficios:
+- Código limpio y mantenible antes de grandes cambios SaaS
+- Tests de integración validan que multi-tenancy funciona
+- Reducción de riesgo arquitectónico
+- Rollback seguro en caso de problemas
+```
 
 ### Flujo de Trabajo por Fase
 
@@ -198,6 +228,7 @@ git push origin --delete phase-X-nombre-fase
 ### Criterios de Aceptación
 
 Cada tarea debe cumplir:
+
 - ✅ Código compila sin errores
 - ✅ No hay errores de TypeScript
 - ✅ No hay warnings críticos en consola
@@ -215,7 +246,71 @@ Cada tarea debe cumplir:
 
 ---
 
-## Fase 0: Preparación y Configuración
+## 🚀 Roadmap Estratégico Híbrido
+
+### Visión General: De Monolito a SaaS Production-Ready
+
+Este es un plan integral para transformar el sistema actual en una plataforma SaaS profesional, manteniendo total estabilidad y permitiendo rollback en cualquier momento.
+
+### Timeline Total: 6-7 Semanas
+
+```
+SEMANA 1: PREPARACIÓN & MANTENIBILIDAD
+├── Phase 5A: Reducir código duplicado (3-4 días)
+├── Phase 5B: Mejorar documentación técnica (2-3 días)
+└── Resultado: Codebase limpio y documentado
+
+SEMANA 2-3: ARQUITECTURA SAAS FOUNDATION
+├── Phase SaaS 0.1: Schema DB multi-tenant (5 días)
+├── Phase SaaS 0.2: RLS para multi-tenancy (5 días)
+├── Phase SaaS 0.3: Tier System Base (3 días)
+└── Resultado: Infraestructura DB lista
+
+SEMANA 3-4: TESTING CRÍTICO (PARALELO CON SAAS 0)
+├── Phase 6.1: Tests unitarios utilidades (5 días)
+├── Phase 6.2A: Tests integración APIs (5 días, validando multi-tenancy)
+└── Resultado: APIs validadas y testeadas
+
+SEMANA 5-6: BILLING & MONETIZACIÓN
+├── Phase SaaS 1.1: Stripe/MercadoPago integration (5 días)
+├── Phase SaaS 1.2: Subscription management (3 días)
+├── Phase SaaS 1.3: Tier enforcement middleware (3 días)
+└── Resultado: Sistema de pagos funcional
+
+SEMANA 7: FINALIZACIÓN & DEPLOYMENT
+├── Phase 6.3: Tests E2E (5 días)
+├── Preparación deployment cloud
+└── Resultado: Listo para producción SaaS
+```
+
+### Decisión Arquitectónica Clave
+
+#### ❌ NO hacer:
+
+- ~~Completar todas las fases 0-6 LUEGO hacer SaaS~~
+- ~~Reescribir todo de cero~~
+- ~~Ignorar testing durante cambios arquitectónicos~~
+
+#### ✅ HACER:
+
+- ✅ Fase 5 (rápida): Mantenibilidad
+- ✅ Fase SaaS 0: Infraestructura DB + RLS
+- ✅ Fase 6 (parcial): Tests validando multi-tenancy
+- ✅ Fase SaaS 1: Billing completo
+- ✅ Mantener main SIEMPRE funcional
+
+### Riesgos Mitigados
+
+| Riesgo                  | Mitigation              | Branch                    |
+| ----------------------- | ----------------------- | ------------------------- |
+| Arquitectura SaaS rota  | RLS testing en Phase 6  | phase-saas-0-multitenancy |
+| Regresiones funcionales | Tests antes de merge    | phase-6-testing           |
+| Pérdida de datos        | Migraciones reversibles | phase-saas-0-multitenancy |
+| Downtime                | Validación exhaustiva   | PRE-MERGE CHECKLIST       |
+
+---
+
+## Fase 0: Preparación y Configuración ✅ COMPLETADA
 
 **Duración Estimada:** 3-5 días  
 **Objetivo:** Preparar el entorno para las mejoras  
@@ -254,6 +349,7 @@ git push origin main
 #### Pasos:
 
 1. **Instalar dependencias de testing**
+
    ```bash
    npm install -D vitest @vitest/ui @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom
    ```
@@ -264,6 +360,7 @@ git push origin main
    - Configurar coverage
 
 3. **Crear estructura de tests**
+
    ```
    src/
      __tests__/
@@ -289,6 +386,7 @@ git push origin main
    ```
 
 **Criterios de Aceptación:**
+
 - ✅ Vitest configurado y funcionando
 - ✅ Al menos 3 tests de ejemplo pasando
 - ✅ Coverage básico configurado
@@ -306,6 +404,7 @@ git push origin main
 #### Pasos:
 
 1. **Instalar librería de logging**
+
    ```bash
    npm install pino pino-pretty
    ```
@@ -316,6 +415,7 @@ git push origin main
    - Configurar formato para desarrollo/producción
 
 3. **Crear wrapper para reemplazar console.log**
+
    ```typescript
    // src/lib/logger/index.ts
    export const logger = {
@@ -329,6 +429,7 @@ git push origin main
 4. **Documentar uso del logger**
 
 **Criterios de Aceptación:**
+
 - ✅ Logger configurado
 - ✅ Funciona en desarrollo y producción
 - ✅ Documentación creada
@@ -346,11 +447,13 @@ git push origin main
 #### Pasos:
 
 1. **Instalar husky y lint-staged**
+
    ```bash
    npm install -D husky lint-staged
    ```
 
 2. **Configurar husky**
+
    ```bash
    npx husky init
    ```
@@ -366,6 +469,7 @@ git push origin main
    - Ejecutar tests básicos
 
 **Criterios de Aceptación:**
+
 - ✅ Pre-commit hooks funcionando
 - ✅ Verificaciones automáticas antes de commit
 - ✅ Documentación de uso
@@ -395,6 +499,7 @@ git push origin main
    - `src/app/admin/error.tsx`
 
 **Criterios de Aceptación:**
+
 - ✅ Error Boundary implementado
 - ✅ Integrado en layouts principales
 - ✅ Páginas de error personalizadas
@@ -472,12 +577,14 @@ Dividir por módulos y hacer commit después de cada módulo:
    - Commit: `chore: Verificación final - eliminar console.log restantes`
 
 **Criterios de Aceptación:**
+
 - ✅ 0 instancias de console.log en código de producción
 - ✅ Todos los logs usan el sistema de logging estructurado
 - ✅ Funcionalidad no afectada
 - ✅ Build de producción sin warnings de console
 
 **Verificación:**
+
 ```bash
 # Buscar console.log restantes
 grep -r "console\." src/ --exclude-dir=node_modules | grep -v "logger\." | wc -l
@@ -520,12 +627,14 @@ Crear tipos para funciones RPC de Supabase primero:
    - Verificar funcionalidad
 
 **Criterios de Aceptación:**
+
 - ✅ Todas las funciones RPC tienen tipos definidos
 - ✅ No se usa `any` para RPC calls
 - ✅ TypeScript compila sin errores
 - ✅ Funcionalidad no afectada
 
 **Tipos a crear:**
+
 ```typescript
 // src/types/supabase-rpc.ts
 export interface IsAdminResult {
@@ -584,20 +693,22 @@ Aplicar rate limiting por categorías de rutas:
    - Verificar que no bloquea uso normal
 
 **Criterios de Aceptación:**
+
 - ✅ Rate limiting aplicado en todas las rutas críticas
 - ✅ Headers de rate limit incluidos en respuestas
 - ✅ No afecta uso normal de la aplicación
 - ✅ Errores de rate limit manejados apropiadamente
 
 **Ejemplo de implementación:**
+
 ```typescript
 // src/app/api/admin/customers/search/route.ts
-import { withRateLimit, rateLimitConfigs } from '@/lib/api/middleware'
+import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
 
 export async function GET(request: NextRequest) {
   return withRateLimit(rateLimitConfigs.general, async () => {
     // ... lógica existente
-  })(request)
+  })(request);
 }
 ```
 
@@ -655,6 +766,7 @@ Dividir en componentes más pequeños manteniendo funcionalidad:
    - Documentar dependencias
 
 2. **Crear estructura de carpetas** (0.5 días)
+
    ```
    src/components/admin/CreateWorkOrderForm/
      ├── index.tsx              # Orchestrator principal
@@ -718,6 +830,7 @@ Dividir en componentes más pequeños manteniendo funcionalidad:
     - Verificar performance
 
 **Criterios de Aceptación:**
+
 - ✅ Componente dividido en al menos 5 sub-componentes
 - ✅ Hooks personalizados creados
 - ✅ Funcionalidad completa preservada
@@ -725,6 +838,7 @@ Dividir en componentes más pequeños manteniendo funcionalidad:
 - ✅ Tests básicos pasando
 
 **Verificación:**
+
 - Probar crear work order completo
 - Verificar cálculos de precios
 - Verificar validaciones
@@ -748,9 +862,11 @@ Dividir en componentes y usar React Query:
    - Plan de división
 
 2. **Instalar React Query** (0.5 días)
+
    ```bash
    npm install @tanstack/react-query
    ```
+
    - Configurar QueryClient
    - Crear provider
    - Commit: `feat: Instalar y configurar React Query`
@@ -786,11 +902,12 @@ Dividir en componentes y usar React Query:
    - Commit: `refactor: Simplificar products page usando componentes extraídos`
 
 9. **Verificación Final** (0.5 días)
-    - Probar todas las funcionalidades
-    - Verificar performance
-    - Verificar que no hay regresiones
+   - Probar todas las funcionalidades
+   - Verificar performance
+   - Verificar que no hay regresiones
 
 **Criterios de Aceptación:**
+
 - ✅ Página dividida en al menos 4 componentes principales
 - ✅ React Query implementado para data fetching
 - ✅ Estado local reducido significativamente
@@ -831,6 +948,7 @@ Dividir en tabs/páginas separadas:
    - Verificar funcionalidad
 
 **Criterios de Aceptación:**
+
 - ✅ Página dividida en tabs/secciones
 - ✅ Cada sección es un componente independiente
 - ✅ Funcionalidad preservada
@@ -907,6 +1025,7 @@ Implementar validación por módulos:
    - Verificar mensajes de error
 
 **Criterios de Aceptación:**
+
 - ✅ Todas las rutas API tienen validación
 - ✅ Mensajes de error claros
 - ✅ Validación consistente
@@ -935,6 +1054,7 @@ Implementar validación por módulos:
    - Commit: `feat: Mejorar headers de seguridad`
 
 **Criterios de Aceptación:**
+
 - ✅ CSP mejorado y funcional
 - ✅ HSTS configurado
 - ✅ Headers de seguridad completos
@@ -1001,6 +1121,7 @@ Memoizar componentes pesados:
    - Medir mejora de performance
 
 **Criterios de Aceptación:**
+
 - ✅ Componentes pesados memoizados
 - ✅ Re-renders reducidos
 - ✅ Performance mejorada
@@ -1035,10 +1156,11 @@ Lazy load componentes grandes:
    - Medir mejora
 
 **Criterios de Aceptación:**
+
 - ✅ Componentes grandes lazy loaded
-   - ✅ Bundle size reducido
-   - ✅ Carga inicial más rápida
-   - ✅ Sin regresiones
+  - ✅ Bundle size reducido
+  - ✅ Carga inicial más rápida
+  - ✅ Sin regresiones
 
 ---
 
@@ -1069,6 +1191,7 @@ Auditar y optimizar queries:
    - Verificar funcionalidad
 
 **Criterios de Aceptación:**
+
 - ✅ Queries N+1 eliminadas
 - ✅ Performance mejorada
 - ✅ Funcionalidad preservada
@@ -1133,9 +1256,10 @@ Identificar y extraer código duplicado:
    - Verificar que no hay regresiones
 
 **Criterios de Aceptación:**
+
 - ✅ Código duplicado reducido significativamente
-   - ✅ Utilidades compartidas creadas
-   - ✅ Funcionalidad preservada
+  - ✅ Utilidades compartidas creadas
+  - ✅ Funcionalidad preservada
 
 ---
 
@@ -1162,6 +1286,7 @@ Identificar y extraer código duplicado:
    - Commit: `docs: Documentar hooks personalizados`
 
 **Criterios de Aceptación:**
+
 - ✅ JSDoc en funciones críticas
 - ✅ Guía de arquitectura creada
 - ✅ Documentación completa
@@ -1228,6 +1353,7 @@ Crear tests para funciones de utilidad:
    - Commits separados
 
 **Criterios de Aceptación:**
+
 - ✅ Coverage > 80% en utilidades críticas
 - ✅ Todos los tests pasando
 - ✅ Tests bien documentados
@@ -1261,6 +1387,7 @@ Crear tests por módulos:
    - Todos los tests pasando
 
 **Criterios de Aceptación:**
+
 - ✅ Tests para todas las APIs principales
 - ✅ Coverage > 70%
 - ✅ Tests bien estructurados
@@ -1299,9 +1426,461 @@ Usar Playwright o Cypress:
    - Commit: `test: Agregar tests E2E para flujos críticos`
 
 **Criterios de Aceptación:**
+
 - ✅ Tests E2E para flujos críticos
 - ✅ Tests pasando
 - ✅ Configuración CI/CD
+
+---
+
+## Fase SaaS 0: Arquitectura Multi-Tenancy
+
+**Duración Estimada:** 2-3 semanas  
+**Objetivo:** Preparar infraestructura de base de datos para multi-tenancy real  
+**Branch:** `phase-saas-0-multitenancy`  
+**Riesgo:** Alto (cambios de esquema) - Requiere Testing en Phase 6
+
+### Inicio de Fase SaaS 0
+
+```bash
+# Crear branch para esta fase
+git checkout main
+git pull origin main
+git checkout -b phase-saas-0-multitenancy
+```
+
+### Finalización de Fase SaaS 0
+
+```bash
+# Verificar todo funciona
+npm run type-check
+npm run lint
+npm run build
+npm run dev  # Verificar que branches aún funcionan
+
+# Merge a main (NO MERGEAR HASTA COMPLETAR TESTS EN PHASE 6)
+# Para máxima seguridad, esperar validación de Phase 6 first
+git checkout main
+git merge phase-saas-0-multitenancy
+git push origin main
+
+# Actualizar PROGRESO_MEJORAS.md
+```
+
+### Tarea SaaS 0.1: Crear Tablas de Organizations y Subscriptions
+
+**Prioridad:** 🔴 CRÍTICA  
+**Tiempo:** 5 días  
+**Riesgo:** Alto (nuevas tablas)
+
+#### Pasos:
+
+1. **Crear tabla `organizations` (Tenants)**
+
+   ```sql
+   CREATE TABLE organizations (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     name TEXT NOT NULL,
+     slug TEXT UNIQUE NOT NULL,  -- Para URLs multi-tenant (mióptica.app)
+     owner_id UUID REFERENCES auth.users(id),
+     subscription_tier TEXT DEFAULT 'basic' CHECK (subscription_tier IN ('basic', 'pro', 'premium')),
+     status TEXT DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'cancelled')),
+     metadata JSONB DEFAULT '{}',
+     created_at TIMESTAMPTZ DEFAULT NOW(),
+     updated_at TIMESTAMPTZ DEFAULT NOW()
+   );
+   ```
+
+2. **Crear tabla `subscriptions`**
+
+   ```sql
+   CREATE TABLE subscriptions (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+     stripe_subscription_id TEXT,
+     stripe_customer_id TEXT,
+     status TEXT CHECK (status IN ('active', 'past_due', 'cancelled')),
+     current_period_start DATE,
+     current_period_end DATE,
+     cancel_at DATE,
+     created_at TIMESTAMPTZ DEFAULT NOW(),
+     updated_at TIMESTAMPTZ DEFAULT NOW()
+   );
+   ```
+
+3. **Crear tabla `subscription_tiers`**
+
+   ```sql
+   CREATE TABLE subscription_tiers (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     name TEXT UNIQUE NOT NULL,
+     price_monthly DECIMAL(10, 2),
+     max_branches INT,
+     max_users INT,
+     max_customers INT,
+     max_products INT,
+     features JSONB DEFAULT '{}',
+     created_at TIMESTAMPTZ DEFAULT NOW()
+   );
+   ```
+
+4. **Extender tabla `organizations` con ID**
+
+   ```sql
+   ALTER TABLE branches ADD COLUMN organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE;
+   ALTER TABLE admin_users ADD COLUMN organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE;
+   ```
+
+5. **Crear índices**
+   ```sql
+   CREATE INDEX idx_organizations_slug ON organizations(slug);
+   CREATE INDEX idx_organizations_owner ON organizations(owner_id);
+   CREATE INDEX idx_subscriptions_org ON subscriptions(organization_id);
+   CREATE INDEX idx_subscriptions_stripe ON subscriptions(stripe_subscription_id);
+   CREATE INDEX idx_branches_org ON branches(organization_id);
+   CREATE INDEX idx_admin_users_org ON admin_users(organization_id);
+   ```
+
+**Criterios de Aceptación:**
+
+- ✅ Tablas creadas sin errores
+- ✅ Migraciones reversibles
+- ✅ Índices creados
+- ✅ Documentación de schema
+
+**Commit:** `feat: Crear schema de organizations y subscriptions para multi-tenancy`
+
+---
+
+### Tarea SaaS 0.2: Extender Row Level Security para Multi-Tenancy
+
+**Prioridad:** 🔴 CRÍTICA  
+**Tiempo:** 5 días  
+**Riesgo:** Alto (RLS es crítico)
+
+#### Pasos:
+
+1. **Crear función para obtener organization_id del usuario**
+
+   ```sql
+   CREATE OR REPLACE FUNCTION public.get_user_organization_id(user_id UUID DEFAULT auth.uid())
+   RETURNS UUID
+   LANGUAGE plpgsql
+   SECURITY DEFINER
+   SET search_path = public
+   AS $$
+   BEGIN
+     RETURN (
+       SELECT organization_id FROM admin_users
+       WHERE id = user_id
+       LIMIT 1
+     );
+   END;
+   $$;
+   ```
+
+2. **Actualizar RLS en todas las tablas de datos**
+
+   ```sql
+   -- Ejemplo para orders
+   CREATE POLICY "Users can only access organization data"
+   ON orders FOR SELECT
+   USING (
+     organization_id = public.get_user_organization_id()
+   );
+   ```
+
+3. **Crear RLS para branches (con organization_id)**
+
+   ```sql
+   CREATE POLICY "Users can only access their organization branches"
+   ON branches FOR SELECT
+   USING (
+     organization_id = public.get_user_organization_id()
+   );
+   ```
+
+4. **Aplicar RLS a tablas críticas:**
+   - orders
+   - quotes
+   - lab_work_orders
+   - appointments
+   - products
+   - customers
+   - branches
+
+5. **Verificación**
+   - Probar que datos de diferentes organizaciones están aislados
+   - Probar que super-admin puede acceder a todo
+
+**Criterios de Aceptación:**
+
+- ✅ RLS actualizado en todas las tablas
+- ✅ Aislamiento de datos validado
+- ✅ Sin errores de acceso
+- ✅ Documentación de RLS
+
+**Commit:** `feat: Extender RLS para multi-tenancy en todos los datos`
+
+---
+
+### Tarea SaaS 0.3: Implementar Tier System Base
+
+**Prioridad:** 🟡 ALTA  
+**Tiempo:** 3 días  
+**Riesgo:** Medio
+
+#### Pasos:
+
+1. **Crear archivo de configuración de tiers**
+   `src/lib/saas/tier-config.ts`
+
+   ```typescript
+   export const TIER_LIMITS = {
+     basic: {
+       name: "Basic",
+       price: 49,
+       max_branches: 1,
+       max_users: 2,
+       max_customers: 500,
+       features: {
+         pos: true,
+         appointments: true,
+         quotes: true,
+         chat_ia: false,
+         analytics: false,
+       },
+     },
+     pro: {
+       name: "Pro",
+       price: 99,
+       max_branches: 3,
+       max_users: 5,
+       max_customers: 2000,
+       features: {
+         pos: true,
+         appointments: true,
+         quotes: true,
+         chat_ia: true,
+         analytics: true,
+       },
+     },
+     premium: {
+       name: "Premium",
+       price: 299,
+       max_branches: 20,
+       max_users: 50,
+       max_customers: "unlimited",
+       features: {
+         pos: true,
+         appointments: true,
+         quotes: true,
+         chat_ia: true,
+         analytics: true,
+         api_access: true,
+       },
+     },
+   };
+   ```
+
+2. **Crear middleware de validación de límites**
+   `src/lib/saas/tier-validator.ts`
+
+   ```typescript
+   export async function validateTierLimit(
+     orgId: UUID,
+     limitType: "branches" | "users" | "customers" | "products",
+     currentCount: number,
+   ): Promise<boolean> {
+     // Validar que no se ha alcanzado el límite
+   }
+   ```
+
+3. **Crear API endpoint para obtener límites**
+   `src/app/api/admin/organization/limits/route.ts`
+
+4. **Insertar datos iniciales de tiers**
+
+   ```sql
+   INSERT INTO subscription_tiers (name, price_monthly, max_branches, features) VALUES
+   ('Basic', 49, 1, '{"pos": true, "appointments": true}'),
+   ('Pro', 99, 3, '{"pos": true, "appointments": true, "chat_ia": true}'),
+   ('Premium', 299, 20, '{"pos": true, "appointments": true, "chat_ia": true, "api": true}');
+   ```
+
+5. **Verificación**
+   - Probar validación de límites
+   - Probar obtención de configuración
+
+**Criterios de Aceptación:**
+
+- ✅ Config de tiers centralizada
+- ✅ Middleware de validación funcional
+- ✅ API endpoint funciona
+- ✅ Sin regresiones en funcionalidad existente
+
+**Commit:** `feat: Implementar tier system base para suscripciones`
+
+---
+
+## Fase SaaS 1: Billing y Suscripciones
+
+**Duración Estimada:** 2 semanas  
+**Objetivo:** Implementar sistema de pagos y gestión de suscripciones  
+**Branch:** `phase-saas-1-billing`  
+**Dependencia:** Fase SaaS 0 completada y testeada
+
+### Inicio de Fase SaaS 1
+
+```bash
+# Crear branch para esta fase
+git checkout main
+git pull origin main
+git checkout -b phase-saas-1-billing
+```
+
+### Finalización de Fase SaaS 1
+
+```bash
+# Verificar todo funciona
+npm run type-check
+npm run lint
+npm run build
+npm test  # Tests de billing
+
+# Merge a main
+git checkout main
+git merge phase-saas-1-billing
+git push origin main
+
+# Actualizar PROGRESO_MEJORAS.md
+```
+
+### Tarea SaaS 1.1: Integración Stripe/MercadoPago
+
+**Prioridad:** 🔴 CRÍTICA  
+**Tiempo:** 5 días  
+**Riesgo:** Medio (APIs de pago)
+
+#### Pasos:
+
+1. **Instalar dependencias**
+
+   ```bash
+   npm install stripe @stripe/react-stripe-js
+   # O para MercadoPago (ya instalado):
+   # @mercadopago/sdk-react ya está en package.json
+   ```
+
+2. **Crear archivo de configuración**
+   `src/lib/saas/payment-provider.ts`
+
+3. **Crear API endpoints para Stripe**
+   - `src/app/api/admin/billing/create-subscription/route.ts`
+   - `src/app/api/admin/billing/manage-subscription/route.ts`
+   - `src/app/api/admin/billing/webhook/stripe/route.ts` (webhook)
+
+4. **Crear componentes de UI**
+   - `src/components/admin/BillingPlans.tsx`
+   - `src/components/admin/SubscriptionManager.tsx`
+
+5. **Crear función para cambiar plan**
+   ```typescript
+   export async function changeSubscriptionPlan(
+     orgId: UUID,
+     newTier: "basic" | "pro" | "premium",
+   ): Promise<void> {
+     // Cambiar tier y actualizar Stripe
+   }
+   ```
+
+**Criterios de Aceptación:**
+
+- ✅ Integración Stripe funcional
+- ✅ Webhooks configurados
+- ✅ Pruebas en sandbox exitosas
+
+**Commit:** `feat: Integrar Stripe para pagos de suscripciones`
+
+---
+
+### Tarea SaaS 1.2: Gestión de Suscripciones
+
+**Prioridad:** 🔴 CRÍTICA  
+**Tiempo:** 3 días  
+**Riesgo:** Medio
+
+#### Pasos:
+
+1. **Crear funciones de gestión**
+   - `createSubscription(orgId, tier)`
+   - `updateSubscription(orgId, newTier)`
+   - `cancelSubscription(orgId)`
+   - `getSubscriptionStatus(orgId)`
+
+2. **Crear página de dashboard de suscripción**
+   `src/app/admin/billing/page.tsx`
+
+3. **Crear componente de cambio de plan**
+   `src/components/admin/ChangePlan.tsx`
+
+4. **Crear notificaciones de renovación**
+   - Email 7 días antes de renovación
+   - Notificación en-app
+
+**Criterios de Aceptación:**
+
+- ✅ Dashboard de billing funcional
+- ✅ Cambio de planes funciona
+- ✅ Notificaciones se envían
+
+**Commit:** `feat: Implementar gestión completa de suscripciones`
+
+---
+
+### Tarea SaaS 1.3: Tier Enforcement Middleware
+
+**Prioridad:** 🟡 ALTA  
+**Tiempo:** 3 días  
+**Riesgo:** Medio
+
+#### Pasos:
+
+1. **Crear middleware de enforcement**
+   `src/lib/saas/tier-enforcement.ts`
+
+   ```typescript
+   export async function enforceOrgTierLimit(
+     orgId: UUID,
+     action: "create_branch" | "add_user" | "enable_feature",
+   ): Promise<boolean> {
+     // Validar que la acción está permitida por el tier
+   }
+   ```
+
+2. **Aplicar middleware a rutas críticas**
+   - POST /api/admin/branches (crear sucursal)
+   - POST /api/admin/admin-users (agregar usuario)
+   - POST /api/admin/features (habilitar feature)
+
+3. **Crear UI para mostrar límites**
+   - Mostrar límites disponibles
+   - Mostrar opción de upgrade
+
+4. **Crear función para mensajes de error**
+   ```typescript
+   export function getTierUpgradeMessage(tier: string, limit: string): string {
+     // Retornar mensaje amigable para upgrade
+   }
+   ```
+
+**Criterios de Aceptación:**
+
+- ✅ Límites son enforced
+- ✅ Mensajes claros para usuarios
+- ✅ Sin regresiones
+
+**Commit:** `feat: Implementar tier enforcement middleware`
 
 ---
 
@@ -1481,12 +2060,14 @@ Crear archivo `PROGRESO_MEJORAS.md` para trackear:
 # Progreso de Mejoras Estructurales
 
 ## Fase 0: Preparación
+
 - [x] Tarea 0.1: Configurar Testing
 - [x] Tarea 0.2: Configurar Logging
 - [ ] Tarea 0.3: Pre-commit hooks
 - [ ] Tarea 0.4: Error Boundary
 
 ## Fase 1: Estabilización
+
 - [ ] Tarea 1.1: Eliminar console.log
 - [ ] Tarea 1.2: Reducir `any`
 - [ ] Tarea 1.3: Rate limiting

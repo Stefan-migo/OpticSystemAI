@@ -1,25 +1,46 @@
-# Progreso de Mejoras Estructurales
+# Progreso de Mejoras Estructurales + Transformación SaaS
 
 ## Tracking Detallado del Avance
 
 **Fecha de Inicio:** 2025-01-27  
-**Última Actualización:** 2026-01-20  
-**Estado General:** 🟢 Fase 4 Completada y Mergeado a Main - Listo para Fase 5
+**Última Actualización:** 2026-01-24  
+**Estado General:** 🟢 Fase 4 Completada - Iniciando Plan Híbrido (Fases 5 + SaaS)
+
+---
+
+## 🎯 Roadmap Estratégico Híbrido ACTUALIZADO
+
+**Visión:** Transformar sistema monolítico en plataforma SaaS production-ready en 6-7 semanas
+
+```
+TIMELINE EJECUTIVO:
+├── SEMANA 1 (ENE 27-FEB 3): Phase 5 - Mantenibilidad
+├── SEMANA 2-3 (FEB 3-17): Phase SaaS 0 - Multi-tenancy Architecture
+├── SEMANA 3-4 (FEB 10-24): Phase 6.1-6.2 - Testing (Paralelo)
+├── SEMANA 5-6 (FEB 24-MAR 10): Phase SaaS 1 - Billing
+└── SEMANA 7 (MAR 10+): Phase 6.3 E2E + Deployment
+
+ESTADO ACTUAL: 80% de fases 0-4 completadas
+PRÓXIMO: Phase 5 (Reducir Código Duplicado)
+```
 
 ---
 
 ## 📊 Resumen de Progreso
 
-| Fase                    | Estado         | Progreso | Tareas Completadas | Tareas Totales |
-| ----------------------- | -------------- | -------- | ------------------ | -------------- |
-| Fase 0: Preparación     | 🟢 Completada  | 100%     | 4/4                | 4              |
-| Fase 1: Estabilización  | 🟢 Completada  | 100%     | 3/3                | 3              |
-| Fase 2: Refactorización | 🟢 Completada  | 100%     | 3/3                | 3              |
-| Fase 3: Seguridad       | 🟢 Completada  | 100%     | 2/2                | 2              |
-| Fase 4: Performance     | 🟢 Completada  | 100%     | 3/3                | 3              |
-| Fase 5: Mantenibilidad  | 🔴 No Iniciada | 0%       | 0/2                | 2              |
-| Fase 6: Testing         | 🔴 No Iniciada | 0%       | 0/3                | 3              |
-| **TOTAL**               |                | **80%**  | **15/20**          | **20**         |
+| Fase                    | Estado        | Progreso | Tareas Completadas | Tareas Totales | Estimado        |
+| ----------------------- | ------------- | -------- | ------------------ | -------------- | --------------- |
+| Fase 0: Preparación     | 🟢 Completada | 100%     | 4/4                | 4              | ✅ 1 día        |
+| Fase 1: Estabilización  | 🟢 Completada | 100%     | 3/3                | 3              | ✅ 1 semana     |
+| Fase 2: Refactorización | 🟢 Completada | 100%     | 3/3                | 3              | ✅ 2 semanas    |
+| Fase 3: Seguridad       | 🟢 Completada | 100%     | 2/2                | 2              | ✅ 1 semana     |
+| Fase 4: Performance     | 🟢 Completada | 100%     | 3/3                | 3              | ✅ 1 día        |
+| **SUBTOTAL (0-4)**      | **80% DONE**  | **100%** | **15/15**          | **15**         | **6 semanas**   |
+| Fase 5: Mantenibilidad  | 🟡 Lista      | 0%       | 0/2                | 2              | ⏳ 1 semana     |
+| **Phase SaaS 0**        | 🔴 Pendiente  | 0%       | 0/3                | 3              | ⏳ 3 semanas    |
+| **Phase SaaS 1**        | 🔴 Pendiente  | 0%       | 0/3                | 3              | ⏳ 2 semanas    |
+| Fase 6: Testing         | 🔴 Pendiente  | 0%       | 0/3                | 3              | ⏳ 3-4 semanas  |
+| **TOTAL**               | **🟢 60%**    | **60%**  | **15/29**          | **29**         | **7-8 semanas** |
 
 ---
 
@@ -406,12 +427,143 @@
 
 ---
 
+## 🛠️ Fase 5: Mejoras de Mantenibilidad
+
+**Estado:** 🟡 Lista para Iniciar  
+**Duración Estimada:** 1 semana  
+**Fecha de Inicio:** Próxima  
+**Fecha de Finalización:** -  
+**Branch:** `phase-5-maintainability`
+
+### Tarea 5.1: Reducir Código Duplicado
+
+- **Estado:** 🔴 No Iniciada
+- **Prioridad:** 🟡 MEDIA
+- **Tiempo Estimado:** 4-5 días
+- **Progreso:** 0/4 pasos
+- **Notas:**
+  - [ ] Auditar código duplicado
+  - [ ] Crear utilidades compartidas
+  - [ ] Refactorizar uso
+  - [ ] Verificación
+
+### Tarea 5.2: Mejorar Documentación Técnica
+
+- **Estado:** 🔴 No Iniciada
+- **Prioridad:** 🟢 BAJA
+- **Tiempo Estimado:** 2-3 días
+- **Progreso:** 0/3 pasos
+- **Notas:**
+  - [ ] Agregar JSDoc a funciones críticas
+  - [ ] Crear guía de arquitectura
+  - [ ] Documentar hooks personalizados
+
+---
+
+## 🔌 Phase SaaS 0: Arquitectura Multi-Tenancy
+
+**Estado:** 🔴 No Iniciada  
+**Duración Estimada:** 2-3 semanas  
+**Fecha de Inicio:** Después de Phase 5  
+**Fecha de Finalización:** -  
+**Branch:** `phase-saas-0-multitenancy`  
+**Riesgo:** Alto (schema changes)  
+**Dependencia:** Completar Testing Phase 6.1-6.2 ANTES de merge a main
+
+### Tarea SaaS 0.1: Crear Tablas de Organizations y Subscriptions
+
+- **Estado:** 🔴 No Iniciada
+- **Prioridad:** 🔴 CRÍTICA
+- **Tiempo Estimado:** 5 días
+- **Progreso:** 0/5 pasos
+- **Notas:**
+  - [ ] Crear tabla organizations
+  - [ ] Crear tabla subscriptions
+  - [ ] Crear tabla subscription_tiers
+  - [ ] Extender referencias en branches/admin_users
+  - [ ] Crear índices y verificación
+
+### Tarea SaaS 0.2: Extender RLS para Multi-Tenancy
+
+- **Estado:** 🔴 No Iniciada
+- **Prioridad:** 🔴 CRÍTICA
+- **Tiempo Estimado:** 5 días
+- **Progreso:** 0/4 pasos
+- **Notas:**
+  - [ ] Crear función get_user_organization_id()
+  - [ ] Actualizar RLS en todas las tablas
+  - [ ] Validar aislamiento de datos
+  - [ ] Verificación de acceso
+
+### Tarea SaaS 0.3: Implementar Tier System Base
+
+- **Estado:** 🔴 No Iniciada
+- **Prioridad:** 🟡 ALTA
+- **Tiempo Estimado:** 3 días
+- **Progreso:** 0/4 pasos
+- **Notas:**
+  - [ ] Crear configuración de tiers
+  - [ ] Crear middleware de validación
+  - [ ] Crear API endpoint de límites
+  - [ ] Insertar datos iniciales
+
+---
+
+## 💳 Phase SaaS 1: Billing y Suscripciones
+
+**Estado:** 🔴 No Iniciada  
+**Duración Estimada:** 2 semanas  
+**Fecha de Inicio:** Después de Phase SaaS 0 + Testing  
+**Fecha de Finalización:** -  
+**Branch:** `phase-saas-1-billing`  
+**Dependencia:** Phase SaaS 0 completada y testeada
+
+### Tarea SaaS 1.1: Integración Stripe/MercadoPago
+
+- **Estado:** 🔴 No Iniciada
+- **Prioridad:** 🔴 CRÍTICA
+- **Tiempo Estimado:** 5 días
+- **Progreso:** 0/5 pasos
+- **Notas:**
+  - [ ] Instalar dependencias
+  - [ ] Crear archivo de configuración
+  - [ ] Crear API endpoints
+  - [ ] Crear componentes de UI
+  - [ ] Configurar webhooks
+
+### Tarea SaaS 1.2: Gestión de Suscripciones
+
+- **Estado:** 🔴 No Iniciada
+- **Prioridad:** 🔴 CRÍTICA
+- **Tiempo Estimado:** 3 días
+- **Progreso:** 0/4 pasos
+- **Notas:**
+  - [ ] Crear funciones de gestión
+  - [ ] Crear dashboard de suscripción
+  - [ ] Crear componente de cambio de plan
+  - [ ] Crear notificaciones
+
+### Tarea SaaS 1.3: Tier Enforcement Middleware
+
+- **Estado:** 🔴 No Iniciada
+- **Prioridad:** 🟡 ALTA
+- **Tiempo Estimado:** 3 días
+- **Progreso:** 0/4 pasos
+- **Notas:**
+  - [ ] Crear middleware de enforcement
+  - [ ] Aplicar a rutas críticas
+  - [ ] Crear UI de límites
+  - [ ] Crear mensajes de upgrade
+
+---
+
 ## 🧪 Fase 6: Testing y Calidad
 
 **Estado:** 🔴 No Iniciada  
 **Duración Estimada:** 3-4 semanas  
-**Fecha de Inicio:** -  
-**Fecha de Finalización:** -
+**Fecha de Inicio:** Paralelo con Phase SaaS 0  
+**Fecha de Finalización:** -  
+**Branch:** `phase-6-testing`
 
 ### Tarea 6.1: Tests Unitarios para Utilidades
 
@@ -434,11 +586,12 @@
 - **Coverage Objetivo:** > 70%
 - **Coverage Actual:** 0%
 - **Progreso:** 0/4 pasos
+- **⚠️ CRÍTICO:** Estos tests VALIDAN que multi-tenancy funciona correctamente
 - **Notas:**
-  - [ ] Tests para Customers API
+  - [ ] Tests para Customers API (con validación multi-tenant)
   - [ ] Tests para Products API
   - [ ] Tests para otras APIs
-  - [ ] Verificación
+  - [ ] Verificación de aislamiento de datos
 
 ### Tarea 6.3: Tests E2E para Flujos Críticos
 
@@ -528,9 +681,67 @@
 
 ---
 
+---
+
+## 📋 Notas Importantes - Plan Híbrido Actualizado (2026-01-24)
+
+### ⚠️ CAMBIO ESTRATÉGICO: De Lineal a Híbrido
+
+Se ha aprobado una estrategia HÍBRIDA que combina:
+
+- **Phase 5 (Mantenibilidad):** Código limpio antes de cambios SaaS
+- **Phase SaaS 0 (Multi-tenancy):** Infraestructura de base de datos
+- **Phase 6 (Testing):** Validación que multi-tenancy funciona ✅ **CRÍTICO**
+- **Phase SaaS 1 (Billing):** Sistema de pagos
+
+### 🔐 Constraint Crítico
+
+**Phase 6.2 (Tests de Integración API) DEBE completarse ANTES de mergear Phase SaaS 0 a main**
+
+Razón: Los tests validarán que el aislamiento de datos por tenant funciona correctamente.
+
+### 📊 Métricas Esperadas al Completar Todo
+
+| Métrica              | Actual | Meta                  | Avance |
+| -------------------- | ------ | --------------------- | ------ |
+| Test Coverage        | 0%     | > 70%                 | 0%     |
+| SaaS-Ready           | No     | Sí                    | 0%     |
+| Multi-tenant Support | No     | Sí                    | 0%     |
+| Billing System       | No     | Sí                    | 0%     |
+| Subscription Tiers   | No     | 3 (Basic/Pro/Premium) | 0%     |
+
+### 🚀 Próximos Pasos Ordenados
+
+1. **Completar Phase 5 (1 semana)** → Branch: `phase-5-maintainability`
+   - Reducir código duplicado
+   - Mejorar documentación
+   - Merge a main
+
+2. **Iniciar Phase SaaS 0 (3 semanas)** → Branch: `phase-saas-0-multitenancy`
+   - NO MERGEAR TODAVÍA A MAIN (esperar tests)
+   - Crear schema de organizations
+   - Extender RLS
+   - Implementar tier system
+
+3. **Iniciar Phase 6.1-6.2 (Paralelo)** → Branch: `phase-6-testing`
+   - Tests unitarios
+   - Tests de integración (validando multi-tenancy)
+   - Ejecutar contra Phase SaaS 0
+
+4. **Si Phase 6 tests PASAN:**
+   - Mergear Phase SaaS 0 a main
+
+5. **Iniciar Phase SaaS 1 (2 semanas)**
+   - Stripe integration
+   - Subscription management
+   - Tier enforcement
+
+6. **Completar Phase 6.3 (E2E tests)**
+   - Mergear a main
+
 **Próxima Revisión:** Después de completar Fase 5  
-**Última Actualización:** 2026-01-20  
-**Próximo Paso:** Comenzar Fase 5 - Mejoras de Mantenibilidad (Tarea 5.1: Reducir Código Duplicado)
+**Última Actualización:** 2026-01-24  
+**Próximo Paso:** Comenzar Fase 5 - Mejoras de Mantenibilidad (Branch: `phase-5-maintainability`)
 
 ---
 

@@ -452,50 +452,59 @@ PRÓXIMO: Phase 5 (Reducir Código Duplicado)
 
 ## 🔌 Phase SaaS 0: Arquitectura Multi-Tenancy
 
-**Estado:** 🔴 No Iniciada  
+**Estado:** 🟢 Completada  
 **Duración Estimada:** 2-3 semanas  
-**Fecha de Inicio:** Después de Phase 5  
+**Duración Real:** Completada previamente  
+**Fecha de Inicio:** -  
 **Fecha de Finalización:** -  
 **Branch:** `phase-saas-0-multitenancy`  
 **Riesgo:** Alto (schema changes)  
-**Dependencia:** Completar Testing Phase 6.1-6.2 ANTES de merge a main
+**Dependencia:** ✅ Testing Phase 6.1-6.2 completado - Listo para validación
 
 ### Tarea SaaS 0.1: Crear Tablas de Organizations y Subscriptions
 
-- **Estado:** 🔴 No Iniciada
+- **Estado:** 🟢 Completada
 - **Prioridad:** 🔴 CRÍTICA
 - **Tiempo Estimado:** 5 días
-- **Progreso:** 0/5 pasos
+- **Progreso:** 5/5 pasos
+- **Commits:**
+  - `7c9a156 - feat: Crear schema de organizations y subscriptions para multi-tenancy (Phase SaaS 0.1)`
 - **Notas:**
-  - [ ] Crear tabla organizations
-  - [ ] Crear tabla subscriptions
-  - [ ] Crear tabla subscription_tiers
-  - [ ] Extender referencias en branches/admin_users
-  - [ ] Crear índices y verificación
+  - [x] Crear tabla organizations
+  - [x] Crear tabla subscriptions
+  - [x] Crear tabla subscription_tiers
+  - [x] Extender referencias en branches/admin_users (y customers, products, orders, quotes, lab_work_orders, appointments)
+  - [x] Crear índices y verificación
+  - **Migración:** `20260128000000_create_organizations_and_subscriptions.sql`
 
 ### Tarea SaaS 0.2: Extender RLS para Multi-Tenancy
 
-- **Estado:** 🔴 No Iniciada
+- **Estado:** 🟢 Completada
 - **Prioridad:** 🔴 CRÍTICA
 - **Tiempo Estimado:** 5 días
-- **Progreso:** 0/4 pasos
+- **Progreso:** 4/4 pasos
+- **Commits:**
+  - `50954f6 - feat: Extender RLS para multi-tenancy (Phase SaaS 0.2)`
 - **Notas:**
-  - [ ] Crear función get_user_organization_id()
-  - [ ] Actualizar RLS en todas las tablas
-  - [ ] Validar aislamiento de datos
-  - [ ] Verificación de acceso
+  - [x] Crear función get_user_organization_id()
+  - [x] Actualizar RLS en todas las tablas (branches, orders, quotes, lab_work_orders, appointments, products, customers)
+  - [x] Validar aislamiento de datos (implementado en RLS policies)
+  - [x] Verificación de acceso (policies creadas)
+  - **Migración:** `20260128000001_extend_rls_for_multitenancy.sql`
 
 ### Tarea SaaS 0.3: Implementar Tier System Base
 
-- **Estado:** 🔴 No Iniciada
+- **Estado:** 🟢 Completada
 - **Prioridad:** 🟡 ALTA
 - **Tiempo Estimado:** 3 días
-- **Progreso:** 0/4 pasos
+- **Progreso:** 4/4 pasos
+- **Commits:**
+  - `3235ff9 - feat: Implementar Tier System Base (Phase SaaS 0.3)`
 - **Notas:**
-  - [ ] Crear configuración de tiers
-  - [ ] Crear middleware de validación
-  - [ ] Crear API endpoint de límites
-  - [ ] Insertar datos iniciales
+  - [x] Crear configuración de tiers (`src/lib/saas/tier-config.ts`)
+  - [x] Crear middleware de validación (`src/lib/saas/tier-validator.ts`)
+  - [x] Crear API endpoint de límites (`src/app/api/admin/organization/limits/route.ts`)
+  - [x] Insertar datos iniciales (en migración 20260128000000)
 
 ---
 

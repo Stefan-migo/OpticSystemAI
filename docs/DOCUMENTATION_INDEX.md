@@ -56,6 +56,33 @@ Guía rápida de comandos git
 
 ---
 
+### 5. **TESTING_INTEGRATION_AUTH_FIX.md** ⭐ NUEVO (2026-01-27)
+
+Guía completa para resolver autenticación en tests de integración
+
+- Análisis del problema (cookies vs tokens Bearer)
+- Dos opciones de solución detalladas
+- Pasos de implementación paso a paso
+- Código de ejemplo
+- Referencias técnicas
+
+👉 **Usar cuando:** Necesitas hacer que los tests de integración pasen
+
+---
+
+### 6. **NEXT_STEPS_TESTING.md** ⭐ NUEVO (2026-01-27)
+
+Resumen ejecutivo de próximos pasos para tests
+
+- Estado actual
+- Problema identificado
+- Pasos a seguir
+- Criterios de éxito
+
+👉 **Usar cuando:** Necesitas un resumen rápido de qué hacer con los tests
+
+---
+
 ## 🎯 Flujo de Trabajo Recomendado
 
 ### Para comenzar una nueva fase:
@@ -72,18 +99,21 @@ Guía rápida de comandos git
 
 ---
 
-## 📊 Estado Actual (2026-01-24)
+## 📊 Estado Actual (2026-01-27)
 
 ```
-✅ Completadas (Fases 0-4):      15 de 15 tareas
-⏳ Próximo (Phase 5):              1 semana
-⏳ Pendiente (Phase SaaS 0):       3 semanas
-⏳ Pendiente (Phase 6):            3-4 semanas
-⏳ Pendiente (Phase SaaS 1):       2 semanas
+✅ Completadas (Fases 0-5 + SaaS 0):  20 de 29 tareas
+⏳ En Progreso (Fase 6):               2 de 3 tareas (65%)
+⏳ Pendiente (Phase SaaS 1):           0 de 3 tareas
 ─────────────────────────────────────────
-📈 Total: 60% (15/29 tareas)
-⏱️  Tiempo estimado restante: 7-8 semanas
+📈 Total: 69% (20/29 tareas)
+⏱️  Tiempo estimado restante: 4-5 semanas
 ```
+
+### ⚠️ Tarea Urgente: Tests de Integración
+
+**Estado:** Tests creados pero fallan por autenticación  
+**Documentación:** Ver `docs/TESTING_INTEGRATION_AUTH_FIX.md` y `docs/NEXT_STEPS_TESTING.md`
 
 ---
 
@@ -107,26 +137,27 @@ Phase SaaS 0 (Multi-tenant schema)
 
 ## 🚀 Próximos 3 Pasos
 
-### 1️⃣ Completar Phase 5 (Esta semana)
+### 1️⃣ ⚠️ URGENTE: Ajustar Autenticación en Tests (Ahora)
 
-- Branch: `phase-5-maintainability`
-- Tareas: Reducir duplicado + Documentación
-- Tiempo: 1 semana
-- Merge: Sí, directo a main
+- **Documentación:** `docs/TESTING_INTEGRATION_AUTH_FIX.md`
+- **Resumen:** `docs/NEXT_STEPS_TESTING.md`
+- Tareas: Modificar `makeAuthenticatedRequest()` para usar cookies
+- Tiempo: 2-4 horas
+- **Estado:** Tests creados pero fallan con 401
 
-### 2️⃣ Iniciar Phase SaaS 0 (Próxima semana)
+### 2️⃣ Validar Tests de Integración
 
-- Branch: `phase-saas-0-multitenancy`
-- Tareas: Schema DB + RLS + Tiers
-- Tiempo: 3 semanas
-- Merge: NO, esperar Phase 6 tests ⚠️
+- Ejecutar todos los tests (34 tests)
+- Verificar que multi-tenancy funciona
+- Tiempo: 1-2 horas
+- **Dependencia:** Paso 1 completado
 
-### 3️⃣ Paralelo: Phase 6 (Semana 2-3)
+### 3️⃣ Iniciar Phase SaaS 1: Billing
 
-- Branch: `phase-6-testing`
-- Tareas: Tests unitarios + Integración + Multi-tenancy validation
-- Tiempo: 3-4 semanas
-- Merge: Después que Phase SaaS 0 esté listo
+- Branch: `phase-saas-1-billing`
+- Tareas: Stripe integration + Subscription management
+- Tiempo: 2 semanas
+- **Dependencia:** Tests de integración pasando
 
 ---
 
@@ -215,14 +246,16 @@ Ejemplo en commit:
 
 ## 📞 Quick Links
 
-| Necesito                   | Archivo                       |
-| -------------------------- | ----------------------------- |
-| Detalles de una tarea      | PLAN_MEJORAS_ESTRUCTURALES.md |
-| Saber qué hacer ahora      | PROGRESO_MEJORAS.md           |
-| Entender arquitectura SaaS | SAAS_IMPLEMENTATION_PLAN.md   |
-| Comandos git               | GIT_BRANCHING_REFERENCE.md    |
-| Setup inicial              | README.md                     |
-| Analizar fase anterior     | docs/refactoring/             |
+| Necesito                   | Archivo                            |
+| -------------------------- | ---------------------------------- |
+| Detalles de una tarea      | PLAN_MEJORAS_ESTRUCTURALES.md      |
+| Saber qué hacer ahora      | PROGRESO_MEJORAS.md                |
+| Entender arquitectura SaaS | SAAS_IMPLEMENTATION_PLAN.md        |
+| Comandos git               | GIT_BRANCHING_REFERENCE.md         |
+| Fix tests de integración   | TESTING_INTEGRATION_AUTH_FIX.md ⭐ |
+| Resumen rápido de tests    | NEXT_STEPS_TESTING.md ⭐           |
+| Setup inicial              | README.md                          |
+| Analizar fase anterior     | docs/refactoring/                  |
 
 ---
 
@@ -248,6 +281,6 @@ Ejemplo en commit:
 
 ---
 
-**Última Actualización:** 2026-01-24  
-**Estado:** 📋 Plan Documentado y Aprobado  
-**Próximo Paso:** `git checkout -b phase-5-maintainability`
+**Última Actualización:** 2026-01-27  
+**Estado:** 🟡 Tests de Integración Requieren Ajustes  
+**Próximo Paso:** Leer `docs/TESTING_INTEGRATION_AUTH_FIX.md` y resolver autenticación

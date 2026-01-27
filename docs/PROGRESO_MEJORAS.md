@@ -604,9 +604,10 @@ PRÓXIMO: Phase 5 (Reducir Código Duplicado)
   - [x] Tests para Orders API - 8 tests creados
   - [x] Helper de test-setup con detección de infraestructura multi-tenancy
   - [x] Migraciones aplicadas, infraestructura disponible
-  - [ ] Ajustar autenticación en tests (cookies vs tokens Bearer) - **PENDIENTE**
+  - [ ] Ajustar autenticación en tests (cookies vs tokens Bearer) - **PENDIENTE - Ver `docs/TESTING_INTEGRATION_AUTH_FIX.md`**
   - [ ] Ejecutar y validar que todos los tests pasen
   - **Resultado:** Estructura de tests completa, requiere ajustes de autenticación para ejecutar
+  - **📋 Documentación:** Ver `docs/TESTING_INTEGRATION_AUTH_FIX.md` para pasos detallados de implementación
 
 ### Tarea 6.3: Tests E2E para Flujos Críticos
 
@@ -756,7 +757,11 @@ Razón: Los tests validarán que el aislamiento de datos por tenant funciona cor
 
 **Próxima Revisión:** Después de completar Fase 5  
 **Última Actualización:** 2026-01-27  
-**Próximo Paso:** Ajustar autenticación en tests de integración, luego continuar con Phase SaaS 1
+**Próximo Paso:**
+
+1. **URGENTE:** Ajustar autenticación en tests de integración (ver `docs/TESTING_INTEGRATION_AUTH_FIX.md`)
+2. Validar que todos los tests pasen (34 tests de integración)
+3. Continuar con Phase SaaS 1: Billing y Suscripciones
 
 ---
 

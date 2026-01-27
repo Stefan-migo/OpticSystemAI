@@ -41,6 +41,7 @@ import {
 import businessConfig from "@/config/business";
 import { DashboardSearch } from "@/components/admin/DashboardSearch";
 import { useBranch } from "@/hooks/useBranch";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 // Colors from the brand palette
 const COLORS = {
@@ -210,24 +211,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchDashboardData();
   }, [currentBranchId, isGlobalView]);
-
-  const formatPrice = (amount: number) => {
-    return new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-AR", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
   const getAppointmentStatusBadge = (status: string) => {
     switch (status) {
@@ -406,7 +389,7 @@ export default function AdminDashboard() {
                       Ingresos del Mes
                     </p>
                     <p className="text-lg md:text-2xl font-bold text-azul-profundo break-words">
-                      {formatPrice(data.kpis.revenue.current)}
+                      {formatCurrency(data.kpis.revenue.current)}
                     </p>
                     <div
                       className={cn(
@@ -564,7 +547,7 @@ export default function AdminDashboard() {
                     tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
-                    formatter={(value: number) => formatPrice(value)}
+                    formatter={(value: number) => formatCurrency(value)}
                     labelFormatter={(date) =>
                       new Date(date).toLocaleDateString("es-AR", {
                         weekday: "short",
@@ -676,7 +659,7 @@ export default function AdminDashboard() {
                 <XAxis
                   type="number"
                   tick={{ fontSize: 12 }}
-                  tickFormatter={(value) => formatPrice(value)}
+                  tickFormatter={(value) => formatCurrency(value)}
                 />
                 <YAxis
                   type="category"
@@ -687,7 +670,7 @@ export default function AdminDashboard() {
                 <Tooltip
                   formatter={(value: number, name: string) => {
                     if (name === "revenue")
-                      return [formatPrice(value), "Ingresos"];
+                      return [formatCurrency(value), "Ingresos"];
                     return [value, "Cantidad"];
                   }}
                 />

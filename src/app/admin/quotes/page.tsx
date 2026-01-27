@@ -70,7 +70,7 @@ const CreateQuoteForm = dynamic(
 );
 import { BranchSelector } from "@/components/admin/BranchSelector";
 import { getBranchHeader } from "@/lib/utils/branch";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatCurrency } from "@/lib/utils";
 
 interface Quote {
   id: string;
@@ -150,13 +150,6 @@ export default function QuotesPage() {
       setLoading(false);
     }
   };
-
-  const formatPrice = (amount: number) =>
-    new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-      minimumFractionDigits: 0,
-    }).format(amount);
 
   const getStatusBadge = (status: string, isConverted: boolean = false) => {
     // Always show the current status (which should be 'accepted' when converted)
@@ -378,7 +371,7 @@ export default function QuotesPage() {
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold text-verde-suave">
-                        {formatPrice(quote.total_amount)}
+                        {formatCurrency(quote.total_amount)}
                       </TableCell>
                       <TableCell>
                         {(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   DollarSign,
+  Wallet,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -44,6 +47,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { formatRUT } from "@/lib/utils/rut";
@@ -53,9 +57,34 @@ import {
   calculateTotal,
 } from "@/lib/utils/tax";
 import { getTaxPercentage } from "@/lib/utils/tax-config";
+import { formatCurrency, formatDate, formatPrice } from "@/lib/utils";
 import { useBranch } from "@/hooks/useBranch";
 import { getBranchHeader } from "@/lib/utils/branch";
 import { BranchSelector } from "@/components/admin/BranchSelector";
+import { useLensPriceCalculation } from "@/hooks/useLensPriceCalculation";
+import {
+  hasAddition,
+  getMaxAddition,
+  getFarSphere,
+  getCylinder,
+  getNearSphere,
+  getDefaultPresbyopiaSolution,
+  getRecommendedLensTypes,
+  type PresbyopiaSolution,
+} from "@/lib/presbyopia-helpers";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface Product {
   id: string;
@@ -66,6 +95,11 @@ interface Product {
   sku?: string;
   barcode?: string;
   featured_image?: string;
+  brand?: string;
+  category?: {
+    id: string;
+    name: string;
+  };
 }
 
 interface CartItem {
@@ -106,9 +140,10 @@ interface Quote {
   labor_cost?: number;
 }
 
-type PaymentMethod = "cash" | "debit_card" | "credit_card" | "installments";
+type PaymentMethod = "cash" | "debit_card" | "credit_card" | "transfer";
 
 export default function POSPage() {
+  const searchParams = useSearchParams();
   const {
     currentBranchId,
     isSuperAdmin,
@@ -123,7 +158,11 @@ export default function POSPage() {
   );
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [cashReceived, setCashReceived] = useState<number>(0);
-  const [installmentsCount, setInstallmentsCount] = useState<number>(1);
+  const [depositAmount, setDepositAmount] = useState<number>(0); // Monto de abono para pagos parciales
+  const [isCashPartial, setIsCashPartial] = useState<boolean>(false); // Para efectivo parcial
+  const [cashPartialAmount, setCashPartialAmount] = useState<number>(0); // Monto parcial para efectivo
+  const [isCashOpen, setIsCashOpen] = useState<boolean | null>(null);
+  const [checkingCashStatus, setCheckingCashStatus] = useState(true);
   const [siiInvoiceType, setSiiInvoiceType] = useState<
     "boleta" | "factura" | "none"
   >("boleta");
@@ -133,7 +172,16 @@ export default function POSPage() {
   const [searching, setSearching] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [showCustomerDialog, setShowCustomerDialog] = useState(false);
+  const [showPendingBalanceDialog, setShowPendingBalanceDialog] =
+    useState(false);
+  const [pendingBalanceOrders, setPendingBalanceOrders] = useState<any[]>([]);
+  const [loadingPendingBalance, setLoadingPendingBalance] = useState(false);
+  const [selectedPendingOrder, setSelectedPendingOrder] = useState<any>(null);
+  const [pendingPaymentAmount, setPendingPaymentAmount] = useState<string>("");
+  const [pendingPaymentMethod, setPendingPaymentMethod] = useState("cash");
+  const [processingPendingPayment, setProcessingPendingPayment] =
+    useState(false);
+  const [pendingBalanceSearchTerm, setPendingBalanceSearchTerm] = useState("");
   const [selectedProductIndex, setSelectedProductIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -148,6 +196,7 @@ export default function POSPage() {
     useState<number>(-1);
   const customerSearchInputRef = useRef<HTMLInputElement>(null);
   const customerSuggestionsRef = useRef<HTMLDivElement>(null);
+  const quoteLoadingRef = useRef<boolean>(false); // Prevent infinite loop when loading quote from URL
 
   // Quote loading states
   const [customerQuotes, setCustomerQuotes] = useState<Quote[]>([]);
@@ -163,6 +212,71 @@ export default function POSPage() {
   const [frameResults, setFrameResults] = useState<any[]>([]);
   const [selectedFrame, setSelectedFrame] = useState<any>(null);
   const [searchingFrames, setSearchingFrames] = useState(false);
+  const [customerOwnFrame, setCustomerOwnFrame] = useState<boolean>(false);
+
+  // Second frame for two separate lenses (near vision)
+  const [nearFrameSearch, setNearFrameSearch] = useState("");
+  const [nearFrameResults, setNearFrameResults] = useState<any[]>([]);
+  const [selectedNearFrame, setSelectedNearFrame] = useState<any>(null);
+  const [searchingNearFrames, setSearchingNearFrames] = useState(false);
+  const [customerOwnNearFrame, setCustomerOwnNearFrame] =
+    useState<boolean>(false);
+
+  const [manualLensPrice, setManualLensPrice] = useState<boolean>(false);
+
+  // Lens families and price calculation
+  const [lensFamilies, setLensFamilies] = useState<any[]>([]);
+  const [loadingFamilies, setLoadingFamilies] = useState(false);
+
+  // Presbyopia solution
+  const [presbyopiaSolution, setPresbyopiaSolution] =
+    useState<PresbyopiaSolution>("none");
+  const [farLensFamilyId, setFarLensFamilyId] = useState<string>("");
+  const [nearLensFamilyId, setNearLensFamilyId] = useState<string>("");
+  const [farLensCost, setFarLensCost] = useState<number>(0);
+  const [nearLensCost, setNearLensCost] = useState<number>(0);
+
+  // Discount type state
+  const [discountType, setDiscountType] = useState<"percentage" | "amount">(
+    "amount",
+  );
+
+  // External customer and prescription states (for walk-in customers with external prescription)
+  const [showExternalPrescriptionDialog, setShowExternalPrescriptionDialog] =
+    useState(false);
+  const [creatingExternalCustomer, setCreatingExternalCustomer] =
+    useState(false);
+  const [externalCustomerData, setExternalCustomerData] = useState({
+    first_name: "",
+    last_name: "",
+    rut: "",
+    phone: "",
+    email: "",
+  });
+  const [externalPrescriptionData, setExternalPrescriptionData] = useState({
+    prescription_date: new Date().toISOString().split("T")[0],
+    expiration_date: "",
+    prescription_number: "",
+    issued_by: "",
+    issued_by_license: "",
+    od_sphere: "",
+    od_cylinder: "",
+    od_axis: "",
+    od_add: "",
+    os_sphere: "",
+    os_cylinder: "",
+    os_axis: "",
+    os_add: "",
+    pd: "",
+    near_pd: "",
+    frame_pd: "",
+    height_segmentation: "",
+  });
+
+  // Import lens price calculation hook
+  const { calculateLensPrice, loading: calculatingPrice } =
+    useLensPriceCalculation();
+
   const [orderFormData, setOrderFormData] = useState({
     frame_name: "",
     frame_brand: "",
@@ -171,17 +285,35 @@ export default function POSPage() {
     frame_size: "",
     frame_sku: "",
     frame_price: 0,
+    lens_family_id: "" as string | "",
     lens_type: "",
     lens_material: "",
     lens_index: null as number | null,
     lens_treatments: [] as string[],
     lens_tint_color: "",
     lens_tint_percentage: 0,
+    presbyopia_solution: "none" as PresbyopiaSolution,
+    far_lens_family_id: "",
+    near_lens_family_id: "",
+    far_lens_cost: 0,
+    near_lens_cost: 0,
+    // Second frame for two separate lenses (near vision)
+    near_frame_product_id: "",
+    near_frame_name: "",
+    near_frame_brand: "",
+    near_frame_model: "",
+    near_frame_color: "",
+    near_frame_size: "",
+    near_frame_sku: "",
+    near_frame_price: 0,
+    near_frame_price_includes_tax: false,
+    near_frame_cost: 0,
     frame_cost: 0,
     lens_cost: 0,
     treatments_cost: 0,
     labor_cost: 0,
     discount_percentage: 0,
+    discount_amount: 0,
   });
 
   // Tax percentage state
@@ -192,6 +324,53 @@ export default function POSPage() {
     getTaxPercentage(19.0).then(setTaxPercentage);
   }, []);
 
+  // Load quote from URL parameter (when coming from "Cargar al POS" button)
+  useEffect(() => {
+    const quoteId = searchParams?.get("quoteId");
+    if (
+      quoteId &&
+      cart.length === 0 &&
+      !selectedQuote &&
+      !quoteLoadingRef.current
+    ) {
+      // Prevent infinite loop by setting loading flag
+      quoteLoadingRef.current = true;
+
+      // Load quote to form instead of directly to cart
+      // This allows editing before adding to cart
+      const loadQuoteFromUrl = async () => {
+        try {
+          // Fetch full quote details
+          const response = await fetch(`/api/admin/quotes/${quoteId}`);
+          if (!response.ok) {
+            throw new Error("Error al cargar el presupuesto");
+          }
+
+          const data = await response.json();
+          const fullQuote = data.quote;
+
+          // Set selected quote immediately to prevent re-triggering the effect
+          setSelectedQuote(fullQuote);
+
+          // Clear the quoteId from URL immediately to prevent re-loading
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.delete("quoteId");
+          window.history.replaceState({}, "", newUrl.toString());
+
+          // Load quote to form (this will load all data correctly including customer)
+          await handleLoadQuoteToForm(fullQuote);
+        } catch (error: any) {
+          console.error("Error loading quote from URL:", error);
+          toast.error(error.message || "Error al cargar el presupuesto");
+          quoteLoadingRef.current = false; // Reset flag on error
+        }
+      };
+
+      loadQuoteFromUrl();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // Calculate totals with tax consideration
   const itemsForTaxCalculation = cart.map((item) => ({
     price: item.unitPrice * item.quantity, // Total price for the quantity
@@ -201,7 +380,43 @@ export default function POSPage() {
   const subtotal = calculateSubtotal(itemsForTaxCalculation, taxPercentage);
   const taxAmount = calculateTotalTax(itemsForTaxCalculation, taxPercentage);
   const total = calculateTotal(itemsForTaxCalculation, taxPercentage);
-  const change = cashReceived - total;
+  const change = isCashPartial ? 0 : cashReceived - total; // No change for partial payments
+
+  // Check cash register status
+  useEffect(() => {
+    if (!currentBranchId && !isSuperAdmin) return;
+    checkCashStatus();
+    const interval = setInterval(checkCashStatus, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, [currentBranchId, isSuperAdmin]);
+
+  const checkCashStatus = async () => {
+    if (!currentBranchId && !isSuperAdmin) {
+      setIsCashOpen(null);
+      setCheckingCashStatus(false);
+      return;
+    }
+
+    setCheckingCashStatus(true);
+    try {
+      const headers: HeadersInit = {
+        ...getBranchHeader(currentBranchId),
+      };
+
+      const response = await fetch("/api/admin/cash-register/open", {
+        headers,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsCashOpen(data.isOpen);
+      }
+    } catch (error: any) {
+      console.error("Error checking cash status:", error);
+    } finally {
+      setCheckingCashStatus(false);
+    }
+  };
 
   // Focus search on mount
   useEffect(() => {
@@ -266,7 +481,10 @@ export default function POSPage() {
   }, [customerSearchTerm, currentBranchId]);
 
   // Fetch customer quotes when customer is selected
-  const fetchCustomerQuotes = async (customerId: string) => {
+  const fetchCustomerQuotes = async (
+    customerId: string,
+    skipAutoLoad: boolean = false,
+  ) => {
     setLoadingQuotes(true);
     try {
       const response = await fetch(
@@ -278,33 +496,36 @@ export default function POSPage() {
         const allQuotes = data.quotes || [];
         setCustomerQuotes(allQuotes);
 
-        // Filter active quotes for auto-loading
-        const activeQuotes = allQuotes.filter(
-          (q: Quote) =>
-            q.status !== "expired" &&
-            q.status !== "converted_to_work" &&
-            q.status !== "accepted",
-        );
+        // Only auto-load if skipAutoLoad is false and no quote is already selected
+        if (!skipAutoLoad && !selectedQuote) {
+          // Filter active quotes for auto-loading
+          const activeQuotes = allQuotes.filter(
+            (q: Quote) =>
+              q.status !== "expired" &&
+              q.status !== "converted_to_work" &&
+              q.status !== "accepted",
+          );
 
-        // If there's exactly one active quote, load it automatically into cart
-        if (activeQuotes.length === 1) {
-          toast.info(
-            `Presupuesto encontrado: ${activeQuotes[0].quote_number}. Cargando automáticamente...`,
-          );
-          await handleLoadQuoteToForm(activeQuotes[0]);
-        }
-        // If there are multiple active quotes, load the most recent one automatically
-        else if (activeQuotes.length > 1) {
-          // Sort by created_at descending and load the most recent
-          const sortedQuotes = [...activeQuotes].sort(
-            (a, b) =>
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime(),
-          );
-          toast.info(
-            `Presupuesto encontrado: ${sortedQuotes[0].quote_number}. Cargando automáticamente...`,
-          );
-          await handleLoadQuoteToForm(sortedQuotes[0]);
+          // If there's exactly one active quote, load it automatically into cart
+          if (activeQuotes.length === 1) {
+            toast.info(
+              `Presupuesto encontrado: ${activeQuotes[0].quote_number}. Cargando automáticamente...`,
+            );
+            await handleLoadQuoteToForm(activeQuotes[0]);
+          }
+          // If there are multiple active quotes, load the most recent one automatically
+          else if (activeQuotes.length > 1) {
+            // Sort by created_at descending and load the most recent
+            const sortedQuotes = [...activeQuotes].sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime(),
+            );
+            toast.info(
+              `Presupuesto encontrado: ${sortedQuotes[0].quote_number}. Cargando automáticamente...`,
+            );
+            await handleLoadQuoteToForm(sortedQuotes[0]);
+          }
         }
       }
     } catch (error) {
@@ -328,8 +549,35 @@ export default function POSPage() {
 
       console.log("📋 Loading quote to form:", fullQuote);
 
-      // Set selected quote
-      setSelectedQuote(fullQuote);
+      // Set customer first (important for proper data loading)
+      if (fullQuote.customer_id && fullQuote.customer) {
+        const customer = {
+          id: fullQuote.customer_id,
+          ...fullQuote.customer,
+          name:
+            fullQuote.customer.first_name && fullQuote.customer.last_name
+              ? `${fullQuote.customer.first_name} ${fullQuote.customer.last_name}`
+              : fullQuote.customer.email || "Sin nombre",
+        };
+        setSelectedCustomer(customer);
+
+        // Format RUT if it exists
+        if (customer.rut) {
+          const formattedRUT = formatRUT(customer.rut);
+          setCustomerRUT(formattedRUT);
+        }
+        setCustomerBusinessName(customer.business_name || "");
+
+        // Fetch customer quotes and prescriptions for the dropdown
+        // Skip auto-loading since we're already loading this quote
+        await fetchCustomerPrescriptions(fullQuote.customer_id);
+        await fetchCustomerQuotes(fullQuote.customer_id, true);
+      }
+
+      // Set selected quote (if not already set - may be set by URL loader)
+      if (!selectedQuote || selectedQuote.id !== fullQuote.id) {
+        setSelectedQuote(fullQuote);
+      }
 
       // Reset frame selection first
       setSelectedFrame(null);
@@ -361,6 +609,7 @@ export default function POSPage() {
         frame_size: fullQuote.frame_size || "",
         frame_sku: fullQuote.frame_sku || "",
         frame_price: fullQuote.frame_price || 0,
+        lens_family_id: fullQuote.lens_family_id || "",
         lens_type: fullQuote.lens_type || "",
         lens_material: fullQuote.lens_material || "",
         lens_index: fullQuote.lens_index || null,
@@ -369,14 +618,86 @@ export default function POSPage() {
           : [],
         lens_tint_color: fullQuote.lens_tint_color || "",
         lens_tint_percentage: fullQuote.lens_tint_percentage || 0,
+        presbyopia_solution: (fullQuote.presbyopia_solution ||
+          "none") as PresbyopiaSolution,
+        far_lens_family_id: fullQuote.far_lens_family_id || "",
+        near_lens_family_id: fullQuote.near_lens_family_id || "",
+        far_lens_cost: fullQuote.far_lens_cost || 0,
+        near_lens_cost: fullQuote.near_lens_cost || 0,
+        // Second frame for two separate lenses
+        near_frame_product_id: fullQuote.near_frame_product_id || "",
+        near_frame_name: fullQuote.near_frame_name || "",
+        near_frame_brand: fullQuote.near_frame_brand || "",
+        near_frame_model: fullQuote.near_frame_model || "",
+        near_frame_color: fullQuote.near_frame_color || "",
+        near_frame_size: fullQuote.near_frame_size || "",
+        near_frame_sku: fullQuote.near_frame_sku || "",
+        near_frame_price: fullQuote.near_frame_price || 0,
+        near_frame_price_includes_tax:
+          fullQuote.near_frame_price_includes_tax || false,
+        near_frame_cost: fullQuote.near_frame_cost || 0,
         frame_cost: fullQuote.frame_cost || 0,
         lens_cost: fullQuote.lens_cost || 0,
         treatments_cost: fullQuote.treatments_cost || 0,
         labor_cost: fullQuote.labor_cost || 0,
         discount_percentage: fullQuote.discount_percentage || 0,
+        discount_amount: fullQuote.discount_amount || 0,
       };
 
+      // Determine discount type based on quote values
+      // If both have values, prefer the one that makes more sense
+      // If discount_amount > 0, use 'amount', otherwise use 'percentage'
+      if (fullQuote.discount_amount && fullQuote.discount_amount > 0) {
+        setDiscountType("amount");
+      } else if (
+        fullQuote.discount_percentage &&
+        fullQuote.discount_percentage > 0
+      ) {
+        setDiscountType("percentage");
+      } else {
+        setDiscountType("amount"); // Default
+      }
+
+      // Set customer_own_frame from quote
+      setCustomerOwnFrame(fullQuote.customer_own_frame || false);
+      setCustomerOwnNearFrame(fullQuote.customer_own_near_frame || false);
+
+      // Set presbyopia solution state
+      const solution = (fullQuote.presbyopia_solution ||
+        "none") as PresbyopiaSolution;
+      setPresbyopiaSolution(solution);
+
+      // Set lens family IDs for two_separate
+      if (solution === "two_separate") {
+        setFarLensFamilyId(fullQuote.far_lens_family_id || "");
+        setNearLensFamilyId(fullQuote.near_lens_family_id || "");
+        setFarLensCost(fullQuote.far_lens_cost || 0);
+        setNearLensCost(fullQuote.near_lens_cost || 0);
+
+        // Load near frame data if exists
+        if (fullQuote.near_frame_product_id) {
+          try {
+            const nearFrameResponse = await fetch(
+              `/api/admin/products/${fullQuote.near_frame_product_id}`,
+            );
+            if (nearFrameResponse.ok) {
+              const nearFrameData = await nearFrameResponse.json();
+              setSelectedNearFrame(nearFrameData.product);
+              console.log(
+                "✅ Near frame product loaded:",
+                nearFrameData.product,
+              );
+            }
+          } catch (error) {
+            console.error("Error fetching near frame product:", error);
+          }
+        }
+      }
+
       console.log("📝 Form data loaded:", formData);
+      console.log("👓 Presbyopia solution:", solution);
+      console.log("🔍 Far lens family:", fullQuote.far_lens_family_id);
+      console.log("🔍 Near lens family:", fullQuote.near_lens_family_id);
 
       setOrderFormData(formData);
 
@@ -387,10 +708,7 @@ export default function POSPage() {
 
       // Load prescription if exists
       if (fullQuote.prescription_id) {
-        // Fetch prescriptions if not already loaded
-        if (prescriptions.length === 0 && fullQuote.customer_id) {
-          await fetchCustomerPrescriptions(fullQuote.customer_id);
-        }
+        // Prescriptions should already be loaded above when setting customer
         // Wait a bit for prescriptions to load, then set
         setTimeout(() => {
           const prescription = prescriptions.find(
@@ -403,7 +721,7 @@ export default function POSPage() {
       }
 
       toast.success(
-        `Presupuesto ${fullQuote.quote_number} cargado en el formulario`,
+        `Presupuesto ${fullQuote.quote_number} cargado en el formulario. Puedes editarlo antes de agregar al carrito.`,
       );
     } catch (error: any) {
       console.error("Error loading quote to form:", error);
@@ -432,7 +750,13 @@ export default function POSPage() {
         );
         if (response.ok) {
           const data = await response.json();
-          setProducts(data.products || []);
+          // Filter out products with category "Marcos" (frames should be added via "Crear Orden Completa")
+          const filteredProducts = (data.products || []).filter(
+            (product: Product) =>
+              product.category?.name?.toLowerCase() !== "marcos" &&
+              product.category?.name?.toLowerCase() !== "marco",
+          );
+          setProducts(filteredProducts);
           setSelectedProductIndex(-1); // Reset selection when new results arrive
         }
       } catch (error) {
@@ -509,7 +833,8 @@ export default function POSPage() {
           quantity: 1,
           unitPrice: product.price,
           subtotal: product.price,
-          priceIncludesTax: product.price_includes_tax || false,
+          // Default to true (IVA incluido) if not specified - typical in Chile
+          priceIncludesTax: product.price_includes_tax ?? true,
         },
       ]);
     }
@@ -556,7 +881,18 @@ export default function POSPage() {
     setSelectedFrame(null);
     setFrameSearch("");
     setFrameResults([]);
+    setSelectedNearFrame(null);
+    setNearFrameSearch("");
+    setNearFrameResults([]);
     setSelectedQuote(null);
+    setCustomerOwnFrame(false);
+    setCustomerOwnNearFrame(false);
+    setManualLensPrice(false);
+    setPresbyopiaSolution("none");
+    setFarLensFamilyId("");
+    setNearLensFamilyId("");
+    setFarLensCost(0);
+    setNearLensCost(0);
     setOrderFormData({
       frame_name: "",
       frame_brand: "",
@@ -565,33 +901,68 @@ export default function POSPage() {
       frame_size: "",
       frame_sku: "",
       frame_price: 0,
+      lens_family_id: "",
       lens_type: "",
       lens_material: "",
       lens_index: null,
       lens_treatments: [],
       lens_tint_color: "",
       lens_tint_percentage: 0,
+      presbyopia_solution: "none" as PresbyopiaSolution,
+      far_lens_family_id: "",
+      near_lens_family_id: "",
+      far_lens_cost: 0,
+      near_lens_cost: 0,
+      near_frame_product_id: "",
+      near_frame_name: "",
+      near_frame_brand: "",
+      near_frame_model: "",
+      near_frame_color: "",
+      near_frame_size: "",
+      near_frame_sku: "",
+      near_frame_price: 0,
+      near_frame_price_includes_tax: false,
+      near_frame_cost: 0,
       frame_cost: 0,
       lens_cost: 0,
       treatments_cost: 0,
-      labor_cost: quoteSettings?.default_labor_cost || 15000,
+      labor_cost: quoteSettings?.default_labor_cost ?? 15000,
       discount_percentage: 0,
+      discount_amount: 0,
     });
+    setDiscountType("amount"); // Reset to default
   };
 
   const handleSelectCustomer = async (customer: Customer) => {
     setSelectedCustomer(customer);
-    // Format RUT if it exists
+    // Auto-fill RUT and name from selected customer
     const formattedRUT = customer.rut ? formatRUT(customer.rut) : "";
     setCustomerRUT(formattedRUT);
-    setCustomerBusinessName(customer.business_name || "");
-    setCustomerSearchTerm(customer.name || customer.email);
+    // Set business name from customer name or business_name
+    const customerName =
+      customer.name ||
+      (customer.first_name && customer.last_name
+        ? `${customer.first_name} ${customer.last_name}`
+        : customer.email || "");
+    setCustomerBusinessName(customer.business_name || customerName);
+    // Keep search term for display but clear results
+    setCustomerSearchTerm(customer.name || customer.email || "");
     setCustomerSearchResults([]);
-    setShowCustomerDialog(false);
 
     // Reset form when changing customer
     setSelectedQuote(null);
     setSelectedFrame(null);
+    setSelectedNearFrame(null);
+    setNearFrameSearch("");
+    setNearFrameResults([]);
+    setCustomerOwnFrame(false);
+    setCustomerOwnNearFrame(false);
+    setManualLensPrice(false);
+    setPresbyopiaSolution("none");
+    setFarLensFamilyId("");
+    setNearLensFamilyId("");
+    setFarLensCost(0);
+    setNearLensCost(0);
     setOrderFormData({
       frame_name: "",
       frame_brand: "",
@@ -600,18 +971,36 @@ export default function POSPage() {
       frame_size: "",
       frame_sku: "",
       frame_price: 0,
+      lens_family_id: "",
       lens_type: "",
       lens_material: "",
       lens_index: null,
       lens_treatments: [],
       lens_tint_color: "",
       lens_tint_percentage: 0,
+      presbyopia_solution: "none" as PresbyopiaSolution,
+      far_lens_family_id: "",
+      near_lens_family_id: "",
+      far_lens_cost: 0,
+      near_lens_cost: 0,
+      near_frame_product_id: "",
+      near_frame_name: "",
+      near_frame_brand: "",
+      near_frame_model: "",
+      near_frame_color: "",
+      near_frame_size: "",
+      near_frame_sku: "",
+      near_frame_price: 0,
+      near_frame_price_includes_tax: false,
+      near_frame_cost: 0,
       frame_cost: 0,
       lens_cost: 0,
       treatments_cost: 0,
-      labor_cost: quoteSettings?.default_labor_cost || 15000,
+      labor_cost: quoteSettings?.default_labor_cost ?? 15000,
       discount_percentage: 0,
+      discount_amount: 0,
     });
+    setDiscountType("amount"); // Reset to default
 
     // Fetch customer quotes and prescriptions
     await Promise.all([
@@ -635,7 +1024,200 @@ export default function POSPage() {
     }
   };
 
-  // Fetch quote settings
+  // Create external customer with prescription (for walk-in customers)
+  const handleCreateExternalCustomerWithPrescription = async () => {
+    try {
+      setCreatingExternalCustomer(true);
+
+      // Validate required fields
+      if (!externalCustomerData.first_name && !externalCustomerData.last_name) {
+        toast.error("El nombre o apellido es requerido");
+        return;
+      }
+      if (!externalCustomerData.rut || externalCustomerData.rut.trim() === "") {
+        toast.error("El RUT es requerido");
+        return;
+      }
+
+      // Validate prescription has at least one eye
+      const hasOD =
+        externalPrescriptionData.od_sphere ||
+        externalPrescriptionData.od_cylinder ||
+        externalPrescriptionData.od_add;
+      const hasOS =
+        externalPrescriptionData.os_sphere ||
+        externalPrescriptionData.os_cylinder ||
+        externalPrescriptionData.os_add;
+      if (!hasOD && !hasOS) {
+        toast.error("La receta debe tener al menos un ojo con datos");
+        return;
+      }
+
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        ...getBranchHeader(currentBranchId),
+      };
+
+      // Step 1: Create customer
+      const customerResponse = await fetch("/api/admin/customers", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          first_name: externalCustomerData.first_name,
+          last_name: externalCustomerData.last_name,
+          rut: externalCustomerData.rut,
+          phone: externalCustomerData.phone || null,
+          email: externalCustomerData.email || null,
+        }),
+      });
+
+      if (!customerResponse.ok) {
+        const errorData = await customerResponse.json();
+        throw new Error(errorData.error || "Error al crear cliente");
+      }
+
+      const customerResult = await customerResponse.json();
+      if (!customerResult.success || !customerResult.customer) {
+        throw new Error("Error al crear cliente");
+      }
+
+      const newCustomer = customerResult.customer;
+
+      // Step 2: Create prescription for the new customer
+      const prescriptionResponse = await fetch(
+        `/api/admin/customers/${newCustomer.id}/prescriptions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prescription_date: externalPrescriptionData.prescription_date,
+            expiration_date: externalPrescriptionData.expiration_date || null,
+            prescription_number:
+              externalPrescriptionData.prescription_number || null,
+            issued_by: externalPrescriptionData.issued_by || null,
+            issued_by_license:
+              externalPrescriptionData.issued_by_license || null,
+            od_sphere: externalPrescriptionData.od_sphere
+              ? parseFloat(externalPrescriptionData.od_sphere)
+              : null,
+            od_cylinder: externalPrescriptionData.od_cylinder
+              ? parseFloat(externalPrescriptionData.od_cylinder)
+              : null,
+            od_axis: externalPrescriptionData.od_axis
+              ? parseInt(externalPrescriptionData.od_axis)
+              : null,
+            od_add: externalPrescriptionData.od_add
+              ? parseFloat(externalPrescriptionData.od_add)
+              : null,
+            od_pd: externalPrescriptionData.pd
+              ? parseFloat(externalPrescriptionData.pd) / 2
+              : null,
+            od_near_pd: externalPrescriptionData.near_pd
+              ? parseFloat(externalPrescriptionData.near_pd) / 2
+              : null,
+            os_sphere: externalPrescriptionData.os_sphere
+              ? parseFloat(externalPrescriptionData.os_sphere)
+              : null,
+            os_cylinder: externalPrescriptionData.os_cylinder
+              ? parseFloat(externalPrescriptionData.os_cylinder)
+              : null,
+            os_axis: externalPrescriptionData.os_axis
+              ? parseInt(externalPrescriptionData.os_axis)
+              : null,
+            os_add: externalPrescriptionData.os_add
+              ? parseFloat(externalPrescriptionData.os_add)
+              : null,
+            os_pd: externalPrescriptionData.pd
+              ? parseFloat(externalPrescriptionData.pd) / 2
+              : null,
+            os_near_pd: externalPrescriptionData.near_pd
+              ? parseFloat(externalPrescriptionData.near_pd) / 2
+              : null,
+            frame_pd: externalPrescriptionData.frame_pd
+              ? parseFloat(externalPrescriptionData.frame_pd)
+              : null,
+            height_segmentation: externalPrescriptionData.height_segmentation
+              ? parseFloat(externalPrescriptionData.height_segmentation)
+              : null,
+            is_current: true, // Mark as current prescription
+          }),
+        },
+      );
+
+      if (!prescriptionResponse.ok) {
+        const errorData = await prescriptionResponse.json();
+        throw new Error(errorData.error || "Error al crear receta");
+      }
+
+      const prescriptionResult = await prescriptionResponse.json();
+      const newPrescription = prescriptionResult.prescription;
+
+      // Step 3: Set the new customer and prescription as selected
+      const customer = {
+        id: newCustomer.id,
+        email: newCustomer.email || "",
+        first_name: newCustomer.first_name,
+        last_name: newCustomer.last_name,
+        name: `${newCustomer.first_name || ""} ${newCustomer.last_name || ""}`.trim(),
+        rut: newCustomer.rut,
+        phone: newCustomer.phone,
+      };
+
+      setSelectedCustomer(customer);
+      if (customer.rut) {
+        setCustomerRUT(formatRUT(customer.rut));
+      }
+
+      // Fetch prescriptions and set the new one as selected
+      await fetchCustomerPrescriptions(customer.id);
+      await fetchCustomerQuotes(customer.id);
+
+      // Set the new prescription as selected after a short delay
+      setTimeout(() => {
+        setSelectedPrescription(newPrescription);
+      }, 300);
+
+      // Close dialog and reset form
+      setShowExternalPrescriptionDialog(false);
+      setExternalCustomerData({
+        first_name: "",
+        last_name: "",
+        rut: "",
+        phone: "",
+        email: "",
+      });
+      setExternalPrescriptionData({
+        prescription_date: new Date().toISOString().split("T")[0],
+        expiration_date: "",
+        prescription_number: "",
+        issued_by: "",
+        issued_by_license: "",
+        od_sphere: "",
+        od_cylinder: "",
+        od_axis: "",
+        od_add: "",
+        os_sphere: "",
+        os_cylinder: "",
+        os_axis: "",
+        os_add: "",
+        pd: "",
+        near_pd: "",
+        frame_pd: "",
+        height_segmentation: "",
+      });
+
+      toast.success(
+        "Cliente y receta creados exitosamente. Puedes continuar con la orden.",
+      );
+    } catch (error: any) {
+      console.error("Error creating external customer:", error);
+      toast.error(error.message || "Error al crear cliente y receta");
+    } finally {
+      setCreatingExternalCustomer(false);
+    }
+  };
+
+  // Fetch quote settings and lens families
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -655,7 +1237,190 @@ export default function POSPage() {
       }
     };
     fetchSettings();
+    fetchLensFamilies();
   }, []);
+
+  // Fetch lens families
+  const fetchLensFamilies = async () => {
+    try {
+      setLoadingFamilies(true);
+      const response = await fetch("/api/admin/lens-families");
+      if (response.ok) {
+        const data = await response.json();
+        setLensFamilies(data.families || []);
+      }
+    } catch (error) {
+      console.error("Error fetching lens families:", error);
+    } finally {
+      setLoadingFamilies(false);
+    }
+  };
+
+  // When a family is selected, inherit genetic properties (type/material) from that family
+  useEffect(() => {
+    if (!orderFormData.lens_family_id) return;
+    const family = lensFamilies.find(
+      (f) => f.id === orderFormData.lens_family_id,
+    );
+    if (!family) return;
+
+    // Obtener el índice de refracción según el material de la familia
+    const materialIndex = family.lens_material
+      ? MATERIAL_INDICES[family.lens_material] || null
+      : null;
+
+    setOrderFormData((prev) => ({
+      ...prev,
+      lens_type: family.lens_type || prev.lens_type,
+      lens_material: family.lens_material || prev.lens_material,
+      lens_index: materialIndex !== null ? materialIndex : prev.lens_index,
+      // Treatments are included in family price (no extras)
+      lens_treatments: [],
+      treatments_cost: 0,
+    }));
+  }, [orderFormData.lens_family_id, lensFamilies]);
+
+  // Detect presbyopia and set default solution
+  useEffect(() => {
+    if (selectedPrescription) {
+      const hasAdd = hasAddition(selectedPrescription);
+      if (hasAdd && presbyopiaSolution === "none") {
+        const defaultSolution =
+          getDefaultPresbyopiaSolution(selectedPrescription);
+        setPresbyopiaSolution(defaultSolution);
+        setOrderFormData((prev) => ({
+          ...prev,
+          presbyopia_solution: defaultSolution,
+        }));
+        if (
+          defaultSolution === "progressive" ||
+          defaultSolution === "bifocal" ||
+          defaultSolution === "trifocal"
+        ) {
+          setOrderFormData((prev) => ({ ...prev, lens_type: defaultSolution }));
+        }
+      } else if (!hasAdd) {
+        setPresbyopiaSolution("none");
+        setOrderFormData((prev) => ({ ...prev, presbyopia_solution: "none" }));
+      }
+    }
+  }, [selectedPrescription]);
+
+  // Calculate prices for two separate lenses
+  useEffect(() => {
+    if (
+      presbyopiaSolution === "two_separate" &&
+      selectedPrescription &&
+      !manualLensPrice
+    ) {
+      const calculateTwoLenses = async () => {
+        // Calculate far lens price
+        if (farLensFamilyId) {
+          const farSphere = getFarSphere(selectedPrescription);
+          const cylinder = getCylinder(selectedPrescription);
+          const result = await calculateLensPrice({
+            lens_family_id: farLensFamilyId,
+            sphere: farSphere,
+            cylinder: cylinder !== 0 ? cylinder : undefined,
+          });
+          if (result && result.price) {
+            setFarLensCost(result.price);
+            setOrderFormData((prev) => ({
+              ...prev,
+              far_lens_cost: result.price,
+            }));
+          }
+        }
+
+        // Calculate near lens price
+        if (nearLensFamilyId) {
+          const nearSphere = getNearSphere(selectedPrescription);
+          const cylinder = getCylinder(selectedPrescription);
+          const result = await calculateLensPrice({
+            lens_family_id: nearLensFamilyId,
+            sphere: nearSphere,
+            cylinder: cylinder !== 0 ? cylinder : undefined,
+          });
+          if (result && result.price) {
+            setNearLensCost(result.price);
+            setOrderFormData((prev) => ({
+              ...prev,
+              near_lens_cost: result.price,
+            }));
+          }
+        }
+
+        // Update total lens cost
+        const totalLensCost = farLensCost + nearLensCost;
+        setOrderFormData((prev) => ({ ...prev, lens_cost: totalLensCost }));
+      };
+      calculateTwoLenses();
+    }
+  }, [
+    farLensFamilyId,
+    nearLensFamilyId,
+    selectedPrescription,
+    presbyopiaSolution,
+    manualLensPrice,
+  ]);
+
+  // Calculate lens price from matrix when parameters change
+  const calculateLensPriceFromMatrix = async () => {
+    if (
+      !orderFormData.lens_family_id ||
+      !selectedPrescription ||
+      manualLensPrice
+    ) {
+      return;
+    }
+
+    // Skip if two separate lenses (handled separately)
+    if (presbyopiaSolution === "two_separate") {
+      return;
+    }
+
+    // Get sphere value from prescription
+    const farSphere = getFarSphere(selectedPrescription);
+    const cylinder = getCylinder(selectedPrescription);
+
+    // For progressive/bifocal/trifocal, include addition in calculation
+    let addition: number | undefined = undefined;
+    if (
+      presbyopiaSolution === "progressive" ||
+      presbyopiaSolution === "bifocal" ||
+      presbyopiaSolution === "trifocal"
+    ) {
+      addition = getMaxAddition(selectedPrescription);
+    }
+
+    try {
+      const result = await calculateLensPrice({
+        lens_family_id: orderFormData.lens_family_id,
+        sphere: farSphere,
+        cylinder: cylinder !== 0 ? cylinder : undefined,
+        addition: addition,
+      });
+
+      if (result && result.price) {
+        setOrderFormData((prev) => ({ ...prev, lens_cost: result.price }));
+      }
+    } catch (error) {
+      // Silently fail - user can manually enter price if matrix doesn't exist
+      console.warn("Could not calculate lens price from matrix:", error);
+    }
+  };
+
+  // Recalculate price when relevant fields change
+  useEffect(() => {
+    if (orderFormData.lens_family_id && selectedPrescription) {
+      calculateLensPriceFromMatrix();
+    }
+  }, [
+    orderFormData.lens_family_id,
+    selectedPrescription?.id,
+    manualLensPrice,
+    presbyopiaSolution,
+  ]);
 
   // Search frames for complete order
   useEffect(() => {
@@ -687,6 +1452,37 @@ export default function POSPage() {
     return () => clearTimeout(debounce);
   }, [frameSearch, currentBranchId]);
 
+  // Search near frames for two separate lenses
+  useEffect(() => {
+    const searchNearFrames = async () => {
+      if (nearFrameSearch.trim().length < 2) {
+        setNearFrameResults([]);
+        return;
+      }
+      setSearchingNearFrames(true);
+      try {
+        const headers: HeadersInit = {
+          ...getBranchHeader(currentBranchId),
+        };
+        const response = await fetch(
+          `/api/admin/products/search?q=${encodeURIComponent(nearFrameSearch)}&type=frame&limit=10`,
+          { headers },
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setNearFrameResults(data.products || []);
+        }
+      } catch (error) {
+        console.error("Error searching near frames:", error);
+      } finally {
+        setSearchingNearFrames(false);
+      }
+    };
+
+    const debounce = setTimeout(searchNearFrames, 300);
+    return () => clearTimeout(debounce);
+  }, [nearFrameSearch, currentBranchId]);
+
   // Lens types and materials
   const lensTypes = [
     { value: "single_vision", label: "Visión Simple" },
@@ -706,6 +1502,18 @@ export default function POSPage() {
     { value: "trivex", label: "Trivex" },
     { value: "glass", label: "Vidrio" },
   ];
+
+  // Mapa de materiales a índices de refracción
+  const MATERIAL_INDICES: Record<string, number> = {
+    cr39: 1.49,
+    mid_index: 1.56,
+    polycarbonate: 1.59,
+    high_index_1_60: 1.6,
+    high_index_1_67: 1.67,
+    high_index_1_74: 1.74,
+    trivex: 1.53,
+    glass: 1.52,
+  };
 
   // Available treatments
   const availableTreatments = quoteSettings
@@ -762,49 +1570,25 @@ export default function POSPage() {
         { value: "tint", label: "Tinte", cost: 15000 },
       ];
 
-  // Calculate lens cost based on type and material
-  const calculateLensCost = (type: string, material: string) => {
-    if (!type || !material) return 0;
-
-    const costs = quoteSettings?.lens_type_base_costs || {
-      single_vision: 30000,
-      bifocal: 45000,
-      trifocal: 55000,
-      progressive: 60000,
-      reading: 25000,
-      computer: 35000,
-      sports: 40000,
-    };
-
-    const multipliers = quoteSettings?.lens_material_multipliers || {
-      cr39: 1.0,
-      polycarbonate: 1.2,
-      high_index_1_67: 1.5,
-      high_index_1_74: 2.0,
-      trivex: 1.3,
-      glass: 0.9,
-    };
-
-    const baseCost = costs[type] || 30000;
-    const multiplier = multipliers[material] || 1.0;
-    return baseCost * multiplier;
-  };
-
-  // Update lens cost when type or material changes
-  useEffect(() => {
-    if (orderFormData.lens_type && orderFormData.lens_material) {
-      const cost = calculateLensCost(
-        orderFormData.lens_type,
-        orderFormData.lens_material,
-      );
-      setOrderFormData((prev) => ({ ...prev, lens_cost: cost }));
-    }
-  }, [orderFormData.lens_type, orderFormData.lens_material, quoteSettings]);
+  // Manual lens cost calculation removed - now only family + matrices or manual input
 
   // Handle treatment toggle
+  // When a lens family is selected, only allow "tint" and "prism_extra" as extras
+  // All other treatments are included in the family price
   const handleTreatmentToggle = (
     treatment: (typeof availableTreatments)[0],
   ) => {
+    // If a family is selected, only allow tint and prism_extra
+    if (orderFormData.lens_family_id) {
+      const allowedExtras = ["tint", "prism_extra"];
+      if (!allowedExtras.includes(treatment.value)) {
+        toast.info(
+          "Este tratamiento está incluido en la familia de lentes seleccionada",
+        );
+        return;
+      }
+    }
+
     const isSelected = orderFormData.lens_treatments.includes(treatment.value);
     let newTreatments = [...orderFormData.lens_treatments];
     let treatmentsCost = orderFormData.treatments_cost;
@@ -835,17 +1619,39 @@ export default function POSPage() {
       frame_color: frame.frame_color || "",
       frame_size: frame.frame_size || "",
       frame_sku: frame.sku || "",
-      frame_price: frame.price || 0,
-      frame_cost: frame.price || 0,
+      frame_price: customerOwnFrame ? 0 : frame.price || 0,
+      frame_cost: customerOwnFrame ? 0 : frame.price || 0,
     }));
     setFrameSearch("");
     setFrameResults([]);
   };
 
+  // Handle near frame select for two separate lenses
+  const handleNearFrameSelectForOrder = (frame: any) => {
+    setSelectedNearFrame(frame);
+    setOrderFormData((prev) => ({
+      ...prev,
+      near_frame_product_id: frame.id,
+      near_frame_name: frame.name,
+      near_frame_brand: frame.frame_brand || "",
+      near_frame_model: frame.frame_model || "",
+      near_frame_color: frame.frame_color || "",
+      near_frame_size: frame.frame_size || "",
+      near_frame_sku: frame.sku || "",
+      near_frame_price: customerOwnNearFrame ? 0 : frame.price || 0,
+      near_frame_price_includes_tax: frame.price_includes_tax || false,
+      near_frame_cost: customerOwnNearFrame ? 0 : frame.price || 0,
+    }));
+    setNearFrameSearch("");
+    setNearFrameResults([]);
+  };
+
   // Add complete order to cart (individual items, don't clear cart)
   const handleAddCompleteOrderToCart = () => {
-    if (!orderFormData.lens_type || !orderFormData.lens_material) {
-      toast.error("Selecciona tipo y material de lente");
+    if (!orderFormData.lens_family_id && orderFormData.lens_cost === 0) {
+      toast.error(
+        "Selecciona una familia de lentes o ingresa el precio manualmente",
+      );
       return;
     }
 
@@ -858,12 +1664,14 @@ export default function POSPage() {
     const itemsToAdd: Product[] = [];
 
     // Add frame - use frame_cost (which is the actual price) or frame_price as fallback
-    const framePrice =
-      orderFormData.frame_cost > 0
+    // If customer brings frame, price is 0
+    const framePrice = customerOwnFrame
+      ? 0
+      : orderFormData.frame_cost > 0
         ? orderFormData.frame_cost
         : orderFormData.frame_price || 0;
 
-    if (orderFormData.frame_name || framePrice > 0) {
+    if (orderFormData.frame_name || framePrice > 0 || customerOwnFrame) {
       let frameProduct: Product;
 
       if (
@@ -876,6 +1684,7 @@ export default function POSPage() {
           id: `${selectedFrame.id}-${baseTimestamp}`,
           name: orderFormData.frame_name || selectedFrame.name,
           price: framePrice,
+          price_includes_tax: selectedFrame.price_includes_tax ?? true, // Default IVA incluido
           inventory_quantity: selectedFrame.inventory_quantity || 0,
           sku: orderFormData.frame_sku || selectedFrame.sku || "FRAME",
           barcode: selectedFrame.barcode,
@@ -892,6 +1701,7 @@ export default function POSPage() {
           id: `frame-manual-${baseTimestamp}-1`,
           name: frameName,
           price: framePrice,
+          price_includes_tax: true, // IVA incluido por defecto
           inventory_quantity: 999,
           sku: orderFormData.frame_sku || "FRAME-MANUAL",
         };
@@ -902,15 +1712,99 @@ export default function POSPage() {
       console.log("✅ Frame prepared:", frameProduct);
     }
 
-    // Add lens - always add if lens_type and lens_material exist
-    if (orderFormData.lens_type && orderFormData.lens_material) {
-      const lensName = `Lente ${orderFormData.lens_type} ${orderFormData.lens_material}`;
+    // Add second frame for two separate lenses (near vision)
+    if (presbyopiaSolution === "two_separate" && !customerOwnNearFrame) {
+      const nearFramePrice =
+        orderFormData.near_frame_cost > 0
+          ? orderFormData.near_frame_cost
+          : orderFormData.near_frame_price || 0;
+
+      if (orderFormData.near_frame_name || nearFramePrice > 0) {
+        let nearFrameProduct: Product;
+
+        if (
+          selectedNearFrame &&
+          selectedNearFrame.id &&
+          !selectedNearFrame.id.startsWith("frame-manual-")
+        ) {
+          // Near frame from product catalog
+          nearFrameProduct = {
+            id: `${selectedNearFrame.id}-near-${baseTimestamp}`,
+            name:
+              orderFormData.near_frame_name ||
+              selectedNearFrame.name ||
+              "Marco de Cerca",
+            price: nearFramePrice,
+            price_includes_tax: selectedNearFrame.price_includes_tax ?? true,
+            inventory_quantity: selectedNearFrame.inventory_quantity || 0,
+            sku:
+              orderFormData.near_frame_sku ||
+              selectedNearFrame.sku ||
+              "FRAME-NEAR",
+            barcode: selectedNearFrame.barcode,
+            featured_image: selectedNearFrame.featured_image,
+          };
+        } else {
+          // Manual near frame entry
+          const nearFrameName =
+            orderFormData.near_frame_name ||
+            (orderFormData.near_frame_brand && orderFormData.near_frame_model
+              ? `${orderFormData.near_frame_brand} ${orderFormData.near_frame_model} (Cerca)`
+              : "Marco de Cerca");
+          nearFrameProduct = {
+            id: `frame-manual-near-${baseTimestamp}`,
+            name: nearFrameName,
+            price: nearFramePrice,
+            price_includes_tax: true,
+            inventory_quantity: 999,
+            sku: orderFormData.near_frame_sku || "FRAME-NEAR-MANUAL",
+          };
+        }
+
+        itemsToAdd.push(nearFrameProduct);
+        itemsAdded++;
+        console.log("✅ Near frame prepared:", nearFrameProduct);
+      }
+    }
+
+    // Add lens(es) - handle both single lens and two separate lenses
+    if (presbyopiaSolution === "two_separate") {
+      // For two separate lenses, add both far and near lenses
+      const totalLensCost = (farLensCost || 0) + (nearLensCost || 0);
+      if (totalLensCost > 0) {
+        const farLensFamilyName = farLensFamilyId
+          ? lensFamilies.find((f) => f.id === farLensFamilyId)?.name || "N/A"
+          : "Manual";
+        const nearLensFamilyName = nearLensFamilyId
+          ? lensFamilies.find((f) => f.id === nearLensFamilyId)?.name || "N/A"
+          : "Manual";
+
+        const lensProduct: Product = {
+          id: `lens-two-separate-${baseTimestamp}`,
+          name: `Lentes (Lejos: ${farLensFamilyName}, Cerca: ${nearLensFamilyName})`,
+          price: totalLensCost,
+          price_includes_tax: true,
+          inventory_quantity: 999,
+          sku: `LENS-TWO-SEPARATE-${baseTimestamp}`,
+        };
+        itemsToAdd.push(lensProduct);
+        itemsAdded++;
+        console.log("✅ Two separate lenses prepared:", lensProduct);
+      }
+    } else if (orderFormData.lens_family_id || orderFormData.lens_cost > 0) {
+      // Single lens
+      const lensName = orderFormData.lens_family_id
+        ? `Lente (Familia: ${lensFamilies.find((f) => f.id === orderFormData.lens_family_id)?.name || "N/A"})`
+        : `Lente (Precio manual)`;
       const lensProduct: Product = {
         id: `lens-${baseTimestamp}-2`,
         name: lensName,
         price: orderFormData.lens_cost || 0,
+        price_includes_tax: true, // IVA incluido por defecto
         inventory_quantity: 999,
-        sku: `LENS-${orderFormData.lens_type?.toUpperCase()}-${orderFormData.lens_material?.toUpperCase()}`,
+        sku: orderFormData.lens_family_id
+          ? `LENS-FAMILY-${orderFormData.lens_family_id.substring(0, 8).toUpperCase()}`
+          : `LENS-MANUAL-${baseTimestamp}`,
       };
       itemsToAdd.push(lensProduct);
       itemsAdded++;
@@ -931,6 +1825,7 @@ export default function POSPage() {
         id: `treatments-${baseTimestamp}-3`,
         name: `Tratamientos: ${treatmentLabels.join(", ")}`,
         price: orderFormData.treatments_cost || 0,
+        price_includes_tax: true, // IVA incluido por defecto
         inventory_quantity: 999,
         sku: "TREATMENTS",
       };
@@ -945,6 +1840,7 @@ export default function POSPage() {
         id: `labor-${baseTimestamp}-4`,
         name: "Mano de obra (montaje)",
         price: orderFormData.labor_cost,
+        price_includes_tax: true, // IVA incluido por defecto
         inventory_quantity: 999,
         sku: "LABOR",
       };
@@ -953,14 +1849,48 @@ export default function POSPage() {
       console.log("✅ Labor prepared:", laborProduct);
     }
 
-    // Calculate discount amount
-    const orderSubtotal =
+    // Calculate discount amount based on type
+    // Include second frame price if two separate lenses
+    const nearFramePrice =
+      presbyopiaSolution === "two_separate" && !customerOwnNearFrame
+        ? orderFormData.near_frame_cost > 0
+          ? orderFormData.near_frame_cost
+          : orderFormData.near_frame_price || 0
+        : 0;
+
+    // Calculate lens cost - for two_separate, use sum of far and near lens costs
+    const effectiveLensCost =
+      presbyopiaSolution === "two_separate"
+        ? (farLensCost || 0) + (nearLensCost || 0)
+        : orderFormData.lens_cost || 0;
+
+    // Calculate total with tax (all prices already include tax by default)
+    // This matches how the quote form calculates the total
+    const orderTotalWithTax =
       framePrice +
-      orderFormData.lens_cost +
+      nearFramePrice +
+      effectiveLensCost +
       orderFormData.treatments_cost +
       orderFormData.labor_cost;
-    const discountAmount =
-      orderSubtotal * (orderFormData.discount_percentage / 100);
+
+    let discountAmount = 0;
+    let discountLabel = "";
+
+    if (discountType === "percentage") {
+      // Apply discount to total with tax (matching quote form logic)
+      discountAmount =
+        orderTotalWithTax * (orderFormData.discount_percentage / 100);
+      discountLabel = `Descuento (${orderFormData.discount_percentage}%)`;
+    } else {
+      // Discount by amount (already calculated on total with tax in quote form)
+      discountAmount = orderFormData.discount_amount || 0;
+      discountLabel = `Descuento ($${formatPrice(discountAmount)})`;
+    }
+
+    // Ensure discount doesn't exceed total with tax
+    if (discountAmount > orderTotalWithTax) {
+      discountAmount = orderTotalWithTax;
+    }
 
     // Add all items to cart at once using a single state update
     if (itemsToAdd.length > 0) {
@@ -973,7 +1903,7 @@ export default function POSPage() {
 
       if (discountAmount > 0) {
         console.log(
-          `  💰 Discount: ${orderFormData.discount_percentage}% = -$${discountAmount}`,
+          `  💰 Discount: ${discountLabel} = -$${formatPrice(discountAmount)}`,
         );
       }
 
@@ -1003,7 +1933,8 @@ export default function POSPage() {
               quantity: 1,
               unitPrice: product.price,
               subtotal: product.price,
-              priceIncludesTax: product.price_includes_tax ?? false,
+              // Default to true (IVA incluido) if not specified - typical in Chile
+              priceIncludesTax: product.price_includes_tax ?? true,
             });
           }
         });
@@ -1012,7 +1943,7 @@ export default function POSPage() {
         if (discountAmount > 0) {
           const discountProduct: Product = {
             id: `discount-${baseTimestamp}`,
-            name: `Descuento (${orderFormData.discount_percentage}%)`,
+            name: discountLabel,
             price: -discountAmount,
             inventory_quantity: 999,
             sku: "DISCOUNT",
@@ -1024,21 +1955,24 @@ export default function POSPage() {
           );
           if (discountIndex >= 0) {
             // Update discount amount
+            // Discount applies to total with tax, so it should also include tax
             newCart[discountIndex] = {
               product: discountProduct,
               quantity: 1,
               unitPrice: -discountAmount,
               subtotal: -discountAmount,
-              priceIncludesTax: false, // Discounts don't include tax
+              priceIncludesTax: true, // Discount applies to total with tax, so it includes tax
             };
           } else {
             // Add discount
+            // Discount should be applied to total with tax, so it should also include tax
+            // This ensures the discount is subtracted correctly from the total
             newCart.push({
               product: discountProduct,
               quantity: 1,
               unitPrice: -discountAmount,
               subtotal: -discountAmount,
-              priceIncludesTax: false, // Discounts don't include tax
+              priceIncludesTax: true, // Discount applies to total with tax, so it includes tax
             });
           }
         }
@@ -1057,98 +1991,100 @@ export default function POSPage() {
     }
   };
 
-  const handleLoadQuote = async (quote: Quote) => {
+  const handleLoadQuote = async (quote: Quote | { id: string }) => {
     try {
-      // Fetch full quote details
-      const response = await fetch(`/api/admin/quotes/${quote.id}`);
+      // Use the new load-to-pos endpoint
+      const response = await fetch(
+        `/api/admin/quotes/${quote.id}/load-to-pos`,
+        {
+          method: "POST",
+        },
+      );
+
       if (!response.ok) {
-        throw new Error("Error al cargar el presupuesto");
+        const error = await response.json();
+        throw new Error(error.error || "Error al cargar el presupuesto");
       }
 
       const data = await response.json();
-      const fullQuote = data.quote;
+      if (!data.success) {
+        throw new Error("Error al cargar el presupuesto");
+      }
+
+      // Set customer if available
+      if (data.customerId) {
+        setSelectedCustomer(data.customer || null);
+      }
 
       // Clear current cart
       setCart([]);
 
-      // Add frame as a product if it exists
-      if (fullQuote.frame_product_id && fullQuote.frame_price > 0) {
-        // Try to fetch the product
-        try {
-          const productResponse = await fetch(
-            `/api/admin/products/${fullQuote.frame_product_id}`,
-          );
-          if (productResponse.ok) {
-            const productData = await productResponse.json();
-            const frameProduct = productData.product;
-
-            addToCart({
-              id: frameProduct.id,
-              name: fullQuote.frame_name || frameProduct.name || "Marco",
-              price: fullQuote.frame_price,
-              inventory_quantity: frameProduct.inventory_quantity || 0,
-              sku: fullQuote.frame_sku || frameProduct.sku,
-              barcode: frameProduct.barcode,
-              featured_image: frameProduct.featured_image,
+      // Load items from quote into cart
+      if (data.items && data.items.length > 0) {
+        console.log("📦 Loading items from quote:", data.items);
+        for (const item of data.items) {
+          if (item.type === "product") {
+            // Regular product (frame)
+            console.log("🖼️ Adding frame to cart:", {
+              id: item.id,
+              name: item.name,
+              price: item.price,
             });
+            const product: Product = {
+              id: item.id,
+              name: item.name,
+              price: item.price || 0, // Ensure price is always a number
+              price_includes_tax: true, // IVA incluido por defecto
+              inventory_quantity: item.inventory_quantity || 0,
+              sku: item.sku,
+              barcode: item.barcode,
+              featured_image: item.featured_image,
+            };
+            addToCart(product);
+          } else if (item.type === "lens_complete") {
+            // Lens as custom item
+            const lensProduct: Product = {
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              price_includes_tax: true, // IVA incluido por defecto
+              inventory_quantity: 999, // Lenses are made to order
+              sku: `LENS-${item.lens_type?.toUpperCase() || "CUSTOM"}`,
+            };
+            addToCart(lensProduct);
+
+            // Add treatments if they have cost
+            if (item.treatments_cost > 0) {
+              const treatmentProduct: Product = {
+                id: `treatments-${quote.id}`,
+                name: `Tratamientos: ${item.lens_treatments?.join(", ") || "Varios"}`,
+                price: item.treatments_cost,
+                price_includes_tax: true, // IVA incluido por defecto
+                inventory_quantity: 999,
+                sku: "TREATMENTS",
+              };
+              addToCart(treatmentProduct);
+            }
+
+            // Add labor cost if exists
+            if (item.labor_cost > 0) {
+              const laborProduct: Product = {
+                id: `labor-${quote.id}`,
+                name: "Mano de obra (montaje)",
+                price: item.labor_cost,
+                price_includes_tax: true, // IVA incluido por defecto
+                inventory_quantity: 999,
+                sku: "LABOR",
+              };
+              addToCart(laborProduct);
+            }
           }
-        } catch (error) {
-          console.error("Error fetching frame product:", error);
-          // Add as a custom item if product not found
-          toast.warning("Marco agregado como item personalizado");
         }
       }
 
-      // Add lens as a custom item (since lenses are not regular products)
-      if (fullQuote.lens_type) {
-        const lensName = `Lente ${fullQuote.lens_type} ${fullQuote.lens_material || ""}`;
-        const lensPrice = fullQuote.lens_cost || 0;
-
-        if (lensPrice > 0) {
-          // Create a virtual product for the lens
-          const lensProduct: Product = {
-            id: `lens-${fullQuote.id}`,
-            name: lensName,
-            price: lensPrice,
-            inventory_quantity: 999, // Lenses are made to order
-            sku: `LENS-${fullQuote.lens_type?.toUpperCase()}`,
-          };
-
-          addToCart(lensProduct);
-        }
-      }
-
-      // Add treatments as items if they have cost
-      if (
-        fullQuote.treatments_cost > 0 &&
-        fullQuote.lens_treatments &&
-        fullQuote.lens_treatments.length > 0
-      ) {
-        const treatmentProduct: Product = {
-          id: `treatments-${fullQuote.id}`,
-          name: `Tratamientos: ${fullQuote.lens_treatments.join(", ")}`,
-          price: fullQuote.treatments_cost,
-          inventory_quantity: 999,
-          sku: "TREATMENTS",
-        };
-
-        addToCart(treatmentProduct);
-      }
-
-      // Add labor cost if exists
-      if (fullQuote.labor_cost > 0) {
-        const laborProduct: Product = {
-          id: `labor-${fullQuote.id}`,
-          name: "Mano de obra (montaje)",
-          price: fullQuote.labor_cost,
-          inventory_quantity: 999,
-          sku: "LABOR",
-        };
-
-        addToCart(laborProduct);
-      }
-
-      toast.success(`Presupuesto ${quote.quote_number} cargado al carrito`);
+      toast.success(
+        `Presupuesto ${data.quoteNumber || quote.id} cargado al carrito. Puedes editarlo antes de procesar el pago.`,
+      );
       setShowQuoteDialog(false);
     } catch (error: any) {
       console.error("Error loading quote:", error);
@@ -1162,47 +2098,155 @@ export default function POSPage() {
       return;
     }
 
-    if (paymentMethod === "cash" && cashReceived < total) {
-      toast.error("El monto recibido es menor al total");
+    // Validar monto según método de pago
+    if (paymentMethod === "cash") {
+      if (isCashPartial) {
+        // Efectivo parcial: validar monto parcial
+        if (cashPartialAmount <= 0) {
+          toast.error("Debe ingresar un monto a pagar");
+          return;
+        }
+        if (cashPartialAmount > total) {
+          toast.error("El monto a pagar no puede ser mayor al total");
+          return;
+        }
+      } else {
+        // Efectivo completo: validar monto recibido
+        if (cashReceived < total) {
+          toast.error("El monto recibido es menor al total");
+          return;
+        }
+      }
+    }
+
+    if (paymentMethod === "transfer") {
+      if (depositAmount <= 0) {
+        toast.error("Debe ingresar un monto de transferencia");
+        return;
+      }
+      if (depositAmount > total) {
+        toast.error("El monto de transferencia no puede ser mayor al total");
+        return;
+      }
+    }
+
+    // Para tarjetas sin abono, se paga el total completo
+    if (
+      (paymentMethod === "debit_card" || paymentMethod === "credit_card") &&
+      depositAmount > 0 &&
+      depositAmount > total
+    ) {
+      toast.error("El abono no puede ser mayor al total");
       return;
     }
 
-    if (siiInvoiceType !== "none" && !customerRUT) {
-      toast.error("Se requiere RUT para generar factura/boleta");
+    // Validar RUT solo si se requiere FACTURA (no boleta) y no hay cliente seleccionado
+    // Las boletas no requieren RUT obligatorio, solo las facturas
+    if (siiInvoiceType === "factura" && !selectedCustomer && !customerRUT) {
+      toast.error("Se requiere RUT para generar factura");
       return;
     }
 
     setProcessingPayment(true);
 
     try {
-      // Validate customer is selected (required for work order)
-      if (!selectedCustomer?.id) {
-        toast.error("Debe seleccionar un cliente para procesar la venta");
+      // Lógica para verificar si realmente se requiere trabajo de laboratorio
+      // Solo los marcos (frames) con datos de lentes requieren trabajo de laboratorio
+
+      // Verificar si hay items temporales de lentes/labor (estos siempre requieren trabajo)
+      const hasTemporaryLensItems = cart.some((item) => {
+        const isTemporaryLensItem =
+          item.product.id.startsWith("lens-") ||
+          item.product.id.startsWith("treatments-") ||
+          item.product.id.startsWith("labor-") ||
+          item.product.id.startsWith("frame-manual-");
+        return isTemporaryLensItem;
+      });
+
+      // Verificar si hay un marco (frame) en el carrito
+      const hasFrameInCart = cart.some((item) => {
+        // Verificar si el producto es de tipo "frame"
+        // product_type existe en runtime aunque no esté en el tipo TypeScript
+        const product = item.product as any;
+        return product?.product_type === "frame";
+      });
+
+      // Verificar si hay datos de lentes que requieren montaje
+      const hasLensDataForMounting =
+        (orderFormData.lens_family_id ||
+          orderFormData.lens_type ||
+          orderFormData.lens_material ||
+          presbyopiaSolution !== "none") &&
+        selectedPrescription?.id; // Solo requiere trabajo si hay receta asociada
+
+      // Solo se requiere trabajo de laboratorio si:
+      // 1. Hay items temporales de lentes/labor (siempre requieren trabajo)
+      // 2. Hay un marco EN EL CARRITO Y hay datos de lentes para montar
+      // Los productos de tipo "accessory", "lens", "service" NO requieren trabajo
+      const requiresWorkOrder =
+        hasTemporaryLensItems || (hasFrameInCart && hasLensDataForMounting);
+
+      if (requiresWorkOrder && !selectedCustomer?.id) {
+        toast.error(
+          "Se requiere un cliente registrado para crear trabajos de laboratorio",
+        );
         setProcessingPayment(false);
         return;
       }
 
+      // Calcular monto de pago según método
+      let paymentAmount = total;
+      let finalPaymentStatus: "paid" | "pending" | "partial" = "paid";
+
+      if (paymentMethod === "cash") {
+        if (isCashPartial) {
+          // Efectivo parcial: usar monto parcial
+          paymentAmount = cashPartialAmount;
+          finalPaymentStatus = cashPartialAmount >= total ? "paid" : "partial";
+        } else {
+          // Efectivo completo: usar monto recibido
+          paymentAmount = cashReceived;
+          finalPaymentStatus = cashReceived >= total ? "paid" : "partial";
+        }
+      } else if (paymentMethod === "transfer") {
+        paymentAmount = depositAmount;
+        finalPaymentStatus = depositAmount >= total ? "paid" : "partial";
+      } else if (
+        paymentMethod === "debit_card" ||
+        paymentMethod === "credit_card"
+      ) {
+        // Para tarjetas, si hay abono se usa ese monto, sino se paga el total
+        paymentAmount = depositAmount > 0 ? depositAmount : total;
+        finalPaymentStatus = paymentAmount >= total ? "paid" : "partial";
+      }
+
       const orderData = {
         is_pos_sale: true,
-        customer_id: selectedCustomer.id, // Required for work order creation
-        email: selectedCustomer?.email || "venta@pos.local",
+        customer_id: selectedCustomer?.id || null, // Optional - allow sales without registered customer
+        email: selectedCustomer?.email || null, // Only use customer email if available, otherwise null (optional)
+        customer_name: selectedCustomer
+          ? `${selectedCustomer.first_name || ""} ${selectedCustomer.last_name || ""}`.trim()
+          : customerBusinessName || null,
+        customer_rut: selectedCustomer?.rut || customerRUT || null,
         payment_method_type: paymentMethod,
-        payment_status: paymentMethod === "cash" ? "paid" : "pending",
+        payment_status: finalPaymentStatus,
         status: "delivered", // POS sales are immediately fulfilled
         subtotal: subtotal,
         tax_amount: taxAmount,
         total_amount: total,
         currency: "CLP", // Chilean Peso
-        installments_count:
-          paymentMethod === "installments" ? installmentsCount : 1,
+        installments_count: 1, // Ya no se usa, mantener para compatibilidad
         sii_invoice_type: siiInvoiceType,
-        sii_rut: customerRUT || null,
-        sii_business_name: customerBusinessName || null,
+        sii_rut: selectedCustomer?.rut || customerRUT || null,
+        sii_business_name:
+          selectedCustomer?.business_name || customerBusinessName || null,
         items: cart.map((item) => ({
           product_id:
             item.product.id.startsWith("lens-") ||
             item.product.id.startsWith("treatments-") ||
-            item.product.id.startsWith("labor-")
+            item.product.id.startsWith("labor-") ||
+            item.product.id.startsWith("frame-manual-") ||
+            /-\d+$/.test(item.product.id) // Filter IDs with timestamp suffix (e.g., "uuid-1234567890")
               ? null
               : item.product.id,
           product_name: item.product.name,
@@ -1210,8 +2254,75 @@ export default function POSPage() {
           unit_price: item.unitPrice,
           total_price: item.subtotal,
         })),
-        cash_received: paymentMethod === "cash" ? cashReceived : null,
-        change_amount: paymentMethod === "cash" ? change : 0,
+        cash_received:
+          paymentMethod === "cash"
+            ? isCashPartial
+              ? cashPartialAmount
+              : cashReceived
+            : paymentMethod === "transfer"
+              ? depositAmount
+              : null,
+        change_amount:
+          paymentMethod === "cash" && !isCashPartial
+            ? Math.max(0, change)
+            : null, // Ensure change is never negative (solo para efectivo completo)
+        deposit_amount: paymentAmount < total ? paymentAmount : null, // Monto de abono si es pago parcial
+        // Datos estructurados de lentes y marcos
+        lens_data:
+          orderFormData.lens_family_id ||
+          orderFormData.lens_type ||
+          orderFormData.lens_material ||
+          presbyopiaSolution !== "none"
+            ? {
+                lens_family_id:
+                  presbyopiaSolution === "two_separate"
+                    ? null
+                    : orderFormData.lens_family_id || null,
+                lens_type: orderFormData.lens_type || null,
+                lens_material: orderFormData.lens_material || null,
+                lens_index: orderFormData.lens_index || null,
+                lens_treatments:
+                  orderFormData.lens_treatments.length > 0
+                    ? orderFormData.lens_treatments
+                    : null,
+                lens_tint_color: orderFormData.lens_tint_color || null,
+                lens_tint_percentage:
+                  orderFormData.lens_tint_percentage > 0
+                    ? orderFormData.lens_tint_percentage
+                    : null,
+                prescription_id: selectedPrescription?.id || null,
+              }
+            : null,
+        // Presbyopia solution data
+        presbyopia_solution:
+          presbyopiaSolution !== "none" ? presbyopiaSolution : null,
+        far_lens_family_id:
+          presbyopiaSolution === "two_separate"
+            ? farLensFamilyId || null
+            : null,
+        near_lens_family_id:
+          presbyopiaSolution === "two_separate"
+            ? nearLensFamilyId || null
+            : null,
+        far_lens_cost:
+          presbyopiaSolution === "two_separate" ? farLensCost || 0 : null,
+        near_lens_cost:
+          presbyopiaSolution === "two_separate" ? nearLensCost || 0 : null,
+        frame_data:
+          orderFormData.frame_name || selectedFrame?.id
+            ? {
+                frame_product_id: selectedFrame?.id || null,
+                frame_name: orderFormData.frame_name || null,
+                frame_brand: orderFormData.frame_brand || null,
+                frame_model: orderFormData.frame_model || null,
+                frame_color: orderFormData.frame_color || null,
+                frame_size: orderFormData.frame_size || null,
+                frame_sku: orderFormData.frame_sku || null,
+                customer_own_frame: customerOwnFrame || false,
+              }
+            : null,
+        // Quote ID if sale comes from a quote
+        quote_id: selectedQuote?.id || null,
       };
 
       const headers: HeadersInit = {
@@ -1256,49 +2367,182 @@ export default function POSPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-      minimumFractionDigits: 0,
-    }).format(amount);
+  const fetchPendingBalanceOrders = async (searchTerm: string = "") => {
+    setLoadingPendingBalance(true);
+    try {
+      const headers = {
+        ...getBranchHeader(currentBranchId),
+      };
+
+      const params = new URLSearchParams({
+        limit: "50",
+      });
+
+      if (searchTerm.trim()) {
+        params.append("search", searchTerm.trim());
+      }
+
+      const response = await fetch(`/api/admin/pos/pending-balance?${params}`, {
+        headers,
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPendingBalanceOrders(data.orders || []);
+        if (data.orders?.length === 0 && searchTerm) {
+          toast.info("No se encontraron órdenes con esos criterios");
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Error al cargar órdenes pendientes");
+      }
+    } catch (error: any) {
+      console.error("Error fetching pending balance orders:", error);
+      toast.error("Error al cargar órdenes pendientes");
+    } finally {
+      setLoadingPendingBalance(false);
+    }
+  };
+
+  const processPendingPayment = async () => {
+    if (!selectedPendingOrder || !pendingPaymentAmount) {
+      toast.error("Selecciona una orden e ingresa el monto");
+      return;
+    }
+
+    const amount = parseFloat(pendingPaymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Ingresa un monto válido");
+      return;
+    }
+
+    if (amount > selectedPendingOrder.pending_amount) {
+      toast.error(
+        `El monto no puede ser mayor al saldo pendiente (${formatCurrency(selectedPendingOrder.pending_amount)})`,
+      );
+      return;
+    }
+
+    setProcessingPendingPayment(true);
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        ...getBranchHeader(currentBranchId),
+      };
+
+      const response = await fetch("/api/admin/pos/pending-balance/pay", {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({
+          order_id: selectedPendingOrder.id,
+          payment_amount: amount,
+          payment_method: pendingPaymentMethod,
+          notes: `Pago de saldo pendiente en POS`,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message);
+        setPendingPaymentAmount("");
+        setSelectedPendingOrder(null);
+        await fetchPendingBalanceOrders();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Error al procesar pago");
+      }
+    } catch (error: any) {
+      console.error("Error processing pending payment:", error);
+      toast.error("Error al procesar el pago");
+    } finally {
+      setProcessingPendingPayment(false);
+    }
   };
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Punto de Venta (POS)
-          </h1>
-          <p className="text-sm text-gray-600">
-            {!currentBranchId && isSuperAdmin
-              ? "Sistema de ventas - Todas las sucursales"
-              : "Sistema de ventas"}
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          {isSuperAdmin && <BranchSelector />}
-          <Link href="/admin/cash-register">
-            <Button variant="outline">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Caja
+      <div className="bg-white border-b px-6 py-4">
+        <div className="flex flex-col gap-3">
+          {/* First row: Branch selector and Caja button */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Punto de Venta (POS)
+              </h1>
+              <p className="text-sm text-gray-600">
+                {!currentBranchId && isSuperAdmin
+                  ? "Sistema de ventas - Todas las sucursales"
+                  : "Sistema de ventas"}
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              {isSuperAdmin && <BranchSelector />}
+              <Link href="/admin/cash-register">
+                <Button variant="outline">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Caja
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                onClick={() => setShowPendingBalanceDialog(true)}
+                title="Cobrar saldos pendientes de órdenes"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Saldos Pendientes
+              </Button>
+            </div>
+          </div>
+          {/* Second row: Total and Clear button */}
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className="text-lg px-4 py-2">
+              Total: {formatCurrency(total)}
+            </Badge>
+            <Button
+              variant="outline"
+              onClick={clearCart}
+              disabled={cart.length === 0}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Limpiar
             </Button>
-          </Link>
-          <Badge variant="outline" className="text-lg px-4 py-2">
-            {formatCurrency(total)}
-          </Badge>
-          <Button
-            variant="outline"
-            onClick={clearCart}
-            disabled={cart.length === 0}
-          >
-            <X className="h-4 w-4 mr-2" />
-            Limpiar
-          </Button>
+          </div>
         </div>
       </div>
+
+      {/* Cash Status Alert */}
+      {!isSuperAdmin && currentBranchId && (
+        <div
+          className={`px-6 py-3 ${isCashOpen === false ? "bg-red-50 border-b border-red-200" : isCashOpen === true ? "bg-green-50 border-b border-green-200" : ""}`}
+        >
+          {checkingCashStatus ? (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Verificando estado de caja...
+            </div>
+          ) : isCashOpen === false ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-red-800">
+                <AlertCircle className="h-4 w-4" />
+                <span className="font-semibold">La caja está cerrada</span>
+                <span> - Debe abrir la caja antes de realizar ventas</span>
+              </div>
+              <Link href="/admin/cash-register">
+                <Button size="sm" variant="default">
+                  Abrir Caja
+                </Button>
+              </Link>
+            </div>
+          ) : isCashOpen === true ? (
+            <div className="flex items-center gap-2 text-sm text-green-800">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Caja abierta - Lista para realizar ventas</span>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Customer & Order Form */}
@@ -1308,39 +2552,200 @@ export default function POSPage() {
             {/* Customer Info */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center justify-between">
-                  <span>Cliente</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowCustomerDialog(true)}
-                  >
-                    <User className="h-4 w-4 mr-1" />
-                    {selectedCustomer ? "Cambiar" : "Seleccionar"}
-                  </Button>
-                </CardTitle>
+                <CardTitle className="text-lg">Cliente</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {selectedCustomer ? (
-                  <div>
-                    <div className="font-medium">
-                      {selectedCustomer.name || selectedCustomer.email}
-                    </div>
-                    {selectedCustomer.rut && (
-                      <div className="text-sm text-gray-600">
-                        RUT: {selectedCustomer.rut}
+                {/* Customer Search Input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    ref={customerSearchInputRef}
+                    placeholder="Buscar cliente (nombre, email, teléfono, RUT)..."
+                    value={customerSearchTerm}
+                    onChange={(e) => {
+                      setCustomerSearchTerm(e.target.value);
+                      setSelectedCustomerIndex(-1);
+                      // Si se borra el término de búsqueda, limpiar cliente seleccionado
+                      if (e.target.value.trim().length === 0) {
+                        setSelectedCustomer(null);
+                        setCustomerBusinessName("");
+                        setCustomerRUT("");
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (
+                          selectedCustomerIndex >= 0 &&
+                          customerSearchResults[selectedCustomerIndex]
+                        ) {
+                          handleSelectCustomer(
+                            customerSearchResults[selectedCustomerIndex],
+                          );
+                        } else if (customerSearchResults.length > 0) {
+                          handleSelectCustomer(customerSearchResults[0]);
+                        }
+                      } else if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setSelectedCustomerIndex((prev) =>
+                          prev < customerSearchResults.length - 1
+                            ? prev + 1
+                            : prev,
+                        );
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setSelectedCustomerIndex((prev) =>
+                          prev > 0 ? prev - 1 : -1,
+                        );
+                      } else if (e.key === "Escape") {
+                        setCustomerSearchResults([]);
+                        setCustomerSearchTerm("");
+                        setSelectedCustomerIndex(-1);
+                      }
+                    }}
+                    className="pl-10"
+                    autoComplete="off"
+                  />
+                </div>
+
+                {/* Customer Search Results Dropdown */}
+                {customerSearchTerm.trim().length > 0 && (
+                  <div className="relative">
+                    {searchingCustomers && (
+                      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg border">
+                        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
                       </div>
                     )}
+
+                    {!searchingCustomers &&
+                      customerSearchResults.length > 0 && (
+                        <div
+                          ref={customerSuggestionsRef}
+                          className="max-h-60 overflow-y-auto border rounded-lg bg-white shadow-lg z-20"
+                        >
+                          {customerSearchResults.map((customer, index) => (
+                            <button
+                              key={customer.id}
+                              onClick={() => handleSelectCustomer(customer)}
+                              onMouseEnter={() =>
+                                setSelectedCustomerIndex(index)
+                              }
+                              className={`w-full p-3 text-left border-b last:border-b-0 flex justify-between items-center transition-colors ${
+                                selectedCustomerIndex === index
+                                  ? "bg-blue-50 border-blue-200"
+                                  : "hover:bg-gray-50"
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-gray-900 truncate">
+                                  {customer.name}
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1 flex flex-wrap gap-2">
+                                  {customer.email && (
+                                    <span>{customer.email}</span>
+                                  )}
+                                  {customer.phone && (
+                                    <span>Tel: {customer.phone}</span>
+                                  )}
+                                  {customer.rut && (
+                                    <span>RUT: {customer.rut}</span>
+                                  )}
+                                </div>
+                              </div>
+                              {selectedCustomerIndex === index && (
+                                <div className="text-xs text-blue-600 ml-2">
+                                  Enter
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                    {!searchingCustomers &&
+                      customerSearchTerm.trim().length > 0 &&
+                      customerSearchResults.length === 0 && (
+                        <div className="border rounded-lg bg-white p-3 text-center text-gray-500 text-sm">
+                          <p>No se encontraron clientes</p>
+                          <p className="text-xs mt-1">
+                            Puedes continuar sin cliente o ingresar datos
+                            manualmente
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                )}
+
+                {/* Selected Customer Info or Manual Input */}
+                {selectedCustomer ? (
+                  <div className="space-y-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium text-green-900">
+                          {selectedCustomer.name || selectedCustomer.email}
+                        </div>
+                        {selectedCustomer.rut && (
+                          <div className="text-sm text-green-700 mt-1">
+                            RUT: {selectedCustomer.rut}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCustomer(null);
+                          setCustomerBusinessName("");
+                          setCustomerRUT("");
+                          setCustomerSearchTerm("");
+                          setCustomerSearchResults([]);
+                        }}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                     {customerQuotes.length > 0 && (
-                      <div className="mt-2 text-xs text-green-600">
-                        {customerQuotes.length} presupuesto(s) cargado(s) en el
-                        carrito
+                      <div className="mt-2 text-xs text-green-700">
+                        {customerQuotes.length} presupuesto(s) disponible(s)
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-500">
-                    Cliente no seleccionado
+                  <div className="space-y-3">
+                    <div className="text-xs text-gray-500">
+                      Cliente no seleccionado (opcional para ventas simples)
+                    </div>
+                    {/* Manual input fields for unregistered customers */}
+                    <div>
+                      <Label className="text-xs text-gray-600">
+                        Nombre (opcional)
+                      </Label>
+                      <Input
+                        type="text"
+                        placeholder="Nombre del cliente"
+                        value={customerBusinessName}
+                        onChange={(e) =>
+                          setCustomerBusinessName(e.target.value)
+                        }
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600">
+                        RUT (opcional)
+                      </Label>
+                      <Input
+                        type="text"
+                        placeholder="Ej: 12.345.678-9"
+                        value={customerRUT}
+                        onChange={(e) => {
+                          const formatted = formatRUT(e.target.value);
+                          setCustomerRUT(formatted);
+                        }}
+                        className="text-sm font-mono"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -1362,21 +2767,6 @@ export default function POSPage() {
                   </Select>
                 </div>
 
-                {siiInvoiceType !== "none" && (
-                  <div>
-                    <Label>RUT Cliente *</Label>
-                    <Input
-                      placeholder="123456789"
-                      value={customerRUT}
-                      onChange={(e) => {
-                        const formatted = formatRUT(e.target.value);
-                        setCustomerRUT(formatted);
-                      }}
-                      maxLength={12}
-                    />
-                  </div>
-                )}
-
                 {siiInvoiceType === "factura" && (
                   <div>
                     <Label>Razón Social</Label>
@@ -1385,6 +2775,144 @@ export default function POSPage() {
                       value={customerBusinessName}
                       onChange={(e) => setCustomerBusinessName(e.target.value)}
                     />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Product Search */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center">
+                  <span className="flex items-center">
+                    <Search className="h-5 w-5 mr-2" />
+                    Búsqueda Rápida de Productos
+                  </span>
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-1">
+                  Busca accesorios, lentes de sol, servicios u otros productos
+                  para agregar al carrito
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                  <Input
+                    ref={searchInputRef}
+                    placeholder="Buscar productos (nombre, SKU, código de barras)..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setSelectedProductIndex(-1);
+                    }}
+                    onKeyDown={handleSearchKeyPress}
+                    className="pl-10 h-12 text-base"
+                    autoComplete="off"
+                  />
+                  {searching && (
+                    <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 animate-spin text-gray-400" />
+                  )}
+                </div>
+
+                {/* Product Search Results */}
+                {searchTerm.trim().length > 0 && (
+                  <div className="relative">
+                    {searching && (
+                      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg border">
+                        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                      </div>
+                    )}
+
+                    {!searching && products.length > 0 && (
+                      <div
+                        ref={suggestionsRef}
+                        className="max-h-96 overflow-y-auto border rounded-lg bg-white shadow-lg divide-y"
+                      >
+                        {products.map((product, index) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => addToCart(product)}
+                            className={`w-full p-3 text-left hover:bg-gray-50 transition-colors ${
+                              index === selectedProductIndex
+                                ? "bg-gray-100 border-l-4 border-gray-400"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">
+                                  {product.name}
+                                </div>
+                                <div className="text-sm text-gray-600 mt-1">
+                                  {product.brand && (
+                                    <span className="mr-2">
+                                      Marca: {product.brand}
+                                    </span>
+                                  )}
+                                  {product.sku && (
+                                    <span className="mr-2">
+                                      SKU: {product.sku}
+                                    </span>
+                                  )}
+                                  {product.category?.name && (
+                                    <span className="inline-block px-2 py-0.5 bg-gray-100 rounded text-xs">
+                                      {product.category.name}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-sm font-semibold text-green-600 mt-1">
+                                  {formatCurrency(product.price)}
+                                  {product.price_includes_tax && (
+                                    <span className="text-xs text-gray-500 ml-1">
+                                      (IVA incluido)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="ml-4">
+                                <Button
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    addToCart(product);
+                                  }}
+                                  variant="default"
+                                >
+                                  <Plus className="h-4 w-4 mr-1" />
+                                  Agregar
+                                </Button>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {!searching &&
+                      searchTerm.trim().length > 0 &&
+                      products.length === 0 && (
+                        <div className="border rounded-lg bg-white p-4 text-center text-gray-500">
+                          <Search className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                          <p>No se encontraron productos</p>
+                          <p className="text-xs mt-1">
+                            Intenta con otro término de búsqueda
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                )}
+
+                {/* Quick Tips */}
+                {searchTerm.trim().length === 0 && (
+                  <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <p className="font-medium mb-1">💡 Consejos de búsqueda:</p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      <li>Busca por nombre, marca, SKU o código de barras</li>
+                      <li>Presiona Enter para agregar el primer resultado</li>
+                      <li>Usa las flechas ↑↓ para navegar entre resultados</li>
+                      <li>Presiona Esc para limpiar la búsqueda</li>
+                    </ul>
                   </div>
                 )}
               </CardContent>
@@ -1400,373 +2928,1676 @@ export default function POSPage() {
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Selected Customer Display (read-only) */}
-                <div>
-                  <Label>Cliente</Label>
-                  {selectedCustomer ? (
-                    <div className="mt-1 p-2 border rounded bg-gray-50">
-                      <div className="font-medium text-sm">
-                        {selectedCustomer.name || selectedCustomer.email}
-                      </div>
-                      {selectedCustomer.rut && (
-                        <div className="text-xs text-gray-600 mt-1">
-                          RUT: {selectedCustomer.rut}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="mt-1 p-2 border rounded bg-gray-50 text-sm text-gray-500">
-                      Selecciona un cliente en el card superior
-                    </div>
-                  )}
-                </div>
+              <CardContent>
+                <Tabs defaultValue="customer" className="w-full">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="customer">Cliente</TabsTrigger>
+                    <TabsTrigger value="frame">Marco</TabsTrigger>
+                    <TabsTrigger value="lenses">Lentes</TabsTrigger>
+                    <TabsTrigger value="pricing">Precios</TabsTrigger>
+                  </TabsList>
 
-                {/* Quote Selection */}
-                <div>
-                  <Label>Presupuesto</Label>
-                  {!selectedCustomer ? (
-                    <div className="text-sm text-gray-500 py-2">
-                      Selecciona un cliente para ver sus presupuestos
-                    </div>
-                  ) : loadingQuotes ? (
-                    <div className="text-sm text-gray-500 py-2 flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Cargando presupuestos...
-                    </div>
-                  ) : customerQuotes.length === 0 ? (
-                    <div className="text-sm text-gray-500 py-2">
-                      Este cliente no tiene presupuestos. Puedes crear una orden
-                      manualmente.
-                    </div>
-                  ) : (
-                    <Select
-                      value={selectedQuote?.id || ""}
-                      onValueChange={async (value) => {
-                        const quote = customerQuotes.find(
-                          (q) => q.id === value,
-                        );
-                        if (quote) {
-                          await handleLoadQuoteToForm(quote);
-                        } else {
-                          setSelectedQuote(null);
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un presupuesto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {customerQuotes.map((quote) => (
-                          <SelectItem key={quote.id} value={quote.id}>
-                            {quote.quote_number} -{" "}
-                            {new Date(quote.created_at).toLocaleDateString(
-                              "es-CL",
+                  {/* Customer & Prescription Tab */}
+                  <TabsContent value="customer" className="space-y-4 mt-4">
+                    {/* Customer and Prescription Section */}
+                    <Tabs defaultValue="customer" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="customer">
+                          Cliente & Receta
+                        </TabsTrigger>
+                        <TabsTrigger value="prescription">
+                          Receta Externa
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="customer" className="space-y-4 mt-4">
+                        {/* Selected Customer Display */}
+                        <div>
+                          <Label>Cliente</Label>
+                          {selectedCustomer ? (
+                            <div className="mt-1 p-2 border rounded bg-gray-50">
+                              <div className="font-medium text-sm">
+                                {selectedCustomer.name ||
+                                  selectedCustomer.email}
+                              </div>
+                              {selectedCustomer.rut && (
+                                <div className="text-xs text-gray-600 mt-1">
+                                  RUT: {selectedCustomer.rut}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="mt-1 p-2 border rounded bg-gray-50 text-sm text-gray-500">
+                              Selecciona un cliente en el card superior
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Prescription Selection */}
+                        {selectedCustomer && (
+                          <div>
+                            <Label>Receta</Label>
+                            {prescriptions.length === 0 ? (
+                              <div className="text-sm text-gray-500 py-2">
+                                Este cliente no tiene recetas registradas.
+                              </div>
+                            ) : (
+                              <Select
+                                value={selectedPrescription?.id || ""}
+                                onValueChange={(value) => {
+                                  const prescription = prescriptions.find(
+                                    (p) => p.id === value,
+                                  );
+                                  setSelectedPrescription(prescription || null);
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecciona una receta" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {prescriptions.map((prescription) => (
+                                    <SelectItem
+                                      key={prescription.id}
+                                      value={prescription.id}
+                                    >
+                                      {prescription.prescription_date
+                                        ? formatDate(
+                                            prescription.prescription_date,
+                                          )
+                                        : "Sin fecha"}
+                                      {prescription.issued_by &&
+                                        ` - ${prescription.issued_by}`}
+                                      {prescription.is_current && " (Actual)"}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             )}
-                            {quote.status && ` (${quote.status})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
+                          </div>
+                        )}
 
-                {/* Frame Selection */}
-                <div>
-                  <Label>Marco</Label>
-                  {selectedFrame ? (
-                    <div className="flex items-center justify-between p-2 border rounded mt-1">
-                      <div>
-                        <div className="font-medium text-sm">
-                          {selectedFrame.name}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          {formatCurrency(orderFormData.frame_price)}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedFrame(null);
-                          setOrderFormData((prev) => ({
-                            ...prev,
-                            frame_price: 0,
-                            frame_cost: 0,
-                          }));
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="relative mt-1">
-                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        placeholder="Buscar marco..."
-                        value={frameSearch}
-                        onChange={(e) => setFrameSearch(e.target.value)}
-                        className="pl-8 h-9 text-sm"
-                      />
-                      {frameSearch.length >= 2 && frameResults.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                          {frameResults.map((frame) => (
-                            <div
-                              key={frame.id}
-                              className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
-                              onClick={() => handleFrameSelectForOrder(frame)}
+                        {/* Quote Selection */}
+                        <div>
+                          <Label>Presupuesto</Label>
+                          {!selectedCustomer ? (
+                            <div className="text-sm text-gray-500 py-2">
+                              Selecciona un cliente para ver sus presupuestos
+                            </div>
+                          ) : loadingQuotes ? (
+                            <div className="text-sm text-gray-500 py-2 flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Cargando presupuestos...
+                            </div>
+                          ) : customerQuotes.length === 0 ? (
+                            <div className="text-sm text-gray-500 py-2">
+                              Este cliente no tiene presupuestos. Puedes crear
+                              una orden manualmente.
+                            </div>
+                          ) : (
+                            <Select
+                              value={selectedQuote?.id || ""}
+                              onValueChange={async (value) => {
+                                const quote = customerQuotes.find(
+                                  (q) => q.id === value,
+                                );
+                                if (quote) {
+                                  await handleLoadQuoteToForm(quote);
+                                } else {
+                                  setSelectedQuote(null);
+                                }
+                              }}
                             >
-                              <div className="font-medium">{frame.name}</div>
-                              <div className="text-xs text-gray-600">
-                                {formatCurrency(frame.price)}
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona un presupuesto" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {customerQuotes.map((quote) => (
+                                  <SelectItem key={quote.id} value={quote.id}>
+                                    {quote.quote_number} -{" "}
+                                    {formatDate(quote.created_at)}
+                                    {quote.status && ` (${quote.status})`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent
+                        value="prescription"
+                        className="space-y-4 mt-4"
+                      >
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            Cliente nuevo con receta externa. Completa los datos
+                            del cliente y su receta.
+                          </AlertDescription>
+                        </Alert>
+
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label>Nombre *</Label>
+                              <Input
+                                placeholder="Juan"
+                                value={externalCustomerData.first_name}
+                                onChange={(e) =>
+                                  setExternalCustomerData((prev) => ({
+                                    ...prev,
+                                    first_name: e.target.value,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Label>Apellido *</Label>
+                              <Input
+                                placeholder="Pérez"
+                                value={externalCustomerData.last_name}
+                                onChange={(e) =>
+                                  setExternalCustomerData((prev) => ({
+                                    ...prev,
+                                    last_name: e.target.value,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label>RUT *</Label>
+                              <Input
+                                placeholder="12345678-9"
+                                value={externalCustomerData.rut}
+                                onChange={(e) => {
+                                  const formatted = formatRUT(e.target.value);
+                                  setExternalCustomerData((prev) => ({
+                                    ...prev,
+                                    rut: formatted,
+                                  }));
+                                }}
+                                className="h-9 text-sm"
+                                maxLength={12}
+                              />
+                            </div>
+                            <div>
+                              <Label>Teléfono</Label>
+                              <Input
+                                placeholder="+56 9 1234 5678"
+                                value={externalCustomerData.phone}
+                                onChange={(e) =>
+                                  setExternalCustomerData((prev) => ({
+                                    ...prev,
+                                    phone: e.target.value,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label>Email</Label>
+                            <Input
+                              type="email"
+                              placeholder="cliente@ejemplo.com"
+                              value={externalCustomerData.email}
+                              onChange={(e) =>
+                                setExternalCustomerData((prev) => ({
+                                  ...prev,
+                                  email: e.target.value,
+                                }))
+                              }
+                              className="h-9 text-sm"
+                            />
+                          </div>
+
+                          <Separator className="my-4" />
+
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-semibold">
+                              Datos de la Receta Externa
+                            </h4>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label>Fecha de Receta</Label>
+                                <Input
+                                  type="date"
+                                  value={
+                                    externalPrescriptionData.prescription_date
+                                  }
+                                  onChange={(e) =>
+                                    setExternalPrescriptionData((prev) => ({
+                                      ...prev,
+                                      prescription_date: e.target.value,
+                                    }))
+                                  }
+                                  className="h-9 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label>Fecha de Vencimiento</Label>
+                                <Input
+                                  type="date"
+                                  value={
+                                    externalPrescriptionData.expiration_date
+                                  }
+                                  onChange={(e) =>
+                                    setExternalPrescriptionData((prev) => ({
+                                      ...prev,
+                                      expiration_date: e.target.value,
+                                    }))
+                                  }
+                                  className="h-9 text-sm"
+                                />
                               </div>
                             </div>
-                          ))}
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label>Número de Receta</Label>
+                                <Input
+                                  placeholder="12345"
+                                  value={
+                                    externalPrescriptionData.prescription_number
+                                  }
+                                  onChange={(e) =>
+                                    setExternalPrescriptionData((prev) => ({
+                                      ...prev,
+                                      prescription_number: e.target.value,
+                                    }))
+                                  }
+                                  className="h-9 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label>Emitida por</Label>
+                                <Input
+                                  placeholder="Dr. Juan Pérez"
+                                  value={externalPrescriptionData.issued_by}
+                                  onChange={(e) =>
+                                    setExternalPrescriptionData((prev) => ({
+                                      ...prev,
+                                      issued_by: e.target.value,
+                                    }))
+                                  }
+                                  className="h-9 text-sm"
+                                />
+                              </div>
+                            </div>
+
+                            <Separator className="my-4" />
+
+                            <div className="space-y-3">
+                              <h5 className="text-xs font-semibold text-gray-700">
+                                Ojo Derecho (OD)
+                              </h5>
+                              <div className="grid grid-cols-4 gap-2">
+                                <div>
+                                  <Label className="text-xs">Esfera</Label>
+                                  <Input
+                                    placeholder="-2.00"
+                                    value={externalPrescriptionData.od_sphere}
+                                    onChange={(e) =>
+                                      setExternalPrescriptionData((prev) => ({
+                                        ...prev,
+                                        od_sphere: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Cilindro</Label>
+                                  <Input
+                                    placeholder="-0.50"
+                                    value={externalPrescriptionData.od_cylinder}
+                                    onChange={(e) =>
+                                      setExternalPrescriptionData((prev) => ({
+                                        ...prev,
+                                        od_cylinder: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Eje</Label>
+                                  <Input
+                                    placeholder="180"
+                                    value={externalPrescriptionData.od_axis}
+                                    onChange={(e) =>
+                                      setExternalPrescriptionData((prev) => ({
+                                        ...prev,
+                                        od_axis: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Adición</Label>
+                                  <Input
+                                    placeholder="+2.00"
+                                    value={externalPrescriptionData.od_add}
+                                    onChange={(e) =>
+                                      setExternalPrescriptionData((prev) => ({
+                                        ...prev,
+                                        od_add: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <h5 className="text-xs font-semibold text-gray-700">
+                                Ojo Izquierdo (OS)
+                              </h5>
+                              <div className="grid grid-cols-4 gap-2">
+                                <div>
+                                  <Label className="text-xs">Esfera</Label>
+                                  <Input
+                                    placeholder="-2.00"
+                                    value={externalPrescriptionData.os_sphere}
+                                    onChange={(e) =>
+                                      setExternalPrescriptionData((prev) => ({
+                                        ...prev,
+                                        os_sphere: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Cilindro</Label>
+                                  <Input
+                                    placeholder="-0.50"
+                                    value={externalPrescriptionData.os_cylinder}
+                                    onChange={(e) =>
+                                      setExternalPrescriptionData((prev) => ({
+                                        ...prev,
+                                        os_cylinder: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Eje</Label>
+                                  <Input
+                                    placeholder="180"
+                                    value={externalPrescriptionData.os_axis}
+                                    onChange={(e) =>
+                                      setExternalPrescriptionData((prev) => ({
+                                        ...prev,
+                                        os_axis: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Adición</Label>
+                                  <Input
+                                    placeholder="+2.00"
+                                    value={externalPrescriptionData.os_add}
+                                    onChange={(e) =>
+                                      setExternalPrescriptionData((prev) => ({
+                                        ...prev,
+                                        os_add: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-xs">
+                                  DP (Distancia Pupilar)
+                                </Label>
+                                <Input
+                                  placeholder="64"
+                                  value={externalPrescriptionData.pd}
+                                  onChange={(e) =>
+                                    setExternalPrescriptionData((prev) => ({
+                                      ...prev,
+                                      pd: e.target.value,
+                                    }))
+                                  }
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">DP Cerca</Label>
+                                <Input
+                                  placeholder="62"
+                                  value={externalPrescriptionData.near_pd}
+                                  onChange={(e) =>
+                                    setExternalPrescriptionData((prev) => ({
+                                      ...prev,
+                                      near_pd: e.target.value,
+                                    }))
+                                  }
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            <Button
+                              type="button"
+                              onClick={
+                                handleCreateExternalCustomerWithPrescription
+                              }
+                              disabled={creatingExternalCustomer}
+                              className="w-full"
+                              size="sm"
+                            >
+                              {creatingExternalCustomer ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Creando...
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Crear Cliente y Receta
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </TabsContent>
+
+                  {/* Frame Tab */}
+                  <TabsContent value="frame" className="space-y-4 mt-4">
+                    <div>
+                      <Label>Marco</Label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          id="customer_own_frame_pos"
+                          checked={customerOwnFrame}
+                          onChange={(e) => {
+                            setCustomerOwnFrame(e.target.checked);
+                            if (e.target.checked) {
+                              setSelectedFrame(null);
+                              setOrderFormData((prev) => ({
+                                ...prev,
+                                frame_price: 0,
+                                frame_cost: 0,
+                              }));
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label
+                          htmlFor="customer_own_frame_pos"
+                          className="cursor-pointer text-sm"
+                        >
+                          Cliente trae marco (recambio de cristales)
+                        </Label>
+                      </div>
+                      {!customerOwnFrame ? (
+                        <>
+                          {selectedFrame ? (
+                            <div className="flex items-center justify-between p-2 border rounded mt-1">
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {selectedFrame.name}
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                  {formatCurrency(orderFormData.frame_price)}
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedFrame(null);
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    frame_price: 0,
+                                    frame_cost: 0,
+                                  }));
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="relative mt-1">
+                              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <Input
+                                placeholder="Buscar marco..."
+                                value={frameSearch}
+                                onChange={(e) => setFrameSearch(e.target.value)}
+                                className="pl-8 h-9 text-sm"
+                              />
+                              {frameSearch.length >= 2 &&
+                                frameResults.length > 0 && (
+                                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                    {frameResults.map((frame) => (
+                                      <div
+                                        key={frame.id}
+                                        className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
+                                        onClick={() =>
+                                          handleFrameSelectForOrder(frame)
+                                        }
+                                      >
+                                        <div className="font-medium">
+                                          {frame.name}
+                                        </div>
+                                        <div className="text-xs text-gray-600">
+                                          {formatCurrency(frame.price)}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                            </div>
+                          )}
+                          {!selectedFrame && (
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <Input
+                                placeholder="Nombre marco"
+                                value={orderFormData.frame_name}
+                                onChange={(e) =>
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    frame_name: e.target.value,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                              <Input
+                                type="number"
+                                placeholder="Precio"
+                                value={orderFormData.frame_price || ""}
+                                onChange={(e) => {
+                                  const price = parseFloat(e.target.value) || 0;
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    frame_price: price,
+                                    frame_cost: price,
+                                  }));
+                                }}
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <Input
+                            placeholder="Nombre marco del cliente"
+                            value={orderFormData.frame_name}
+                            onChange={(e) =>
+                              setOrderFormData((prev) => ({
+                                ...prev,
+                                frame_name: e.target.value,
+                              }))
+                            }
+                            className="h-9 text-sm"
+                          />
+                          <div className="text-xs text-gray-500 flex items-center">
+                            Precio: $0 (cliente trae marco)
+                          </div>
                         </div>
                       )}
                     </div>
-                  )}
-                  {!selectedFrame && (
-                    <div className="mt-2 grid grid-cols-2 gap-2">
+                  </TabsContent>
+
+                  {/* Lenses Tab */}
+                  <TabsContent value="lenses" className="space-y-4 mt-4">
+                    {/* Presbyopia Solution Selector */}
+                    {selectedPrescription &&
+                      hasAddition(selectedPrescription) && (
+                        <div className="space-y-3 p-3 border rounded-lg bg-orange-50">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-orange-600" />
+                            <Label className="text-sm font-medium">
+                              Presbicia detectada (+
+                              {getMaxAddition(selectedPrescription)} D)
+                            </Label>
+                          </div>
+                          <RadioGroup
+                            value={presbyopiaSolution}
+                            onValueChange={(value) => {
+                              const solution = value as PresbyopiaSolution;
+                              setPresbyopiaSolution(solution);
+                              setOrderFormData((prev) => ({
+                                ...prev,
+                                presbyopia_solution: solution,
+                              }));
+                              if (
+                                solution === "progressive" ||
+                                solution === "bifocal" ||
+                                solution === "trifocal"
+                              ) {
+                                setOrderFormData((prev) => ({
+                                  ...prev,
+                                  lens_type: solution,
+                                }));
+                              }
+                              // Reset lens families when changing solution
+                              if (solution !== "two_separate") {
+                                setFarLensFamilyId("");
+                                setNearLensFamilyId("");
+                                setSelectedNearFrame(null);
+                                setCustomerOwnNearFrame(false);
+                                setNearFrameSearch("");
+                                setNearFrameResults([]);
+                                setOrderFormData((prev) => ({
+                                  ...prev,
+                                  far_lens_family_id: "",
+                                  near_lens_family_id: "",
+                                  far_lens_cost: 0,
+                                  near_lens_cost: 0,
+                                  near_frame_product_id: "",
+                                  near_frame_name: "",
+                                  near_frame_brand: "",
+                                  near_frame_model: "",
+                                  near_frame_color: "",
+                                  near_frame_size: "",
+                                  near_frame_sku: "",
+                                  near_frame_price: 0,
+                                  near_frame_price_includes_tax: false,
+                                  near_frame_cost: 0,
+                                }));
+                              }
+                            }}
+                            className="space-y-2"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem
+                                value="progressive"
+                                id="pos-progressive"
+                              />
+                              <Label
+                                htmlFor="pos-progressive"
+                                className="cursor-pointer text-sm"
+                              >
+                                Progresivo
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem
+                                value="bifocal"
+                                id="pos-bifocal"
+                              />
+                              <Label
+                                htmlFor="pos-bifocal"
+                                className="cursor-pointer text-sm"
+                              >
+                                Bifocal
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem
+                                value="two_separate"
+                                id="pos-two-separate"
+                              />
+                              <Label
+                                htmlFor="pos-two-separate"
+                                className="cursor-pointer text-sm"
+                              >
+                                Dos lentes separados
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                      )}
+
+                    {/* Two Separate Lenses Layout - Improved with clear sections */}
+                    {presbyopiaSolution === "two_separate" ? (
+                      <div className="space-y-6">
+                        {/* Section 1: Far Vision (Lejos) */}
+                        <Card className="border-2 border-blue-200 bg-blue-50/30">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center text-blue-900">
+                              <Eye className="h-4 w-4 mr-2" />
+                              Marco y Lente de Lejos (Visión Lejana)
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            {/* Far Frame - Already selected above, show summary */}
+                            <div className="p-2 bg-white rounded border">
+                              <div className="text-xs font-medium text-gray-700 mb-1">
+                                Marco de Lejos:
+                              </div>
+                              {selectedFrame ? (
+                                <div className="text-sm">
+                                  {selectedFrame.name} -{" "}
+                                  {formatCurrency(orderFormData.frame_price)}
+                                </div>
+                              ) : customerOwnFrame ? (
+                                <div className="text-sm text-gray-600">
+                                  {orderFormData.frame_name ||
+                                    "Cliente trae marco"}{" "}
+                                  - $0
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500">
+                                  {orderFormData.frame_name ||
+                                    "Sin marco seleccionado"}{" "}
+                                  - {formatCurrency(orderFormData.frame_price)}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Far Lens Family */}
+                            <div>
+                              <Label className="text-sm font-medium">
+                                Familia de Lente de Lejos
+                              </Label>
+                              <Select
+                                value={farLensFamilyId || "none"}
+                                onValueChange={(value) => {
+                                  const familyId =
+                                    value === "none" ? "" : value;
+                                  setFarLensFamilyId(familyId);
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    far_lens_family_id: familyId,
+                                  }));
+                                }}
+                                disabled={loadingFamilies}
+                              >
+                                <SelectTrigger className="h-9 text-sm">
+                                  <SelectValue placeholder="Selecciona familia de lente" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">
+                                    Sin familia (precio manual)
+                                  </SelectItem>
+                                  {lensFamilies
+                                    .filter(
+                                      (f) => f.lens_type === "single_vision",
+                                    )
+                                    .map((family) => (
+                                      <SelectItem
+                                        key={family.id}
+                                        value={family.id}
+                                      >
+                                        {family.name}{" "}
+                                        {family.brand && `(${family.brand})`}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              {farLensCost > 0 && (
+                                <div className="mt-1 p-2 bg-green-50 border border-green-200 rounded">
+                                  <p className="text-xs font-medium text-green-800">
+                                    Precio Lente de Lejos:{" "}
+                                    {formatCurrency(farLensCost)}
+                                  </p>
+                                </div>
+                              )}
+                              {!farLensFamilyId && (
+                                <div className="mt-2">
+                                  <Label className="text-sm">
+                                    Costo del Lente de Lejos (Manual)
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    placeholder="Ej: 30000"
+                                    value={orderFormData.far_lens_cost || ""}
+                                    onChange={(e) => {
+                                      const newValue =
+                                        parseFloat(e.target.value) || 0;
+                                      setOrderFormData((prev) => ({
+                                        ...prev,
+                                        far_lens_cost: newValue,
+                                      }));
+                                      setFarLensCost(newValue);
+                                    }}
+                                    className="h-9 text-sm mt-1"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* Section 2: Near Vision (Cerca) */}
+                        <Card className="border-2 border-purple-200 bg-purple-50/30">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center text-purple-900">
+                              <Eye className="h-4 w-4 mr-2" />
+                              Marco y Lente de Cerca (Visión Cercana)
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            {/* Near Frame Selection */}
+                            <div>
+                              <Label className="text-sm font-medium">
+                                Marco de Cerca
+                              </Label>
+                              <div className="flex items-center gap-2 mb-2 mt-1">
+                                <input
+                                  type="checkbox"
+                                  id="customer_own_near_frame_pos"
+                                  checked={customerOwnNearFrame}
+                                  onChange={(e) => {
+                                    setCustomerOwnNearFrame(e.target.checked);
+                                    if (e.target.checked) {
+                                      setSelectedNearFrame(null);
+                                      setOrderFormData((prev) => ({
+                                        ...prev,
+                                        near_frame_price: 0,
+                                        near_frame_cost: 0,
+                                      }));
+                                    }
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300"
+                                />
+                                <Label
+                                  htmlFor="customer_own_near_frame_pos"
+                                  className="cursor-pointer text-sm"
+                                >
+                                  Cliente trae marco (recambio de cristales)
+                                </Label>
+                              </div>
+                              {!customerOwnNearFrame ? (
+                                <>
+                                  {selectedNearFrame ? (
+                                    <div className="flex items-center justify-between p-2 border rounded bg-white">
+                                      <div>
+                                        <div className="font-medium text-sm">
+                                          {selectedNearFrame.name}
+                                        </div>
+                                        <div className="text-xs text-gray-600">
+                                          {formatCurrency(
+                                            orderFormData.near_frame_price,
+                                          )}
+                                        </div>
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedNearFrame(null);
+                                          setOrderFormData((prev) => ({
+                                            ...prev,
+                                            near_frame_price: 0,
+                                            near_frame_cost: 0,
+                                          }));
+                                        }}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <div className="relative">
+                                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                      <Input
+                                        placeholder="Buscar marco de cerca..."
+                                        value={nearFrameSearch}
+                                        onChange={(e) =>
+                                          setNearFrameSearch(e.target.value)
+                                        }
+                                        className="pl-8 h-9 text-sm"
+                                      />
+                                      {nearFrameSearch.length >= 2 &&
+                                        nearFrameResults.length > 0 && (
+                                          <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                            {nearFrameResults.map((frame) => (
+                                              <div
+                                                key={frame.id}
+                                                className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
+                                                onClick={() =>
+                                                  handleNearFrameSelectForOrder(
+                                                    frame,
+                                                  )
+                                                }
+                                              >
+                                                <div className="font-medium">
+                                                  {frame.name}
+                                                </div>
+                                                <div className="text-xs text-gray-600">
+                                                  {formatCurrency(frame.price)}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                    </div>
+                                  )}
+                                  {!selectedNearFrame && (
+                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                      <Input
+                                        placeholder="Nombre marco de cerca"
+                                        value={orderFormData.near_frame_name}
+                                        onChange={(e) =>
+                                          setOrderFormData((prev) => ({
+                                            ...prev,
+                                            near_frame_name: e.target.value,
+                                          }))
+                                        }
+                                        className="h-9 text-sm"
+                                      />
+                                      <Input
+                                        type="number"
+                                        placeholder="Precio"
+                                        value={
+                                          orderFormData.near_frame_price || ""
+                                        }
+                                        onChange={(e) => {
+                                          const price =
+                                            parseFloat(e.target.value) || 0;
+                                          setOrderFormData((prev) => ({
+                                            ...prev,
+                                            near_frame_price: price,
+                                            near_frame_cost: price,
+                                          }));
+                                        }}
+                                        className="h-9 text-sm"
+                                      />
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                  <Input
+                                    placeholder="Nombre marco del cliente"
+                                    value={orderFormData.near_frame_name}
+                                    onChange={(e) =>
+                                      setOrderFormData((prev) => ({
+                                        ...prev,
+                                        near_frame_name: e.target.value,
+                                      }))
+                                    }
+                                    className="h-9 text-sm"
+                                  />
+                                  <div className="text-xs text-gray-500 flex items-center">
+                                    Precio: $0 (cliente trae marco)
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Near Lens Family */}
+                            <div>
+                              <Label className="text-sm font-medium">
+                                Familia de Lente de Cerca
+                              </Label>
+                              <Select
+                                value={nearLensFamilyId || "none"}
+                                onValueChange={(value) => {
+                                  const familyId =
+                                    value === "none" ? "" : value;
+                                  setNearLensFamilyId(familyId);
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    near_lens_family_id: familyId,
+                                  }));
+                                }}
+                                disabled={loadingFamilies}
+                              >
+                                <SelectTrigger className="h-9 text-sm">
+                                  <SelectValue placeholder="Selecciona familia de lente" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">
+                                    Sin familia (precio manual)
+                                  </SelectItem>
+                                  {lensFamilies
+                                    .filter(
+                                      (f) =>
+                                        f.lens_type === "single_vision" ||
+                                        f.lens_type === "reading",
+                                    )
+                                    .map((family) => (
+                                      <SelectItem
+                                        key={family.id}
+                                        value={family.id}
+                                      >
+                                        {family.name}{" "}
+                                        {family.brand && `(${family.brand})`}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              {nearLensCost > 0 && (
+                                <div className="mt-1 p-2 bg-green-50 border border-green-200 rounded">
+                                  <p className="text-xs font-medium text-green-800">
+                                    Precio Lente de Cerca:{" "}
+                                    {formatCurrency(nearLensCost)}
+                                  </p>
+                                </div>
+                              )}
+                              {!nearLensFamilyId && (
+                                <div className="mt-2">
+                                  <Label className="text-sm">
+                                    Costo del Lente de Cerca (Manual)
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    placeholder="Ej: 30000"
+                                    value={orderFormData.near_lens_cost || ""}
+                                    onChange={(e) => {
+                                      const newValue =
+                                        parseFloat(e.target.value) || 0;
+                                      setOrderFormData((prev) => ({
+                                        ...prev,
+                                        near_lens_cost: newValue,
+                                      }));
+                                      setNearLensCost(newValue);
+                                    }}
+                                    className="h-9 text-sm mt-1"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    ) : null}
+
+                    {/* Single Lens Family Selection */}
+                    {presbyopiaSolution !== "two_separate" && (
+                      <div>
+                        <Label>Familia de Lentes</Label>
+                        <Select
+                          value={orderFormData.lens_family_id || "none"}
+                          onValueChange={(value) => {
+                            if (value === "none") {
+                              setOrderFormData((prev) => ({
+                                ...prev,
+                                lens_family_id: "",
+                              }));
+                              setManualLensPrice(false);
+                            } else {
+                              setOrderFormData((prev) => ({
+                                ...prev,
+                                lens_family_id: value,
+                              }));
+                              setManualLensPrice(false);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder="Selecciona una familia (opcional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              Sin familia (manual)
+                            </SelectItem>
+                            {loadingFamilies ? (
+                              <SelectItem value="loading" disabled>
+                                Cargando...
+                              </SelectItem>
+                            ) : (
+                              lensFamilies
+                                .filter((f) => {
+                                  if (presbyopiaSolution === "none")
+                                    return true;
+                                  const recommended =
+                                    getRecommendedLensTypes(presbyopiaSolution);
+                                  return recommended.includes(f.lens_type);
+                                })
+                                .map((family) => (
+                                  <SelectItem key={family.id} value={family.id}>
+                                    {family.name} ({family.brand || "Sin marca"}
+                                    )
+                                  </SelectItem>
+                                ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {/* Lens Configuration */}
+                    <div>
+                      <Label>Tipo de Lente *</Label>
+                      {orderFormData.lens_family_id ? (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mt-1">
+                          <p className="text-sm text-blue-800">
+                            Tipo: {orderFormData.lens_type || "—"} · Material:{" "}
+                            {orderFormData.lens_material || "—"} (heredados de
+                            la familia)
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 mt-1">
+                          <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-xs text-yellow-800">
+                              No hay familia seleccionada. Ingresa el precio del
+                              lente manualmente.
+                            </p>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Costo del Lente</Label>
+                            <Input
+                              type="number"
+                              placeholder="Ej: 30000"
+                              value={orderFormData.lens_cost || ""}
+                              onChange={(e) => {
+                                const newValue =
+                                  parseFloat(e.target.value) || 0;
+                                setOrderFormData((prev) => ({
+                                  ...prev,
+                                  lens_cost: newValue,
+                                }));
+                              }}
+                              className="h-9 text-sm mt-1"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {orderFormData.lens_index && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Índice: {orderFormData.lens_index}
+                        </div>
+                      )}
+                      {orderFormData.lens_family_id &&
+                        orderFormData.lens_cost > 0 && (
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="text-xs text-gray-600">
+                              Costo lente:{" "}
+                              {formatCurrency(orderFormData.lens_cost)}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() =>
+                                setManualLensPrice(!manualLensPrice)
+                              }
+                            >
+                              {manualLensPrice ? "Auto" : "Manual"}
+                            </Button>
+                          </div>
+                        )}
+                      {orderFormData.lens_family_id && manualLensPrice && (
+                        <div className="mt-2">
+                          <Label className="text-sm">
+                            Costo del Lente (Manual)
+                          </Label>
+                          <Input
+                            type="number"
+                            placeholder="Ej: 30000"
+                            value={orderFormData.lens_cost || ""}
+                            onChange={(e) => {
+                              const newValue = parseFloat(e.target.value) || 0;
+                              setOrderFormData((prev) => ({
+                                ...prev,
+                                lens_cost: newValue,
+                              }));
+                            }}
+                            className="h-9 text-sm mt-1"
+                          />
+                        </div>
+                      )}
+                      {calculatingPrice && (
+                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Calculando precio...
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Treatments */}
+                    {/* Hide treatments when two_separate solution */}
+                    {presbyopiaSolution !== "two_separate" && (
+                      <>
+                        {/* Show all treatments when no family is selected */}
+                        {!orderFormData.lens_family_id && (
+                          <div>
+                            <Label>Tratamientos</Label>
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                              {availableTreatments
+                                .slice(0, 6)
+                                .map((treatment) => (
+                                  <Button
+                                    key={treatment.value}
+                                    type="button"
+                                    variant={
+                                      orderFormData.lens_treatments.includes(
+                                        treatment.value,
+                                      )
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    size="sm"
+                                    className="h-8 text-xs"
+                                    onClick={() =>
+                                      handleTreatmentToggle(treatment)
+                                    }
+                                  >
+                                    {treatment.label}
+                                  </Button>
+                                ))}
+                            </div>
+                            {orderFormData.treatments_cost > 0 && (
+                              <div className="text-xs text-gray-600 mt-1">
+                                Costo tratamientos:{" "}
+                                {formatCurrency(orderFormData.treatments_cost)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* Show only extras when family is selected */}
+                        {orderFormData.lens_family_id && (
+                          <div>
+                            <Label>Extras</Label>
+                            <div className="text-xs text-gray-500 mb-2">
+                              Los tratamientos estándar están incluidos en la
+                              familia. Solo extras:
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                              {availableTreatments
+                                .filter(
+                                  (t) =>
+                                    t.value === "tint" ||
+                                    t.value === "prism_extra",
+                                )
+                                .map((treatment) => (
+                                  <Button
+                                    key={treatment.value}
+                                    type="button"
+                                    variant={
+                                      orderFormData.lens_treatments.includes(
+                                        treatment.value,
+                                      )
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    size="sm"
+                                    className="h-8 text-xs"
+                                    onClick={() =>
+                                      handleTreatmentToggle(treatment)
+                                    }
+                                  >
+                                    {treatment.label}
+                                  </Button>
+                                ))}
+                            </div>
+                            {orderFormData.treatments_cost > 0 && (
+                              <div className="text-xs text-gray-600 mt-1">
+                                Costo extras:{" "}
+                                {formatCurrency(orderFormData.treatments_cost)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </TabsContent>
+
+                  {/* Pricing Tab */}
+                  <TabsContent value="pricing" className="space-y-4 mt-4">
+                    {/* Labor Cost */}
+                    <div>
+                      <Label>Mano de Obra</Label>
                       <Input
-                        placeholder="Nombre marco"
-                        value={orderFormData.frame_name}
+                        type="number"
+                        placeholder="15000"
+                        value={orderFormData.labor_cost || ""}
                         onChange={(e) =>
                           setOrderFormData((prev) => ({
                             ...prev,
-                            frame_name: e.target.value,
+                            labor_cost: parseFloat(e.target.value) || 0,
                           }))
                         }
                         className="h-9 text-sm"
                       />
-                      <Input
-                        type="number"
-                        placeholder="Precio"
-                        value={orderFormData.frame_price || ""}
-                        onChange={(e) => {
-                          const price = parseFloat(e.target.value) || 0;
-                          setOrderFormData((prev) => ({
-                            ...prev,
-                            frame_price: price,
-                            frame_cost: price,
-                          }));
+                    </div>
+
+                    {/* Discount */}
+                    <div className="space-y-2">
+                      <Label>Tipo de Descuento</Label>
+                      <Select
+                        value={discountType}
+                        onValueChange={(value: "percentage" | "amount") => {
+                          setDiscountType(value);
+                          // Clear the other discount field when switching types
+                          if (value === "percentage") {
+                            setOrderFormData((prev) => ({
+                              ...prev,
+                              discount_amount: 0,
+                            }));
+                          } else {
+                            setOrderFormData((prev) => ({
+                              ...prev,
+                              discount_percentage: 0,
+                            }));
+                          }
                         }}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Lens Configuration */}
-                <div>
-                  <Label>Tipo de Lente *</Label>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    <Select
-                      value={orderFormData.lens_type}
-                      onValueChange={(value) => {
-                        setOrderFormData((prev) => ({
-                          ...prev,
-                          lens_type: value,
-                        }));
-                      }}
-                    >
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {lensTypes.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={orderFormData.lens_material}
-                      onValueChange={(value) => {
-                        setOrderFormData((prev) => ({
-                          ...prev,
-                          lens_material: value,
-                        }));
-                      }}
-                    >
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Material" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {lensMaterials.map((material) => (
-                          <SelectItem
-                            key={material.value}
-                            value={material.value}
-                          >
-                            {material.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {orderFormData.lens_cost > 0 && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      Costo lente: {formatCurrency(orderFormData.lens_cost)}
-                    </div>
-                  )}
-                </div>
-
-                {/* Treatments */}
-                <div>
-                  <Label>Tratamientos</Label>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    {availableTreatments.slice(0, 6).map((treatment) => (
-                      <Button
-                        key={treatment.value}
-                        type="button"
-                        variant={
-                          orderFormData.lens_treatments.includes(
-                            treatment.value,
-                          )
-                            ? "default"
-                            : "outline"
-                        }
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => handleTreatmentToggle(treatment)}
                       >
-                        {treatment.label}
-                      </Button>
-                    ))}
-                  </div>
-                  {orderFormData.treatments_cost > 0 && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      Costo tratamientos:{" "}
-                      {formatCurrency(orderFormData.treatments_cost)}
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percentage">
+                            Por Porcentaje (%)
+                          </SelectItem>
+                          <SelectItem value="amount">Por Valor ($)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div>
+                        <Label>
+                          {discountType === "percentage"
+                            ? "Descuento (%)"
+                            : "Descuento ($)"}
+                        </Label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          min="0"
+                          max={
+                            discountType === "percentage" ? "100" : undefined
+                          }
+                          step={discountType === "percentage" ? "0.01" : "1"}
+                          value={
+                            discountType === "percentage"
+                              ? orderFormData.discount_percentage || ""
+                              : orderFormData.discount_amount || ""
+                          }
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            setOrderFormData((prev) => ({
+                              ...prev,
+                              [discountType === "percentage"
+                                ? "discount_percentage"
+                                : "discount_amount"]: value,
+                            }));
+                          }}
+                          className="h-9 text-sm"
+                        />
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Labor Cost */}
-                <div>
-                  <Label>Mano de Obra</Label>
-                  <Input
-                    type="number"
-                    placeholder="15000"
-                    value={orderFormData.labor_cost || ""}
-                    onChange={(e) =>
-                      setOrderFormData((prev) => ({
-                        ...prev,
-                        labor_cost: parseFloat(e.target.value) || 0,
-                      }))
-                    }
-                    className="h-9 text-sm"
-                  />
-                </div>
-
-                {/* Discount */}
-                <div>
-                  <Label>Descuento (%)</Label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={orderFormData.discount_percentage || ""}
-                    onChange={(e) =>
-                      setOrderFormData((prev) => ({
-                        ...prev,
-                        discount_percentage: parseFloat(e.target.value) || 0,
-                      }))
-                    }
-                    className="h-9 text-sm"
-                  />
-                </div>
-
-                {/* Order Total Preview */}
-                {(orderFormData.frame_cost > 0 ||
-                  orderFormData.frame_price > 0 ||
-                  orderFormData.lens_cost > 0 ||
-                  orderFormData.treatments_cost > 0 ||
-                  orderFormData.labor_cost > 0) && (
-                  <div className="border-t pt-2 space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span>Marco:</span>
-                      <span>
-                        {formatCurrency(
-                          orderFormData.frame_cost > 0
-                            ? orderFormData.frame_cost
-                            : orderFormData.frame_price || 0,
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span>Lente:</span>
-                      <span>{formatCurrency(orderFormData.lens_cost)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span>Tratamientos:</span>
-                      <span>
-                        {formatCurrency(orderFormData.treatments_cost)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span>Mano de obra:</span>
-                      <span>{formatCurrency(orderFormData.labor_cost)}</span>
-                    </div>
-                    {(() => {
-                      const framePrice =
-                        orderFormData.frame_cost > 0
-                          ? orderFormData.frame_cost
-                          : orderFormData.frame_price || 0;
-                      const subtotal =
-                        framePrice +
-                        orderFormData.lens_cost +
-                        orderFormData.treatments_cost +
-                        orderFormData.labor_cost;
-                      const discountAmount =
-                        subtotal * (orderFormData.discount_percentage / 100);
-                      const subtotalAfterDiscount = subtotal - discountAmount;
-
-                      return (
-                        <>
-                          <div className="flex justify-between text-xs font-semibold pt-1 border-t">
-                            <span>Subtotal:</span>
-                            <span>{formatCurrency(subtotal)}</span>
-                          </div>
-                          {orderFormData.discount_percentage > 0 && (
+                    {/* Order Total Preview - Detailed Breakdown */}
+                    {(orderFormData.frame_cost > 0 ||
+                      orderFormData.frame_price > 0 ||
+                      orderFormData.lens_cost > 0 ||
+                      orderFormData.treatments_cost > 0 ||
+                      orderFormData.labor_cost > 0 ||
+                      farLensCost > 0 ||
+                      nearLensCost > 0) && (
+                      <Card className="bg-gray-50 border-2">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center">
+                            <Calculator className="h-4 w-4 mr-2" />
+                            Desglose de Precios
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {presbyopiaSolution === "two_separate" ? (
                             <>
-                              <div className="flex justify-between text-xs text-red-600">
-                                <span>
-                                  Descuento ({orderFormData.discount_percentage}
-                                  %):
-                                </span>
-                                <span>-{formatCurrency(discountAmount)}</span>
+                              {/* Two separate lenses pricing breakdown */}
+                              <div className="space-y-2 pb-3 border-b">
+                                <p className="text-sm font-semibold text-gray-700 mb-2">
+                                  Marco y Lente de Lejos:
+                                </p>
+                                <div className="flex justify-between pl-4">
+                                  <span className="text-xs text-gray-600">
+                                    Marco de Lejos:
+                                  </span>
+                                  <span className="text-xs font-medium">
+                                    {formatCurrency(
+                                      orderFormData.frame_cost > 0
+                                        ? orderFormData.frame_cost
+                                        : orderFormData.frame_price || 0,
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between pl-4">
+                                  <span className="text-xs text-gray-600">
+                                    Lente de Lejos:
+                                  </span>
+                                  <span className="text-xs font-medium">
+                                    {formatCurrency(farLensCost || 0)}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Subtotal con descuento:</span>
-                                <span>
-                                  {formatCurrency(subtotalAfterDiscount)}
-                                </span>
+                              <div className="space-y-2 pb-3 border-b">
+                                <p className="text-sm font-semibold text-gray-700 mb-2">
+                                  Marco y Lente de Cerca:
+                                </p>
+                                {customerOwnNearFrame ? (
+                                  <div className="flex justify-between pl-4">
+                                    <span className="text-xs text-gray-600">
+                                      Marco de Cerca:
+                                    </span>
+                                    <span className="text-xs font-medium">
+                                      $0 (Cliente trae marco)
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex justify-between pl-4">
+                                    <span className="text-xs text-gray-600">
+                                      Marco de Cerca:
+                                    </span>
+                                    <span className="text-xs font-medium">
+                                      {formatCurrency(
+                                        orderFormData.near_frame_cost > 0
+                                          ? orderFormData.near_frame_cost
+                                          : orderFormData.near_frame_price || 0,
+                                      )}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between pl-4">
+                                  <span className="text-xs text-gray-600">
+                                    Lente de Cerca:
+                                  </span>
+                                  <span className="text-xs font-medium">
+                                    {formatCurrency(nearLensCost || 0)}
+                                  </span>
+                                </div>
                               </div>
+                              {orderFormData.treatments_cost > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-xs text-gray-600">
+                                    Tratamientos:
+                                  </span>
+                                  <span className="text-xs font-medium">
+                                    {formatCurrency(
+                                      orderFormData.treatments_cost,
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {orderFormData.labor_cost > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-xs text-gray-600">
+                                    Mano de Obra:
+                                  </span>
+                                  <span className="text-xs font-medium">
+                                    {formatCurrency(orderFormData.labor_cost)}
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {/* Single lens pricing breakdown */}
+                              {(orderFormData.frame_cost > 0 ||
+                                orderFormData.frame_price > 0) && (
+                                <div className="flex justify-between">
+                                  <span className="text-xs text-gray-600">
+                                    Marco:
+                                  </span>
+                                  <span className="text-xs font-medium">
+                                    {formatCurrency(
+                                      orderFormData.frame_cost > 0
+                                        ? orderFormData.frame_cost
+                                        : orderFormData.frame_price || 0,
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {orderFormData.lens_cost > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-xs text-gray-600">
+                                    Lente:
+                                  </span>
+                                  <span className="text-xs font-medium">
+                                    {formatCurrency(orderFormData.lens_cost)}
+                                  </span>
+                                </div>
+                              )}
+                              {orderFormData.treatments_cost > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-xs text-gray-600">
+                                    Tratamientos:
+                                  </span>
+                                  <span className="text-xs font-medium">
+                                    {formatCurrency(
+                                      orderFormData.treatments_cost,
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {orderFormData.labor_cost > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-xs text-gray-600">
+                                    Mano de Obra:
+                                  </span>
+                                  <span className="text-xs font-medium">
+                                    {formatCurrency(orderFormData.labor_cost)}
+                                  </span>
+                                </div>
+                              )}
                             </>
                           )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
 
-                {/* Add to Cart Button */}
-                <Button
-                  type="button"
-                  onClick={handleAddCompleteOrderToCart}
-                  disabled={
-                    !orderFormData.lens_type || !orderFormData.lens_material
-                  }
-                  className="w-full"
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Orden al Carrito
-                </Button>
+                          {(() => {
+                            const framePrice =
+                              orderFormData.frame_cost > 0
+                                ? orderFormData.frame_cost
+                                : orderFormData.frame_price || 0;
+
+                            // Include second frame price if two separate lenses
+                            const nearFramePrice =
+                              presbyopiaSolution === "two_separate" &&
+                              !customerOwnNearFrame
+                                ? orderFormData.near_frame_cost > 0
+                                  ? orderFormData.near_frame_cost
+                                  : orderFormData.near_frame_price || 0
+                                : 0;
+
+                            // Calculate lens cost - for two_separate, use sum of far and near lens costs
+                            const effectiveLensCost =
+                              presbyopiaSolution === "two_separate"
+                                ? (farLensCost || 0) + (nearLensCost || 0)
+                                : orderFormData.lens_cost || 0;
+
+                            const subtotal =
+                              framePrice +
+                              nearFramePrice +
+                              effectiveLensCost +
+                              orderFormData.treatments_cost +
+                              orderFormData.labor_cost;
+
+                            // Calculate discount based on type
+                            let discountAmount = 0;
+                            let discountLabel = "";
+                            if (discountType === "percentage") {
+                              discountAmount =
+                                subtotal *
+                                (orderFormData.discount_percentage / 100);
+                              discountLabel = `Descuento (${orderFormData.discount_percentage}%)`;
+                            } else {
+                              discountAmount =
+                                orderFormData.discount_amount || 0;
+                              discountLabel = `Descuento ($${formatPrice(discountAmount)})`;
+                            }
+
+                            // Ensure discount doesn't exceed subtotal
+                            if (discountAmount > subtotal) {
+                              discountAmount = subtotal;
+                            }
+
+                            const subtotalAfterDiscount =
+                              subtotal - discountAmount;
+
+                            return (
+                              <>
+                                <div className="border-t pt-2 flex justify-between">
+                                  <span className="text-sm font-semibold">
+                                    Subtotal:
+                                  </span>
+                                  <span className="text-sm font-semibold">
+                                    {formatCurrency(subtotal)}
+                                  </span>
+                                </div>
+                                {discountAmount > 0 && (
+                                  <>
+                                    <div className="flex justify-between text-red-600">
+                                      <span className="text-xs">
+                                        {discountType === "percentage"
+                                          ? `Descuento (${orderFormData.discount_percentage}%)`
+                                          : `Descuento ($${formatPrice(orderFormData.discount_amount)})`}
+                                        :
+                                      </span>
+                                      <span className="text-xs font-medium">
+                                        -{formatCurrency(discountAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="border-t pt-2 flex justify-between">
+                                      <span className="text-sm font-bold">
+                                        Total:
+                                      </span>
+                                      <span className="text-sm font-bold text-green-600">
+                                        {formatCurrency(subtotalAfterDiscount)}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                                {discountAmount === 0 && (
+                                  <div className="border-t pt-2 flex justify-between">
+                                    <span className="text-sm font-bold">
+                                      Total:
+                                    </span>
+                                    <span className="text-sm font-bold text-green-600">
+                                      {formatCurrency(subtotal)}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Add to Cart Button */}
+                    <Button
+                      type="button"
+                      onClick={handleAddCompleteOrderToCart}
+                      disabled={
+                        !orderFormData.lens_family_id &&
+                        orderFormData.lens_cost === 0 &&
+                        farLensCost === 0 &&
+                        nearLensCost === 0
+                      }
+                      className="w-full"
+                      size="sm"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Orden al Carrito
+                    </Button>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </div>
@@ -1916,69 +4747,170 @@ export default function POSPage() {
                   </Button>
                   <Button
                     variant={
-                      paymentMethod === "installments" ? "default" : "outline"
+                      paymentMethod === "transfer" ? "default" : "outline"
                     }
-                    onClick={() => setPaymentMethod("installments")}
+                    onClick={() => setPaymentMethod("transfer")}
                     className="h-16"
                   >
-                    <Calculator className="h-5 w-5 mr-2" />
-                    Cuotas
+                    <Send className="h-5 w-5 mr-2" />
+                    Transferencia
                   </Button>
                 </div>
 
                 {paymentMethod === "cash" && (
                   <div>
-                    <Label>Monto Recibido</Label>
-                    <Input
-                      type="number"
-                      placeholder="0"
-                      value={cashReceived || ""}
-                      onChange={(e) =>
-                        setCashReceived(parseFloat(e.target.value) || 0)
-                      }
-                      className="text-lg"
-                    />
-                    {cashReceived > 0 && change >= 0 && (
-                      <div className="mt-2 text-sm text-gray-600">
-                        Vuelto:{" "}
-                        <span className="font-semibold">
-                          {formatCurrency(change)}
-                        </span>
-                      </div>
-                    )}
-                    {cashReceived > 0 && change < 0 && (
-                      <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        <AlertCircle className="h-4 w-4" />
-                        Faltan {formatCurrency(Math.abs(change))}
-                      </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        id="cash-partial"
+                        checked={isCashPartial}
+                        onChange={(e) => {
+                          setIsCashPartial(e.target.checked);
+                          if (!e.target.checked) {
+                            setCashPartialAmount(0);
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <Label htmlFor="cash-partial" className="cursor-pointer">
+                        Pago parcial (abono)
+                      </Label>
+                    </div>
+                    {isCashPartial ? (
+                      <>
+                        <Label>
+                          Monto a Pagar (opcional - dejar vacío para pago
+                          completo)
+                        </Label>
+                        <Input
+                          type="number"
+                          placeholder="Dejar vacío para pagar el total"
+                          value={cashPartialAmount > 0 ? cashPartialAmount : ""}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            setCashPartialAmount(value);
+                          }}
+                          className="text-lg"
+                          min={0}
+                          max={total}
+                        />
+                        {cashPartialAmount > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <div className="text-sm text-gray-600">
+                              Abono:{" "}
+                              <span className="font-semibold">
+                                {formatCurrency(cashPartialAmount)}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Saldo pendiente:{" "}
+                              <span className="font-semibold text-orange-600">
+                                {formatCurrency(total - cashPartialAmount)}
+                              </span>
+                            </div>
+                            {cashPartialAmount < total * 0.5 && (
+                              <div className="text-xs text-amber-600 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                El abono mínimo recomendado es{" "}
+                                {formatCurrency(total * 0.5)} (50%)
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {cashPartialAmount === 0 && (
+                          <div className="mt-2 text-sm text-gray-500">
+                            Se procesará el pago completo:{" "}
+                            {formatCurrency(total)}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Label>Monto Recibido</Label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={cashReceived || ""}
+                          onChange={(e) =>
+                            setCashReceived(parseFloat(e.target.value) || 0)
+                          }
+                          className="text-lg"
+                        />
+                        {cashReceived > 0 && change >= 0 && (
+                          <div className="mt-2 text-sm text-gray-600">
+                            Vuelto:{" "}
+                            <span className="font-semibold">
+                              {formatCurrency(change)}
+                            </span>
+                          </div>
+                        )}
+                        {cashReceived > 0 && change < 0 && (
+                          <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                            <AlertCircle className="h-4 w-4" />
+                            Faltan {formatCurrency(Math.abs(change))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
 
-                {paymentMethod === "installments" && (
+                {(paymentMethod === "transfer" ||
+                  paymentMethod === "debit_card" ||
+                  paymentMethod === "credit_card") && (
                   <div>
-                    <Label>Número de Cuotas</Label>
-                    <Select
-                      value={installmentsCount.toString()}
-                      onValueChange={(v) => setInstallmentsCount(parseInt(v))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[2, 3, 4, 5, 6, 8, 10, 12].map((num) => (
-                          <SelectItem key={num} value={num.toString()}>
-                            {num} cuotas
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="mt-2 text-sm text-gray-600">
-                      Valor cuota:{" "}
-                      <span className="font-semibold">
-                        {formatCurrency(total / installmentsCount)}
-                      </span>
-                    </div>
+                    <Label>
+                      {paymentMethod === "transfer"
+                        ? "Monto de Transferencia"
+                        : "Monto a Pagar (opcional - dejar vacío para pago completo)"}
+                    </Label>
+                    <Input
+                      type="number"
+                      placeholder={
+                        paymentMethod === "transfer"
+                          ? "Ingrese el monto de transferencia"
+                          : "Dejar vacío para pagar el total"
+                      }
+                      value={depositAmount > 0 ? depositAmount : ""}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        setDepositAmount(value);
+                      }}
+                      className="text-lg"
+                      min={0}
+                      max={total}
+                    />
+                    {depositAmount > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <div className="text-sm text-gray-600">
+                          {paymentMethod === "transfer"
+                            ? "Transferencia"
+                            : "Abono"}
+                          :{" "}
+                          <span className="font-semibold">
+                            {formatCurrency(depositAmount)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Saldo pendiente:{" "}
+                          <span className="font-semibold text-orange-600">
+                            {formatCurrency(total - depositAmount)}
+                          </span>
+                        </div>
+                        {depositAmount < total * 0.5 && (
+                          <div className="text-xs text-amber-600 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            El abono mínimo recomendado es{" "}
+                            {formatCurrency(total * 0.5)} (50%)
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {depositAmount === 0 && paymentMethod !== "transfer" && (
+                      <div className="mt-2 text-sm text-gray-500">
+                        Se procesará el pago completo: {formatCurrency(total)}
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -1986,10 +4918,27 @@ export default function POSPage() {
           </div>
 
           {/* Fixed Process Payment Button */}
-          <div className="p-4 border-t bg-white flex-shrink-0">
+          <div className="p-4 border-t bg-white flex-shrink-0 space-y-3">
+            {/* Warning if cash closed */}
+            {isCashOpen === false && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-800">
+                    Caja cerrada
+                  </p>
+                  <p className="text-xs text-red-700">
+                    No se pueden realizar ventas sin abrir la caja. Ve a Caja
+                    para abrirla.
+                  </p>
+                </div>
+              </div>
+            )}
             <Button
               onClick={() => setShowPaymentDialog(true)}
-              disabled={cart.length === 0 || processingPayment}
+              disabled={
+                cart.length === 0 || processingPayment || isCashOpen === false
+              }
               className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700"
               size="lg"
             >
@@ -2031,10 +4980,27 @@ export default function POSPage() {
                 {paymentMethod === "cash" && "Efectivo"}
                 {paymentMethod === "debit_card" && "Tarjeta Débito"}
                 {paymentMethod === "credit_card" && "Tarjeta Crédito"}
-                {paymentMethod === "installments" &&
-                  `${installmentsCount} cuotas`}
+                {paymentMethod === "transfer" && "Transferencia"}
               </div>
             </div>
+            {(paymentMethod === "transfer" ||
+              paymentMethod === "debit_card" ||
+              paymentMethod === "credit_card") &&
+              depositAmount > 0 && (
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">
+                    Monto de abono:
+                  </div>
+                  <div className="font-medium text-blue-600">
+                    {formatCurrency(depositAmount)}
+                  </div>
+                  {depositAmount < total && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Saldo pendiente: {formatCurrency(total - depositAmount)}
+                    </div>
+                  )}
+                </div>
+              )}
             {paymentMethod === "cash" && cashReceived > 0 && (
               <div>
                 <div className="text-sm text-gray-600 mb-1">Vuelto:</div>
@@ -2065,148 +5031,6 @@ export default function POSPage() {
                     Confirmar
                   </>
                 )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Customer Selection Dialog */}
-      <Dialog open={showCustomerDialog} onOpenChange={setShowCustomerDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Seleccionar Cliente</DialogTitle>
-            <DialogDescription>
-              Busca un cliente por nombre, email, teléfono o RUT
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <Input
-                ref={customerSearchInputRef}
-                placeholder="Buscar cliente (nombre, email, teléfono, RUT)..."
-                value={customerSearchTerm}
-                onChange={(e) => {
-                  setCustomerSearchTerm(e.target.value);
-                  setSelectedCustomerIndex(-1);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (
-                      selectedCustomerIndex >= 0 &&
-                      customerSearchResults[selectedCustomerIndex]
-                    ) {
-                      handleSelectCustomer(
-                        customerSearchResults[selectedCustomerIndex],
-                      );
-                    } else if (customerSearchResults.length > 0) {
-                      handleSelectCustomer(customerSearchResults[0]);
-                    }
-                  } else if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    setSelectedCustomerIndex((prev) =>
-                      prev < customerSearchResults.length - 1 ? prev + 1 : prev,
-                    );
-                  } else if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setSelectedCustomerIndex((prev) =>
-                      prev > 0 ? prev - 1 : -1,
-                    );
-                  } else if (e.key === "Escape") {
-                    setCustomerSearchResults([]);
-                    setCustomerSearchTerm("");
-                    setSelectedCustomerIndex(-1);
-                  }
-                }}
-                className="pl-10"
-                autoComplete="off"
-              />
-            </div>
-
-            {/* Customer Search Results */}
-            {customerSearchTerm.trim().length > 0 && (
-              <div className="relative">
-                {searchingCustomers && (
-                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg border">
-                    <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                  </div>
-                )}
-
-                {!searchingCustomers && customerSearchResults.length > 0 && (
-                  <div
-                    ref={customerSuggestionsRef}
-                    className="max-h-80 overflow-y-auto border rounded-lg bg-white shadow-lg"
-                  >
-                    {customerSearchResults.map((customer, index) => (
-                      <button
-                        key={customer.id}
-                        onClick={() => handleSelectCustomer(customer)}
-                        onMouseEnter={() => setSelectedCustomerIndex(index)}
-                        className={`w-full p-4 text-left border-b last:border-b-0 flex justify-between items-center transition-colors ${
-                          selectedCustomerIndex === index
-                            ? "bg-blue-50 border-blue-200"
-                            : "hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-gray-900 truncate">
-                            {customer.name}
-                          </div>
-                          <div className="text-sm text-gray-600 mt-1 flex flex-wrap gap-2">
-                            {customer.email && <span>{customer.email}</span>}
-                            {customer.phone && (
-                              <span>Tel: {customer.phone}</span>
-                            )}
-                            {customer.rut && <span>RUT: {customer.rut}</span>}
-                          </div>
-                        </div>
-                        {selectedCustomerIndex === index && (
-                          <div className="text-xs text-blue-600 ml-2">
-                            Presiona Enter
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {!searchingCustomers &&
-                  customerSearchTerm.trim().length > 0 &&
-                  customerSearchResults.length === 0 && (
-                    <div className="border rounded-lg bg-white p-4 text-center text-gray-500">
-                      <User className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                      <p>No se encontraron clientes</p>
-                      <p className="text-sm mt-1">
-                        Intenta con otro término de búsqueda
-                      </p>
-                    </div>
-                  )}
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedCustomer(null);
-                  setCustomerRUT("");
-                  setCustomerBusinessName("");
-                  setCustomerSearchTerm("");
-                  setCustomerSearchResults([]);
-                  setShowCustomerDialog(false);
-                }}
-                className="flex-1"
-              >
-                Sin Cliente
-              </Button>
-              <Button
-                onClick={() => setShowCustomerDialog(false)}
-                className="flex-1"
-                variant="outline"
-              >
-                Cancelar
               </Button>
             </div>
           </div>
@@ -2253,10 +5077,7 @@ export default function POSPage() {
                             )}
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
-                            Creado:{" "}
-                            {new Date(quote.created_at).toLocaleDateString(
-                              "es-CL",
-                            )}
+                            Creado: {formatDate(quote.created_at)}
                           </div>
                         </div>
                         <div className="text-right">
@@ -2289,6 +5110,253 @@ export default function POSPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pending Balance Payment Dialog */}
+      <Dialog
+        open={showPendingBalanceDialog}
+        onOpenChange={(open) => {
+          setShowPendingBalanceDialog(open);
+          if (open) {
+            fetchPendingBalanceOrders();
+          } else {
+            setPendingBalanceSearchTerm("");
+            setSelectedPendingOrder(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Cobrar Saldos Pendientes</DialogTitle>
+            <DialogDescription>
+              Busca clientes u órdenes con saldo pendiente por cobrar
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <Input
+                placeholder="Buscar por nombre, RUT, número de orden, email..."
+                value={pendingBalanceSearchTerm}
+                onChange={(e) => {
+                  setPendingBalanceSearchTerm(e.target.value);
+                  fetchPendingBalanceOrders(e.target.value);
+                }}
+                className="pl-10"
+              />
+            </div>
+
+            {loadingPendingBalance ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : pendingBalanceOrders.length > 0 ? (
+              <>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Orden</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Pagado</TableHead>
+                        <TableHead className="text-right">Pendiente</TableHead>
+                        <TableHead>Acción</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingBalanceOrders.map((order) => (
+                        <TableRow
+                          key={order.id}
+                          className={
+                            selectedPendingOrder?.id === order.id
+                              ? "bg-blue-50"
+                              : "cursor-pointer hover:bg-gray-50"
+                          }
+                          onClick={() => {
+                            setSelectedPendingOrder(order);
+                            setPendingPaymentAmount(
+                              order.pending_amount.toString(),
+                            );
+                          }}
+                        >
+                          <TableCell className="font-mono font-semibold">
+                            {order.order_number}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">
+                              {order.customer_name ||
+                                order.customer_email ||
+                                "Sin nombre"}
+                            </div>
+                            {order.customer_rut && (
+                              <div className="text-xs text-gray-600 font-mono">
+                                RUT: {order.customer_rut}
+                              </div>
+                            )}
+                            {order.customer_email && (
+                              <div className="text-xs text-gray-500">
+                                {order.customer_email}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(order.total_amount)}
+                          </TableCell>
+                          <TableCell className="text-right text-green-600">
+                            {formatCurrency(order.total_paid)}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-orange-600">
+                            {formatCurrency(order.pending_amount)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant={
+                                selectedPendingOrder?.id === order.id
+                                  ? "default"
+                                  : "outline"
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPendingOrder(order);
+                                setPendingPaymentAmount(
+                                  order.pending_amount.toString(),
+                                );
+                              }}
+                            >
+                              {selectedPendingOrder?.id === order.id
+                                ? "Seleccionado"
+                                : "Seleccionar"}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {selectedPendingOrder && (
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="pt-6 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs text-gray-600">Orden</Label>
+                          <div className="font-semibold text-lg">
+                            {selectedPendingOrder.order_number}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-600">
+                            Cliente
+                          </Label>
+                          <div className="font-semibold">
+                            {selectedPendingOrder.customer_name ||
+                              selectedPendingOrder.customer_email ||
+                              "Sin nombre"}
+                          </div>
+                          {selectedPendingOrder.customer_rut && (
+                            <div className="text-xs text-gray-600 font-mono">
+                              RUT: {selectedPendingOrder.customer_rut}
+                            </div>
+                          )}
+                          {selectedPendingOrder.customer_email && (
+                            <div className="text-xs text-gray-600">
+                              {selectedPendingOrder.customer_email}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-600">
+                            Saldo Pendiente
+                          </Label>
+                          <div className="font-semibold text-lg text-orange-600">
+                            {formatCurrency(
+                              selectedPendingOrder.pending_amount,
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-600">
+                            Método de Pago
+                          </Label>
+                          <Select
+                            value={pendingPaymentMethod}
+                            onValueChange={setPendingPaymentMethod}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">Efectivo</SelectItem>
+                              <SelectItem value="debit">Débito</SelectItem>
+                              <SelectItem value="credit">Crédito</SelectItem>
+                              <SelectItem value="transfer">
+                                Transferencia
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Monto a Pagar *</Label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={pendingPaymentAmount}
+                          onChange={(e) =>
+                            setPendingPaymentAmount(e.target.value)
+                          }
+                          max={selectedPendingOrder.pending_amount}
+                        />
+                        <p className="text-xs text-gray-600 mt-1">
+                          Máximo:{" "}
+                          {formatCurrency(selectedPendingOrder.pending_amount)}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <CreditCard className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                <p>
+                  {pendingBalanceSearchTerm
+                    ? "No se encontraron resultados"
+                    : "No hay órdenes con saldo pendiente"}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowPendingBalanceDialog(false)}
+            >
+              Cerrar
+            </Button>
+            {selectedPendingOrder && (
+              <Button
+                onClick={processPendingPayment}
+                disabled={processingPendingPayment || !pendingPaymentAmount}
+              >
+                {processingPendingPayment ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Registrar Pago
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

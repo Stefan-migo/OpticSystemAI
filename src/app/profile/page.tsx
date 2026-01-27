@@ -45,6 +45,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/utils";
 
 // Form schemas
 const personalInfoSchema = z.object({
@@ -275,18 +276,11 @@ function ProfilePageContent() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-CL", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   const memberSince = profile?.created_at
-    ? new Date(profile.created_at).toLocaleDateString("es-CL", {
-        year: "numeric",
-        month: "long",
+    ? formatDate(profile.created_at, {
+        format: "long",
+        locale: "es-CL",
+        includeYear: false,
       })
     : "Recientemente";
 

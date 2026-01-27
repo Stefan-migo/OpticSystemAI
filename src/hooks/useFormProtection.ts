@@ -3,6 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+/**
+ * Opciones para el hook useFormProtection
+ *
+ * @property {boolean} [enabled=true] - Si la protección está habilitada
+ * @property {string} [message] - Mensaje a mostrar en la confirmación
+ * @property {() => void} [onBeforeUnload] - Callback antes de cerrar/refrescar la página
+ */
 interface UseFormProtectionOptions {
   enabled?: boolean;
   message?: string;
@@ -10,8 +17,33 @@ interface UseFormProtectionOptions {
 }
 
 /**
- * Hook to protect forms from accidental navigation or page refresh
- * when there are unsaved changes
+ * Hook para proteger formularios contra navegación accidental o refresh de página
+ * cuando hay cambios sin guardar
+ *
+ * Este hook intercepta:
+ * - Cierre/refresh del navegador (beforeunload)
+ * - Navegación programática (router.push/replace)
+ * - Navegación por Link de Next.js
+ *
+ * @param hasUnsavedChanges - Si hay cambios sin guardar en el formulario
+ * @param options - Opciones de configuración
+ * @returns Objeto con estado y funciones de control:
+ * - `isNavigating`: Si se está navegando actualmente
+ * - `allowNavigation()`: Función para permitir navegación programáticamente
+ *
+ * @example
+ * ```typescript
+ * function MyForm() {
+ *   const [hasChanges, setHasChanges] = useState(false)
+ *   const { allowNavigation } = useFormProtection(hasChanges)
+ *
+ *   const handleSave = async () => {
+ *     await saveData()
+ *     allowNavigation() // Permitir navegación después de guardar
+ *     router.push('/success')
+ *   }
+ * }
+ * ```
  */
 export function useFormProtection(
   hasUnsavedChanges: boolean,

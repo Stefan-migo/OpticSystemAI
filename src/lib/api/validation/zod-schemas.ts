@@ -4,8 +4,22 @@ import { isValidRUTFormat, normalizeRUT } from "@/lib/utils/rut";
 /**
  * Base Zod Schemas - Reutilizables en todo el sistema
  *
- * Estos schemas proporcionan validación consistente para campos comunes
- * usados en múltiples rutas API.
+ * Este módulo contiene schemas Zod reutilizables para validación consistente
+ * de campos comunes usados en múltiples rutas API. Todos los schemas incluyen
+ * transformaciones apropiadas (trim, lowercase, normalización, etc.).
+ *
+ * @module lib/api/validation/zod-schemas
+ *
+ * @example
+ * ```typescript
+ * import { emailSchema, rutSchema, paginationSchema } from '@/lib/api/validation/zod-schemas'
+ *
+ * const createCustomerSchema = z.object({
+ *   email: emailSchema,
+ *   rut: rutSchema,
+ *   name: z.string().min(2)
+ * })
+ * ```
  */
 
 // ============================================================================
@@ -30,20 +44,28 @@ export const rutSchema = z
   .string()
   .min(1, "El RUT es requerido")
   .refine((rut) => isValidRUTFormat(rut), {
-    message: "El formato del RUT no es válido (debe ser xx.xxx.xxx-x)",
+    message:
+      "El formato del RUT no es válido (debe ser xx.xxx.xxx-x o x.xxx.xxx-x, dígito verificador puede ser K)",
   })
   .transform((rut) => normalizeRUT(rut));
 
 /**
  * Schema para validar RUT opcional
+ * Permite string, null, o undefined
  */
 export const rutOptionalSchema = z
-  .string()
+  .union([
+    z.string().refine((rut) => isValidRUTFormat(rut), {
+      message: "El formato del RUT no es válido (debe ser xx.xxx.xxx-x)",
+    }),
+    z.null(),
+    z.undefined(),
+  ])
   .optional()
-  .refine((rut) => !rut || isValidRUTFormat(rut), {
-    message: "El formato del RUT no es válido (debe ser xx.xxx.xxx-x)",
-  })
-  .transform((rut) => (rut ? normalizeRUT(rut) : undefined));
+  .nullable()
+  .transform((rut) =>
+    rut && typeof rut === "string" ? normalizeRUT(rut) : null,
+  );
 
 /**
  * Schema para validar teléfono
@@ -442,7 +464,8 @@ export const productBaseSchema = z.object({
   compare_at_price: priceOptionalSchema,
   cost_price: priceOptionalSchema,
   price_includes_tax: z.boolean().default(false).optional(),
-  inventory_quantity: quantityOptionalSchema,
+  // inventory_quantity removed - use product_branch_stock table instead
+  // Use stock_quantity in createProductSchema for initial stock per branch
   category_id: uuidOptionalSchema,
   branch_id: uuidOptionalSchema,
   featured_image: urlOptionalSchema,
@@ -456,7 +479,7 @@ export const productBaseSchema = z.object({
     }),
   tags: z.array(z.string()).optional(),
   product_type: z
-    .enum(["frame", "lens", "accessory", "other"])
+    .enum(["frame", "lens", "accessory", "service", "other"])
     .default("frame")
     .optional(),
   optical_category: z.string().max(100).trim().optional().nullable(),
@@ -497,8 +520,11 @@ export const productBaseSchema = z.object({
 
 /**
  * Schema para crear un producto
+ * Includes optional stock_quantity for initial stock in the branch
  */
-export const createProductSchema = productBaseSchema;
+export const createProductSchema = productBaseSchema.extend({
+  stock_quantity: quantityOptionalSchema, // Optional: initial stock for branch (handled separately in product_branch_stock)
+});
 
 /**
  * Schema para actualizar un producto
@@ -512,7 +538,9 @@ export const updateProductSchema = productBaseSchema.partial().extend({
  */
 export const searchProductSchema = searchSchema.extend({
   category_id: uuidOptionalSchema,
-  product_type: z.enum(["frame", "lens", "accessory", "other"]).optional(),
+  product_type: z
+    .enum(["frame", "lens", "accessory", "service", "other"])
+    .optional(),
   status: z.enum(["active", "draft", "archived"]).optional(),
   branch_id: uuidOptionalSchema,
   min_price: z.coerce.number().positive().optional(),
@@ -567,16 +595,67 @@ const posSaleItemSchema = z.object({
 });
 
 /**
+ * Schema para datos de lentes en venta POS
+ */
+const lensDataSchema = z
+  .object({
+    lens_family_id: uuidOptionalSchema,
+    lens_type: z.string().max(100).trim().optional().nullable(),
+    lens_material: z.string().max(100).trim().optional().nullable(),
+    lens_index: z.number().positive().optional().nullable(),
+    lens_treatments: z.array(z.string()).optional().nullable(),
+    lens_tint_color: z.string().max(100).trim().optional().nullable(),
+    lens_tint_percentage: z.number().min(0).max(100).optional().nullable(),
+    prescription_id: uuidOptionalSchema,
+  })
+  .optional()
+  .nullable();
+
+/**
+ * Schema para datos de marco en venta POS
+ */
+const frameDataSchema = z
+  .object({
+    frame_product_id: uuidOptionalSchema,
+    frame_name: z.string().max(255).trim().optional().nullable(),
+    frame_brand: z.string().max(100).trim().optional().nullable(),
+    frame_model: z.string().max(100).trim().optional().nullable(),
+    frame_color: z.string().max(100).trim().optional().nullable(),
+    frame_size: z.string().max(50).trim().optional().nullable(),
+    frame_sku: z.string().max(100).trim().optional().nullable(),
+    customer_own_frame: z.boolean().optional().default(false),
+  })
+  .optional()
+  .nullable();
+
+/**
  * Schema para procesar una venta POS
  */
 export const processSaleSchema = z
   .object({
-    email: emailSchema.optional().nullable(),
-    customer_id: uuidSchema, // Required for work order creation
-    customer_name: z.string().max(200).trim().optional(),
-    payment_method_type: z.enum(["cash", "card", "credit", "installments"]),
+    email: z
+      .union([
+        z.string().email("Debe ser un email válido").toLowerCase().trim(),
+        z.null(),
+        z.literal(""),
+      ])
+      .optional()
+      .nullable()
+      .transform((val) => (val === "" ? null : val)),
+    customer_id: uuidOptionalSchema, // Optional - allow sales without registered customer
+    customer_name: z.string().max(200).trim().optional().nullable(),
+    customer_rut: rutOptionalSchema, // Optional RUT for unregistered customers
+    payment_method_type: z.enum([
+      "cash",
+      "card",
+      "credit",
+      "debit_card",
+      "credit_card",
+      "deposit",
+      "transfer",
+    ]),
     payment_status: z
-      .enum(["paid", "pending", "failed", "refunded"])
+      .enum(["paid", "pending", "partial", "failed", "refunded"])
       .default("paid")
       .optional(),
     status: z
@@ -596,9 +675,23 @@ export const processSaleSchema = z
     sii_business_name: z.string().max(200).trim().optional().nullable(),
     items: z.array(posSaleItemSchema).min(1, "Debe incluir al menos un item"),
     cash_received: priceOptionalSchema,
-    change_amount: priceOptionalSchema,
+    change_amount: priceNonNegativeSchema.optional().nullable(), // Can be 0 or null
+    deposit_amount: priceNonNegativeSchema.optional().nullable(), // Monto de abono para pagos parciales
     branch_id: uuidOptionalSchema,
     notes: z.string().max(1000).trim().optional().nullable(),
+    // Nuevos campos estructurados para lentes y marcos
+    lens_data: lensDataSchema,
+    frame_data: frameDataSchema,
+    // Presbyopia solution fields
+    presbyopia_solution: z
+      .enum(["none", "two_separate", "bifocal", "trifocal", "progressive"])
+      .optional()
+      .nullable(),
+    far_lens_family_id: uuidOptionalSchema,
+    near_lens_family_id: uuidOptionalSchema,
+    far_lens_cost: priceOptionalSchema,
+    near_lens_cost: priceOptionalSchema,
+    quote_id: uuidOptionalSchema, // Quote ID if sale comes from a quote
   })
   .refine(
     (data) => {
@@ -625,6 +718,7 @@ export const createWorkOrderSchema = z.object({
   prescription_id: uuidOptionalSchema,
   quote_id: uuidOptionalSchema,
   frame_product_id: uuidOptionalSchema,
+  customer_own_frame: z.boolean().default(false).optional(),
   frame_name: z
     .string()
     .min(1, "El nombre del marco es requerido")
@@ -636,6 +730,7 @@ export const createWorkOrderSchema = z.object({
   frame_size: z.string().max(50).trim().optional().nullable(),
   frame_sku: z.string().max(100).trim().optional().nullable(),
   frame_serial_number: z.string().max(100).trim().optional().nullable(),
+  lens_family_id: uuidOptionalSchema,
   lens_type: z.string().min(1, "El tipo de lente es requerido").max(100).trim(),
   lens_material: z
     .string()
@@ -646,6 +741,59 @@ export const createWorkOrderSchema = z.object({
   lens_treatments: z.array(z.string()).optional(),
   lens_tint_color: z.string().max(100).trim().optional().nullable(),
   lens_tint_percentage: z.number().min(0).max(100).optional().nullable(),
+  // Presbyopia solution fields
+  presbyopia_solution: z
+    .enum(["none", "two_separate", "bifocal", "trifocal", "progressive"])
+    .default("none")
+    .optional(),
+  far_lens_family_id: uuidOptionalSchema,
+  near_lens_family_id: uuidOptionalSchema,
+  far_lens_cost: z
+    .preprocess(
+      (val) => {
+        if (val === null || val === undefined || val === "") return null;
+        if (typeof val === "number") return val;
+        if (typeof val === "string") {
+          const trimmed = val.trim();
+          if (trimmed === "") return null;
+          const num = parseFloat(trimmed);
+          return isNaN(num) ? null : num;
+        }
+        return val;
+      },
+      z.union([
+        z
+          .number()
+          .nonnegative("El precio debe ser un número no negativo")
+          .finite("El precio debe ser un número finito"),
+        z.null(),
+      ]),
+    )
+    .optional()
+    .nullable(),
+  near_lens_cost: z
+    .preprocess(
+      (val) => {
+        if (val === null || val === undefined || val === "") return null;
+        if (typeof val === "number") return val;
+        if (typeof val === "string") {
+          const trimmed = val.trim();
+          if (trimmed === "") return null;
+          const num = parseFloat(trimmed);
+          return isNaN(num) ? null : num;
+        }
+        return val;
+      },
+      z.union([
+        z
+          .number()
+          .nonnegative("El precio debe ser un número no negativo")
+          .finite("El precio debe ser un número finito"),
+        z.null(),
+      ]),
+    )
+    .optional()
+    .nullable(),
   lab_name: z.string().max(200).trim().optional().nullable(),
   lab_contact: z.string().max(200).trim().optional().nullable(),
   lab_order_number: z.string().max(100).trim().optional().nullable(),
@@ -692,10 +840,117 @@ export const createWorkOrderSchema = z.object({
 /**
  * Schema para crear un presupuesto
  */
+// ============================================================================
+// Lens Families Schemas
+// ============================================================================
+
+export const lensFamilyBaseSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido").max(255),
+  brand: z.string().max(255).optional().nullable(),
+  lens_type: z.enum([
+    "single_vision",
+    "bifocal",
+    "trifocal",
+    "progressive",
+    "reading",
+    "computer",
+    "sports",
+  ]),
+  lens_material: z.enum([
+    "cr39",
+    "polycarbonate",
+    "high_index_1_67",
+    "high_index_1_74",
+    "trivex",
+    "glass",
+  ]),
+  description: z.string().optional().nullable(),
+  is_active: z.boolean().default(true),
+});
+
+export const createLensFamilySchema = lensFamilyBaseSchema;
+export const updateLensFamilySchema = lensFamilyBaseSchema.partial();
+
+// ============================================================================
+// Lens Price Matrices Schemas
+// ============================================================================
+
+const lensPriceMatrixBaseObject = z.object({
+  lens_family_id: uuidSchema,
+  sphere_min: z.number().min(-30).max(30).multipleOf(0.25),
+  sphere_max: z.number().min(-30).max(30).multipleOf(0.25),
+  cylinder_min: z.number().min(-30).max(30).multipleOf(0.25),
+  cylinder_max: z.number().min(-30).max(30).multipleOf(0.25),
+  addition_min: z.number().min(0).max(4).multipleOf(0.25).default(0).optional(),
+  addition_max: z
+    .number()
+    .min(0)
+    .max(4)
+    .multipleOf(0.25)
+    .default(4.0)
+    .optional(),
+  base_price: z.number().min(0),
+  sourcing_type: z.enum(["stock", "surfaced"]).default("surfaced"),
+  cost: z.number().min(0),
+  is_active: z.boolean().default(true),
+});
+
+export const lensPriceMatrixBaseSchema = lensPriceMatrixBaseObject.refine(
+  (data) => data.sphere_min <= data.sphere_max,
+  {
+    message: "sphere_min debe ser menor o igual a sphere_max",
+    path: ["sphere_max"],
+  },
+);
+
+export const lensPriceMatrixV2RangeRefine = lensPriceMatrixBaseSchema.refine(
+  (data) => data.cylinder_min <= data.cylinder_max,
+  {
+    message: "cylinder_min debe ser menor o igual a cylinder_max",
+    path: ["cylinder_max"],
+  },
+);
+
+export const createLensPriceMatrixSchema = lensPriceMatrixV2RangeRefine;
+export const updateLensPriceMatrixSchema = lensPriceMatrixBaseObject
+  .partial()
+  .refine(
+    (data) => {
+      // Only validate sphere range if both values are provided
+      if (data.sphere_min !== undefined && data.sphere_max !== undefined) {
+        return data.sphere_min <= data.sphere_max;
+      }
+      return true;
+    },
+    {
+      message: "sphere_min debe ser menor o igual a sphere_max",
+      path: ["sphere_max"],
+    },
+  );
+
+export const updateLensPriceMatrixSchemaV2 = updateLensPriceMatrixSchema.refine(
+  (data) => {
+    // Only validate cylinder range if both values are provided
+    if (data.cylinder_min !== undefined && data.cylinder_max !== undefined) {
+      return data.cylinder_min <= data.cylinder_max;
+    }
+    return true;
+  },
+  {
+    message: "cylinder_min debe ser menor o igual a cylinder_max",
+    path: ["cylinder_max"],
+  },
+);
+
+// ============================================================================
+// Quote Schemas
+// ============================================================================
+
 export const createQuoteSchema = z.object({
   customer_id: uuidSchema,
   prescription_id: uuidOptionalSchema,
   frame_product_id: uuidOptionalSchema,
+  customer_own_frame: z.boolean().default(false).optional(),
   frame_name: z.string().max(255).trim().optional().nullable(),
   frame_brand: z.string().max(100).trim().optional().nullable(),
   frame_model: z.string().max(100).trim().optional().nullable(),
@@ -703,12 +958,81 @@ export const createQuoteSchema = z.object({
   frame_size: z.string().max(50).trim().optional().nullable(),
   frame_sku: z.string().max(100).trim().optional().nullable(),
   frame_price: priceNonNegativeSchema.default(0).optional(),
+  lens_family_id: uuidOptionalSchema,
   lens_type: z.string().max(100).trim().optional().nullable(),
   lens_material: z.string().max(100).trim().optional().nullable(),
-  lens_index: z.number().positive().optional().nullable(),
+  lens_index: z
+    .union([z.number().positive().finite(), z.null()])
+    .optional()
+    .nullable(),
   lens_treatments: z.array(z.string()).optional(),
   lens_tint_color: z.string().max(100).trim().optional().nullable(),
   lens_tint_percentage: z.number().min(0).max(100).optional().nullable(),
+  // Presbyopia solution fields
+  presbyopia_solution: z
+    .enum(["none", "two_separate", "bifocal", "trifocal", "progressive"])
+    .default("none")
+    .optional(),
+  far_lens_family_id: uuidOptionalSchema,
+  near_lens_family_id: uuidOptionalSchema,
+  far_lens_cost: z
+    .preprocess(
+      (val) => {
+        if (val === null || val === undefined || val === "") return null;
+        if (typeof val === "number") return val;
+        if (typeof val === "string") {
+          const trimmed = val.trim();
+          if (trimmed === "") return null;
+          const num = parseFloat(trimmed);
+          return isNaN(num) ? null : num;
+        }
+        return val;
+      },
+      z.union([
+        z
+          .number()
+          .nonnegative("El precio debe ser un número no negativo")
+          .finite("El precio debe ser un número finito"),
+        z.null(),
+      ]),
+    )
+    .optional()
+    .nullable(),
+  near_lens_cost: z
+    .preprocess(
+      (val) => {
+        if (val === null || val === undefined || val === "") return null;
+        if (typeof val === "number") return val;
+        if (typeof val === "string") {
+          const trimmed = val.trim();
+          if (trimmed === "") return null;
+          const num = parseFloat(trimmed);
+          return isNaN(num) ? null : num;
+        }
+        return val;
+      },
+      z.union([
+        z
+          .number()
+          .nonnegative("El precio debe ser un número no negativo")
+          .finite("El precio debe ser un número finito"),
+        z.null(),
+      ]),
+    )
+    .optional()
+    .nullable(),
+  // Near frame fields (for two_separate solution)
+  near_frame_product_id: uuidOptionalSchema,
+  near_frame_name: z.string().max(255).trim().optional().nullable(),
+  near_frame_brand: z.string().max(100).trim().optional().nullable(),
+  near_frame_model: z.string().max(100).trim().optional().nullable(),
+  near_frame_color: z.string().max(100).trim().optional().nullable(),
+  near_frame_size: z.string().max(50).trim().optional().nullable(),
+  near_frame_sku: z.string().max(100).trim().optional().nullable(),
+  near_frame_price: priceNonNegativeSchema.default(0).optional(),
+  near_frame_price_includes_tax: z.boolean().default(false).optional(),
+  near_frame_cost: priceNonNegativeSchema.default(0).optional(),
+  customer_own_near_frame: z.boolean().default(false).optional(),
   frame_cost: priceNonNegativeSchema.default(0).optional(),
   lens_cost: priceNonNegativeSchema.default(0).optional(),
   treatments_cost: priceNonNegativeSchema.default(0).optional(),
@@ -717,7 +1041,7 @@ export const createQuoteSchema = z.object({
   tax_amount: priceNonNegativeSchema.default(0).optional(),
   discount_amount: priceNonNegativeSchema.default(0).optional(),
   discount_percentage: z.number().min(0).max(100).default(0).optional(),
-  total_amount: priceSchema,
+  total_amount: priceNonNegativeSchema.default(0).optional(),
   currency: z.string().max(10).default("CLP").optional(),
   status: z
     .enum(["draft", "sent", "accepted", "rejected", "expired"])

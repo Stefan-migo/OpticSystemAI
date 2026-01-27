@@ -6,17 +6,45 @@ import { logger } from "@/lib/logger";
 /**
  * Helpers para usar Zod en rutas API de Next.js
  *
- * Estos helpers proporcionan funciones convenientes para validar
+ * Este módulo proporciona funciones convenientes para validar
  * request bodies, query parameters y path parameters usando Zod.
+ * Todas las funciones incluyen logging automático de errores y
+ * manejo consistente de excepciones.
+ *
+ * @module lib/api/validation/zod-helpers
+ *
+ * @example
+ * ```typescript
+ * import { parseAndValidateBody } from '@/lib/api/validation/zod-helpers'
+ * import { createProductSchema } from '@/lib/api/validation/zod-schemas'
+ *
+ * export async function POST(request: NextRequest) {
+ *   const data = await parseAndValidateBody(request, createProductSchema)
+ *   // data está validado y tipado correctamente
+ * }
+ * ```
  */
 
 /**
  * Valida un objeto usando un schema Zod (para cuando el body ya fue parseado)
  *
- * @param body - Objeto ya parseado
- * @param schema - Zod schema para validar el body
- * @returns Datos validados y parseados
- * @throws ValidationError si la validación falla
+ * Esta función es útil cuando ya tienes el objeto parseado y solo necesitas validarlo.
+ * Para validar directamente desde un Request, usa `parseAndValidateBody`.
+ *
+ * @template T - Tipo del schema Zod (inferido automáticamente)
+ * @param body - Objeto ya parseado a validar
+ * @param schema - Schema Zod para validar el body
+ * @returns Datos validados y parseados con el tipo inferido del schema
+ * @throws {ValidationError} Si la validación falla, con detalles de los errores
+ *
+ * @example
+ * ```typescript
+ * const body = await request.json()
+ * const validated = validateBody(body, createProductSchema)
+ * // validated tiene el tipo correcto según createProductSchema
+ * ```
+ *
+ * @see {@link parseAndValidateBody} Para validar directamente desde un Request
  */
 export function validateBody<T extends z.ZodTypeAny>(
   body: unknown,
@@ -68,10 +96,23 @@ export function validateBody<T extends z.ZodTypeAny>(
 /**
  * Valida y parsea el body de una request usando un schema Zod
  *
- * @param request - NextRequest object
- * @param schema - Zod schema para validar el body
- * @returns Datos validados y parseados
- * @throws ValidationError si la validación falla
+ * Esta es la función más común para validar request bodies en API routes.
+ * Combina el parsing del JSON y la validación en un solo paso.
+ *
+ * @template T - Tipo del schema Zod (inferido automáticamente)
+ * @param request - Objeto NextRequest de Next.js
+ * @param schema - Schema Zod para validar el body
+ * @returns Promise que resuelve con los datos validados y parseados
+ * @throws {ValidationError} Si el JSON es inválido o la validación falla
+ *
+ * @example
+ * ```typescript
+ * export async function POST(request: NextRequest) {
+ *   const data = await parseAndValidateBody(request, createProductSchema)
+ *   // data está validado y tipado
+ *   await createProduct(data)
+ * }
+ * ```
  */
 export async function parseAndValidateBody<T extends z.ZodTypeAny>(
   request: NextRequest,
@@ -96,10 +137,24 @@ export async function parseAndValidateBody<T extends z.ZodTypeAny>(
 /**
  * Valida query parameters usando un schema Zod
  *
- * @param request - NextRequest object
- * @param schema - Zod schema para validar los query params
- * @returns Query parameters validados y parseados
- * @throws ValidationError si la validación falla
+ * Convierte automáticamente los query parameters de strings a sus tipos apropiados
+ * según el schema (números, booleanos, etc.).
+ *
+ * @template T - Tipo del schema Zod (inferido automáticamente)
+ * @param request - Objeto NextRequest de Next.js
+ * @param schema - Schema Zod para validar los query parameters
+ * @returns Query parameters validados y parseados con tipos correctos
+ * @throws {ValidationError} Si la validación falla
+ *
+ * @example
+ * ```typescript
+ * const query = parseAndValidateQuery(request, z.object({
+ *   page: z.coerce.number().min(1),
+ *   limit: z.coerce.number().min(1).max(100),
+ *   search: z.string().optional()
+ * }))
+ * // query.page y query.limit son números, no strings
+ * ```
  */
 export function parseAndValidateQuery<T extends z.ZodTypeAny>(
   request: NextRequest,
@@ -152,10 +207,26 @@ export function parseAndValidateQuery<T extends z.ZodTypeAny>(
 /**
  * Valida path parameters usando un schema Zod
  *
- * @param params - Path parameters object
- * @param schema - Zod schema para validar los params
+ * Útil para validar parámetros de ruta dinámicos (ej: `/api/products/[id]`).
+ *
+ * @template T - Tipo del schema Zod (inferido automáticamente)
+ * @param params - Objeto con los path parameters (típicamente de `params` en route handlers)
+ * @param schema - Schema Zod para validar los path parameters
  * @returns Path parameters validados y parseados
- * @throws ValidationError si la validación falla
+ * @throws {ValidationError} Si la validación falla
+ *
+ * @example
+ * ```typescript
+ * export async function GET(
+ *   request: NextRequest,
+ *   { params }: { params: { id: string } }
+ * ) {
+ *   const { id } = parseAndValidateParams(params, z.object({
+ *     id: z.string().uuid()
+ *   }))
+ *   // id está validado como UUID
+ * }
+ * ```
  */
 export function parseAndValidateParams<T extends z.ZodTypeAny>(
   params: Record<string, string | string[] | undefined>,
@@ -189,10 +260,28 @@ export function parseAndValidateParams<T extends z.ZodTypeAny>(
 }
 
 /**
- * Middleware wrapper para manejar errores de validación
+ * Middleware wrapper para manejar errores de validación automáticamente
  *
- * @param handler - Función handler de la ruta API
- * @returns Handler envuelto con manejo de errores de validación
+ * Envuelve un handler de API route con validación automática del body.
+ * Si la validación falla, retorna una respuesta 400 con los errores.
+ * Si hay un error inesperado, retorna 500.
+ *
+ * @template T - Tipo del schema Zod
+ * @param schema - Schema Zod para validar el body del request
+ * @param handler - Función handler que recibe los datos validados y el request
+ * @returns Handler envuelto que maneja validación y errores automáticamente
+ *
+ * @example
+ * ```typescript
+ * export const POST = withValidation(
+ *   createProductSchema,
+ *   async (data, request) => {
+ *     // data está validado y tipado
+ *     const product = await createProduct(data)
+ *     return NextResponse.json(product)
+ *   }
+ * )
+ * ```
  */
 export function withValidation<T extends z.ZodTypeAny>(
   schema: T,
@@ -235,8 +324,20 @@ export function withValidation<T extends z.ZodTypeAny>(
 /**
  * Helper para crear respuestas de error de validación consistentes
  *
- * @param error - Error de validación
- * @returns NextResponse con error de validación
+ * Convierte errores de validación (ValidationError o ZodError) en respuestas
+ * HTTP 400 con formato consistente.
+ *
+ * @param error - Error de validación (ValidationError o ZodError)
+ * @returns NextResponse con status 400 y detalles del error
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   const data = await parseAndValidateBody(request, schema)
+ * } catch (error) {
+ *   return validationErrorResponse(error)
+ * }
+ * ```
  */
 export function validationErrorResponse(
   error: ValidationError | z.ZodError,

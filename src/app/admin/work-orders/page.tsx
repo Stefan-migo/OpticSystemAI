@@ -51,26 +51,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import dynamic from "next/dynamic";
+// dynamic import eliminado: CreateWorkOrderForm ya no se usa
 import { useBranch } from "@/hooks/useBranch";
 import { getBranchHeader } from "@/lib/utils/branch";
 import { BranchSelector } from "@/components/admin/BranchSelector";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
-// Lazy load CreateWorkOrderForm to reduce initial bundle size
-const CreateWorkOrderForm = dynamic(
-  () => import("@/components/admin/CreateWorkOrderForm"),
-  {
-    loading: () => (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-azul-profundo mx-auto"></div>
-          <p className="text-tierra-media">Cargando formulario...</p>
-        </div>
-      </div>
-    ),
-    ssr: false, // Form doesn't need SSR
-  },
-);
+// CreateWorkOrderForm eliminado: Los trabajos solo se crean desde POS (process-sale)
+// Esto previene trabajos "fantasma" sin vínculo financiero ni control de inventario
 
 interface WorkOrder {
   id: string;
@@ -110,7 +98,6 @@ export default function WorkOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalWorkOrders, setTotalWorkOrders] = useState(0);
@@ -166,13 +153,6 @@ export default function WorkOrdersPage() {
       setLoading(false);
     }
   };
-
-  const formatPrice = (amount: number) =>
-    new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-      minimumFractionDigits: 0,
-    }).format(amount);
 
   const getStatusBadge = (status: string) => {
     const config: Record<
@@ -288,10 +268,7 @@ export default function WorkOrdersPage() {
     return true;
   });
 
-  const handleWorkOrderCreated = () => {
-    setShowCreateWorkOrder(false);
-    fetchWorkOrders();
-  };
+  // handleWorkOrderCreated eliminado: Los trabajos solo se crean desde POS
 
   const handleDeleteClick = (workOrderId: string) => {
     setWorkOrderToDelete(workOrderId);
@@ -385,10 +362,8 @@ export default function WorkOrdersPage() {
         </div>
         <div className="flex items-center gap-2">
           {isSuperAdmin && <BranchSelector />}
-          <Button onClick={() => setShowCreateWorkOrder(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Trabajo
-          </Button>
+          {/* Botón "Nuevo Trabajo" eliminado: Los trabajos solo se crean desde POS (process-sale) */}
+          {/* Esto previene trabajos "fantasma" sin vínculo financiero ni control de inventario */}
         </div>
       </div>
 
@@ -519,14 +494,8 @@ export default function WorkOrdersPage() {
               <p className="text-tierra-media mb-4">
                 {searchTerm
                   ? "No se encontraron trabajos que coincidan con la búsqueda"
-                  : "Comienza creando tu primer trabajo"}
+                  : "Los trabajos se crean automáticamente desde el POS al procesar una venta"}
               </p>
-              {!searchTerm && (
-                <Button onClick={() => setShowCreateWorkOrder(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Trabajo
-                </Button>
-              )}
             </div>
           ) : (
             <>
@@ -638,7 +607,7 @@ export default function WorkOrdersPage() {
                         )}
                       </TableCell>
                       <TableCell className="font-semibold text-verde-suave">
-                        {formatPrice(workOrder.total_amount)}
+                        {formatCurrency(workOrder.total_amount)}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -701,21 +670,7 @@ export default function WorkOrdersPage() {
         </CardContent>
       </Card>
 
-      {/* Create Work Order Dialog */}
-      <Dialog open={showCreateWorkOrder} onOpenChange={setShowCreateWorkOrder}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nuevo Trabajo</DialogTitle>
-            <DialogDescription>
-              Crea un nuevo trabajo de laboratorio
-            </DialogDescription>
-          </DialogHeader>
-          <CreateWorkOrderForm
-            onSuccess={handleWorkOrderCreated}
-            onCancel={() => setShowCreateWorkOrder(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Create Work Order Dialog eliminado: Los trabajos solo se crean desde POS (process-sale) */}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

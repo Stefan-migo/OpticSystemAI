@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { 
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -29,7 +29,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,10 +37,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { 
-  Users, 
-  UserPlus, 
+} from "@/components/ui/dropdown-menu";
+import {
+  Users,
+  UserPlus,
   Crown,
   Shield,
   User,
@@ -58,12 +58,14 @@ import {
   Check,
   MoreVertical,
   Building2,
-  Globe
-} from 'lucide-react';
-import Link from 'next/link';
-import { toast } from 'sonner';
-import PermissionsEditor from '@/components/admin/PermissionsEditor';
-import { useBranch } from '@/hooks/useBranch';
+  Globe,
+} from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+import PermissionsEditor from "@/components/admin/PermissionsEditor";
+import { Pagination } from "@/components/ui/pagination";
+import { useBranch } from "@/hooks/useBranch";
+import { formatTimeAgo, formatDate } from "@/lib/utils";
 
 interface AdminUser {
   id: string;
@@ -106,12 +108,17 @@ export default function AdminUsersPage() {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+
   // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
   // Search autocomplete state
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<AdminUser[]>([]);
@@ -120,40 +127,43 @@ export default function AdminUsersPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newAdminData, setNewAdminData] = useState({
-    email: '',
-    role: 'admin',
+    email: "",
+    role: "admin",
     is_active: true,
     branch_ids: [] as string[],
-    is_super_admin: false
+    is_super_admin: false,
   });
-  
+
   // Branches for selection
-  const [availableBranches, setAvailableBranches] = useState<Array<{id: string; name: string; code: string}>>([]);
-  
+  const [availableBranches, setAvailableBranches] = useState<
+    Array<{ id: string; name: string; code: string }>
+  >([]);
+
   // Autocomplete state
   const [openUserSelect, setOpenUserSelect] = useState(false);
-  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  
+
   // Permissions editor state
   const [showPermissionsEditor, setShowPermissionsEditor] = useState(false);
-  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<AdminUser | null>(null);
+  const [selectedUserForPermissions, setSelectedUserForPermissions] =
+    useState<AdminUser | null>(null);
 
   useEffect(() => {
     fetchAdminUsers();
     fetchBranches();
-  }, [roleFilter, statusFilter]);
+  }, [roleFilter, statusFilter, currentPage, itemsPerPage]);
 
   const fetchBranches = async () => {
     try {
-      const response = await fetch('/api/admin/branches');
+      const response = await fetch("/api/admin/branches");
       if (response.ok) {
         const data = await response.json();
         setAvailableBranches(data.branches || []);
       }
     } catch (error) {
-      console.error('Error fetching branches:', error);
+      console.error("Error fetching branches:", error);
     }
   };
 
@@ -167,20 +177,20 @@ export default function AdminUsersPage() {
   // Fetch users when dialog opens and reset state when closed
   useEffect(() => {
     if (showCreateDialog) {
-      fetchSuggestedUsers('');
-      setUserSearchQuery('');
+      fetchSuggestedUsers("");
+      setUserSearchQuery("");
       setOpenUserSelect(false);
       // Reset form
       setNewAdminData({
-        email: '',
-        role: 'admin',
+        email: "",
+        role: "admin",
         is_active: true,
         branch_ids: [],
-        is_super_admin: false
+        is_super_admin: false,
       });
     } else {
       // Clean up when dialog closes
-      setUserSearchQuery('');
+      setUserSearchQuery("");
       setSuggestedUsers([]);
       setOpenUserSelect(false);
     }
@@ -190,25 +200,28 @@ export default function AdminUsersPage() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (openUserSelect && !target.closest('.autocomplete-container')) {
+      if (openUserSelect && !target.closest(".autocomplete-container")) {
         setOpenUserSelect(false);
       }
-      if (showSearchSuggestions && !target.closest('.search-autocomplete-container')) {
+      if (
+        showSearchSuggestions &&
+        !target.closest(".search-autocomplete-container")
+      ) {
         setShowSearchSuggestions(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openUserSelect, showSearchSuggestions]);
 
   // Generate search suggestions from existing admin users
   useEffect(() => {
     if (searchTerm.trim().length > 0) {
-      const filtered = adminUsers.filter(admin => {
+      const filtered = adminUsers.filter((admin) => {
         const searchLower = searchTerm.toLowerCase();
         const email = admin.email.toLowerCase();
-        const fullName = (admin.analytics?.fullName || '').toLowerCase();
+        const fullName = (admin.analytics?.fullName || "").toLowerCase();
         return email.includes(searchLower) || fullName.includes(searchLower);
       });
       setSearchSuggestions(filtered.slice(0, 5)); // Limit to 5 suggestions
@@ -224,18 +237,18 @@ export default function AdminUsersPage() {
       setLoadingUsers(true);
       const params = new URLSearchParams();
       if (query.trim()) {
-        params.set('q', query);
+        params.set("q", query);
       }
-      
+
       const response = await fetch(`/api/admin/users/search?${params}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch users');
+        throw new Error("Failed to fetch users");
       }
-      
+
       const data = await response.json();
       setSuggestedUsers(data.users || []);
     } catch (err) {
-      console.error('Error fetching users:', err);
+      console.error("Error fetching users:", err);
       setSuggestedUsers([]);
     } finally {
       setLoadingUsers(false);
@@ -245,25 +258,31 @@ export default function AdminUsersPage() {
   const fetchAdminUsers = async () => {
     try {
       setLoading(true);
+      const offset = (currentPage - 1) * itemsPerPage;
       const params = new URLSearchParams({
-        ...(roleFilter !== 'all' && { role: roleFilter }),
-        ...(statusFilter !== 'all' && { status: statusFilter })
+        limit: itemsPerPage.toString(),
+        offset: offset.toString(),
+        ...(roleFilter !== "all" && { role: roleFilter }),
+        ...(statusFilter !== "all" && { status: statusFilter }),
       });
 
       const response = await fetch(`/api/admin/admin-users?${params}`);
       if (!response.ok) {
         if (response.status === 403) {
-          throw new Error('Acceso restringido: Solo administradores pueden ver esta sección');
+          throw new Error(
+            "Acceso restringido: Solo administradores pueden ver esta sección",
+          );
         }
-        throw new Error('Failed to fetch admin users');
+        throw new Error("Failed to fetch admin users");
       }
 
       const data = await response.json();
       setAdminUsers(data.adminUsers || []);
+      setTotalCount(data.pagination?.total || 0);
       setError(null);
     } catch (err) {
-      console.error('Error fetching admin users:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      console.error("Error fetching admin users:", err);
+      setError(err instanceof Error ? err.message : "Unknown error occurred");
     } finally {
       setLoading(false);
     }
@@ -271,118 +290,146 @@ export default function AdminUsersPage() {
 
   const handleCreateAdmin = async () => {
     if (!newAdminData.email) {
-      toast.error('Email es requerido');
+      toast.error("Email es requerido");
       return;
     }
 
     // Validate: if not super admin, must have at least one branch
-    if (!newAdminData.is_super_admin && (!newAdminData.branch_ids || newAdminData.branch_ids.length === 0)) {
-      toast.error('Debe asignar al menos una sucursal al administrador');
+    if (
+      !newAdminData.is_super_admin &&
+      (!newAdminData.branch_ids || newAdminData.branch_ids.length === 0)
+    ) {
+      toast.error("Debe asignar al menos una sucursal al administrador");
       return;
     }
 
     try {
       setCreating(true);
-      
-      const response = await fetch('/api/admin/admin-users', {
-        method: 'POST',
+
+      const response = await fetch("/api/admin/admin-users", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           email: newAdminData.email,
-          role: 'admin',
+          role: "admin",
           is_active: newAdminData.is_active,
           is_super_admin: newAdminData.is_super_admin,
-          branch_ids: newAdminData.is_super_admin ? [] : newAdminData.branch_ids
+          branch_ids: newAdminData.is_super_admin
+            ? []
+            : newAdminData.branch_ids,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create admin user');
+        throw new Error(errorData.error || "Failed to create admin user");
       }
 
-      toast.success('Usuario administrador creado exitosamente');
+      toast.success("Usuario administrador creado exitosamente");
       setShowCreateDialog(false);
-      setNewAdminData({ 
-        email: '', 
-        role: 'admin', 
-        is_active: true, 
+      setNewAdminData({
+        email: "",
+        role: "admin",
+        is_active: true,
         branch_ids: [],
-        is_super_admin: false 
+        is_super_admin: false,
       });
       fetchAdminUsers();
-
     } catch (error) {
-      console.error('Error creating admin user:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al crear usuario administrador');
+      console.error("Error creating admin user:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Error al crear usuario administrador",
+      );
     } finally {
       setCreating(false);
     }
   };
 
-  const handleToggleStatus = async (adminId: string, currentStatus: boolean) => {
+  const handleToggleStatus = async (
+    adminId: string,
+    currentStatus: boolean,
+  ) => {
     if (!isSuperAdmin) {
-      toast.error('Solo los super administradores pueden activar o desactivar otros administradores');
+      toast.error(
+        "Solo los super administradores pueden activar o desactivar otros administradores",
+      );
       return;
     }
 
-    if (!confirm(`¿Estás seguro de que quieres ${!currentStatus ? 'activar' : 'desactivar'} a este administrador?`)) {
+    if (
+      !confirm(
+        `¿Estás seguro de que quieres ${!currentStatus ? "activar" : "desactivar"} a este administrador?`,
+      )
+    ) {
       return;
     }
 
     try {
       const response = await fetch(`/api/admin/admin-users/${adminId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ is_active: !currentStatus }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update admin user');
+        throw new Error(errorData.error || "Failed to update admin user");
       }
 
-      toast.success(`Usuario ${!currentStatus ? 'activado' : 'desactivado'} exitosamente`);
+      toast.success(
+        `Usuario ${!currentStatus ? "activado" : "desactivado"} exitosamente`,
+      );
       fetchAdminUsers();
-
     } catch (error) {
-      console.error('Error updating admin user:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al actualizar usuario');
+      console.error("Error updating admin user:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Error al actualizar usuario",
+      );
     }
   };
 
   const handleDeleteAdmin = async (adminId: string, adminEmail: string) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar al administrador ${adminEmail}? Esta acción no se puede deshacer.`)) {
+    if (
+      !confirm(
+        `¿Estás seguro de que quieres eliminar al administrador ${adminEmail}? Esta acción no se puede deshacer.`,
+      )
+    ) {
       return;
     }
 
     try {
       const response = await fetch(`/api/admin/admin-users/${adminId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete admin user');
+        throw new Error(errorData.error || "Failed to delete admin user");
       }
 
-      toast.success('Usuario administrador eliminado exitosamente');
+      toast.success("Usuario administrador eliminado exitosamente");
       fetchAdminUsers();
-
     } catch (error) {
-      console.error('Error deleting admin user:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al eliminar usuario');
+      console.error("Error deleting admin user:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Error al eliminar usuario",
+      );
     }
   };
 
   const getRoleBadge = (admin: AdminUser) => {
     if (admin.is_super_admin) {
       return (
-        <Badge variant="default" className="flex items-center gap-1 bg-dorado text-primary">
+        <Badge
+          variant="default"
+          className="flex items-center gap-1 bg-dorado text-primary"
+        >
           <Globe className="h-3 w-3" />
           Super Administrador
         </Badge>
@@ -398,26 +445,15 @@ export default function AdminUsersPage() {
 
   const getStatusBadge = (isActive: boolean) => {
     return (
-      <Badge variant={isActive ? 'default' : 'outline'}>
-        {isActive ? 'Activo' : 'Inactivo'}
+      <Badge variant={isActive ? "default" : "outline"}>
+        {isActive ? "Activo" : "Inactivo"}
       </Badge>
     );
   };
 
   const formatLastActivity = (dateString?: string) => {
-    if (!dateString) return 'Nunca';
-    
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffHours < 1) return 'Hace menos de 1 hora';
-    if (diffHours < 24) return `Hace ${diffHours} horas`;
-    
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `Hace ${diffDays} días`;
-    
-    return date.toLocaleDateString('es-AR');
+    if (!dateString) return "Nunca";
+    return formatTimeAgo(dateString, "es-AR");
   };
 
   if (loading) {
@@ -425,8 +461,12 @@ export default function AdminUsersPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Gestión de Administradores</h1>
-            <p className="text-tierra-media">Cargando usuarios administradores...</p>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Gestión de Administradores
+            </h1>
+            <p className="text-tierra-media">
+              Cargando usuarios administradores...
+            </p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -448,14 +488,18 @@ export default function AdminUsersPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Gestión de Administradores</h1>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Gestión de Administradores
+            </h1>
             <p className="text-tierra-media">Error al cargar los datos</p>
           </div>
         </div>
         <Card>
           <CardContent className="text-center py-16">
             <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-red-700 mb-2">Error al cargar administradores</h3>
+            <h3 className="text-lg font-semibold text-red-700 mb-2">
+              Error al cargar administradores
+            </h3>
             <p className="text-tierra-media mb-4">{error}</p>
             <Button onClick={fetchAdminUsers}>Reintentar</Button>
           </CardContent>
@@ -469,12 +513,14 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">Gestión de Administradores</h1>
+          <h1 className="text-3xl font-bold text-azul-profundo">
+            Gestión de Administradores
+          </h1>
           <p className="text-tierra-media">
             Administra usuarios con acceso al panel de administración
           </p>
         </div>
-        
+
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button>
@@ -489,7 +535,7 @@ export default function AdminUsersPage() {
                 Otorga acceso administrativo a un usuario registrado
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div className="relative autocomplete-container">
                 <Label htmlFor="email">Email del Usuario</Label>
@@ -512,44 +558,52 @@ export default function AdminUsersPage() {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Autocomplete Suggestions */}
-                {openUserSelect && (userSearchQuery.length > 0 || suggestedUsers.length > 0) && (
-                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {suggestedUsers.length === 0 && !loadingUsers && (
-                      <div className="px-4 py-3 text-sm text-tierra-media text-center">
-                        No se encontraron usuarios
-                      </div>
-                    )}
-                    {suggestedUsers.map((user) => (
-                      <div
-                        key={user.id}
-                        className="px-4 py-3 hover:bg-admin-bg-tertiary cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
-                        onClick={() => {
-                          setNewAdminData({...newAdminData, email: user.email});
-                          setUserSearchQuery(user.email);
-                          setOpenUserSelect(false);
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          {newAdminData.email === user.email && (
-                            <Check className="h-4 w-4 text-admin-accent-tertiary flex-shrink-0" />
-                          )}
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <span className="font-medium text-sm truncate">{user.fullName}</span>
-                            <span className="text-xs text-tierra-media truncate">{user.email}</span>
+                {openUserSelect &&
+                  (userSearchQuery.length > 0 || suggestedUsers.length > 0) && (
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {suggestedUsers.length === 0 && !loadingUsers && (
+                        <div className="px-4 py-3 text-sm text-tierra-media text-center">
+                          No se encontraron usuarios
+                        </div>
+                      )}
+                      {suggestedUsers.map((user) => (
+                        <div
+                          key={user.id}
+                          className="px-4 py-3 hover:bg-admin-bg-tertiary cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
+                          onClick={() => {
+                            setNewAdminData({
+                              ...newAdminData,
+                              email: user.email,
+                            });
+                            setUserSearchQuery(user.email);
+                            setOpenUserSelect(false);
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            {newAdminData.email === user.email && (
+                              <Check className="h-4 w-4 text-admin-accent-tertiary flex-shrink-0" />
+                            )}
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <span className="font-medium text-sm truncate">
+                                {user.fullName}
+                              </span>
+                              <span className="text-xs text-tierra-media truncate">
+                                {user.email}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
+                      ))}
+                    </div>
+                  )}
+
                 <p className="text-sm text-tierra-media mt-1">
                   Escribe para buscar un usuario registrado del sistema
                 </p>
               </div>
-              
+
               {/* Super Admin Option - Only for super admins */}
               {isSuperAdmin && (
                 <div>
@@ -560,13 +614,21 @@ export default function AdminUsersPage() {
                         type="radio"
                         name="admin_type"
                         checked={newAdminData.is_super_admin}
-                        onChange={() => setNewAdminData({...newAdminData, is_super_admin: true, branch_ids: []})}
+                        onChange={() =>
+                          setNewAdminData({
+                            ...newAdminData,
+                            is_super_admin: true,
+                            branch_ids: [],
+                          })
+                        }
                         className="mt-1"
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <Globe className="h-4 w-4 text-dorado" />
-                          <span className="font-medium">Super Administrador</span>
+                          <span className="font-medium">
+                            Super Administrador
+                          </span>
                         </div>
                         <p className="text-sm text-tierra-media mt-1">
                           Acceso a todas las sucursales y funciones del sistema
@@ -578,13 +640,21 @@ export default function AdminUsersPage() {
                         type="radio"
                         name="admin_type"
                         checked={!newAdminData.is_super_admin}
-                        onChange={() => setNewAdminData({...newAdminData, is_super_admin: false, branch_ids: []})}
+                        onChange={() =>
+                          setNewAdminData({
+                            ...newAdminData,
+                            is_super_admin: false,
+                            branch_ids: [],
+                          })
+                        }
                         className="mt-1"
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-admin-accent-tertiary" />
-                          <span className="font-medium">Administrador de Sucursal</span>
+                          <span className="font-medium">
+                            Administrador de Sucursal
+                          </span>
                         </div>
                         <p className="text-sm text-tierra-media mt-1">
                           Acceso limitado a sucursales específicas
@@ -601,48 +671,66 @@ export default function AdminUsersPage() {
                   <Label>Sucursales</Label>
                   <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
                     {availableBranches.length === 0 ? (
-                      <p className="text-sm text-tierra-media">No hay sucursales disponibles</p>
+                      <p className="text-sm text-tierra-media">
+                        No hay sucursales disponibles
+                      </p>
                     ) : (
                       availableBranches.map((branch) => (
-                        <label key={branch.id} className="flex items-center gap-2 cursor-pointer hover:bg-admin-bg-tertiary p-2 rounded">
+                        <label
+                          key={branch.id}
+                          className="flex items-center gap-2 cursor-pointer hover:bg-admin-bg-tertiary p-2 rounded"
+                        >
                           <input
                             type="checkbox"
-                            checked={newAdminData.branch_ids.includes(branch.id)}
+                            checked={newAdminData.branch_ids.includes(
+                              branch.id,
+                            )}
                             onChange={(e) => {
                               if (e.target.checked) {
                                 setNewAdminData({
                                   ...newAdminData,
-                                  branch_ids: [...newAdminData.branch_ids, branch.id]
+                                  branch_ids: [
+                                    ...newAdminData.branch_ids,
+                                    branch.id,
+                                  ],
                                 });
                               } else {
                                 setNewAdminData({
                                   ...newAdminData,
-                                  branch_ids: newAdminData.branch_ids.filter(id => id !== branch.id)
+                                  branch_ids: newAdminData.branch_ids.filter(
+                                    (id) => id !== branch.id,
+                                  ),
                                 });
                               }
                             }}
                             className="rounded"
                           />
-                          <span className="text-sm">{branch.name} ({branch.code})</span>
+                          <span className="text-sm">
+                            {branch.name} ({branch.code})
+                          </span>
                         </label>
                       ))
                     )}
                   </div>
                   {newAdminData.branch_ids.length > 0 && (
                     <p className="text-xs text-tierra-media mt-1">
-                      {newAdminData.branch_ids.length} sucursal(es) seleccionada(s)
+                      {newAdminData.branch_ids.length} sucursal(es)
+                      seleccionada(s)
                     </p>
                   )}
                 </div>
               )}
             </div>
-            
+
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateDialog(false)}
+              >
                 Cancelar
               </Button>
               <Button onClick={handleCreateAdmin} disabled={creating}>
-                {creating ? 'Creando...' : 'Crear Administrador'}
+                {creating ? "Creando..." : "Crear Administrador"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -656,8 +744,12 @@ export default function AdminUsersPage() {
             <div className="flex items-center">
               <Users className="h-8 w-8 text-azul-profundo" />
               <div className="ml-4">
-                <p className="text-sm text-tierra-media">Total Administradores</p>
-                <p className="text-2xl font-bold text-azul-profundo">{adminUsers.length}</p>
+                <p className="text-sm text-tierra-media">
+                  Total Administradores
+                </p>
+                <p className="text-2xl font-bold text-azul-profundo">
+                  {adminUsers.length}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -668,9 +760,11 @@ export default function AdminUsersPage() {
             <div className="flex items-center">
               <Globe className="h-8 w-8 text-dorado" />
               <div className="ml-4">
-                <p className="text-sm text-tierra-media">Super Administradores</p>
+                <p className="text-sm text-tierra-media">
+                  Super Administradores
+                </p>
                 <p className="text-2xl font-bold text-dorado">
-                  {adminUsers.filter(admin => admin.is_super_admin).length}
+                  {adminUsers.filter((admin) => admin.is_super_admin).length}
                 </p>
               </div>
             </div>
@@ -684,7 +778,7 @@ export default function AdminUsersPage() {
               <div className="ml-4">
                 <p className="text-sm text-tierra-media">Activos</p>
                 <p className="text-2xl font-bold text-verde-suave">
-                  {adminUsers.filter(admin => admin.is_active).length}
+                  {adminUsers.filter((admin) => admin.is_active).length}
                 </p>
               </div>
             </div>
@@ -698,7 +792,13 @@ export default function AdminUsersPage() {
               <div className="ml-4">
                 <p className="text-sm text-tierra-media">Activos Recientes</p>
                 <p className="text-2xl font-bold text-red-500">
-                  {adminUsers.filter(admin => admin.analytics?.activityCount30Days && admin.analytics.activityCount30Days > 0).length}
+                  {
+                    adminUsers.filter(
+                      (admin) =>
+                        admin.analytics?.activityCount30Days &&
+                        admin.analytics.activityCount30Days > 0,
+                    ).length
+                  }
                 </p>
               </div>
             </div>
@@ -721,13 +821,16 @@ export default function AdminUsersPage() {
                     setShowSearchSuggestions(true);
                   }}
                   onFocus={() => {
-                    if (searchTerm.trim().length > 0 && searchSuggestions.length > 0) {
+                    if (
+                      searchTerm.trim().length > 0 &&
+                      searchSuggestions.length > 0
+                    ) {
                       setShowSearchSuggestions(true);
                     }
                   }}
                   className="pl-10"
                 />
-                
+
                 {/* Search Autocomplete Suggestions */}
                 {showSearchSuggestions && searchSuggestions.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -744,18 +847,27 @@ export default function AdminUsersPage() {
                         >
                           <div className="flex items-center gap-3">
                             <div className="flex flex-col min-w-0 flex-1">
-                              <span className="font-medium text-sm truncate">{fullName}</span>
-                              <span className="text-xs text-tierra-media truncate">{admin.email}</span>
+                              <span className="font-medium text-sm truncate">
+                                {fullName}
+                              </span>
+                              <span className="text-xs text-tierra-media truncate">
+                                {admin.email}
+                              </span>
                             </div>
                             {admin.is_active ? (
-                              <Badge 
-                                className="bg-verde-suave text-primary text-xs" 
-                                style={{ backgroundColor: 'var(--accent)', color: 'var(--admin-bg-primary)' }}
+                              <Badge
+                                className="bg-verde-suave text-primary text-xs"
+                                style={{
+                                  backgroundColor: "var(--accent)",
+                                  color: "var(--admin-bg-primary)",
+                                }}
                               >
                                 Activo
                               </Badge>
                             ) : (
-                              <Badge variant="destructive" className="text-xs">Inactivo</Badge>
+                              <Badge variant="destructive" className="text-xs">
+                                Inactivo
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -765,7 +877,7 @@ export default function AdminUsersPage() {
                 )}
               </div>
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Estado" />
@@ -776,7 +888,6 @@ export default function AdminUsersPage() {
                 <SelectItem value="inactive">Inactivos</SelectItem>
               </SelectContent>
             </Select>
-
           </div>
         </CardContent>
       </Card>
@@ -786,17 +897,23 @@ export default function AdminUsersPage() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Users className="h-5 w-5 mr-2" />
-            Usuarios Administradores ({(() => {
+            Usuarios Administradores (
+            {(() => {
               // Client-side filtering for search
-              const filtered = adminUsers.filter(admin => {
+              const filtered = adminUsers.filter((admin) => {
                 if (!searchTerm) return true;
                 const searchLower = searchTerm.toLowerCase();
-                const fullName = (admin.analytics?.fullName || '').toLowerCase();
+                const fullName = (
+                  admin.analytics?.fullName || ""
+                ).toLowerCase();
                 const email = admin.email.toLowerCase();
-                return fullName.includes(searchLower) || email.includes(searchLower);
+                return (
+                  fullName.includes(searchLower) || email.includes(searchLower)
+                );
               });
               return filtered.length;
-            })()})
+            })()}
+            )
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -816,158 +933,210 @@ export default function AdminUsersPage() {
             <TableBody>
               {(() => {
                 // Client-side filtering for search
-                const filteredAdminUsers = adminUsers.filter(admin => {
+                const filteredAdminUsers = adminUsers.filter((admin) => {
                   if (!searchTerm) return true;
                   const searchLower = searchTerm.toLowerCase();
-                  const fullName = (admin.analytics?.fullName || '').toLowerCase();
+                  const fullName = (
+                    admin.analytics?.fullName || ""
+                  ).toLowerCase();
                   const email = admin.email.toLowerCase();
-                  return fullName.includes(searchLower) || email.includes(searchLower);
+                  return (
+                    fullName.includes(searchLower) ||
+                    email.includes(searchLower)
+                  );
                 });
                 return filteredAdminUsers.map((admin) => (
-                <TableRow key={admin.id} className="hover:bg-[#AE000025] transition-colors">
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">
-                        {admin.analytics?.fullName || 'Sin nombre'}
-                      </div>
-                      <div className="text-sm text-tierra-media">{admin.email}</div>
-                      {admin.profiles?.phone && (
-                        <div className="flex items-center text-xs text-tierra-media mt-1">
-                          <Phone className="h-3 w-3 mr-1" />
-                          {admin.profiles.phone}
+                  <TableRow
+                    key={admin.id}
+                    className="hover:bg-[#AE000025] transition-colors"
+                  >
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">
+                          {admin.analytics?.fullName || "Sin nombre"}
                         </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    {getRoleBadge(admin)}
-                  </TableCell>
-                  
-                  <TableCell>
-                    {admin.is_super_admin ? (
-                      <Badge variant="outline" className="flex items-center gap-1 w-fit">
-                        <Globe className="h-3 w-3" />
-                        Todas las sucursales
-                      </Badge>
-                    ) : admin.branches && admin.branches.length > 0 ? (
-                      <div className="flex flex-col gap-1">
-                        {admin.branches.slice(0, 2).map((branch) => (
-                          <Badge key={branch.id} variant="outline" className="flex items-center gap-1 w-fit text-xs">
-                            <Building2 className="h-3 w-3" />
-                            {branch.name}
-                            {branch.is_primary && <span className="text-dorado">★</span>}
-                          </Badge>
-                        ))}
-                        {admin.branches.length > 2 && (
-                          <span className="text-xs text-tierra-media">
-                            +{admin.branches.length - 2} más
-                          </span>
+                        <div className="text-sm text-tierra-media">
+                          {admin.email}
+                        </div>
+                        {admin.profiles?.phone && (
+                          <div className="flex items-center text-xs text-tierra-media mt-1">
+                            <Phone className="h-3 w-3 mr-1" />
+                            {admin.profiles.phone}
+                          </div>
                         )}
                       </div>
-                    ) : (
-                      <span className="text-sm text-tierra-media">Sin sucursales</span>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    {getStatusBadge(admin.is_active)}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="flex items-center text-sm">
-                      <Clock className="h-3 w-3 mr-1 text-tierra-media" />
-                      {formatLastActivity(admin.last_login)}
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="text-center">
-                      <div className="font-medium">
-                        {admin.analytics?.activityCount30Days || 0}
-                      </div>
-                      <div className="text-xs text-tierra-media">acciones</div>
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell className="text-sm text-tierra-media">
-                    {new Date(admin.created_at).toLocaleDateString('es-AR')}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menú</span>
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href={`/admin/admin-users/${admin.id}`} className="flex items-center cursor-pointer">
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver detalles
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/admin/admin-users/${admin.id}/edit`} className="flex items-center cursor-pointer">
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedUserForPermissions(admin);
-                            setShowPermissionsEditor(true);
-                          }}
-                          className="flex items-center cursor-pointer"
+                    </TableCell>
+
+                    <TableCell>{getRoleBadge(admin)}</TableCell>
+
+                    <TableCell>
+                      {admin.is_super_admin ? (
+                        <Badge
+                          variant="outline"
+                          className="flex items-center gap-1 w-fit"
                         >
-                          <Shield className="mr-2 h-4 w-4" />
-                          Editar Permisos
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {isSuperAdmin && (
+                          <Globe className="h-3 w-3" />
+                          Todas las sucursales
+                        </Badge>
+                      ) : admin.branches && admin.branches.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {admin.branches.slice(0, 2).map((branch) => (
+                            <Badge
+                              key={branch.id}
+                              variant="outline"
+                              className="flex items-center gap-1 w-fit text-xs"
+                            >
+                              <Building2 className="h-3 w-3" />
+                              {branch.name}
+                              {branch.is_primary && (
+                                <span className="text-dorado">★</span>
+                              )}
+                            </Badge>
+                          ))}
+                          {admin.branches.length > 2 && (
+                            <span className="text-xs text-tierra-media">
+                              +{admin.branches.length - 2} más
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-tierra-media">
+                          Sin sucursales
+                        </span>
+                      )}
+                    </TableCell>
+
+                    <TableCell>{getStatusBadge(admin.is_active)}</TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center text-sm">
+                        <Clock className="h-3 w-3 mr-1 text-tierra-media" />
+                        {formatLastActivity(admin.last_login)}
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="text-center">
+                        <div className="font-medium">
+                          {admin.analytics?.activityCount30Days || 0}
+                        </div>
+                        <div className="text-xs text-tierra-media">
+                          acciones
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="text-sm text-tierra-media">
+                      {formatDate(admin.created_at, { locale: "es-AR" })}
+                    </TableCell>
+
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            <span className="sr-only">Abrir menú</span>
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/admin/admin-users/${admin.id}`}
+                              className="flex items-center cursor-pointer"
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              Ver detalles
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/admin/admin-users/${admin.id}/edit`}
+                              className="flex items-center cursor-pointer"
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </Link>
+                          </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleToggleStatus(admin.id, admin.is_active)}
+                            onClick={() => {
+                              setSelectedUserForPermissions(admin);
+                              setShowPermissionsEditor(true);
+                            }}
                             className="flex items-center cursor-pointer"
                           >
-                            {admin.is_active ? (
-                              <>
-                                <AlertTriangle className="mr-2 h-4 w-4 text-red-500" />
-                                Desactivar
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-                                Activar
-                              </>
-                            )}
+                            <Shield className="mr-2 h-4 w-4" />
+                            Editar Permisos
                           </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteAdmin(admin.id, admin.email)}
-                          className="flex items-center cursor-pointer text-red-500 focus:text-red-500"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ));
+                          <DropdownMenuSeparator />
+                          {isSuperAdmin && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleToggleStatus(admin.id, admin.is_active)
+                              }
+                              className="flex items-center cursor-pointer"
+                            >
+                              {admin.is_active ? (
+                                <>
+                                  <AlertTriangle className="mr-2 h-4 w-4 text-red-500" />
+                                  Desactivar
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                                  Activar
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() =>
+                              handleDeleteAdmin(admin.id, admin.email)
+                            }
+                            className="flex items-center cursor-pointer text-red-500 focus:text-red-500"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ));
               })()}
             </TableBody>
           </Table>
 
+          {/* Pagination */}
+          {!loading && adminUsers.length > 0 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(totalCount / itemsPerPage)}
+                itemsPerPage={itemsPerPage}
+                totalItems={totalCount}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+                itemsPerPageOptions={[10, 20, 50, 100]}
+              />
+            </div>
+          )}
+
           {adminUsers.length === 0 && (
             <div className="text-center py-12">
               <Users className="h-12 w-12 text-tierra-media mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-azul-profundo mb-2">No se encontraron administradores</h3>
-              <p className="text-tierra-media">Ajusta los filtros o crea un nuevo administrador.</p>
+              <h3 className="text-lg font-semibold text-azul-profundo mb-2">
+                No se encontraron administradores
+              </h3>
+              <p className="text-tierra-media">
+                Ajusta los filtros o crea un nuevo administrador.
+              </p>
             </div>
           )}
         </CardContent>

@@ -46,6 +46,7 @@ import {
   RefreshCw,
   Settings,
   Trash2,
+  ShoppingCart,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -69,6 +70,7 @@ const CreateQuoteForm = dynamic(
 );
 import { BranchSelector } from "@/components/admin/BranchSelector";
 import { getBranchHeader } from "@/lib/utils/branch";
+import { formatDate } from "@/lib/utils";
 
 interface Quote {
   id: string;
@@ -507,11 +509,7 @@ export default function QuotesPage() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div>
-                            {new Date(quote.quote_date).toLocaleDateString(
-                              "es-CL",
-                            )}
-                          </div>
+                          <div>{formatDate(quote.quote_date)}</div>
                           {quote.expiration_date && (
                             <div
                               className={`text-xs ${
@@ -520,10 +518,7 @@ export default function QuotesPage() {
                                   : "text-tierra-media"
                               }`}
                             >
-                              Exp:{" "}
-                              {new Date(
-                                quote.expiration_date,
-                              ).toLocaleDateString("es-CL")}
+                              Exp: {formatDate(quote.expiration_date)}
                             </div>
                           )}
                         </div>
@@ -536,11 +531,27 @@ export default function QuotesPage() {
                               Ver
                             </Button>
                           </Link>
+                          {quote.status !== "accepted" &&
+                            !quote.converted_to_work_order_id && (
+                              <Link href={`/admin/pos?quoteId=${quote.id}`}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                >
+                                  <ShoppingCart className="h-4 w-4 mr-1" />
+                                  Cargar al POS
+                                </Button>
+                              </Link>
+                            )}
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleDeleteClick(quote.id)}
-                            disabled={!!quote.converted_to_work_order_id}
+                            disabled={
+                              quote.status === "accepted" ||
+                              !!quote.converted_to_work_order_id
+                            }
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
                             <Trash2 className="h-4 w-4" />

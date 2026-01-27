@@ -1,42 +1,42 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { 
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { 
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { 
+} from "@/components/ui/table";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { 
+} from "@/components/ui/dropdown-menu";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { 
-  Search, 
+} from "@/components/ui/dialog";
+import {
+  Search,
   Filter,
   MoreHorizontal,
   Eye,
@@ -55,10 +55,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
-  AlertTriangle
-} from 'lucide-react';
-import { toast } from 'sonner';
-import CreateManualOrderForm from '@/components/admin/CreateManualOrderForm';
+  AlertTriangle,
+} from "lucide-react";
+import { toast } from "sonner";
+import CreateManualOrderForm from "@/components/admin/CreateManualOrderForm";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 interface Order {
   id: string;
@@ -82,8 +83,8 @@ interface Order {
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
@@ -101,92 +102,92 @@ export default function OrdersPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      
+
       const offset = (currentPage - 1) * ordersPerPage;
       const params = new URLSearchParams({
         limit: ordersPerPage.toString(),
-        offset: offset.toString()
+        offset: offset.toString(),
       });
 
-      if (statusFilter !== 'all') {
-        params.append('status', statusFilter);
+      if (statusFilter !== "all") {
+        params.append("status", statusFilter);
       }
-      
+
       const response = await fetch(`/api/admin/orders?${params}`);
-      
+
       if (!response.ok) {
-        throw new Error('Failed to fetch orders');
+        throw new Error("Failed to fetch orders");
       }
-      
+
       const data = await response.json();
-      console.log('📊 Orders API response:', {
+      console.log("📊 Orders API response:", {
         ordersLength: data.orders?.length,
         total: data.total,
-        totalPages: Math.ceil((data.total || 0) / ordersPerPage)
+        totalPages: Math.ceil((data.total || 0) / ordersPerPage),
       });
 
       setOrders(data.orders || []);
       setTotalOrders(data.total || 0);
       const calculatedTotalPages = Math.ceil((data.total || 0) / ordersPerPage);
       setTotalPages(calculatedTotalPages);
-      
-      console.log('Pagination state updated:', {
+
+      console.log("Pagination state updated:", {
         totalOrders: data.total || 0,
         totalPages: calculatedTotalPages,
         ordersPerPage,
-        shouldShowPagination: calculatedTotalPages > 1
+        shouldShowPagination: calculatedTotalPages > 1,
       });
     } catch (error) {
-      console.error('Error fetching orders:', error);
-      toast.error('Error al cargar los pedidos');
-      
+      console.error("Error fetching orders:", error);
+      toast.error("Error al cargar los pedidos");
+
       // Mock data for development
       setOrders([
         {
-          id: '1',
-          order_number: 'DL-1704123456',
-          customer_name: 'María González',
-          customer_email: 'maria@example.com',
+          id: "1",
+          order_number: "DL-1704123456",
+          customer_name: "María González",
+          customer_email: "maria@example.com",
           total_amount: 15750,
-          status: 'pending',
-          payment_status: 'pending',
-          created_at: '2024-01-20T10:30:00Z',
-          mp_payment_id: '123456789',
-          mp_payment_method: 'credit_card',
+          status: "pending",
+          payment_status: "pending",
+          created_at: "2024-01-20T10:30:00Z",
+          mp_payment_id: "123456789",
+          mp_payment_method: "credit_card",
           order_items: [
             {
-              product_name: 'Crema Hidratante Rosa Mosqueta',
+              product_name: "Crema Hidratante Rosa Mosqueta",
               quantity: 1,
               unit_price: 12500,
-              variant_title: '50ml'
+              variant_title: "50ml",
             },
             {
-              product_name: 'Aceite Corporal Lavanda',
+              product_name: "Aceite Corporal Lavanda",
               quantity: 1,
-              unit_price: 3250
-            }
-          ]
+              unit_price: 3250,
+            },
+          ],
         },
         {
-          id: '2',
-          order_number: 'DL-1704123455',
-          customer_name: 'Carlos Ruiz',
-          customer_email: 'carlos@example.com',
+          id: "2",
+          order_number: "DL-1704123455",
+          customer_name: "Carlos Ruiz",
+          customer_email: "carlos@example.com",
           total_amount: 8900,
-          status: 'delivered',
-          payment_status: 'paid',
-          created_at: '2024-01-20T09:15:00Z',
-          mp_payment_id: '123456788',
-          mp_payment_method: 'bank_transfer',
+          status: "delivered",
+          payment_status: "paid",
+          created_at: "2024-01-20T09:15:00Z",
+          mp_payment_id: "123456788",
+          mp_payment_method: "bank_transfer",
           order_items: [
             {
-              product_name: 'Hidrolato de Rosas',
+              product_name: "Hidrolato de Rosas",
               quantity: 1,
               unit_price: 8900,
-              variant_title: '100ml'
-            }
-          ]
-        }
+              variant_title: "100ml",
+            },
+          ],
+        },
       ]);
     } finally {
       setLoading(false);
@@ -196,62 +197,67 @@ export default function OrdersPage() {
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
       setUpdating(orderId);
-      
+
       const response = await fetch(`/api/admin/orders/${orderId}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ status: newStatus }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update order');
+        throw new Error("Failed to update order");
       }
 
       // Update local state
-      setOrders(orders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: newStatus }
-          : order
-      ));
+      setOrders(
+        orders.map((order) =>
+          order.id === orderId ? { ...order, status: newStatus } : order,
+        ),
+      );
 
-      toast.success('Estado del pedido actualizado');
+      toast.success("Estado del pedido actualizado");
     } catch (error) {
-      console.error('Error updating order:', error);
-      toast.error('Error al actualizar el pedido');
+      console.error("Error updating order:", error);
+      toast.error("Error al actualizar el pedido");
     } finally {
       setUpdating(null);
     }
   };
 
-  const updatePaymentStatus = async (orderId: string, newPaymentStatus: string) => {
+  const updatePaymentStatus = async (
+    orderId: string,
+    newPaymentStatus: string,
+  ) => {
     try {
       setUpdating(orderId);
-      
+
       const response = await fetch(`/api/admin/orders/${orderId}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ payment_status: newPaymentStatus }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update payment status');
+        throw new Error("Failed to update payment status");
       }
 
       // Update local state
-      setOrders(orders.map(order => 
-        order.id === orderId 
-          ? { ...order, payment_status: newPaymentStatus }
-          : order
-      ));
+      setOrders(
+        orders.map((order) =>
+          order.id === orderId
+            ? { ...order, payment_status: newPaymentStatus }
+            : order,
+        ),
+      );
 
-      toast.success('Estado de pago actualizado');
+      toast.success("Estado de pago actualizado");
     } catch (error) {
-      console.error('Error updating payment status:', error);
-      toast.error('Error al actualizar el estado de pago');
+      console.error("Error updating payment status:", error);
+      toast.error("Error al actualizar el estado de pago");
     } finally {
       setUpdating(null);
     }
@@ -260,111 +266,134 @@ export default function OrdersPage() {
   const sendEmailNotification = async (order: Order) => {
     try {
       const response = await fetch(`/api/admin/orders/${order.id}/notify`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-        }
+          "Content-Type": "application/json",
+        },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send notification');
+        throw new Error("Failed to send notification");
       }
 
-      toast.success('Notificación enviada al cliente');
+      toast.success("Notificación enviada al cliente");
     } catch (error) {
-      console.error('Error sending notification:', error);
-      toast.error('Error al enviar la notificación');
+      console.error("Error sending notification:", error);
+      toast.error("Error al enviar la notificación");
     }
   };
 
   const createManualOrder = async (orderData: any) => {
     try {
-      const response = await fetch('/api/admin/orders', {
-        method: 'POST',
+      const response = await fetch("/api/admin/orders", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action: 'create_manual_order',
-          orderData
-        })
+          action: "create_manual_order",
+          orderData,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create order');
+        throw new Error("Failed to create order");
       }
 
       const data = await response.json();
-      toast.success('Pedido creado exitosamente');
+      toast.success("Pedido creado exitosamente");
       setShowCreateOrder(false);
       fetchOrders(); // Refresh the orders list
     } catch (error) {
-      console.error('Error creating manual order:', error);
-      toast.error('Error al crear el pedido');
+      console.error("Error creating manual order:", error);
+      toast.error("Error al crear el pedido");
     }
   };
 
   const deleteOrder = async (orderId: string) => {
     try {
       setDeletingOrder(orderId);
-      
+
       const response = await fetch(`/api/admin/orders/${orderId}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Content-Type': 'application/json',
-        }
+          "Content-Type": "application/json",
+        },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete order');
+        throw new Error("Failed to delete order");
       }
 
-      toast.success('Pedido eliminado exitosamente');
+      toast.success("Pedido eliminado exitosamente");
       fetchOrders(); // Refresh the orders list
     } catch (error) {
-      console.error('Error deleting order:', error);
-      toast.error('Error al eliminar el pedido');
+      console.error("Error deleting order:", error);
+      toast.error("Error al eliminar el pedido");
     } finally {
       setDeletingOrder(null);
     }
   };
 
   const formatPrice = (amount: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
     }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-AR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(dateString).toLocaleDateString("es-AR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'delivered':
-      case 'completed':
-        return <Badge 
-          className="bg-verde-suave text-white"
-          style={{ color: 'var(--admin-accent-secondary)' }}
-        >
-          <CheckCircle className="h-3 w-3 mr-1" />Completado
-        </Badge>;
-      case 'pending':
-        return <Badge className="bg-dorado text-azul-profundo"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>;
-      case 'processing':
-        return <Badge className="bg-azul-profundo text-white"><Package className="h-3 w-3 mr-1" />Procesando</Badge>;
-      case 'shipped':
-        return <Badge className="bg-blue-500 text-white"><Truck className="h-3 w-3 mr-1" />Enviado</Badge>;
-      case 'cancelled':
-        return <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" />Cancelado</Badge>;
-      case 'refunded':
+      case "delivered":
+      case "completed":
+        return (
+          <Badge
+            className="bg-verde-suave text-white"
+            style={{ color: "var(--admin-accent-secondary)" }}
+          >
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Completado
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge className="bg-dorado text-azul-profundo">
+            <Clock className="h-3 w-3 mr-1" />
+            Pendiente
+          </Badge>
+        );
+      case "processing":
+        return (
+          <Badge className="bg-azul-profundo text-white">
+            <Package className="h-3 w-3 mr-1" />
+            Procesando
+          </Badge>
+        );
+      case "shipped":
+        return (
+          <Badge className="bg-blue-500 text-white">
+            <Truck className="h-3 w-3 mr-1" />
+            Enviado
+          </Badge>
+        );
+      case "cancelled":
+        return (
+          <Badge variant="secondary">
+            <XCircle className="h-3 w-3 mr-1" />
+            Cancelado
+          </Badge>
+        );
+      case "refunded":
         return <Badge variant="secondary">Reembolsado</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
@@ -373,16 +402,39 @@ export default function OrdersPage() {
 
   const getPaymentStatusBadge = (status: string) => {
     switch (status) {
-      case 'paid':
-        return <Badge variant="outline" className="border-verde-suave text-verde-suave">Pagado</Badge>;
-      case 'pending':
-        return <Badge variant="outline" className="border-dorado text-dorado">Pendiente</Badge>;
-      case 'failed':
-        return <Badge variant="outline" className="border-red-500 text-red-500">Fallido</Badge>;
-      case 'refunded':
-        return <Badge variant="outline" className="border-gray-500 text-gray-500">Reembolsado</Badge>;
-      case 'partially_refunded':
-        return <Badge variant="outline" className="border-gray-400 text-gray-400">Parcialmente Reembolsado</Badge>;
+      case "paid":
+        return (
+          <Badge
+            variant="outline"
+            className="border-verde-suave text-verde-suave"
+          >
+            Pagado
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge variant="outline" className="border-dorado text-dorado">
+            Pendiente
+          </Badge>
+        );
+      case "failed":
+        return (
+          <Badge variant="outline" className="border-red-500 text-red-500">
+            Fallido
+          </Badge>
+        );
+      case "refunded":
+        return (
+          <Badge variant="outline" className="border-gray-500 text-gray-500">
+            Reembolsado
+          </Badge>
+        );
+      case "partially_refunded":
+        return (
+          <Badge variant="outline" className="border-gray-400 text-gray-400">
+            Parcialmente Reembolsado
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -390,16 +442,21 @@ export default function OrdersPage() {
 
   // For display, we'll use the orders directly since pagination is handled server-side
   // Only apply client-side filtering for search when not using server pagination
-  const displayOrders = searchTerm ? orders.filter(order => {
-    const matchesSearch = 
-      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer_email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  }) : orders;
+  const displayOrders = searchTerm
+    ? orders.filter((order) => {
+        const matchesSearch =
+          order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          order.customer_name
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          order.customer_email.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus =
+          statusFilter === "all" || order.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+      })
+    : orders;
 
   if (loading) {
     return (
@@ -428,12 +485,14 @@ export default function OrdersPage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">Gestión de Pedidos</h1>
+          <h1 className="text-3xl font-bold text-azul-profundo">
+            Gestión de Pedidos
+          </h1>
           <p className="text-tierra-media">
             Administra todos los pedidos de la tienda
           </p>
         </div>
-        
+
         <div className="flex gap-2">
           <Button onClick={fetchOrders} variant="outline">
             <RefreshCw className="h-4 w-4 mr-2" />
@@ -467,7 +526,7 @@ export default function OrdersPage() {
                 />
               </div>
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Estado" />
@@ -477,9 +536,9 @@ export default function OrdersPage() {
                 <SelectItem value="pending">Pendiente</SelectItem>
                 <SelectItem value="processing">Procesando</SelectItem>
                 <SelectItem value="shipped">Enviado</SelectItem>
-                  <SelectItem value="delivered">Completado</SelectItem>
+                <SelectItem value="delivered">Completado</SelectItem>
                 <SelectItem value="cancelled">Cancelado</SelectItem>
-                  <SelectItem value="refunded">Reembolsado</SelectItem>
+                <SelectItem value="refunded">Reembolsado</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -493,46 +552,72 @@ export default function OrdersPage() {
             <Table>
               <TableHeader className="">
                 <TableRow>
-                  <TableHead className="font-semibold text-azul-profundo">Pedido</TableHead>
-                  <TableHead className="font-semibold text-azul-profundo">Cliente</TableHead>
-                  <TableHead className="font-semibold text-azul-profundo">Fecha</TableHead>
-                  <TableHead className="font-semibold text-azul-profundo">Estado</TableHead>
-                  <TableHead className="font-semibold text-azul-profundo">Pago</TableHead>
-                  <TableHead className="font-semibold text-azul-profundo">Total</TableHead>
-                  <TableHead className="w-[50px] font-semibold text-azul-profundo">Acciones</TableHead>
+                  <TableHead className="font-semibold text-azul-profundo">
+                    Pedido
+                  </TableHead>
+                  <TableHead className="font-semibold text-azul-profundo">
+                    Cliente
+                  </TableHead>
+                  <TableHead className="font-semibold text-azul-profundo">
+                    Fecha
+                  </TableHead>
+                  <TableHead className="font-semibold text-azul-profundo">
+                    Estado
+                  </TableHead>
+                  <TableHead className="font-semibold text-azul-profundo">
+                    Pago
+                  </TableHead>
+                  <TableHead className="font-semibold text-azul-profundo">
+                    Total
+                  </TableHead>
+                  <TableHead className="w-[50px] font-semibold text-azul-profundo">
+                    Acciones
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {displayOrders.map((order) => (
-                  <TableRow key={order.id} className="hover:bg-[#AE000025] transition-colors">
+                  <TableRow
+                    key={order.id}
+                    className="hover:bg-[#AE000025] transition-colors"
+                  >
                     <TableCell className="py-4">
                       <div>
-                        <p className="font-medium text-azul-profundo">{order.order_number}</p>
+                        <p className="font-medium text-azul-profundo">
+                          {order.order_number}
+                        </p>
                         <p className="text-xs text-tierra-media">
-                          {order.order_items.length} producto{order.order_items.length !== 1 ? 's' : ''}
+                          {order.order_items.length} producto
+                          {order.order_items.length !== 1 ? "s" : ""}
                         </p>
                       </div>
                     </TableCell>
                     <TableCell className="py-4">
                       <div>
                         <p className="font-medium">{order.customer_name}</p>
-                        <p className="text-xs text-tierra-media">{order.customer_email}</p>
+                        <p className="text-xs text-tierra-media">
+                          {order.customer_email}
+                        </p>
                       </div>
                     </TableCell>
                     <TableCell className="py-4">
                       <div className="flex items-center text-sm">
                         <Calendar className="h-4 w-4 mr-1 text-tierra-media" />
-                        {formatDate(order.created_at)}
+                        {formatDateTime(order.created_at)}
                       </div>
                     </TableCell>
                     <TableCell className="py-4">
-                      <Select 
-                        value={order.status} 
-                        onValueChange={(value) => updateOrderStatus(order.id, value)}
+                      <Select
+                        value={order.status}
+                        onValueChange={(value) =>
+                          updateOrderStatus(order.id, value)
+                        }
                         disabled={updating === order.id}
                       >
                         <SelectTrigger className="w-[140px] h-8 text-xs">
-                          <SelectValue>{getStatusBadge(order.status)}</SelectValue>
+                          <SelectValue>
+                            {getStatusBadge(order.status)}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="pending">
@@ -565,13 +650,17 @@ export default function OrdersPage() {
                       </Select>
                     </TableCell>
                     <TableCell className="py-4">
-                      <Select 
-                        value={order.payment_status} 
-                        onValueChange={(value) => updatePaymentStatus(order.id, value)}
+                      <Select
+                        value={order.payment_status}
+                        onValueChange={(value) =>
+                          updatePaymentStatus(order.id, value)
+                        }
                         disabled={updating === order.id}
                       >
                         <SelectTrigger className="w-[120px] h-8 text-xs">
-                          <SelectValue>{getPaymentStatusBadge(order.payment_status)}</SelectValue>
+                          <SelectValue>
+                            {getPaymentStatusBadge(order.payment_status)}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="pending">
@@ -593,100 +682,112 @@ export default function OrdersPage() {
                             </div>
                           </SelectItem>
                           <SelectItem value="refunded">Reembolsado</SelectItem>
-                          <SelectItem value="partially_refunded">Parcialmente Reembolsado</SelectItem>
+                          <SelectItem value="partially_refunded">
+                            Parcialmente Reembolsado
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
                     <TableCell className="py-4">
                       <p className="font-semibold text-verde-suave">
-                        {formatPrice(order.total_amount)}
+                        {formatCurrency(order.total_amount)}
                       </p>
                     </TableCell>
                     <TableCell className="py-4">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          Ver Detalles
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
-                        
-                        {order.status === 'pending' && (
-                          <DropdownMenuItem 
-                            onClick={() => updateOrderStatus(order.id, 'processing')}
-                            disabled={updating === order.id}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => setSelectedOrder(order)}
                           >
-                            <Package className="h-4 w-4 mr-2" />
-                            Marcar como Procesando
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Detalles
                           </DropdownMenuItem>
-                        )}
-                        
-                        {order.status === 'processing' && (
-                          <DropdownMenuItem 
-                            onClick={() => updateOrderStatus(order.id, 'shipped')}
-                            disabled={updating === order.id}
-                          >
-                            <Truck className="h-4 w-4 mr-2" />
-                            Marcar como Enviado
-                          </DropdownMenuItem>
-                        )}
-                        
-                        {order.status === 'shipped' && (
-                          <DropdownMenuItem 
-                            onClick={() => updateOrderStatus(order.id, 'delivered')}
-                            disabled={updating === order.id}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Marcar como Completado
-                          </DropdownMenuItem>
-                        )}
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem onClick={() => sendEmailNotification(order)}>
-                          <Mail className="h-4 w-4 mr-2" />
-                          Enviar Notificación
-                        </DropdownMenuItem>
-                        
-                        {order.mp_payment_id && (
-                          <DropdownMenuItem asChild>
-                            <a 
-                              href={`https://www.mercadopago.com.ar/activities?id=${order.mp_payment_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+
+                          <DropdownMenuSeparator />
+
+                          {order.status === "pending" && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                updateOrderStatus(order.id, "processing")
+                              }
+                              disabled={updating === order.id}
                             >
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              Ver en MercadoPago
-                            </a>
-                          </DropdownMenuItem>
-                        )}
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem 
-                          onClick={() => deleteOrder(order.id)}
-                          disabled={deletingOrder === order.id}
-                          className="text-red-600 focus:text-red-600"
-                        >
-                          {deletingOrder === order.id ? (
-                            <>
-                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                              Eliminando...
-                            </>
-                          ) : (
-                            <>
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Eliminar Pedido
-                            </>
+                              <Package className="h-4 w-4 mr-2" />
+                              Marcar como Procesando
+                            </DropdownMenuItem>
                           )}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
+
+                          {order.status === "processing" && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                updateOrderStatus(order.id, "shipped")
+                              }
+                              disabled={updating === order.id}
+                            >
+                              <Truck className="h-4 w-4 mr-2" />
+                              Marcar como Enviado
+                            </DropdownMenuItem>
+                          )}
+
+                          {order.status === "shipped" && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                updateOrderStatus(order.id, "delivered")
+                              }
+                              disabled={updating === order.id}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Marcar como Completado
+                            </DropdownMenuItem>
+                          )}
+
+                          <DropdownMenuSeparator />
+
+                          <DropdownMenuItem
+                            onClick={() => sendEmailNotification(order)}
+                          >
+                            <Mail className="h-4 w-4 mr-2" />
+                            Enviar Notificación
+                          </DropdownMenuItem>
+
+                          {order.mp_payment_id && (
+                            <DropdownMenuItem asChild>
+                              <a
+                                href={`https://www.mercadopago.com.ar/activities?id=${order.mp_payment_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                Ver en MercadoPago
+                              </a>
+                            </DropdownMenuItem>
+                          )}
+
+                          <DropdownMenuSeparator />
+
+                          <DropdownMenuItem
+                            onClick={() => deleteOrder(order.id)}
+                            disabled={deletingOrder === order.id}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            {deletingOrder === order.id ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Eliminando...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Eliminar Pedido
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
@@ -694,7 +795,7 @@ export default function OrdersPage() {
               </TableBody>
             </Table>
           </div>
-          
+
           {displayOrders.length === 0 && (
             <div className="text-center py-12">
               <Package className="h-16 w-16 text-tierra-media mx-auto mb-4" />
@@ -702,10 +803,9 @@ export default function OrdersPage() {
                 No hay pedidos
               </h3>
               <p className="text-tierra-media">
-                {searchTerm || statusFilter !== 'all' 
-                  ? 'No se encontraron pedidos con los filtros aplicados'
-                  : 'Aún no hay pedidos para mostrar'
-                }
+                {searchTerm || statusFilter !== "all"
+                  ? "No se encontraron pedidos con los filtros aplicados"
+                  : "Aún no hay pedidos para mostrar"}
               </p>
             </div>
           )}
@@ -715,19 +815,21 @@ export default function OrdersPage() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-6 py-4 border-t">
             <div className="text-sm text-tierra-media">
-              Mostrando {((currentPage - 1) * ordersPerPage) + 1} a {Math.min(currentPage * ordersPerPage, totalOrders)} de {totalOrders} pedidos
+              Mostrando {(currentPage - 1) * ordersPerPage + 1} a{" "}
+              {Math.min(currentPage * ordersPerPage, totalOrders)} de{" "}
+              {totalOrders} pedidos
             </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1 || loading}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Anterior
               </Button>
-              
+
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   // Show first 2, current page, and last 2 pages
@@ -749,7 +851,11 @@ export default function OrdersPage() {
                       size="sm"
                       onClick={() => setCurrentPage(pageNum)}
                       disabled={loading}
-                      className={currentPage === pageNum ? "bg-[#AE0000] hover:bg-[#C70000]" : ""}
+                      className={
+                        currentPage === pageNum
+                          ? "bg-[#AE0000] hover:bg-[#C70000]"
+                          : ""
+                      }
                     >
                       {pageNum}
                     </Button>
@@ -760,7 +866,9 @@ export default function OrdersPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
                 disabled={currentPage === totalPages || loading}
               >
                 Siguiente
@@ -772,23 +880,26 @@ export default function OrdersPage() {
       </Card>
 
       {/* Order Detail Dialog */}
-      <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
+      <Dialog
+        open={!!selectedOrder}
+        onOpenChange={() => setSelectedOrder(null)}
+      >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-azul-profundo">
               Detalles del Pedido
             </DialogTitle>
-            <DialogDescription>
-              {selectedOrder?.order_number}
-            </DialogDescription>
+            <DialogDescription>{selectedOrder?.order_number}</DialogDescription>
           </DialogHeader>
-          
+
           {selectedOrder && (
             <div className="space-y-6">
               {/* Customer Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="font-semibold text-azul-profundo mb-2">Cliente</h4>
+                  <h4 className="font-semibold text-azul-profundo mb-2">
+                    Cliente
+                  </h4>
                   <div className="space-y-1">
                     <p className="flex items-center text-sm">
                       <User className="h-4 w-4 mr-2 text-tierra-media" />
@@ -800,13 +911,15 @@ export default function OrdersPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div>
-                  <h4 className="font-semibold text-azul-profundo mb-2">Pago</h4>
+                  <h4 className="font-semibold text-azul-profundo mb-2">
+                    Pago
+                  </h4>
                   <div className="space-y-1">
                     <p className="flex items-center text-sm">
                       <CreditCard className="h-4 w-4 mr-2 text-tierra-media" />
-                      {selectedOrder.mp_payment_method || 'MercadoPago'}
+                      {selectedOrder.mp_payment_method || "MercadoPago"}
                     </p>
                     {selectedOrder.mp_payment_id && (
                       <p className="text-xs text-tierra-media">
@@ -819,19 +932,30 @@ export default function OrdersPage() {
 
               {/* Order Items */}
               <div>
-                <h4 className="font-semibold text-azul-profundo mb-3">Productos</h4>
+                <h4 className="font-semibold text-azul-profundo mb-3">
+                  Productos
+                </h4>
                 <div className="space-y-2">
                   {selectedOrder.order_items.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                    >
                       <div className="flex-1">
-                        <p className="font-medium text-azul-profundo">{item.product_name}</p>
+                        <p className="font-medium text-azul-profundo">
+                          {item.product_name}
+                        </p>
                         {item.variant_title && (
-                          <p className="text-xs text-tierra-media">Variante: {item.variant_title}</p>
+                          <p className="text-xs text-tierra-media">
+                            Variante: {item.variant_title}
+                          </p>
                         )}
-                        <p className="text-sm text-tierra-media">Cantidad: {item.quantity}</p>
+                        <p className="text-sm text-tierra-media">
+                          Cantidad: {item.quantity}
+                        </p>
                       </div>
                       <p className="font-semibold text-verde-suave">
-                        {formatPrice(item.unit_price)}
+                        {formatCurrency(item.unit_price)}
                       </p>
                     </div>
                   ))}
@@ -841,9 +965,11 @@ export default function OrdersPage() {
               {/* Order Summary */}
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center">
-                  <h4 className="font-semibold text-azul-profundo">Total del Pedido</h4>
+                  <h4 className="font-semibold text-azul-profundo">
+                    Total del Pedido
+                  </h4>
                   <p className="text-2xl font-bold text-verde-suave">
-                    {formatPrice(selectedOrder.total_amount)}
+                    {formatCurrency(selectedOrder.total_amount)}
                   </p>
                 </div>
               </div>
@@ -863,14 +989,13 @@ export default function OrdersPage() {
               Agregar un pedido realizado fuera de la plataforma
             </DialogDescription>
           </DialogHeader>
-          
-          <CreateManualOrderForm 
+
+          <CreateManualOrderForm
             onSubmit={createManualOrder}
             onCancel={() => setShowCreateOrder(false)}
           />
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

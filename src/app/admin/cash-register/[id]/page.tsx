@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
   ArrowLeft,
   DollarSign,
   CreditCard,
@@ -17,11 +17,28 @@ import {
   TrendingDown,
   RefreshCw,
   User,
-  Building2
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { getBranchHeader } from '@/lib/utils/branch';
-import Link from 'next/link';
+  Building2,
+  AlertCircle,
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toast } from "sonner";
+import { getBranchHeader } from "@/lib/utils/branch";
+import Link from "next/link";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 interface CashClosure {
   id: string;
@@ -48,10 +65,14 @@ interface CashClosure {
   closing_cash_amount: number | null;
   notes: string | null;
   discrepancies: string | null;
-  status: 'draft' | 'confirmed' | 'reviewed';
+  status: "draft" | "confirmed" | "reviewed" | "closed" | "reopened";
   opened_at: string;
   closed_at: string;
   confirmed_at: string | null;
+  reopened_at?: string | null;
+  reopened_by?: string | null;
+  reopen_count?: number;
+  reopen_notes?: string | null;
   branch?: {
     id: string;
     name: string;
@@ -79,79 +100,124 @@ interface Order {
   }>;
 }
 
+interface Movement {
+  id: string;
+  movement_type: string;
+  order_id: string;
+  order_number: string;
+  customer_name: string;
+  customer_rut: string | null;
+  payment_method: string;
+  payment_method_code: string;
+  amount: number;
+  payment_status: string;
+  paid_at: string;
+  notes: string | null;
+  order_total: number;
+  order_payment_status: string | null;
+}
+
 export default function CashClosureDetailPage() {
   const params = useParams();
   const router = useRouter();
   const closureId = params.id as string;
-  
+
   const [closure, setClosure] = useState<CashClosure | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [loadingMovements, setLoadingMovements] = useState(false);
+  const [movementFilter, setMovementFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchClosure();
   }, [closureId]);
 
+  useEffect(() => {
+    if (closure?.pos_session_id) {
+      fetchMovements(closure.pos_session_id);
+    }
+  }, [closure?.pos_session_id]);
+
   const fetchClosure = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/cash-register/closures/${closureId}`);
+      const response = await fetch(
+        `/api/admin/cash-register/closures/${closureId}`,
+        {
+          credentials: "include",
+        },
+      );
       if (response.ok) {
         const data = await response.json();
         setClosure(data.closure);
         setOrders(data.orders || []);
       } else {
         const error = await response.json();
-        toast.error(error.error || 'Error al cargar el cierre de caja');
-        router.push('/admin/cash-register');
+        toast.error(error.error || "Error al cargar el cierre de caja");
+        router.push("/admin/cash-register");
       }
     } catch (error: any) {
-      console.error('Error fetching closure:', error);
-      toast.error('Error al cargar el cierre de caja');
-      router.push('/admin/cash-register');
+      console.error("Error fetching closure:", error);
+      toast.error("Error al cargar el cierre de caja");
+      router.push("/admin/cash-register");
     } finally {
       setLoading(false);
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0
-    }).format(amount);
+  const fetchMovements = async (sessionId: string) => {
+    setLoadingMovements(true);
+    try {
+      const response = await fetch(
+        `/api/admin/cash-register/session-movements?session_id=${sessionId}`,
+        { credentials: "include" },
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setMovements(data.movements || []);
+      } else {
+        console.error("Error fetching movements");
+      }
+    } catch (error: any) {
+      console.error("Error fetching movements:", error);
+    } finally {
+      setLoadingMovements(false);
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-CL', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, reopenedAt?: string | null) => {
     const config: Record<string, { variant: any; label: string }> = {
-      draft: { variant: 'outline', label: 'Borrador' },
-      confirmed: { variant: 'default', label: 'Confirmado' },
-      reviewed: { variant: 'secondary', label: 'Revisado' }
+      draft: { variant: "outline", label: "Borrador" },
+      confirmed: { variant: "default", label: "Confirmado" },
+      reviewed: { variant: "secondary", label: "Revisado" },
+      closed: { variant: "default", label: "Cerrada" },
+      reopened: { variant: "secondary", label: "Abierta" },
     };
 
-    const statusConfig = config[status] || { variant: 'outline', label: status };
+    // Si está cerrada pero fue reabierta, mostrar como "Abierta"
+    if (status === "closed" && reopenedAt) {
+      const statusConfig = config.reopened || config[status];
+      return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
+    }
+
+    const statusConfig = config[status] || {
+      variant: "outline",
+      label: status,
+    };
     return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
   };
 
   const getPaymentMethodLabel = (method: string) => {
     const labels: Record<string, string> = {
-      cash: 'Efectivo',
-      debit_card: 'Tarjeta Débito',
-      credit_card: 'Tarjeta Crédito',
-      installments: 'Cuotas',
-      transfer: 'Transferencia',
-      check: 'Cheque',
-      other: 'Otro'
+      cash: "Efectivo",
+      debit_card: "Tarjeta Débito",
+      credit_card: "Tarjeta Crédito",
+      installments: "Cuotas",
+      transfer: "Transferencia",
+      check: "Cheque",
+      other: "Otro",
     };
     return labels[method] || method;
   };
@@ -183,14 +249,16 @@ export default function CashClosureDetailPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Cierre de Caja</h1>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Cierre de Caja
+            </h1>
             <p className="text-tierra-media">
-              {formatDate(closure.closure_date)}
+              {formatDateTime(closure.closure_date)}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {getStatusBadge(closure.status)}
+          {getStatusBadge(closure.status, closure.reopened_at)}
         </div>
       </div>
 
@@ -241,11 +309,13 @@ export default function CashClosureDetailPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-azul-profundo">
-              {formatCurrency(closure.debit_card_sales + closure.credit_card_sales)}
+              {formatCurrency(
+                closure.debit_card_sales + closure.credit_card_sales,
+              )}
             </p>
             <p className="text-sm text-tierra-media mt-1">
-              Débito: {formatCurrency(closure.debit_card_sales)} | 
-              Crédito: {formatCurrency(closure.credit_card_sales)}
+              Débito: {formatCurrency(closure.debit_card_sales)} | Crédito:{" "}
+              {formatCurrency(closure.credit_card_sales)}
             </p>
           </CardContent>
         </Card>
@@ -261,34 +331,51 @@ export default function CashClosureDetailPage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between">
               <span className="text-tierra-media">Monto Inicial:</span>
-              <span className="font-semibold">{formatCurrency(closure.opening_cash_amount)}</span>
+              <span className="font-semibold">
+                {formatCurrency(closure.opening_cash_amount)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-tierra-media">Ventas en Efectivo:</span>
-              <span className="font-semibold">{formatCurrency(closure.cash_sales)}</span>
+              <span className="font-semibold">
+                {formatCurrency(closure.cash_sales)}
+              </span>
             </div>
             <div className="flex justify-between border-t pt-2">
-              <span className="text-tierra-media font-semibold">Efectivo Esperado:</span>
-              <span className="font-bold text-verde-suave">{formatCurrency(closure.expected_cash)}</span>
+              <span className="text-tierra-media font-semibold">
+                Efectivo Esperado:
+              </span>
+              <span className="font-bold text-verde-suave">
+                {formatCurrency(closure.expected_cash)}
+              </span>
             </div>
             {closure.actual_cash !== null && (
               <>
                 <div className="flex justify-between border-t pt-2">
                   <span className="text-tierra-media">Efectivo Físico:</span>
-                  <span className="font-semibold">{formatCurrency(closure.actual_cash)}</span>
+                  <span className="font-semibold">
+                    {formatCurrency(closure.actual_cash)}
+                  </span>
                 </div>
                 <div className="flex justify-between border-t pt-2">
-                  <span className="text-tierra-media font-semibold">Diferencia:</span>
-                  <span className={`font-bold flex items-center gap-1 ${
-                    closure.cash_difference > 0 ? 'text-green-600' : 
-                    closure.cash_difference < 0 ? 'text-red-600' : 
-                    'text-tierra-media'
-                  }`}>
-                    {closure.cash_difference !== 0 && (
-                      closure.cash_difference > 0 ? 
-                        <TrendingUp className="h-4 w-4" /> : 
+                  <span className="text-tierra-media font-semibold">
+                    Diferencia:
+                  </span>
+                  <span
+                    className={`font-bold flex items-center gap-1 ${
+                      closure.cash_difference > 0
+                        ? "text-green-600"
+                        : closure.cash_difference < 0
+                          ? "text-red-600"
+                          : "text-tierra-media"
+                    }`}
+                  >
+                    {closure.cash_difference !== 0 &&
+                      (closure.cash_difference > 0 ? (
+                        <TrendingUp className="h-4 w-4" />
+                      ) : (
                         <TrendingDown className="h-4 w-4" />
-                    )}
+                      ))}
                     {formatCurrency(Math.abs(closure.cash_difference))}
                   </span>
                 </div>
@@ -305,30 +392,45 @@ export default function CashClosureDetailPage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between">
               <span className="text-tierra-media">Ventas Débito:</span>
-              <span className="font-semibold">{formatCurrency(closure.debit_card_sales)}</span>
+              <span className="font-semibold">
+                {formatCurrency(closure.debit_card_sales)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-tierra-media">Máquina Débito:</span>
-              <span className="font-semibold">{formatCurrency(closure.card_machine_debit_total)}</span>
+              <span className="font-semibold">
+                {formatCurrency(closure.card_machine_debit_total)}
+              </span>
             </div>
             <div className="flex justify-between border-t pt-2">
               <span className="text-tierra-media">Ventas Crédito:</span>
-              <span className="font-semibold">{formatCurrency(closure.credit_card_sales)}</span>
+              <span className="font-semibold">
+                {formatCurrency(closure.credit_card_sales)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-tierra-media">Máquina Crédito:</span>
-              <span className="font-semibold">{formatCurrency(closure.card_machine_credit_total)}</span>
+              <span className="font-semibold">
+                {formatCurrency(closure.card_machine_credit_total)}
+              </span>
             </div>
             {closure.card_machine_difference !== 0 && (
               <div className="flex justify-between border-t pt-2">
-                <span className="text-tierra-media font-semibold">Diferencia:</span>
-                <span className={`font-bold flex items-center gap-1 ${
-                  closure.card_machine_difference > 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {closure.card_machine_difference > 0 ? 
-                    <TrendingUp className="h-4 w-4" /> : 
+                <span className="text-tierra-media font-semibold">
+                  Diferencia:
+                </span>
+                <span
+                  className={`font-bold flex items-center gap-1 ${
+                    closure.card_machine_difference > 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {closure.card_machine_difference > 0 ? (
+                    <TrendingUp className="h-4 w-4" />
+                  ) : (
                     <TrendingDown className="h-4 w-4" />
-                  }
+                  )}
                   {formatCurrency(Math.abs(closure.card_machine_difference))}
                 </span>
               </div>
@@ -346,24 +448,34 @@ export default function CashClosureDetailPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-tierra-media">Efectivo</p>
-              <p className="text-xl font-bold">{formatCurrency(closure.cash_sales)}</p>
+              <p className="text-xl font-bold">
+                {formatCurrency(closure.cash_sales)}
+              </p>
             </div>
             <div>
               <p className="text-sm text-tierra-media">Tarjeta Débito</p>
-              <p className="text-xl font-bold">{formatCurrency(closure.debit_card_sales)}</p>
+              <p className="text-xl font-bold">
+                {formatCurrency(closure.debit_card_sales)}
+              </p>
             </div>
             <div>
               <p className="text-sm text-tierra-media">Tarjeta Crédito</p>
-              <p className="text-xl font-bold">{formatCurrency(closure.credit_card_sales)}</p>
+              <p className="text-xl font-bold">
+                {formatCurrency(closure.credit_card_sales)}
+              </p>
             </div>
             <div>
               <p className="text-sm text-tierra-media">Cuotas</p>
-              <p className="text-xl font-bold">{formatCurrency(closure.installments_sales)}</p>
+              <p className="text-xl font-bold">
+                {formatCurrency(closure.installments_sales)}
+              </p>
             </div>
             {closure.other_payment_sales > 0 && (
               <div>
                 <p className="text-sm text-tierra-media">Otros</p>
-                <p className="text-xl font-bold">{formatCurrency(closure.other_payment_sales)}</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(closure.other_payment_sales)}
+                </p>
               </div>
             )}
           </div>
@@ -378,15 +490,21 @@ export default function CashClosureDetailPage() {
         <CardContent className="space-y-3">
           <div className="flex justify-between">
             <span className="text-tierra-media">Subtotal:</span>
-            <span className="font-semibold">{formatCurrency(closure.total_subtotal)}</span>
+            <span className="font-semibold">
+              {formatCurrency(closure.total_subtotal)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-tierra-media">IVA:</span>
-            <span className="font-semibold">{formatCurrency(closure.total_tax)}</span>
+            <span className="font-semibold">
+              {formatCurrency(closure.total_tax)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-tierra-media">Descuentos:</span>
-            <span className="font-semibold">{formatCurrency(closure.total_discounts)}</span>
+            <span className="font-semibold">
+              {formatCurrency(closure.total_discounts)}
+            </span>
           </div>
           <div className="flex justify-between border-t pt-2">
             <span className="text-tierra-media font-semibold">Total:</span>
@@ -407,33 +525,62 @@ export default function CashClosureDetailPage() {
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-tierra-media" />
               <span className="text-tierra-media">Sucursal:</span>
-              <span className="font-semibold">{closure.branch.name} ({closure.branch.code})</span>
+              <span className="font-semibold">
+                {closure.branch.name} ({closure.branch.code})
+              </span>
             </div>
           )}
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-tierra-media" />
             <span className="text-tierra-media">Cerrado por:</span>
             <span className="font-semibold">
-              {closure.closed_by_user 
+              {closure.closed_by_user
                 ? `${closure.closed_by_user.first_name} ${closure.closed_by_user.last_name}`
-                : 'N/A'}
+                : "N/A"}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-tierra-media" />
             <span className="text-tierra-media">Abierto:</span>
-            <span className="font-semibold">{formatDate(closure.opened_at)}</span>
+            <span className="font-semibold">
+              {formatDateTime(closure.opened_at)}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-tierra-media" />
             <span className="text-tierra-media">Cerrado:</span>
-            <span className="font-semibold">{formatDate(closure.closed_at)}</span>
+            <span className="font-semibold">
+              {formatDateTime(closure.closed_at)}
+            </span>
           </div>
           {closure.confirmed_at && (
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-tierra-media" />
               <span className="text-tierra-media">Confirmado:</span>
-              <span className="font-semibold">{formatDate(closure.confirmed_at)}</span>
+              <span className="font-semibold">
+                {formatDateTime(closure.confirmed_at)}
+              </span>
+            </div>
+          )}
+          {closure.reopened_at && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-2 mb-2">
+                <RefreshCw className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold text-blue-900">Caja Reabierta</p>
+                  <p className="text-sm text-blue-800 mt-1">
+                    Reabierta el {formatDateTime(closure.reopened_at)}
+                    {closure.reopen_count &&
+                      closure.reopen_count > 1 &&
+                      ` (${closure.reopen_count} veces)`}
+                  </p>
+                  {closure.reopen_notes && (
+                    <p className="text-sm text-blue-700 mt-2 italic">
+                      Notas: {closure.reopen_notes}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           {closure.notes && (
@@ -451,6 +598,170 @@ export default function CashClosureDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Movements Detail */}
+      {closure.pos_session_id && (
+        <Card className="bg-admin-bg-tertiary">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Detalle de Movimientos
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={movementFilter}
+                  onValueChange={setMovementFilter}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filtrar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="cash">Efectivo</SelectItem>
+                    <SelectItem value="debit">Débito</SelectItem>
+                    <SelectItem value="credit">Crédito</SelectItem>
+                    <SelectItem value="transfer">Transferencia</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingMovements ? (
+              <div className="text-center py-8">
+                <RefreshCw className="h-6 w-6 animate-spin text-azul-profundo mx-auto mb-2" />
+                <p className="text-sm text-tierra-media">
+                  Cargando movimientos...
+                </p>
+              </div>
+            ) : movements.length === 0 ? (
+              <div className="text-center py-8 text-tierra-media">
+                <p>No hay movimientos registrados en esta sesión</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-sm text-tierra-media">
+                  Total de movimientos: <strong>{movements.length}</strong> |
+                  Total:{" "}
+                  <strong>
+                    {formatCurrency(
+                      movements.reduce((sum, m) => sum + m.amount, 0),
+                    )}
+                  </strong>
+                </div>
+                <div className="border rounded-lg overflow-x-visible">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[100px] whitespace-nowrap">
+                            Hora
+                          </TableHead>
+                          <TableHead className="w-[100px] whitespace-nowrap">
+                            Tipo
+                          </TableHead>
+                          <TableHead className="w-[120px] whitespace-nowrap">
+                            Orden
+                          </TableHead>
+                          <TableHead className="min-w-[200px] whitespace-nowrap">
+                            Cliente
+                          </TableHead>
+                          <TableHead className="w-[120px] whitespace-nowrap">
+                            Método
+                          </TableHead>
+                          <TableHead className="w-[120px] text-right whitespace-nowrap">
+                            Monto
+                          </TableHead>
+                          <TableHead className="w-[120px] whitespace-nowrap">
+                            Estado
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {movements
+                          .filter((m) => {
+                            if (movementFilter === "all") return true;
+                            return m.payment_method_code === movementFilter;
+                          })
+                          .map((movement) => (
+                            <TableRow key={movement.id}>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                {new Date(movement.paid_at).toLocaleTimeString(
+                                  "es-CL",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )}
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                <Badge
+                                  variant={
+                                    movement.movement_type === "sale"
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                >
+                                  {movement.movement_type === "sale"
+                                    ? "Venta"
+                                    : "Pago Saldo"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-mono text-sm whitespace-nowrap">
+                                {movement.order_number}
+                              </TableCell>
+                              <TableCell className="min-w-[200px]">
+                                <div className="text-sm">
+                                  <div className="truncate">
+                                    {movement.customer_name}
+                                  </div>
+                                  {movement.customer_rut && (
+                                    <div className="text-xs text-tierra-media font-mono truncate">
+                                      {movement.customer_rut}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                <Badge variant="outline">
+                                  {movement.payment_method}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold whitespace-nowrap">
+                                {formatCurrency(movement.amount)}
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                <Badge
+                                  variant={
+                                    movement.payment_status === "Completo"
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                >
+                                  {movement.payment_status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+                {movements.filter((m) => {
+                  if (movementFilter === "all") return true;
+                  return m.payment_method_code === movementFilter;
+                }).length === 0 &&
+                  movementFilter !== "all" && (
+                    <div className="text-center py-4 text-tierra-media text-sm">
+                      No hay movimientos con el filtro seleccionado
+                    </div>
+                  )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Orders List */}
       {orders.length > 0 && (
         <Card className="bg-admin-bg-tertiary">
@@ -460,14 +771,20 @@ export default function CashClosureDetailPage() {
           <CardContent>
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {orders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
                   <div>
                     <p className="font-semibold">{order.order_number}</p>
                     <p className="text-sm text-tierra-media">
-                      {getPaymentMethodLabel(order.payment_method_type)} • {formatDate(order.created_at)}
+                      {getPaymentMethodLabel(order.payment_method_type)} •{" "}
+                      {formatDateTime(order.created_at)}
                     </p>
                   </div>
-                  <p className="font-bold">{formatCurrency(order.total_amount)}</p>
+                  <p className="font-bold">
+                    {formatCurrency(order.total_amount)}
+                  </p>
                 </div>
               ))}
             </div>

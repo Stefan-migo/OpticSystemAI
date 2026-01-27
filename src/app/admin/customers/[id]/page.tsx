@@ -42,6 +42,7 @@ import {
   Calendar as CalendarIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -263,13 +264,6 @@ export default function CustomerDetailPage() {
     }
   };
 
-  const formatPrice = (amount: number) =>
-    new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-      minimumFractionDigits: 0,
-    }).format(amount);
-
   const getSegmentBadge = (segment: string) => {
     const variants: Record<
       string,
@@ -449,7 +443,7 @@ export default function CustomerDetailPage() {
               <div className="ml-4">
                 <p className="text-sm text-tierra-media">Total Gastado</p>
                 <p className="text-2xl font-bold text-verde-suave">
-                  {formatPrice(customer.analytics?.totalSpent || 0)}
+                  {formatCurrency(customer.analytics?.totalSpent || 0)}
                 </p>
               </div>
             </div>
@@ -477,7 +471,7 @@ export default function CustomerDetailPage() {
               <div className="ml-4">
                 <p className="text-sm text-tierra-media">Ticket Promedio</p>
                 <p className="text-2xl font-bold text-dorado">
-                  {formatPrice(customer.analytics?.avgOrderValue || 0)}
+                  {formatCurrency(customer.analytics?.avgOrderValue || 0)}
                 </p>
               </div>
             </div>
@@ -491,7 +485,7 @@ export default function CustomerDetailPage() {
               <div className="ml-4">
                 <p className="text-sm text-tierra-media">Cliente Desde</p>
                 <p className="text-lg font-bold text-red-500">
-                  {new Date(customer.created_at).toLocaleDateString("es-CL")}
+                  {formatDate(customer.created_at)}
                 </p>
               </div>
             </div>
@@ -574,9 +568,7 @@ export default function CustomerDetailPage() {
                       Último Examen de la Vista
                     </p>
                     <p className="font-medium">
-                      {new Date(customer.last_eye_exam_date).toLocaleDateString(
-                        "es-CL",
-                      )}
+                      {formatDate(customer.last_eye_exam_date)}
                     </p>
                   </div>
                 )}
@@ -587,9 +579,7 @@ export default function CustomerDetailPage() {
                       Próximo Examen Recomendado
                     </p>
                     <p className="font-medium text-azul-profundo">
-                      {new Date(customer.next_eye_exam_due).toLocaleDateString(
-                        "es-CL",
-                      )}
+                      {formatDate(customer.next_eye_exam_due)}
                     </p>
                   </div>
                 )}
@@ -747,9 +737,7 @@ export default function CustomerDetailPage() {
                         <div>
                           <p className="font-medium">#{order.order_number}</p>
                           <p className="text-sm text-tierra-media">
-                            {new Date(order.created_at).toLocaleDateString(
-                              "es-CL",
-                            )}
+                            {formatDate(order.created_at)}
                           </p>
                         </div>
                       </div>
@@ -757,7 +745,7 @@ export default function CustomerDetailPage() {
                       <div className="flex items-center space-x-3">
                         <div className="text-right">
                           <p className="font-medium">
-                            {formatPrice(order.total_amount)}
+                            {formatCurrency(order.total_amount)}
                           </p>
                           {getOrderStatusBadge(order.status)}
                         </div>
@@ -1326,7 +1314,7 @@ export default function CustomerDetailPage() {
                                   Marco:
                                 </span>{" "}
                                 <span className="font-medium">
-                                  {formatPrice(quote.frame_price)}
+                                  {formatCurrency(quote.frame_price)}
                                 </span>
                               </p>
                             )}
@@ -1336,7 +1324,7 @@ export default function CustomerDetailPage() {
                                   Lente:
                                 </span>{" "}
                                 <span className="font-medium">
-                                  {formatPrice(quote.lens_cost)}
+                                  {formatCurrency(quote.lens_cost)}
                                 </span>
                               </p>
                             )}
@@ -1347,7 +1335,7 @@ export default function CustomerDetailPage() {
                                     Tratamientos:
                                   </span>{" "}
                                   <span className="font-medium">
-                                    {formatPrice(quote.treatments_cost)}
+                                    {formatCurrency(quote.treatments_cost)}
                                   </span>
                                 </p>
                               )}
@@ -1357,7 +1345,7 @@ export default function CustomerDetailPage() {
                                   Mano de obra:
                                 </span>{" "}
                                 <span className="font-medium">
-                                  {formatPrice(quote.labor_cost)}
+                                  {formatCurrency(quote.labor_cost)}
                                 </span>
                               </p>
                             )}
@@ -1367,7 +1355,7 @@ export default function CustomerDetailPage() {
                                   Total:
                                 </span>{" "}
                                 <span className="font-medium text-verde-suave text-base">
-                                  {formatPrice(quote.total_amount)}
+                                  {formatCurrency(quote.total_amount)}
                                 </span>
                               </p>
                             )}
@@ -1513,7 +1501,7 @@ export default function CustomerDetailPage() {
                                     Precio unitario:
                                   </span>{" "}
                                   <span className="font-medium">
-                                    {formatPrice(purchase.unit_price)}
+                                    {formatCurrency(purchase.unit_price)}
                                   </span>
                                 </p>
                                 <p>
@@ -1521,7 +1509,7 @@ export default function CustomerDetailPage() {
                                     Total:
                                   </span>{" "}
                                   <span className="font-medium text-verde-suave">
-                                    {formatPrice(purchase.total_price)}
+                                    {formatCurrency(purchase.total_price)}
                                   </span>
                                 </p>
                                 {purchase.prescription_id && (
@@ -1631,7 +1619,7 @@ export default function CustomerDetailPage() {
                           </TableCell>
 
                           <TableCell className="font-medium text-verde-suave">
-                            {formatPrice(order.total_amount)}
+                            {formatCurrency(order.total_amount)}
                           </TableCell>
 
                           <TableCell>
@@ -1685,12 +1673,14 @@ export default function CustomerDetailPage() {
                                               </p>
                                               <p className="text-xs text-tierra-media">
                                                 Cantidad: {item.quantity} ×{" "}
-                                                {formatPrice(item.unit_price)}
+                                                {formatCurrency(
+                                                  item.unit_price,
+                                                )}
                                               </p>
                                             </div>
                                           </div>
                                           <p className="text-sm font-medium text-verde-suave">
-                                            {formatPrice(item.total_price)}
+                                            {formatCurrency(item.total_price)}
                                           </p>
                                         </div>
                                       );
@@ -1727,12 +1717,9 @@ export default function CustomerDetailPage() {
                 </h3>
                 <p className="text-tierra-media mb-6 max-w-md mx-auto">
                   Este cliente aún no ha realizado ningún pedido. Las analíticas
-                  estarán disponibles una vez que realice su primera compra.
+                  estarán disponibles una vez que realice su primera compra a
+                  través del POS.
                 </p>
-                <Button onClick={() => router.push("/admin/orders/new")}>
-                  <Package className="h-4 w-4 mr-2" />
-                  Crear Pedido Manual
-                </Button>
               </CardContent>
             </Card>
           )}
@@ -1787,10 +1774,10 @@ export default function CustomerDetailPage() {
                                 </div>
                                 <div className="text-right">
                                   <p className="font-medium text-verde-suave">
-                                    {formatPrice(item.totalSpent)}
+                                    {formatCurrency(item.totalSpent)}
                                   </p>
                                   <p className="text-xs text-tierra-media">
-                                    {formatPrice(
+                                    {formatCurrency(
                                       item.totalSpent / item.quantity,
                                     )}{" "}
                                     por unidad
@@ -1844,7 +1831,7 @@ export default function CustomerDetailPage() {
                           Tendencia de Gastos (Últimos 12 meses)
                         </div>
                         <div className="text-sm font-normal text-tierra-media">
-                          Total: {formatPrice(customer.analytics.totalSpent)}
+                          Total: {formatCurrency(customer.analytics.totalSpent)}
                         </div>
                       </CardTitle>
                     </CardHeader>
@@ -1864,7 +1851,7 @@ export default function CustomerDetailPage() {
                                 {month.month}
                               </p>
                               <p className="font-bold text-sm text-azul-profundo">
-                                {formatPrice(month.amount)}
+                                {formatCurrency(month.amount)}
                               </p>
                               <p className="text-xs text-tierra-media mt-1">
                                 {month.orders}{" "}
@@ -1882,13 +1869,13 @@ export default function CustomerDetailPage() {
                             Promedio Mensual
                           </p>
                           <p className="font-bold text-lg text-azul-profundo">
-                            {formatPrice(customer.analytics.totalSpent / 12)}
+                            {formatCurrency(customer.analytics.totalSpent / 12)}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-tierra-media">Mejor Mes</p>
                           <p className="font-bold text-lg text-verde-suave">
-                            {formatPrice(
+                            {formatCurrency(
                               Math.max(
                                 ...customer.analytics.monthlySpending.map(
                                   (m: any) => m.amount,

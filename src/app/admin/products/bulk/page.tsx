@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useBranch } from "@/hooks/useBranch";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface Product {
   id: string;
@@ -91,6 +94,8 @@ interface ImportResult {
 export default function BulkOperationsPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { currentBranchId, isSuperAdmin } = useBranch();
+  const queryClient = useQueryClient();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
@@ -180,14 +185,41 @@ export default function BulkOperationsPage() {
       return;
     }
 
+    // Validate inventory update specific fields
+    if (bulkOperation === "update_inventory") {
+      if (!bulkUpdates.adjustment_type) {
+        toast.error(
+          "Selecciona un tipo de ajuste (Establecer cantidad o Agregar/Quitar)",
+        );
+        return;
+      }
+      if (
+        bulkUpdates.inventory_adjustment === undefined ||
+        bulkUpdates.inventory_adjustment === null ||
+        isNaN(Number(bulkUpdates.inventory_adjustment))
+      ) {
+        toast.error("Ingresa un valor válido para el ajuste de inventario");
+        return;
+      }
+    }
+
     try {
       setProcessing(true);
 
+      // Prepare headers with branch context
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+
+      if (currentBranchId) {
+        headers["x-branch-id"] = currentBranchId;
+      } else if (isSuperAdmin) {
+        headers["x-branch-id"] = "global";
+      }
+
       const response = await fetch("/api/admin/products/bulk", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           operation: bulkOperation,
           product_ids: selectedProducts,
@@ -196,10 +228,15 @@ export default function BulkOperationsPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to perform bulk operation");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to perform bulk operation");
       }
 
       const result: BulkOperationResult = await response.json();
+
+      // Invalidate React Query cache to refresh the products list
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["productStats"] });
 
       toast.success(
         `Operación completada: ${result.affected_count} productos afectados`,
@@ -212,7 +249,11 @@ export default function BulkOperationsPage() {
       fetchProducts();
     } catch (error) {
       console.error("Error performing bulk operation:", error);
-      toast.error("Error al realizar la operación masiva");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Error al realizar la operación masiva";
+      toast.error(errorMessage);
     } finally {
       setProcessing(false);
     }
@@ -285,13 +326,6 @@ export default function BulkOperationsPage() {
       setProcessing(false);
     }
   };
-
-  const formatPrice = (amount: number) =>
-    new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency: "ARS",
-      minimumFractionDigits: 0,
-    }).format(amount);
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: any; label: string }> = {
@@ -429,12 +463,24 @@ export default function BulkOperationsPage() {
                     ? "ej: 50"
                     : "ej: -10 o +20"
                 }
-                onChange={(e) =>
-                  setBulkUpdates({
-                    ...bulkUpdates,
-                    inventory_adjustment: parseInt(e.target.value),
-                  })
-                }
+                value={bulkUpdates.inventory_adjustment ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "") {
+                    setBulkUpdates({
+                      ...bulkUpdates,
+                      inventory_adjustment: undefined,
+                    });
+                  } else {
+                    const numValue = parseInt(value, 10);
+                    if (!isNaN(numValue)) {
+                      setBulkUpdates({
+                        ...bulkUpdates,
+                        inventory_adjustment: numValue,
+                      });
+                    }
+                  }
+                }}
               />
             </div>
           </div>
@@ -921,7 +967,7 @@ export default function BulkOperationsPage() {
                   </TableCell>
 
                   <TableCell className="font-medium">
-                    {formatPrice(product.price)}
+                    {formatCurrency(product.price)}
                   </TableCell>
 
                   <TableCell>
@@ -936,7 +982,7 @@ export default function BulkOperationsPage() {
                   <TableCell>{getStatusBadge(product.status)}</TableCell>
 
                   <TableCell className="text-sm text-tierra-media">
-                    {new Date(product.created_at).toLocaleDateString("es-AR")}
+                    {formatDate(product.created_at, { locale: "es-AR" })}
                   </TableCell>
 
                   <TableCell>

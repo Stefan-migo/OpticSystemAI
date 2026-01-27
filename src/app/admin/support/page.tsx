@@ -46,6 +46,7 @@ import { toast } from "sonner";
 import { useBranch } from "@/hooks/useBranch";
 import { getBranchHeader } from "@/lib/utils/branch";
 import { BranchSelector } from "@/components/admin/BranchSelector";
+import { formatTimeAgo, formatDate } from "@/lib/utils";
 
 interface SupportTicket {
   id: string;
@@ -282,22 +283,6 @@ export default function SupportPage() {
     return (
       <Badge variant={priorityConfig.variant}>{priorityConfig.label}</Badge>
     );
-  };
-
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffHours = Math.floor(
-      (now.getTime() - date.getTime()) / (1000 * 60 * 60),
-    );
-
-    if (diffHours < 1) return "Hace menos de 1 hora";
-    if (diffHours < 24) return `Hace ${diffHours} horas`;
-
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `Hace ${diffDays} días`;
-
-    return date.toLocaleDateString("es-AR");
   };
 
   const handleStatusChange = async (ticketId: string, newStatus: string) => {

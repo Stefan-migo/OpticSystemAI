@@ -28,6 +28,39 @@ const DEFAULT_CONFIG: ChatConfig = {
   requireConfirmation: true,
 };
 
+/**
+ * Hook para gestionar la configuración del chat AI
+ *
+ * Proporciona estado y funciones para configurar el comportamiento del chat,
+ * incluyendo proveedor, modelo, temperatura, herramientas, y prompts.
+ *
+ * @param initialConfig - Configuración inicial (opcional, se mergea con defaults)
+ * @returns Objeto con:
+ * - `config`: Configuración actual
+ * - `updateConfig()`: Función para actualizar la configuración
+ * - `resetConfig()`: Función para resetear a valores por defecto
+ * - `setSystemPromptPreset()`: Función para cambiar el preset de prompt
+ *
+ * @example
+ * ```typescript
+ * function ChatSettings() {
+ *   const { config, updateConfig, resetConfig } = useChatConfig({
+ *     temperature: 0.9,
+ *     maxTokens: 4000
+ *   })
+ *
+ *   return (
+ *     <div>
+ *       <input
+ *         type="range"
+ *         value={config.temperature}
+ *         onChange={(e) => updateConfig({ temperature: Number(e.target.value) })}
+ *       />
+ *     </div>
+ *   )
+ * }
+ * ```
+ */
 export function useChatConfig(initialConfig?: Partial<ChatConfig>) {
   // Use useMemo to create initial state only once
   const initialState = useState(() => ({

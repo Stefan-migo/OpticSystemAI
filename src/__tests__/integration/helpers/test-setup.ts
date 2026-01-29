@@ -28,12 +28,13 @@ function createTestServiceRoleClient() {
 
 type Tables<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Row"];
-type Organization = Tables<"organizations">;
-type AdminUser = Tables<"admin_users">;
-type Branch = Tables<"branches">;
-type Customer = Tables<"customers">;
-type Product = Tables<"products">;
-type Order = Tables<"orders">;
+// Use any for tables that might not be in the Database type yet
+type Organization = any; // Tables<"organizations">;
+type AdminUser = any; // Tables<"admin_users">;
+type Branch = any; // Tables<"branches">;
+type Customer = any; // Tables<"customers">;
+type Product = any; // Tables<"products">;
+type Order = any; // Tables<"orders">;
 
 export interface TestOrganization {
   id: string;
@@ -47,6 +48,15 @@ export interface TestUser {
   email: string;
   organization_id: string;
   authToken?: string;
+  sessionData?: {
+    session?: {
+      access_token: string;
+      refresh_token?: string;
+      expires_at?: number;
+      token_type?: string;
+    };
+    user?: any;
+  };
 }
 
 export interface TestBranch {
@@ -169,11 +179,26 @@ export async function createTestUser(
       password: "TestPassword123!",
     });
 
+  if (sessionError || !sessionData?.session) {
+    // Cleanup if session creation fails
+    await supabase.auth.admin.deleteUser(authUser.user.id);
+    throw new Error(`Failed to create session: ${sessionError?.message}`);
+  }
+
   return {
     id: authUser.user.id,
     email,
     organization_id: organizationId,
-    authToken: sessionData?.session?.access_token,
+    authToken: sessionData.session.access_token,
+    sessionData: {
+      session: {
+        access_token: sessionData.session.access_token,
+        refresh_token: sessionData.session.refresh_token,
+        expires_at: sessionData.session.expires_at,
+        token_type: sessionData.session.token_type,
+      },
+      user: sessionData.user,
+    },
   };
 }
 
@@ -208,6 +233,34 @@ export async function createTestBranch(
     code: data.code,
     organization_id: data.organization_id!,
   };
+}
+
+/**
+ * Assign branch access to a test user
+ */
+export async function assignTestUserBranchAccess(
+  userId: string,
+  branchId: string,
+  role: string = "manager",
+  isPrimary: boolean = true,
+): Promise<void> {
+  const supabase = createTestServiceRoleClient();
+
+  const { error } = await supabase.from("admin_branch_access").upsert(
+    {
+      admin_user_id: userId,
+      branch_id: branchId,
+      role,
+      is_primary: isPrimary,
+    },
+    {
+      onConflict: "admin_user_id,branch_id",
+    },
+  );
+
+  if (error) {
+    throw new Error(`Failed to assign branch access: ${error.message}`);
+  }
 }
 
 /**
@@ -338,38 +391,93 @@ export async function cleanupTestData(organizationId: string): Promise<void> {
 /**
  * Make authenticated API request
  * Note: Next.js API routes use cookies for auth, not Bearer tokens
- * We need to set the session cookie manually
+ * We need to set the session cookie manually with the correct format
  */
 export async function makeAuthenticatedRequest(
   url: string,
   options: RequestInit = {},
   authToken?: string,
+  sessionData?: {
+    session?: {
+      access_token: string;
+      refresh_token?: string;
+      expires_at?: number;
+      token_type?: string;
+    };
+    user?: any;
+  },
 ): Promise<Response> {
   const headers = new Headers(options.headers);
 
   // For Next.js API routes, we need to set the session cookie
-  // The token is stored in a cookie named 'sb-<project-ref>-auth-token'
-  if (authToken) {
-    // Extract project ref from URL (local Supabase uses '127.0.0.1:54321')
-    const projectRef = "127.0.0.1:54321";
-    const cookieName = `sb-${projectRef.replace(/[^a-zA-Z0-9]/g, "-")}-auth-token`;
+  // The cookie format for Supabase SSR is an array with session object
+  if (authToken && sessionData?.session) {
+    // Extract project ref from Supabase URL
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321";
 
-    // Create a cookie with the session data
-    // The cookie format for Supabase SSR is: { access_token, refresh_token, expires_at, token_type, user }
-    const sessionData = {
-      access_token: authToken,
-      refresh_token: "", // Not needed for testing
-      expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
-      token_type: "bearer",
-      user: {}, // User data would be here
-    };
+    // For local Supabase, the project ref is sanitized
+    // Based on logs, Supabase SSR uses "127" for localhost, not "127-0-0-1-54321"
+    let projectRef: string;
+    if (
+      supabaseUrl.includes("localhost") ||
+      supabaseUrl.includes("127.0.0.1")
+    ) {
+      projectRef = "127"; // Simplified format for localhost (matches Supabase SSR behavior)
+    } else {
+      // Extract from URL (e.g., https://xyz.supabase.co -> xyz)
+      const match = supabaseUrl.match(/https?:\/\/([^.]+)/);
+      projectRef = match ? match[1] : "default";
+    }
 
-    headers.set(
-      "Cookie",
-      `${cookieName}=${encodeURIComponent(JSON.stringify([sessionData]))}`,
-    );
+    const cookieName = `sb-${projectRef}-auth-token`;
 
-    // Also set Authorization header as fallback
+    // Create cookie with complete session data in Supabase SSR format
+    // Format: [{ access_token, refresh_token, expires_at, token_type, user }]
+    const cookieValue = JSON.stringify([
+      {
+        access_token: sessionData.session.access_token,
+        refresh_token: sessionData.session.refresh_token || "",
+        expires_at:
+          sessionData.session.expires_at ||
+          Math.floor(Date.now() / 1000) + 3600, // Default: 1 hour from now
+        token_type: sessionData.session.token_type || "bearer",
+        user: sessionData.user || {},
+      },
+    ]);
+
+    headers.set("Cookie", `${cookieName}=${encodeURIComponent(cookieValue)}`);
+    // Also set Authorization header for API routes that support Bearer tokens
+    headers.set("Authorization", `Bearer ${authToken}`);
+  } else if (authToken) {
+    // Fallback: if only token is provided, create minimal session data
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321";
+
+    let projectRef: string;
+    if (
+      supabaseUrl.includes("localhost") ||
+      supabaseUrl.includes("127.0.0.1")
+    ) {
+      projectRef = "127-0-0-1-54321";
+    } else {
+      const match = supabaseUrl.match(/https?:\/\/([^.]+)/);
+      projectRef = match ? match[1] : "default";
+    }
+
+    const cookieName = `sb-${projectRef}-auth-token`;
+    const cookieValue = JSON.stringify([
+      {
+        access_token: authToken,
+        refresh_token: "",
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        token_type: "bearer",
+        user: {},
+      },
+    ]);
+
+    headers.set("Cookie", `${cookieName}=${encodeURIComponent(cookieValue)}`);
+    // Also set Authorization header for API routes that support Bearer tokens
     headers.set("Authorization", `Bearer ${authToken}`);
   }
 

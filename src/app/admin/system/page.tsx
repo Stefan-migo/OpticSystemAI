@@ -29,6 +29,8 @@ import {
   Download,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useBranch } from "@/hooks/useBranch";
+import { BranchSelector } from "@/components/admin/BranchSelector";
 import EmailTemplatesManager from "@/components/admin/EmailTemplatesManager";
 import NotificationSettings from "@/components/admin/NotificationSettings";
 import { useSystemConfig } from "./hooks/useSystemConfig";
@@ -40,6 +42,7 @@ import SystemHealth from "./components/SystemHealth";
 import SystemMaintenance from "./components/SystemMaintenance";
 
 export default function SystemAdministrationPage() {
+  const { currentBranchId, isSuperAdmin, branches } = useBranch();
   const [activeTab, setActiveTab] = useState("overview");
 
   // Dialogs for maintenance results

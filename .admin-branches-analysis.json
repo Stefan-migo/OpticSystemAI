@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Administradores - Frontend",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 3
+  },
+  {
+    "name": "Administradores - API Routes",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 3
+  },
+  {
+    "name": "Sucursales - Frontend",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 1
+  },
+  {
+    "name": "Sucursales - API Routes",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 4
+  },
+  {
+    "name": "Administradores y Sucursales - Migraciones",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 40
+  },
+  {
+    "name": "Administradores y Sucursales - Hooks y Utilidades",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 0
+  }
+]

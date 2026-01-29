@@ -1,0 +1,151 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
+
+/**
+ * GET /api/admin/lens-matrices/calculate
+ * Calculates lens price based on lens family, sphere, cylinder, and optional addition
+ *
+ * Query parameters:
+ * - lens_family_id: UUID of the lens family
+ * - sphere: Sphere value (required)
+ * - cylinder: Cylinder value (default: 0)
+ * - addition: Addition value for presbyopia (optional)
+ * - sourcing_type: 'stock' or 'surfaced' (optional)
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    // Check authentication
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check admin status
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
+      user_id: user.id,
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
+    }
+
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const lensFamilyId = searchParams.get("lens_family_id");
+    const sphereParam = searchParams.get("sphere");
+    const cylinderParam = searchParams.get("cylinder");
+    const additionParam = searchParams.get("addition");
+    const sourcingType = searchParams.get("sourcing_type") as
+      | "stock"
+      | "surfaced"
+      | null;
+
+    // Validate required parameters
+    if (!lensFamilyId) {
+      return NextResponse.json(
+        { error: "lens_family_id is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!sphereParam) {
+      return NextResponse.json(
+        { error: "sphere is required" },
+        { status: 400 },
+      );
+    }
+
+    const sphere = parseFloat(sphereParam);
+    if (isNaN(sphere)) {
+      return NextResponse.json(
+        { error: "sphere must be a valid number" },
+        { status: 400 },
+      );
+    }
+
+    const cylinder = cylinderParam ? parseFloat(cylinderParam) : 0;
+    if (isNaN(cylinder)) {
+      return NextResponse.json(
+        { error: "cylinder must be a valid number" },
+        { status: 400 },
+      );
+    }
+
+    // For presbyopia (addition), we need to calculate the near sphere
+    // The near sphere = far sphere + addition
+    // But for the price matrix, we use the sphere value directly (the matrix should account for addition ranges)
+    // However, if addition is provided, we might need to adjust the sphere calculation
+    // For now, we'll use the sphere as-is and let the matrix handle it
+    // Note: The SQL function calculate_lens_price doesn't use addition parameter,
+    // so we'll calculate the effective sphere if addition is provided
+    let effectiveSphere = sphere;
+    if (additionParam) {
+      const addition = parseFloat(additionParam);
+      if (!isNaN(addition) && addition > 0) {
+        // For progressive/bifocal/trifocal lenses, the addition is already accounted for
+        // in the lens family type, so we use the far sphere for the matrix lookup
+        // The matrix should be set up for the base sphere range
+        effectiveSphere = sphere;
+      }
+    }
+
+    // Call the SQL function to calculate lens price
+    const { data: calculation, error } = await supabase.rpc(
+      "calculate_lens_price",
+      {
+        p_lens_family_id: lensFamilyId,
+        p_sphere: effectiveSphere,
+        p_cylinder: cylinder,
+        p_sourcing_type: sourcingType || null,
+      },
+    );
+
+    if (error) {
+      logger.error("Error calculating lens price", error);
+      return NextResponse.json(
+        {
+          error: "Error al calcular el precio del lente",
+          details: error.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    // If no result found, return appropriate error
+    if (!calculation || calculation.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No se encontró una matriz de precios para los parámetros especificados",
+        },
+        { status: 404 },
+      );
+    }
+
+    // The RPC function returns an array, get the first result
+    const result = Array.isArray(calculation) ? calculation[0] : calculation;
+
+    return NextResponse.json({
+      calculation: {
+        price: parseFloat(result.price),
+        sourcing_type: result.sourcing_type,
+        cost: parseFloat(result.cost),
+      },
+    });
+  } catch (error) {
+    logger.error("Error in lens price calculation API", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}

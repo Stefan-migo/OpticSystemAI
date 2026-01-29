@@ -4,6 +4,67 @@ import { createServiceRoleClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; prescriptionId: string }> },
+) {
+  try {
+    const supabase = await createClient();
+    const supabaseServiceRole = createServiceRoleClient();
+
+    // Check admin authorization
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
+      user_id: user.id,
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
+    }
+
+    const { id: customerId, prescriptionId } = await params;
+
+    // Get prescription
+    const { data: prescription, error } = await supabaseServiceRole
+      .from("prescriptions")
+      .select("*")
+      .eq("id", prescriptionId)
+      .eq("customer_id", customerId)
+      .single();
+
+    if (error) {
+      logger.error("Error fetching prescription", error);
+      return NextResponse.json(
+        {
+          error: "Prescription not found",
+          details: error.message,
+        },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      prescription,
+    });
+  } catch (error) {
+    logger.error("Error in prescription get API", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; prescriptionId: string }> },

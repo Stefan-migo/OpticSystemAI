@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClientFromRequest } from "@/utils/supabase/server";
 import { NotificationService } from "@/lib/notifications/notification-service";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
@@ -49,13 +49,12 @@ export async function GET(request: NextRequest) {
 
     logger.debug("Query params", { search, status, page, limit });
 
-    const supabase = await createClient();
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
 
     // Check admin authorization
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
     if (userError || !user) {
       logger.error("User authentication failed", userError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -82,16 +81,47 @@ export async function GET(request: NextRequest) {
     }
     logger.debug("Admin access confirmed", { email: user.email });
 
-    // Get branch context
-    const branchContext = await getBranchContext(request, user.id);
+    // Get branch context (pass supabase client to use same auth context)
+    const branchContext = await getBranchContext(request, user.id, supabase);
+
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = adminUser?.organization_id;
 
     // Build branch filter function
     const applyBranchFilter = (query: any) => {
-      return addBranchFilter(
-        query,
-        branchContext.branchId,
-        branchContext.isSuperAdmin,
-      );
+      // For customers, we should filter by organization_id first
+      // Then optionally filter by branch_id if a specific branch is selected
+      if (userOrganizationId && !branchContext.isSuperAdmin) {
+        // Filter by organization_id - this ensures multi-tenancy isolation
+        query = query.eq("organization_id", userOrganizationId);
+
+        // If a specific branch is selected, also filter by branch_id
+        // Otherwise, show all customers from the organization
+        if (branchContext.branchId) {
+          query = query.eq("branch_id", branchContext.branchId);
+        }
+      } else if (branchContext.isSuperAdmin) {
+        // Super admin: use branch filter if branch is selected, otherwise show all
+        if (branchContext.branchId) {
+          query = query.eq("branch_id", branchContext.branchId);
+        }
+        // If no branch selected, super admin sees all (no filter)
+      } else {
+        // Fallback: no organization_id found, use branch filter only
+        query = addBranchFilter(
+          query,
+          branchContext.branchId,
+          branchContext.isSuperAdmin,
+        );
+      }
+
+      return query;
     };
 
     // Build the query to get customers from customers table (not profiles)
@@ -198,13 +228,12 @@ export async function POST(request: NextRequest) {
       request,
       async () => {
         try {
-          const supabase = await createClient();
+          const { client: supabase, getUser } =
+            await createClientFromRequest(request);
 
           // Check admin authorization
-          const {
-            data: { user },
-            error: userError,
-          } = await supabase.auth.getUser();
+          const { data, error: userError } = await getUser();
+          const user = data?.user;
           if (userError || !user) {
             logger.error("User authentication failed", userError);
             return NextResponse.json(
@@ -234,6 +263,23 @@ export async function POST(request: NextRequest) {
           }
           logger.debug("Admin access confirmed", { email: user.email });
 
+          // Get user's organization_id from admin_users table
+          const { data: adminUser, error: adminUserError } = await supabase
+            .from("admin_users")
+            .select("organization_id")
+            .eq("id", user.id)
+            .single();
+
+          if (adminUserError || !adminUser?.organization_id) {
+            logger.error("Error getting user organization", adminUserError);
+            return NextResponse.json(
+              { error: "User organization not found" },
+              { status: 500 },
+            );
+          }
+
+          const userOrganizationId = adminUser.organization_id;
+
           // Get request body to determine action
           let body: any;
           try {
@@ -255,7 +301,12 @@ export async function POST(request: NextRequest) {
 
           // Check if this is a customer creation request (has first_name or last_name)
           // Analytics requests have empty body or only summary-related fields
-          const isCustomerCreation = body.first_name || body.last_name;
+          // Check if the property exists (not just if it's truthy, to catch empty strings)
+          const isCustomerCreation =
+            "first_name" in body ||
+            "last_name" in body ||
+            body.first_name ||
+            body.last_name;
 
           if (isCustomerCreation) {
             logger.info("Customers API POST called (create new customer)");
@@ -310,7 +361,11 @@ export async function POST(request: NextRequest) {
             }
 
             // Get branch context
-            const branchContext = await getBranchContext(request, user.id);
+            const branchContext = await getBranchContext(
+              request,
+              user.id,
+              supabase,
+            );
 
             logger.debug("Branch context for customer creation", {
               branchId: branchContext.branchId,
@@ -331,6 +386,31 @@ export async function POST(request: NextRequest) {
               });
             } else if (validatedBody.branch_id) {
               // If no branch in context but provided in body (super admin in global view)
+              // Validate that the branch belongs to the user's organization
+              const { data: branch } = await supabase
+                .from("branches")
+                .select("id, organization_id")
+                .eq("id", validatedBody.branch_id)
+                .single();
+
+              if (!branch) {
+                return NextResponse.json(
+                  { error: "Sucursal no encontrada" },
+                  { status: 404 },
+                );
+              }
+
+              // Check if branch belongs to user's organization
+              if (
+                branch.organization_id !== userOrganizationId &&
+                !branchContext.isSuperAdmin
+              ) {
+                return NextResponse.json(
+                  { error: "No tienes acceso a esta sucursal" },
+                  { status: 403 },
+                );
+              }
+
               customerBranchId = validatedBody.branch_id;
               logger.debug("Using branch_id from request body", {
                 branchId: customerBranchId,
@@ -405,6 +485,7 @@ export async function POST(request: NextRequest) {
             // Create customer data (NO auth user creation - customers don't need authentication)
             // Usar datos validados por Zod
             const customerData = {
+              organization_id: userOrganizationId,
               branch_id: customerBranchId,
               first_name: validatedBody.first_name || null,
               last_name: validatedBody.last_name || null,
@@ -481,16 +562,23 @@ export async function POST(request: NextRequest) {
               validatedBody.email || undefined,
             ).catch((err) => logger.error("Error creating notification", err));
 
-            return NextResponse.json({
-              success: true,
-              customer: newCustomer,
-            });
+            return NextResponse.json(
+              {
+                success: true,
+                customer: newCustomer,
+              },
+              { status: 201 },
+            );
           } else {
             // This is an analytics request
             logger.info("Customers API POST called (analytics summary)");
 
             // Get branch context
-            const branchContext = await getBranchContext(request, user.id);
+            const branchContext = await getBranchContext(
+              request,
+              user.id,
+              supabase,
+            );
 
             // Build branch filter function
             const applyBranchFilter = (query: any) => {

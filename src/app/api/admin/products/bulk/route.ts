@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
+import { getBranchContext } from "@/lib/api/branch-middleware";
 import type {
   IsAdminParams,
   IsAdminResult,
@@ -143,60 +144,147 @@ export async function POST(request: NextRequest) {
         break;
 
       case "update_inventory":
-        if (updates.inventory_adjustment === undefined) {
+        // Validate inventory_adjustment
+        if (
+          updates.inventory_adjustment === undefined ||
+          updates.inventory_adjustment === null ||
+          isNaN(Number(updates.inventory_adjustment))
+        ) {
           return NextResponse.json(
-            { error: "Inventory adjustment is required" },
+            {
+              error:
+                "El ajuste de inventario es requerido y debe ser un número válido",
+            },
             { status: 400 },
           );
         }
 
-        // Get current inventory
-        const { data: currentInventory, error: inventoryFetchError } =
-          await supabase
-            .from("products")
-            .select("id, inventory_quantity")
-            .in("id", product_ids);
-
-        if (inventoryFetchError) {
-          throw inventoryFetchError;
+        // Validate adjustment_type
+        if (
+          !updates.adjustment_type ||
+          !["set", "add"].includes(updates.adjustment_type)
+        ) {
+          return NextResponse.json(
+            { error: "El tipo de ajuste debe ser 'set' o 'add'" },
+            { status: 400 },
+          );
         }
 
-        // Calculate new inventory
-        const inventoryUpdates =
-          currentInventory?.map((product) => {
-            let newQuantity = product.inventory_quantity || 0;
+        // Get branch context for stock updates
+        const branchContext = await getBranchContext(request, user.id);
+        let branchId = branchContext.branchId;
+
+        // If superadmin in global view, try to get first accessible branch
+        if (!branchId && branchContext.isSuperAdmin) {
+          if (branchContext.accessibleBranches.length > 0) {
+            branchId = branchContext.accessibleBranches[0].id;
+            logger.warn(
+              "SuperAdmin in global view - using first accessible branch for stock update",
+              {
+                branchId,
+              },
+            );
+          } else {
+            return NextResponse.json(
+              {
+                error:
+                  "Debe seleccionar una sucursal para actualizar inventario. No hay sucursales disponibles.",
+              },
+              { status: 400 },
+            );
+          }
+        }
+
+        if (!branchId) {
+          return NextResponse.json(
+            {
+              error: "Debe seleccionar una sucursal para actualizar inventario",
+            },
+            { status: 400 },
+          );
+        }
+
+        const serviceSupabase = createServiceRoleClient();
+
+        // Get current stock from product_branch_stock
+        const { data: currentStock, error: stockFetchError } =
+          await serviceSupabase
+            .from("product_branch_stock")
+            .select("product_id, quantity")
+            .in("product_id", product_ids)
+            .eq("branch_id", branchId);
+
+        if (stockFetchError) {
+          logger.error("Error fetching stock", stockFetchError);
+          throw stockFetchError;
+        }
+
+        // Create a map of current stock
+        const stockMap = new Map(
+          currentStock?.map((s) => [s.product_id, s.quantity || 0]) || [],
+        );
+
+        // Parse inventory_adjustment as number
+        const inventoryAdjustment = Number(updates.inventory_adjustment);
+        if (isNaN(inventoryAdjustment)) {
+          return NextResponse.json(
+            { error: "El ajuste de inventario debe ser un número válido" },
+            { status: 400 },
+          );
+        }
+
+        // Calculate new inventory and update using update_product_stock function
+        const inventoryUpdatePromises = product_ids.map(
+          async (productId: string) => {
+            const currentQuantity = stockMap.get(productId) || 0;
+            let newQuantity = currentQuantity;
 
             if (updates.adjustment_type === "set") {
-              newQuantity = updates.inventory_adjustment;
+              newQuantity = Math.max(0, inventoryAdjustment);
             } else if (updates.adjustment_type === "add") {
-              newQuantity =
-                (product.inventory_quantity || 0) +
-                updates.inventory_adjustment;
+              newQuantity = Math.max(0, currentQuantity + inventoryAdjustment);
             }
 
-            return {
-              id: product.id,
-              inventory_quantity: Math.max(0, newQuantity), // Ensure quantity doesn't go below 0
-            };
-          }) || [];
+            const quantityChange = newQuantity - currentQuantity;
 
-        // Update inventory
-        const inventoryUpdatePromises = inventoryUpdates.map(
-          ({ id, inventory_quantity }) =>
-            supabase
+            if (quantityChange !== 0) {
+              // Use update_product_stock function
+              const { error: updateError } = await serviceSupabase.rpc(
+                "update_product_stock",
+                {
+                  p_product_id: productId,
+                  p_branch_id: branchId,
+                  p_quantity_change: quantityChange,
+                  p_reserve: false,
+                },
+              );
+
+              if (updateError) {
+                logger.error(
+                  `Error updating stock for product ${productId}`,
+                  updateError,
+                );
+                return null;
+              }
+            }
+
+            // Get product name for response
+            const { data: product } = await serviceSupabase
               .from("products")
-              .update({
-                inventory_quantity,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", id)
-              .select("id, name, inventory_quantity"),
+              .select("id, name")
+              .eq("id", productId)
+              .single();
+
+            return {
+              id: productId,
+              name: product?.name,
+              quantity: Math.max(0, newQuantity),
+            };
+          },
         );
 
         const inventoryResults = await Promise.all(inventoryUpdatePromises);
-        results = inventoryResults
-          .map((result) => result.data?.[0])
-          .filter(Boolean);
+        results = inventoryResults.filter(Boolean);
         break;
 
       case "delete":
@@ -349,7 +437,7 @@ export async function POST(request: NextRequest) {
               name: `${product.name} (Copia)`,
               slug: `${product.slug}-copy-${Date.now()}`,
               status: "draft",
-              inventory_quantity: 0,
+              // inventory_quantity removed - stock managed in product_branch_stock
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             };
@@ -430,9 +518,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build query
-    let query = supabase.from("products").select(`
-        id,
+    // Get branch context for stock
+    const branchContext = await getBranchContext(request, user.id);
+    const branchId = branchContext.branchId;
+
+    // Build query - include stock from product_branch_stock if branch is selected
+    const selectFields = branchId
+      ? `id,
+        name,
+        slug,
+        description,
+        price,
+        compare_at_price,
+        status,
+        is_featured,
+        sku,
+        weight,
+        skin_type,
+        benefits,
+        certifications,
+        usage_instructions,
+        category:categories(name),
+        created_at,
+        updated_at,
+        product_branch_stock!inner (
+          quantity,
+          available_quantity
+        )`
+      : `id,
         name,
         slug,
         description,
@@ -449,8 +562,13 @@ export async function GET(request: NextRequest) {
         usage_instructions,
         category:categories(name),
         created_at,
-        updated_at
-      `);
+        updated_at`;
+
+    let query = supabase.from("products").select(selectFields);
+
+    if (branchId) {
+      query = query.eq("product_branch_stock.branch_id", branchId);
+    }
 
     if (category_id && category_id !== "all") {
       query = query.eq("category_id", category_id);
@@ -500,7 +618,16 @@ export async function GET(request: NextRequest) {
             `"${(product.description || "").replace(/"/g, '""')}"`,
             product.price || 0,
             product.compare_at_price || "",
-            product.inventory_quantity || 0,
+            // Use stock from product_branch_stock if available, otherwise fallback to deprecated inventory_quantity
+            (() => {
+              const stock = (product as any).product_branch_stock?.[0];
+              return (
+                stock?.available_quantity ??
+                stock?.quantity ??
+                product.inventory_quantity ??
+                0
+              );
+            })(),
             product.status || "",
             product.is_featured ? "Sí" : "No",
             `"${product.sku || ""}"`,

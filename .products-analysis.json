@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Productos - Frontend",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 20
+  },
+  {
+    "name": "Productos - API Routes",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 12
+  },
+  {
+    "name": "Productos - Migraciones",
+    "deletedFiles": [
+      "supabase/migrations/20260120000000_refactor_separate_products_inventory.sql"
+    ],
+    "modifiedFiles": [],
+    "totalFiles": 27
+  },
+  {
+    "name": "Productos - Hooks y Utilidades",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 1
+  }
+]

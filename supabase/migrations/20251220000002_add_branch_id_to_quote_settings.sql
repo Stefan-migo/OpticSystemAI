@@ -29,6 +29,7 @@ DROP POLICY IF EXISTS "Admins can update quote settings" ON public.quote_setting
 DROP POLICY IF EXISTS "Admins can insert quote settings" ON public.quote_settings;
 
 -- Create new RLS policies that consider branch_id
+DROP POLICY IF EXISTS "Admins can view quote settings in their branches" ON public.quote_settings;
 CREATE POLICY "Admins can view quote settings in their branches"
 ON public.quote_settings
 FOR SELECT

@@ -1,0 +1,444 @@
+{
+  "referenceCommit": "f8e9340",
+  "currentCommit": "b0a9a8e434dda3d7e562b14c30e5f2b1c0de8aac",
+  "timestamp": "2026-01-27T17:10:35.095Z",
+  "sections": {
+    "POS/Caja": {
+      "deleted": [
+        "src/app/admin/pos/settings/page.tsx",
+        "src/app/api/admin/pos/pending-balance/pay/route.ts",
+        "src/app/api/admin/pos/pending-balance/route.ts",
+        "src/app/api/admin/pos/settings/route.ts",
+        "src/app/api/admin/cash-register/open/route.ts",
+        "src/app/api/admin/cash-register/reopen/route.ts",
+        "src/app/api/admin/cash-register/session-movements/route.ts"
+      ],
+      "modified": [
+        {
+          "file": "src/app/api/admin/pos/process-sale/route.ts",
+          "removedLines": 767,
+          "addedLines": 100,
+          "netLoss": 667,
+          "removedFunctions": 29,
+          "addedFunctions": 2,
+          "functionLoss": 27,
+          "hasSignificantLoss": true
+        },
+        {
+          "file": "src/app/api/admin/cash-register/close/route.ts",
+          "removedLines": 493,
+          "addedLines": 103,
+          "netLoss": 390,
+          "removedFunctions": 17,
+          "addedFunctions": 4,
+          "functionLoss": 13,
+          "hasSignificantLoss": true
+        }
+      ],
+      "significantLoss": [
+        {
+          "file": "src/app/api/admin/pos/process-sale/route.ts",
+          "netLoss": 667,
+          "functionLoss": 27,
+          "removedLines": 767,
+          "addedLines": 100,
+          "removedFunctions": 29,
+          "addedFunctions": 2
+        },
+        {
+          "file": "src/app/api/admin/cash-register/close/route.ts",
+          "netLoss": 390,
+          "functionLoss": 13,
+          "removedLines": 493,
+          "addedLines": 103,
+          "removedFunctions": 17,
+          "addedFunctions": 4
+        }
+      ],
+      "new": [],
+      "unchanged": [
+        "src/app/admin/pos/page.tsx",
+        "src/app/admin/cash-register/[id]/page.tsx",
+        "src/app/admin/cash-register/orders/[id]/page.tsx",
+        "src/app/admin/cash-register/page.tsx",
+        "src/app/api/admin/cash-register/closures/[id]/route.ts",
+        "src/app/api/admin/cash-register/closures/route.ts"
+      ],
+      "totalFiles": 7,
+      "totalLinesLost": 1057,
+      "totalFunctionsLost": 40
+    },
+    "Trabajos (Work Orders)": {
+      "deleted": ["src/app/api/admin/work-orders/[id]/deliver/route.ts"],
+      "modified": [
+        {
+          "file": "src/components/admin/CreateWorkOrderForm/FrameSelector.tsx",
+          "removedLines": 46,
+          "addedLines": 2,
+          "netLoss": 44,
+          "removedFunctions": 0,
+          "addedFunctions": 0,
+          "functionLoss": 0,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/components/admin/CreateWorkOrderForm/LensConfiguration.tsx",
+          "removedLines": 130,
+          "addedLines": 92,
+          "netLoss": 38,
+          "removedFunctions": 3,
+          "addedFunctions": 6,
+          "functionLoss": -3,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/components/admin/CreateWorkOrderForm/PricingSection.tsx",
+          "removedLines": 90,
+          "addedLines": 40,
+          "netLoss": 50,
+          "removedFunctions": 0,
+          "addedFunctions": 0,
+          "functionLoss": 0,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/components/admin/CreateWorkOrderForm/hooks/useWorkOrderCalculations.ts",
+          "removedLines": 6,
+          "addedLines": 1,
+          "netLoss": 5,
+          "removedFunctions": 1,
+          "addedFunctions": 0,
+          "functionLoss": 1,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/components/admin/CreateWorkOrderForm/hooks/useWorkOrderForm.ts",
+          "removedLines": 3,
+          "addedLines": 0,
+          "netLoss": 3,
+          "removedFunctions": 0,
+          "addedFunctions": 0,
+          "functionLoss": 0,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/app/api/admin/work-orders/route.ts",
+          "removedLines": 19,
+          "addedLines": 1,
+          "netLoss": 18,
+          "removedFunctions": 0,
+          "addedFunctions": 0,
+          "functionLoss": 0,
+          "hasSignificantLoss": false
+        }
+      ],
+      "significantLoss": [],
+      "new": [],
+      "unchanged": [
+        "src/app/admin/work-orders/[id]/page.tsx",
+        "src/app/admin/work-orders/page.tsx",
+        "src/components/admin/CreateWorkOrderForm/CustomerSelector.tsx",
+        "src/components/admin/CreateWorkOrderForm/LabInfoSection.tsx",
+        "src/components/admin/CreateWorkOrderForm/NotesSection.tsx",
+        "src/components/admin/CreateWorkOrderForm/PrescriptionSelector.tsx",
+        "src/components/admin/CreateWorkOrderForm/StatusSection.tsx",
+        "src/components/admin/CreateWorkOrderForm/hooks/useWorkOrderValidation.ts",
+        "src/components/admin/CreateWorkOrderForm/index.tsx",
+        "src/app/api/admin/work-orders/[id]/route.ts",
+        "src/app/api/admin/work-orders/[id]/status/route.ts"
+      ],
+      "totalFiles": 1,
+      "totalLinesLost": 0,
+      "totalFunctionsLost": 0
+    },
+    "Presupuestos (Quotes)": {
+      "deleted": ["src/app/api/admin/quotes/[id]/load-to-pos/route.ts"],
+      "modified": [
+        {
+          "file": "src/app/api/admin/quotes/[id]/route.ts",
+          "removedLines": 251,
+          "addedLines": 10,
+          "netLoss": 241,
+          "removedFunctions": 3,
+          "addedFunctions": 0,
+          "functionLoss": 3,
+          "hasSignificantLoss": true
+        },
+        {
+          "file": "src/app/api/admin/quotes/route.ts",
+          "removedLines": 34,
+          "addedLines": 3,
+          "netLoss": 31,
+          "removedFunctions": 0,
+          "addedFunctions": 0,
+          "functionLoss": 0,
+          "hasSignificantLoss": false
+        }
+      ],
+      "significantLoss": [
+        {
+          "file": "src/app/api/admin/quotes/[id]/route.ts",
+          "netLoss": 241,
+          "functionLoss": 3,
+          "removedLines": 251,
+          "addedLines": 10,
+          "removedFunctions": 3,
+          "addedFunctions": 0
+        }
+      ],
+      "new": [],
+      "unchanged": [
+        "src/app/admin/quotes/[id]/page.tsx",
+        "src/app/admin/quotes/page.tsx",
+        "src/app/admin/quotes/settings/page.tsx",
+        "src/app/api/admin/quotes/[id]/convert/route.ts",
+        "src/app/api/admin/quotes/[id]/send/route.ts",
+        "src/app/api/admin/quotes/[id]/status/route.ts"
+      ],
+      "totalFiles": 1,
+      "totalLinesLost": 241,
+      "totalFunctionsLost": 3
+    },
+    "Clientes": {
+      "deleted": [],
+      "modified": [
+        {
+          "file": "src/app/admin/customers/[id]/edit/page.tsx",
+          "removedLines": 92,
+          "addedLines": 30,
+          "netLoss": 62,
+          "removedFunctions": 4,
+          "addedFunctions": 1,
+          "functionLoss": 3,
+          "hasSignificantLoss": true
+        }
+      ],
+      "significantLoss": [
+        {
+          "file": "src/app/admin/customers/[id]/edit/page.tsx",
+          "netLoss": 62,
+          "functionLoss": 3,
+          "removedLines": 92,
+          "addedLines": 30,
+          "removedFunctions": 4,
+          "addedFunctions": 1
+        }
+      ],
+      "new": [],
+      "unchanged": [
+        "src/app/admin/customers/[id]/page.tsx",
+        "src/app/admin/customers/new/page.tsx",
+        "src/app/admin/customers/page.tsx",
+        "src/app/api/admin/customers/[id]/appointments/route.ts",
+        "src/app/api/admin/customers/[id]/prescriptions/[prescriptionId]/route.ts",
+        "src/app/api/admin/customers/[id]/prescriptions/route.ts",
+        "src/app/api/admin/customers/[id]/route.ts",
+        "src/app/api/admin/customers/route.ts",
+        "src/app/api/admin/customers/search/route.ts"
+      ],
+      "totalFiles": 0,
+      "totalLinesLost": 62,
+      "totalFunctionsLost": 3
+    },
+    "Productos": {
+      "deleted": [],
+      "modified": [
+        {
+          "file": "src/app/admin/products/components/ProductGrid.tsx",
+          "removedLines": 5,
+          "addedLines": 2,
+          "netLoss": 3,
+          "removedFunctions": 4,
+          "addedFunctions": 2,
+          "functionLoss": 2,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/app/admin/products/components/ProductTable.tsx",
+          "removedLines": 16,
+          "addedLines": 4,
+          "netLoss": 12,
+          "removedFunctions": 4,
+          "addedFunctions": 0,
+          "functionLoss": 4,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/app/admin/products/edit/[id]/page.tsx",
+          "removedLines": 205,
+          "addedLines": 203,
+          "netLoss": 2,
+          "removedFunctions": 11,
+          "addedFunctions": 5,
+          "functionLoss": 6,
+          "hasSignificantLoss": true
+        },
+        {
+          "file": "src/app/admin/products/hooks/useProductFilters.ts",
+          "removedLines": 7,
+          "addedLines": 2,
+          "netLoss": 5,
+          "removedFunctions": 4,
+          "addedFunctions": 1,
+          "functionLoss": 3,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/app/admin/products/hooks/useProductStats.ts",
+          "removedLines": 20,
+          "addedLines": 7,
+          "netLoss": 13,
+          "removedFunctions": 5,
+          "addedFunctions": 0,
+          "functionLoss": 5,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/app/admin/products/hooks/useProducts.ts",
+          "removedLines": 9,
+          "addedLines": 1,
+          "netLoss": 8,
+          "removedFunctions": 0,
+          "addedFunctions": 0,
+          "functionLoss": 0,
+          "hasSignificantLoss": false
+        },
+        {
+          "file": "src/app/api/admin/products/[id]/route.ts",
+          "removedLines": 127,
+          "addedLines": 5,
+          "netLoss": 122,
+          "removedFunctions": 11,
+          "addedFunctions": 0,
+          "functionLoss": 11,
+          "hasSignificantLoss": true
+        },
+        {
+          "file": "src/app/api/admin/products/bulk/route.ts",
+          "removedLines": 151,
+          "addedLines": 48,
+          "netLoss": 103,
+          "removedFunctions": 11,
+          "addedFunctions": 2,
+          "functionLoss": 9,
+          "hasSignificantLoss": true
+        },
+        {
+          "file": "src/app/api/admin/products/import/route.ts",
+          "removedLines": 120,
+          "addedLines": 9,
+          "netLoss": 111,
+          "removedFunctions": 8,
+          "addedFunctions": 0,
+          "functionLoss": 8,
+          "hasSignificantLoss": true
+        },
+        {
+          "file": "src/app/api/admin/products/route.ts",
+          "removedLines": 123,
+          "addedLines": 38,
+          "netLoss": 85,
+          "removedFunctions": 5,
+          "addedFunctions": 3,
+          "functionLoss": 2,
+          "hasSignificantLoss": true
+        },
+        {
+          "file": "src/app/api/admin/products/search/route.ts",
+          "removedLines": 119,
+          "addedLines": 14,
+          "netLoss": 105,
+          "removedFunctions": 4,
+          "addedFunctions": 0,
+          "functionLoss": 4,
+          "hasSignificantLoss": true
+        }
+      ],
+      "significantLoss": [
+        {
+          "file": "src/app/admin/products/edit/[id]/page.tsx",
+          "netLoss": 2,
+          "functionLoss": 6,
+          "removedLines": 205,
+          "addedLines": 203,
+          "removedFunctions": 11,
+          "addedFunctions": 5
+        },
+        {
+          "file": "src/app/api/admin/products/[id]/route.ts",
+          "netLoss": 122,
+          "functionLoss": 11,
+          "removedLines": 127,
+          "addedLines": 5,
+          "removedFunctions": 11,
+          "addedFunctions": 0
+        },
+        {
+          "file": "src/app/api/admin/products/bulk/route.ts",
+          "netLoss": 103,
+          "functionLoss": 9,
+          "removedLines": 151,
+          "addedLines": 48,
+          "removedFunctions": 11,
+          "addedFunctions": 2
+        },
+        {
+          "file": "src/app/api/admin/products/import/route.ts",
+          "netLoss": 111,
+          "functionLoss": 8,
+          "removedLines": 120,
+          "addedLines": 9,
+          "removedFunctions": 8,
+          "addedFunctions": 0
+        },
+        {
+          "file": "src/app/api/admin/products/route.ts",
+          "netLoss": 85,
+          "functionLoss": 2,
+          "removedLines": 123,
+          "addedLines": 38,
+          "removedFunctions": 5,
+          "addedFunctions": 3
+        },
+        {
+          "file": "src/app/api/admin/products/search/route.ts",
+          "netLoss": 105,
+          "functionLoss": 4,
+          "removedLines": 119,
+          "addedLines": 14,
+          "removedFunctions": 4,
+          "addedFunctions": 0
+        }
+      ],
+      "new": [],
+      "unchanged": [
+        "src/app/admin/products/[slug]/page.tsx",
+        "src/app/admin/products/add/page.tsx",
+        "src/app/admin/products/bulk/page.tsx",
+        "src/app/admin/products/components/ProductActions.tsx",
+        "src/app/admin/products/components/ProductFilters.tsx",
+        "src/app/admin/products/components/ProductList.tsx",
+        "src/app/admin/products/components/ProductPagination.tsx",
+        "src/app/admin/products/components/ProductStats.tsx",
+        "src/app/admin/products/components/QuickActions.tsx",
+        "src/app/admin/products/hooks/useCategories.ts",
+        "src/app/admin/products/options/page.tsx",
+        "src/app/admin/products/page.backup.tsx",
+        "src/app/admin/products/page.refactored.tsx",
+        "src/app/admin/products/page.tsx",
+        "src/app/api/admin/products/import-json/route.ts",
+        "src/app/api/admin/products/json-template/route.ts",
+        "src/app/api/admin/products/template/route.ts"
+      ],
+      "totalFiles": 0,
+      "totalLinesLost": 528,
+      "totalFunctionsLost": 40
+    }
+  },
+  "summary": {
+    "totalDeleted": 9,
+    "totalSignificantLoss": 10,
+    "totalLinesLost": 1888,
+    "totalFunctionsLost": 86
+  }
+}

@@ -172,3 +172,78 @@ export async function PUT(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check if user is super admin
+    const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
+      user_id: user.id,
+    });
+
+    if (!isSuperAdmin) {
+      return NextResponse.json(
+        { error: "Only super admins can delete branches" },
+        { status: 403 },
+      );
+    }
+
+    if (id === "global") {
+      return NextResponse.json(
+        { error: "Cannot delete global view" },
+        { status: 400 },
+      );
+    }
+
+    // Check if branch has associated data (orders, products, etc.)
+    // This is a soft check - in production you might want to check more thoroughly
+    const { data: hasOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("branch_id", id)
+      .limit(1)
+      .single();
+
+    if (hasOrders) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot delete branch with associated orders. Deactivate it instead.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Delete branch
+    const { error } = await supabase.from("branches").delete().eq("id", id);
+
+    if (error) {
+      logger.error("Error deleting branch", error);
+      return NextResponse.json(
+        { error: "Failed to delete branch" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    logger.error("Error in DELETE /api/admin/branches/[id]", error);
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 500 },
+    );
+  }
+}

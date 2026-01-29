@@ -1,0 +1,43 @@
+[
+  {
+    "name": "Sistema - Frontend",
+    "deletedFiles": [
+      "src/app/admin/system/billing-settings/page.tsx",
+      "src/app/admin/system/pos-billing-settings/page.tsx",
+      "src/app/admin/system/pos-settings/page.tsx"
+    ],
+    "modifiedFiles": [],
+    "totalFiles": 10
+  },
+  {
+    "name": "Soporte - Frontend",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 4
+  },
+  {
+    "name": "Sistema y Soporte - API Routes",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 23
+  },
+  {
+    "name": "Sistema y Soporte - Migraciones",
+    "deletedFiles": [
+      "supabase/migrations/20250129000000_add_printer_settings_to_billing.sql",
+      "supabase/migrations/20260122000005_create_organization_settings.sql",
+      "supabase/migrations/20260123000000_add_system_categories.sql",
+      "supabase/migrations/20260124000000_update_system_config_for_optometry.sql",
+      "supabase/migrations/20260124000002_fix_system_health_metrics_rls.sql",
+      "supabase/migrations/20260125000000_add_addition_support_to_lens_matrices.sql"
+    ],
+    "modifiedFiles": [],
+    "totalFiles": 25
+  },
+  {
+    "name": "Branch Validation Logic",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 4
+  }
+]

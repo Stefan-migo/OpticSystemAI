@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
+import {
+  createClientFromRequest,
+  createServiceRoleClient,
+} from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
+import { getBranchContext } from "@/lib/api/branch-middleware";
+import {
+  getProductStock,
+  updateProductStock,
+} from "@/lib/inventory/stock-helpers";
 
 export async function GET(
   request: NextRequest,
@@ -8,12 +16,57 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
+
+    // Check authentication for branch context
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = adminUser
+      ? (adminUser as { organization_id?: string }).organization_id
+      : undefined;
+
+    const branchContext = await getBranchContext(request, user.id, supabase);
 
     const { searchParams } = new URL(request.url);
     const includeArchived = searchParams.get("include_archived") === "true";
 
-    let query = supabase.from("products").select("*").eq("id", id);
+    // Build query - include stock if branch is selected
+    const currentBranchId = branchContext?.branchId;
+    // Note: We can't filter nested relations directly in Supabase, so we'll filter in post-processing
+    let query = supabase
+      .from("products")
+      .select(
+        currentBranchId
+          ? `
+          *,
+          product_branch_stock (
+            quantity,
+            reserved_quantity,
+            low_stock_threshold,
+            branch_id
+          )
+        `
+          : "*",
+      )
+      .eq("id", id);
+
+    // Filter by organization_id for multi-tenancy isolation
+    if (userOrganizationId && !branchContext.isSuperAdmin) {
+      query = query.eq("organization_id", userOrganizationId);
+    }
 
     if (!includeArchived) {
       query = query.neq("status", "archived");
@@ -22,11 +75,130 @@ export async function GET(
     const { data: product, error } = await query.single();
 
     if (error) {
+      // Check if it's a "not found" error or an access denied error
+      if (error.code === "PGRST116") {
+        // Product not found - could be because it doesn't exist or user doesn't have access
+        logger.debug("Product not found or access denied", {
+          productId: id,
+          userOrganizationId,
+          errorCode: error.code,
+        });
+        return NextResponse.json(
+          { error: "Product not found" },
+          { status: 404 },
+        );
+      }
       logger.error("Error fetching product", error);
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ product });
+    if (!product) {
+      logger.debug("Product query returned no data", { productId: id });
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // CRITICAL: Verify organization_id matches user's organization (multi-tenancy check)
+    // This is a safety check in case the query filter didn't work correctly
+    if (userOrganizationId && !branchContext.isSuperAdmin) {
+      if (product.organization_id !== userOrganizationId) {
+        logger.warn(
+          "User attempted to access product from another organization",
+          {
+            productId: id,
+            productOrganizationId: product.organization_id,
+            userOrganizationId,
+          },
+        );
+        return NextResponse.json(
+          { error: "Forbidden: You don't have access to this product" },
+          { status: 403 },
+        );
+      }
+    }
+
+    // Type assertion for product with stock
+    const productWithStock = product as any;
+
+    // CRITICAL: Verify organization_id matches user's organization (multi-tenancy check)
+    // This is a safety check in case the query filter didn't work correctly
+    if (userOrganizationId && !branchContext.isSuperAdmin) {
+      if (productWithStock.organization_id !== userOrganizationId) {
+        logger.warn(
+          "User attempted to access product from another organization",
+          {
+            productId: id,
+            productOrganizationId: productWithStock.organization_id,
+            userOrganizationId,
+          },
+        );
+        return NextResponse.json(
+          { error: "Forbidden: You don't have access to this product" },
+          { status: 403 },
+        );
+      }
+    }
+
+    // Filter stock by branch_id in post-processing if branch is selected
+    if (
+      currentBranchId &&
+      productWithStock &&
+      productWithStock.product_branch_stock
+    ) {
+      // Filter stock array to only include the current branch
+      if (Array.isArray(productWithStock.product_branch_stock)) {
+        const filteredStock = productWithStock.product_branch_stock.filter(
+          (stock: any) => stock?.branch_id === currentBranchId,
+        );
+        productWithStock.product_branch_stock =
+          filteredStock.length > 0 ? filteredStock : null;
+      } else if (
+        productWithStock.product_branch_stock.branch_id !== currentBranchId
+      ) {
+        productWithStock.product_branch_stock = null;
+      }
+    }
+
+    // Log for debugging
+    logger.info("Product fetched", {
+      productId: id,
+      currentBranchId,
+      hasStock: !!productWithStock.product_branch_stock,
+      stockLength: Array.isArray(productWithStock.product_branch_stock)
+        ? productWithStock.product_branch_stock.length
+        : productWithStock.product_branch_stock
+          ? 1
+          : 0,
+    });
+
+    // If branch is selected but no stock record exists, fetch or create default stock
+    if (
+      currentBranchId &&
+      productWithStock &&
+      !productWithStock.product_branch_stock
+    ) {
+      logger.info("No valid stock found, fetching from getProductStock", {
+        productId: id,
+        branchId: currentBranchId,
+      });
+      const stock = await getProductStock(id, currentBranchId, supabase);
+      if (stock) {
+        productWithStock.product_branch_stock = [stock];
+        logger.info("Stock fetched successfully", { stock });
+      } else {
+        // If no stock record exists, return default stock with quantity 0
+        productWithStock.product_branch_stock = [
+          {
+            quantity: 0,
+            reserved_quantity: 0,
+            low_stock_threshold: 5,
+            branch_id: currentBranchId,
+          },
+        ];
+        logger.info("Using default stock (0)");
+      }
+    }
+
+    return NextResponse.json({ product: productWithStock });
   } catch (error) {
     logger.error("API error in products GET", { error });
     return NextResponse.json(
@@ -42,13 +214,12 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
 
     // Check authentication
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -63,6 +234,17 @@ export async function PUT(
         { status: 403 },
       );
     }
+
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = adminUser
+      ? (adminUser as { organization_id?: string }).organization_id
+      : undefined;
 
     const body = await request.json();
 
@@ -120,7 +302,7 @@ export async function PUT(
       price?: number;
       compare_at_price?: number | null;
       cost_price?: number | null;
-      inventory_quantity?: number;
+      // inventory_quantity removed - use product_branch_stock table instead
       category_id?: string | null;
       featured_image?: string | null;
       gallery?: string[];
@@ -150,14 +332,14 @@ export async function PUT(
       description: body.description || null,
       short_description: body.short_description || null,
       price: parseFloat(body.price),
+      price_includes_tax:
+        body.price_includes_tax === true || body.price_includes_tax === "true",
       compare_at_price: body.compare_at_price
         ? parseFloat(body.compare_at_price)
         : null,
       cost_price: body.cost_price ? parseFloat(body.cost_price) : null,
       category_id: body.category_id || null,
-      inventory_quantity: body.inventory_quantity
-        ? parseInt(String(body.inventory_quantity))
-        : 0,
+      // inventory_quantity removed - managed in product_branch_stock table
       status: body.status || "draft",
       featured_image: body.featured_image || null,
       gallery: body.gallery || [],
@@ -256,29 +438,91 @@ export async function PUT(
       productData.published_at = body.published_at;
     }
 
-    // Try with regular client first
-    let data, error;
-    const result = await supabase
+    // First, verify the product exists and belongs to user's organization
+    let productCheckQuery = supabase
       .from("products")
-      .update(productData)
+      .select("id, organization_id")
       .eq("id", id)
-      .select()
       .single();
 
-    data = result.data;
+    // Filter by organization_id for multi-tenancy isolation
+    if (userOrganizationId) {
+      const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
+        user_id: user.id,
+      });
+      if (!isSuperAdmin) {
+        productCheckQuery = productCheckQuery.eq(
+          "organization_id",
+          userOrganizationId,
+        );
+      }
+    }
+
+    const { data: existingProduct, error: checkError } =
+      await productCheckQuery;
+
+    // If product doesn't exist or doesn't belong to user's organization, return 403/404
+    if (checkError || !existingProduct) {
+      if (checkError?.code === "PGRST116") {
+        // Product not found
+        return NextResponse.json(
+          { error: "Product not found" },
+          { status: 404 },
+        );
+      }
+      // Product exists but doesn't belong to user's organization
+      return NextResponse.json(
+        { error: "Forbidden: You don't have access to this product" },
+        { status: 403 },
+      );
+    }
+
+    // Try with regular client first
+    let updatedProduct, error;
+    let updateQuery = supabase
+      .from("products")
+      .update(productData)
+      .eq("id", id);
+
+    // Filter by organization_id for multi-tenancy isolation
+    if (userOrganizationId) {
+      const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
+        user_id: user.id,
+      });
+      if (!isSuperAdmin) {
+        updateQuery = updateQuery.eq("organization_id", userOrganizationId);
+      }
+    }
+
+    const result = await updateQuery.select().single();
+
+    updatedProduct = result.data;
     error = result.error;
 
     // If RLS error, try with service role
     if (error && error.code === "42501") {
       const serviceSupabase = createServiceRoleClient();
-      const serviceResult = await serviceSupabase
+      let serviceUpdateQuery = serviceSupabase
         .from("products")
         .update(productData)
-        .eq("id", id)
-        .select()
-        .single();
+        .eq("id", id);
 
-      data = serviceResult.data;
+      // Filter by organization_id for multi-tenancy isolation
+      if (userOrganizationId) {
+        const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
+          user_id: user.id,
+        });
+        if (!isSuperAdmin) {
+          serviceUpdateQuery = serviceUpdateQuery.eq(
+            "organization_id",
+            userOrganizationId,
+          );
+        }
+      }
+
+      const serviceResult = await serviceUpdateQuery.select().single();
+
+      updatedProduct = serviceResult.data;
       error = serviceResult.error;
     }
 
@@ -290,7 +534,58 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json({ product: data });
+    // Handle stock update if stock_quantity is provided
+    if (body.stock_quantity !== undefined && updatedProduct) {
+      const branchContext = await getBranchContext(request, user.id);
+      const branchId = branchContext.branchId || body.branch_id;
+
+      if (!branchId) {
+        logger.warn("Stock update skipped: no branch_id provided", {
+          productId: id,
+          stockQuantity: body.stock_quantity,
+          branchContext: branchContext.branchId,
+        });
+        // Return success but with a warning message
+        return NextResponse.json({
+          product: data,
+          warning:
+            "El producto se actualizó, pero el stock no se actualizó porque no se seleccionó una sucursal",
+        });
+      }
+
+      const stockQty = parseInt(String(body.stock_quantity)) || 0;
+      const serviceSupabase = createServiceRoleClient();
+
+      // Get current stock to calculate difference
+      const currentStock = await getProductStock(id, branchId, serviceSupabase);
+      const currentQty = currentStock?.quantity || 0;
+      const quantityChange = stockQty - currentQty;
+
+      if (quantityChange !== 0) {
+        const stockResult = await updateProductStock(
+          id,
+          branchId,
+          quantityChange,
+          false,
+          serviceSupabase,
+        );
+
+        if (!stockResult.success) {
+          logger.warn("Failed to update stock, but product was updated", {
+            productId: id,
+            branchId,
+            error: stockResult.error,
+          });
+          return NextResponse.json({
+            product: data,
+            warning:
+              "El producto se actualizó, pero hubo un error al actualizar el stock",
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({ product: updatedProduct });
   } catch (error) {
     logger.error("API error in products PUT", error);
     return NextResponse.json(
@@ -306,13 +601,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
 
     // Check authentication
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -328,9 +622,32 @@ export async function DELETE(
       );
     }
 
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = adminUser
+      ? (adminUser as { organization_id?: string }).organization_id
+      : undefined;
+
     // Try with regular client first
     let error;
-    const result = await supabase.from("products").delete().eq("id", id);
+    let deleteQuery = supabase.from("products").delete().eq("id", id);
+
+    // Filter by organization_id for multi-tenancy isolation
+    if (userOrganizationId) {
+      const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
+        user_id: user.id,
+      });
+      if (!isSuperAdmin) {
+        deleteQuery = deleteQuery.eq("organization_id", userOrganizationId);
+      }
+    }
+
+    const result = await deleteQuery;
 
     error = result.error;
 

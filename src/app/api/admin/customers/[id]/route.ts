@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClientFromRequest } from "@/utils/supabase/server";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
@@ -11,13 +11,12 @@ export async function GET(
   try {
     logger.info("Customer Detail API GET called", { customerId: params.id });
 
-    const supabase = await createClient();
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
 
     // Check admin authorization
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
     if (userError || !user) {
       logger.error("User authentication failed", userError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -44,16 +43,47 @@ export async function GET(
     }
     logger.debug("Admin access confirmed", { email: user.email });
 
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = adminUser?.organization_id;
+
     // Get branch context
-    const branchContext = await getBranchContext(request, user.id);
+    const branchContext = await getBranchContext(request, user.id, supabase);
 
     // Build branch filter function
     const applyBranchFilter = (query: any) => {
-      return addBranchFilter(
-        query,
-        branchContext.branchId,
-        branchContext.isSuperAdmin,
-      );
+      // For customers, we should filter by organization_id first
+      // Then optionally filter by branch_id if a specific branch is selected
+      if (userOrganizationId && !branchContext.isSuperAdmin) {
+        // Filter by organization_id - this ensures multi-tenancy isolation
+        query = query.eq("organization_id", userOrganizationId);
+
+        // If a specific branch is selected, also filter by branch_id
+        // Otherwise, show all customers from the organization
+        if (branchContext.branchId) {
+          query = query.eq("branch_id", branchContext.branchId);
+        }
+      } else if (branchContext.isSuperAdmin) {
+        // Super admin: use branch filter if branch is selected, otherwise show all
+        if (branchContext.branchId) {
+          query = query.eq("branch_id", branchContext.branchId);
+        }
+        // If no branch selected, super admin sees all (no filter)
+      } else {
+        // Fallback: no organization_id found, use branch filter only
+        query = addBranchFilter(
+          query,
+          branchContext.branchId,
+          branchContext.isSuperAdmin,
+        );
+      }
+
+      return query;
     };
 
     // Get customer from customers table (not profiles)
@@ -326,13 +356,12 @@ export async function PUT(
   try {
     logger.info("Customer Update API PUT called", { customerId: params.id });
 
-    const supabase = await createClient();
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
 
     // Check admin authorization
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
     if (userError || !user) {
       logger.error("User authentication failed", userError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -395,16 +424,47 @@ export async function PUT(
       updated_at: new Date().toISOString(),
     };
 
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = adminUser?.organization_id;
+
     // Get branch context for update
-    const branchContext = await getBranchContext(request, user.id);
+    const branchContext = await getBranchContext(request, user.id, supabase);
 
     // Build branch filter function
     const applyBranchFilter = (query: any) => {
-      return addBranchFilter(
-        query,
-        branchContext.branchId,
-        branchContext.isSuperAdmin,
-      );
+      // For customers, we should filter by organization_id first
+      // Then optionally filter by branch_id if a specific branch is selected
+      if (userOrganizationId && !branchContext.isSuperAdmin) {
+        // Filter by organization_id - this ensures multi-tenancy isolation
+        query = query.eq("organization_id", userOrganizationId);
+
+        // If a specific branch is selected, also filter by branch_id
+        // Otherwise, show all customers from the organization
+        if (branchContext.branchId) {
+          query = query.eq("branch_id", branchContext.branchId);
+        }
+      } else if (branchContext.isSuperAdmin) {
+        // Super admin: use branch filter if branch is selected, otherwise show all
+        if (branchContext.branchId) {
+          query = query.eq("branch_id", branchContext.branchId);
+        }
+        // If no branch selected, super admin sees all (no filter)
+      } else {
+        // Fallback: no organization_id found, use branch filter only
+        query = addBranchFilter(
+          query,
+          branchContext.branchId,
+          branchContext.isSuperAdmin,
+        );
+      }
+
+      return query;
     };
 
     // First verify customer exists and user has access
@@ -456,6 +516,129 @@ export async function PUT(
     });
   } catch (error) {
     logger.error("Error in customer update API PUT", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    logger.info("Customer DELETE API called", { customerId: params.id });
+
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
+
+    // Check admin authorization
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
+    if (userError || !user) {
+      logger.error("User authentication failed", userError);
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    logger.debug("User authenticated", { email: user.email });
+
+    const { data: isAdmin, error: adminError } = await supabase.rpc(
+      "is_admin",
+      { user_id: user.id },
+    );
+    if (adminError) {
+      logger.error("Admin check error", adminError);
+      return NextResponse.json(
+        { error: "Admin verification failed" },
+        { status: 500 },
+      );
+    }
+    if (!isAdmin) {
+      logger.warn("User is not admin", { email: user.email });
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
+    }
+    logger.debug("Admin access confirmed", { email: user.email });
+
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = adminUser?.organization_id;
+
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id, supabase);
+
+    // Build branch filter function
+    const applyBranchFilter = (query: any) => {
+      // For customers, we should filter by organization_id first
+      // Then optionally filter by branch_id if a specific branch is selected
+      if (userOrganizationId && !branchContext.isSuperAdmin) {
+        // Filter by organization_id - this ensures multi-tenancy isolation
+        query = query.eq("organization_id", userOrganizationId);
+
+        // If a specific branch is selected, also filter by branch_id
+        // Otherwise, show all customers from the organization
+        if (branchContext.branchId) {
+          query = query.eq("branch_id", branchContext.branchId);
+        }
+      } else if (branchContext.isSuperAdmin) {
+        // Super admin: use branch filter if branch is selected, otherwise show all
+        if (branchContext.branchId) {
+          query = query.eq("branch_id", branchContext.branchId);
+        }
+        // If no branch selected, super admin sees all (no filter)
+      } else {
+        // Fallback: no organization_id found, use branch filter only
+        query = addBranchFilter(
+          query,
+          branchContext.branchId,
+          branchContext.isSuperAdmin,
+        );
+      }
+
+      return query;
+    };
+
+    // First verify customer exists and user has access
+    const { data: existingCustomer } = await applyBranchFilter(
+      supabase.from("customers").select("id, branch_id").eq("id", params.id),
+    ).single();
+
+    if (!existingCustomer) {
+      return NextResponse.json(
+        { error: "Customer not found or access denied" },
+        { status: 404 },
+      );
+    }
+
+    // Delete customer
+    const { error: deleteError } = await supabase
+      .from("customers")
+      .delete()
+      .eq("id", params.id);
+
+    if (deleteError) {
+      logger.error("Error deleting customer", deleteError);
+      return NextResponse.json(
+        { error: "Failed to delete customer" },
+        { status: 500 },
+      );
+    }
+
+    logger.info("Customer deleted successfully", { customerId: params.id });
+
+    return NextResponse.json({
+      success: true,
+      message: "Customer deleted successfully",
+    });
+  } catch (error) {
+    logger.error("Error in customer delete API DELETE", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

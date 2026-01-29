@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
+import { getBranchContext } from "@/lib/api/branch-middleware";
 import type {
   IsAdminParams,
   IsAdminResult,
@@ -63,8 +64,9 @@ export async function POST(request: NextRequest) {
       price: "price",
       precio_comparacion: "compare_at_price",
       compare_at_price: "compare_at_price",
-      stock: "inventory_quantity",
-      inventory_quantity: "inventory_quantity",
+      stock: "stock_quantity", // Changed to stock_quantity for product_branch_stock
+      stock_quantity: "stock_quantity",
+      inventory_quantity: "stock_quantity", // Map old field name for backward compatibility
       estado: "status",
       status: "status",
       destacado: "is_featured",
@@ -145,7 +147,11 @@ export async function POST(request: NextRequest) {
           compare_at_price: rowData.compare_at_price
             ? parseFloat(rowData.compare_at_price)
             : null,
-          inventory_quantity: parseInt(rowData.inventory_quantity) || 0,
+          // Stock quantity will be handled separately in product_branch_stock
+          stock_quantity:
+            parseInt(
+              rowData.stock_quantity || rowData.inventory_quantity || "0",
+            ) || 0,
           status: rowData.status?.toLowerCase() || "draft",
           is_featured: parseBoolean(rowData.is_featured),
           sku: rowData.sku?.trim(),
@@ -165,7 +171,7 @@ export async function POST(request: NextRequest) {
             rowData.gallery_3?.trim(),
             rowData.gallery_4?.trim(),
           ].filter(Boolean),
-          track_inventory: true,
+          // track_inventory removed - managed in product_branch_stock
           vendor: "ALKIMYA DA LUZ",
           currency: "ARS",
         };
@@ -221,6 +227,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get branch context for stock management
+    const branchContext = await getBranchContext(request, user.id);
+    const branchId = branchContext.branchId;
+    const serviceSupabase = createServiceRoleClient();
+
     // Process products based on mode
     const results = {
       created: 0,
@@ -232,13 +243,17 @@ export async function POST(request: NextRequest) {
     };
 
     for (const product of products) {
+      // Extract stock_quantity before inserting/updating product
+      const stockQuantity = product.stock_quantity || 0;
+      // Remove stock_quantity from product data (it's not a column in products table)
+      const { stock_quantity, ...productData } = product;
       try {
         if (mode === "create") {
           // Always create new products
           const { data, error } = await supabase
             .from("products")
             .insert({
-              ...product,
+              ...productData,
               line_number: undefined,
               original_data: undefined,
               created_at: new Date().toISOString(),
@@ -263,6 +278,29 @@ export async function POST(request: NextRequest) {
           } else {
             results.created++;
             results.details.push({ action: "created", product: data });
+
+            // Create stock in product_branch_stock if branch_id and stock_quantity are provided
+            if (branchId && stockQuantity > 0 && data?.id) {
+              const { error: stockError } = await serviceSupabase.rpc(
+                "update_product_stock",
+                {
+                  p_product_id: data.id,
+                  p_branch_id: branchId,
+                  p_quantity_change: stockQuantity,
+                  p_reserve: false,
+                },
+              );
+
+              if (stockError) {
+                logger.warn(
+                  `Failed to create stock for product ${data.id}`,
+                  stockError,
+                );
+                results.warnings.push(
+                  `Línea ${product.line_number}: Stock no pudo ser creado para '${product.name}'`,
+                );
+              }
+            }
           }
         } else if (mode === "update") {
           // Update existing products by SKU or slug
@@ -277,7 +315,7 @@ export async function POST(request: NextRequest) {
             const { data, error } = await supabase
               .from("products")
               .update({
-                ...product,
+                ...productData,
                 line_number: undefined,
                 original_data: undefined,
                 updated_at: new Date().toISOString(),
@@ -294,6 +332,42 @@ export async function POST(request: NextRequest) {
             } else {
               results.updated++;
               results.details.push({ action: "updated", product: data });
+
+              // Update stock in product_branch_stock if branch_id and stock_quantity are provided
+              if (branchId && stockQuantity >= 0 && data?.id) {
+                // Get current stock to calculate difference
+                const { data: currentStock } = await serviceSupabase
+                  .from("product_branch_stock")
+                  .select("quantity")
+                  .eq("product_id", data.id)
+                  .eq("branch_id", branchId)
+                  .single();
+
+                const currentQty = currentStock?.quantity || 0;
+                const quantityChange = stockQuantity - currentQty;
+
+                if (quantityChange !== 0) {
+                  const { error: stockError } = await serviceSupabase.rpc(
+                    "update_product_stock",
+                    {
+                      p_product_id: data.id,
+                      p_branch_id: branchId,
+                      p_quantity_change: quantityChange,
+                      p_reserve: false,
+                    },
+                  );
+
+                  if (stockError) {
+                    logger.warn(
+                      `Failed to update stock for product ${data.id}`,
+                      stockError,
+                    );
+                    results.warnings.push(
+                      `Línea ${product.line_number}: Stock no pudo ser actualizado para '${product.name}'`,
+                    );
+                  }
+                }
+              }
             }
           } else {
             results.warnings.push(
@@ -315,7 +389,7 @@ export async function POST(request: NextRequest) {
             const { data, error } = await supabase
               .from("products")
               .update({
-                ...product,
+                ...productData,
                 line_number: undefined,
                 original_data: undefined,
                 updated_at: new Date().toISOString(),
@@ -332,13 +406,45 @@ export async function POST(request: NextRequest) {
             } else {
               results.updated++;
               results.details.push({ action: "updated", product: data });
+
+              // Update stock in product_branch_stock if branch_id and stock_quantity are provided
+              if (branchId && stockQuantity >= 0 && data?.id) {
+                const { data: currentStock } = await serviceSupabase
+                  .from("product_branch_stock")
+                  .select("quantity")
+                  .eq("product_id", data.id)
+                  .eq("branch_id", branchId)
+                  .single();
+
+                const currentQty = currentStock?.quantity || 0;
+                const quantityChange = stockQuantity - currentQty;
+
+                if (quantityChange !== 0) {
+                  const { error: stockError } = await serviceSupabase.rpc(
+                    "update_product_stock",
+                    {
+                      p_product_id: data.id,
+                      p_branch_id: branchId,
+                      p_quantity_change: quantityChange,
+                      p_reserve: false,
+                    },
+                  );
+
+                  if (stockError) {
+                    logger.warn(
+                      `Failed to update stock for product ${data.id}`,
+                      stockError,
+                    );
+                  }
+                }
+              }
             }
           } else {
             // Create new
             const { data, error } = await supabase
               .from("products")
               .insert({
-                ...product,
+                ...productData,
                 line_number: undefined,
                 original_data: undefined,
                 created_at: new Date().toISOString(),
@@ -355,6 +461,26 @@ export async function POST(request: NextRequest) {
             } else {
               results.created++;
               results.details.push({ action: "created", product: data });
+
+              // Create stock in product_branch_stock if branch_id and stock_quantity are provided
+              if (branchId && stockQuantity > 0 && data?.id) {
+                const { error: stockError } = await serviceSupabase.rpc(
+                  "update_product_stock",
+                  {
+                    p_product_id: data.id,
+                    p_branch_id: branchId,
+                    p_quantity_change: stockQuantity,
+                    p_reserve: false,
+                  },
+                );
+
+                if (stockError) {
+                  logger.warn(
+                    `Failed to create stock for product ${data.id}`,
+                    stockError,
+                  );
+                }
+              }
             }
           }
         }

@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Presupuestos - Frontend",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 3
+  },
+  {
+    "name": "Presupuestos - API Routes",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 6
+  },
+  {
+    "name": "Presupuestos - Migraciones",
+    "deletedFiles": [
+      "supabase/migrations/20260123000000_add_near_frame_fields_to_quotes.sql"
+    ],
+    "modifiedFiles": [],
+    "totalFiles": 12
+  },
+  {
+    "name": "Presupuestos - Hooks y Utilidades",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 0
+  }
+]

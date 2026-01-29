@@ -482,4 +482,158 @@ html.theme-red {
 [data-sonner-toast] {
   z-index: 9999 !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  position: relative;
+  overflow: hidden;
+  animation: toastIn 0.3s ease-out;
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+/* Asegurar que el contenedor interno permita ver la barra de progreso */
+[data-sonner-toast] > div {
+  position: relative;
+  overflow: visible;
+}
+
+/* Toast entrance animation */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Toast exit animation (fade out) - Mejorada */
+[data-sonner-toast][data-removed="true"],
+[data-sonner-toast][data-swipe-out="true"] {
+  animation: toastOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+  pointer-events: none;
+}
+
+@keyframes toastOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 200px;
+    margin-bottom: 8px;
+  }
+  50% {
+    opacity: 0.5;
+    transform: translateY(-5px) scale(0.98);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* Progress bar timeline animation - En la parte superior */
+[data-sonner-toast]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 4px;
+  width: 0%;
+  min-width: 0%;
+  background: linear-gradient(
+    90deg,
+    #3b82f6 0%,
+    #60a5fa 50%,
+    #3b82f6 100%
+  );
+  background-size: 200% 100%;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.7), inset 0 0 8px rgba(59, 130, 246, 0.3);
+  transform-origin: left center;
+  animation: progressBarFill var(--toast-duration, 4s) linear forwards;
+  z-index: 10000 !important;
+  border-radius: 4px 4px 0 0;
+  transition: opacity 0.2s ease;
+  opacity: 1 !important;
+  pointer-events: none;
+  will-change: width;
+}
+
+/* Barra verde para toast de éxito (success) */
+[data-sonner-toast][data-type="success"]::before,
+[data-sonner-toast][data-toast-type="success"]::before,
+[data-sonner-toast].success::before {
+  background: linear-gradient(
+    90deg,
+    #22c55e 0%,
+    #4ade80 50%,
+    #22c55e 100%
+  );
+  background-size: 200% 100%;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.7), inset 0 0 8px rgba(34, 197, 94, 0.3);
+}
+
+/* Barra roja para toast de error */
+[data-sonner-toast][data-type="error"]::before,
+[data-sonner-toast][data-toast-type="error"]::before,
+[data-sonner-toast].error::before {
+  background: linear-gradient(
+    90deg,
+    #ef4444 0%,
+    #f87171 50%,
+    #ef4444 100%
+  );
+  background-size: 200% 100%;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.7), inset 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+/* Barra azul para toast informativo (info) - por defecto */
+[data-sonner-toast][data-type="info"]::before,
+[data-sonner-toast][data-toast-type="info"]::before,
+[data-sonner-toast].info::before,
+[data-sonner-toast]:not([data-type="success"]):not([data-type="error"]):not([data-type="warning"]):not([data-toast-type="success"]):not([data-toast-type="error"])::before {
+  background: linear-gradient(
+    90deg,
+    #3b82f6 0%,
+    #60a5fa 50%,
+    #3b82f6 100%
+  );
+  background-size: 200% 100%;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.7), inset 0 0 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Progress bar animation - va de 0% a 100% mostrando tiempo transcurrido */
+@keyframes progressBarFill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+/* Pause animation on hover - para todos los tipos */
+[data-sonner-toast]:hover::before {
+  animation-play-state: paused;
+}
+
+/* Detener animación cuando el toast se está cerrando */
+[data-sonner-toast][data-removed="true"]::before,
+[data-sonner-toast][data-swipe-out="true"]::before {
+  animation-play-state: paused;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Ocultar botón de cerrar completamente */
+[data-sonner-toast] [data-close-button],
+[data-sonner-toast] button[aria-label*="close"],
+[data-sonner-toast] button[aria-label*="Close"],
+[data-sonner-toast] button[aria-label*="Dismiss"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }

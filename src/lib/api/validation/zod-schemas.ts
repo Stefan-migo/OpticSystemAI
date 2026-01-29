@@ -324,16 +324,46 @@ export const customerBaseSchema = z
   .object({
     first_name: z
       .string()
-      .min(1, "El nombre es requerido")
       .max(100)
-      .trim()
-      .optional(),
+      .optional()
+      .superRefine((val, ctx) => {
+        // Explicitly reject empty strings (including after trim)
+        if (val !== undefined && val !== null) {
+          const trimmed = String(val).trim();
+          if (trimmed.length === 0) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "El nombre no puede estar vacío",
+              path: ["first_name"],
+            });
+          }
+        }
+      })
+      .transform((val) => {
+        // Trim after validation
+        return val !== undefined && val !== null ? String(val).trim() : val;
+      }),
     last_name: z
       .string()
-      .min(1, "El apellido es requerido")
       .max(100)
-      .trim()
-      .optional(),
+      .optional()
+      .superRefine((val, ctx) => {
+        // Explicitly reject empty strings (including after trim)
+        if (val !== undefined && val !== null) {
+          const trimmed = String(val).trim();
+          if (trimmed.length === 0) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "El apellido no puede estar vacío",
+              path: ["last_name"],
+            });
+          }
+        }
+      })
+      .transform((val) => {
+        // Trim after validation
+        return val !== undefined && val !== null ? String(val).trim() : val;
+      }),
     email: emailSchema.optional().nullable(),
     phone: phoneOptionalSchema,
     rut: rutOptionalSchema,
@@ -367,10 +397,32 @@ export const customerBaseSchema = z
     is_active: z.boolean().default(true).optional(),
     branch_id: uuidOptionalSchema,
   })
-  .refine((data) => data.first_name || data.last_name, {
-    message: "Al menos el nombre o apellido es requerido",
-    path: ["first_name"],
-  });
+  .refine(
+    (data) => {
+      // After preprocess, empty strings are converted to undefined
+      // So we just need to check that at least one of first_name or last_name is present and non-empty
+      const hasFirstName =
+        data.first_name !== undefined &&
+        data.first_name !== null &&
+        String(data.first_name).trim().length > 0;
+      const hasLastName =
+        data.last_name !== undefined &&
+        data.last_name !== null &&
+        String(data.last_name).trim().length > 0;
+
+      // At least one must be present and non-empty
+      if (!hasFirstName && !hasLastName) {
+        return false;
+      }
+
+      return true;
+    },
+    {
+      message:
+        "Al menos el nombre o apellido es requerido y no puede estar vacío",
+      path: ["first_name"],
+    },
+  );
 
 /**
  * Schema para crear un cliente

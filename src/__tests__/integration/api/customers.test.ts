@@ -86,6 +86,7 @@ describe("Customers API - Integration Tests", () => {
           method: "GET",
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       expect(response.status).toBe(200);
@@ -106,6 +107,7 @@ describe("Customers API - Integration Tests", () => {
           method: "GET",
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       // Should return 404 or 403 (not found or forbidden)
@@ -129,6 +131,7 @@ describe("Customers API - Integration Tests", () => {
           }),
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       // Should fail - user cannot create customer in another org's branch
@@ -150,6 +153,7 @@ describe("Customers API - Integration Tests", () => {
           }),
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       // Should fail
@@ -164,6 +168,7 @@ describe("Customers API - Integration Tests", () => {
           method: "DELETE",
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       // Should fail
@@ -188,6 +193,7 @@ describe("Customers API - Integration Tests", () => {
           }),
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       expect(response.status).toBe(201);
@@ -204,6 +210,7 @@ describe("Customers API - Integration Tests", () => {
           method: "GET",
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       expect(response.status).toBe(200);
@@ -227,6 +234,7 @@ describe("Customers API - Integration Tests", () => {
           }),
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       expect(response.status).toBe(200);
@@ -241,6 +249,7 @@ describe("Customers API - Integration Tests", () => {
           method: "GET",
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       expect(response.status).toBe(200);
@@ -257,6 +266,7 @@ describe("Customers API - Integration Tests", () => {
           method: "GET",
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       expect(response.status).toBe(200);
@@ -283,6 +293,7 @@ describe("Customers API - Integration Tests", () => {
           }),
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       expect(response.status).toBe(400);
@@ -304,6 +315,7 @@ describe("Customers API - Integration Tests", () => {
           }),
         },
         userA.authToken,
+        userA.sessionData,
       );
 
       expect(response.status).toBe(400);

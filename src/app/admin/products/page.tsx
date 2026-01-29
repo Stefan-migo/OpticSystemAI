@@ -386,6 +386,11 @@ export default function ProductsPage() {
 
   // Utility functions
 
+  // Format price helper function
+  const formatPrice = (price: number | null | undefined): string => {
+    return formatCurrency(price || 0);
+  };
+
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: any; label: string }> = {
       active: { variant: "default", label: "Activo" },

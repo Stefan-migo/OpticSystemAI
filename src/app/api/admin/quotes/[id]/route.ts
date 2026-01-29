@@ -50,20 +50,280 @@ export async function GET(
     // Check and expire quotes before fetching (including this one)
     await supabaseServiceRole.rpc("check_and_expire_quotes");
 
-    const { data: quote, error } = await applyBranchFilter(
-      supabase.from("quotes").select(`
-          *,
-          customer:customers!quotes_customer_id_fkey(id, first_name, last_name, email, phone),
-          prescription:prescriptions!quotes_prescription_id_fkey(*),
-          frame_product:products!quotes_frame_product_id_fkey(id, name, price, frame_brand, frame_model)
-        `) as any,
-    )
+    // First, try to fetch the quote directly with service role to check if it exists
+    // This bypasses RLS to verify existence
+    const { data: quoteCheck, error: checkError } = await supabaseServiceRole
+      .from("quotes")
+      .select("id, branch_id, quote_number")
       .eq("id", id)
       .single();
 
-    if (error || !quote) {
-      return NextResponse.json({ error: "Quote not found" }, { status: 404 });
+    if (checkError || !quoteCheck) {
+      logger.error("Quote not found in database:", {
+        error: checkError,
+        quoteId: id,
+        errorCode: checkError?.code,
+        errorMessage: checkError?.message,
+        errorDetails: checkError?.details,
+        errorHint: checkError?.hint,
+        branchContext: {
+          branchId: branchContext.branchId,
+          isGlobalView: branchContext.isGlobalView,
+          isSuperAdmin: branchContext.isSuperAdmin,
+        },
+      });
+      return NextResponse.json(
+        {
+          error: "Quote not found",
+          details: checkError?.message || "Quote does not exist in database",
+        },
+        { status: 404 },
+      );
     }
+
+    logger.info("Quote exists, checking access:", {
+      quoteId: id,
+      quoteNumber: quoteCheck.quote_number,
+      quoteBranchId: quoteCheck.branch_id,
+      userBranchId: branchContext.branchId,
+      isGlobalView: branchContext.isGlobalView,
+      isSuperAdmin: branchContext.isSuperAdmin,
+    });
+
+    // Check branch access if not super admin in global view
+    // Allow access if:
+    // 1. User is super admin in global view (isGlobalView = true)
+    // 2. Quote branch_id matches user's branch_id
+    // 3. Quote branch_id is NULL (legacy quote, accessible by all)
+    if (
+      !branchContext.isGlobalView &&
+      quoteCheck.branch_id !== null &&
+      quoteCheck.branch_id !== branchContext.branchId
+    ) {
+      logger.warn("Branch access denied:", {
+        quoteId: id,
+        quoteBranchId: quoteCheck.branch_id,
+        userBranchId: branchContext.branchId,
+        isSuperAdmin: branchContext.isSuperAdmin,
+        isGlobalView: branchContext.isGlobalView,
+      });
+      return NextResponse.json(
+        { error: "Access denied to this quote" },
+        { status: 403 },
+      );
+    }
+
+    // Now fetch the full quote with relations
+    // Since we already verified access, we can use service role to bypass RLS
+    // Fetch quote first without relations to avoid foreign key issues
+    const { data: quoteData, error: quoteError } = await supabaseServiceRole
+      .from("quotes")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    // Log presbyopia fields for debugging
+    logger.info("Quote data fetched - presbyopia fields:", {
+      quoteId: id,
+      presbyopia_solution: quoteData?.presbyopia_solution,
+      far_lens_family_id: quoteData?.far_lens_family_id,
+      near_lens_family_id: quoteData?.near_lens_family_id,
+      far_lens_cost: quoteData?.far_lens_cost,
+      near_lens_cost: quoteData?.near_lens_cost,
+      near_frame_name: quoteData?.near_frame_name,
+      near_frame_cost: quoteData?.near_frame_cost,
+      hasPresbyopiaData: !!(
+        quoteData?.presbyopia_solution &&
+        quoteData.presbyopia_solution !== "none"
+      ),
+    });
+
+    if (quoteError || !quoteData) {
+      logger.error("Error fetching quote data:", {
+        error: quoteError,
+        errorCode: quoteError?.code,
+        errorMessage: quoteError?.message,
+        errorDetails: quoteError?.details,
+        quoteId: id,
+      });
+      return NextResponse.json(
+        {
+          error: "Quote not found",
+          details: quoteError?.message || "Failed to fetch quote",
+        },
+        { status: 404 },
+      );
+    }
+
+    // Now fetch relations separately to avoid foreign key constraint issues
+    const relations: any = {};
+
+    // Fetch customer - always try to fetch if customer_id exists
+    if (quoteData.customer_id) {
+      // First, check if customer exists at all (even if deleted/archived)
+      const { data: customerCheck, error: checkError } =
+        await supabaseServiceRole
+          .from("customers")
+          .select("id")
+          .eq("id", quoteData.customer_id)
+          .maybeSingle();
+
+      logger.info("Customer existence check:", {
+        quoteId: id,
+        customerId: quoteData.customer_id,
+        exists: !!customerCheck,
+        checkError: checkError?.message,
+      });
+
+      if (checkError) {
+        logger.error("Error checking customer existence:", {
+          quoteId: id,
+          customerId: quoteData.customer_id,
+          error: checkError,
+          errorCode: checkError.code,
+          errorMessage: checkError.message,
+        });
+      }
+
+      // Now fetch full customer data
+      // Use a simple query without maybeSingle to see what happens
+      // Note: business_name may not exist in customers table, so we'll select it conditionally
+      const customerQuery = supabaseServiceRole
+        .from("customers")
+        .select("id, first_name, last_name, email, phone, rut")
+        .eq("id", quoteData.customer_id);
+
+      const { data: customerData, error: customerError } = await customerQuery;
+
+      logger.info("Customer query result:", {
+        quoteId: id,
+        customerId: quoteData.customer_id,
+        hasData: !!customerData,
+        dataLength: customerData?.length || 0,
+        error: customerError,
+        errorCode: customerError?.code,
+        errorMessage: customerError?.message,
+      });
+
+      if (customerError) {
+        logger.error("Error fetching customer for quote:", {
+          quoteId: id,
+          customerId: quoteData.customer_id,
+          error: customerError,
+          errorCode: customerError.code,
+          errorMessage: customerError.message,
+          errorDetails: customerError.details,
+          customerExists: !!customerCheck,
+        });
+        relations.customer = null;
+      } else if (customerData && customerData.length > 0) {
+        relations.customer = customerData[0];
+        logger.info("Customer loaded successfully:", {
+          quoteId: id,
+          customerId: customerData[0].id,
+          customerName:
+            `${customerData[0].first_name || ""} ${customerData[0].last_name || ""}`.trim() ||
+            "Sin nombre",
+        });
+      } else {
+        logger.warn(
+          "Customer not found for quote (customer_id exists but customer not found):",
+          {
+            quoteId: id,
+            customerId: quoteData.customer_id,
+            customerCheckResult: customerCheck,
+            queryResult: customerData,
+          },
+        );
+        relations.customer = null;
+      }
+    } else {
+      logger.warn("Quote has no customer_id:", { quoteId: id });
+      relations.customer = null;
+    }
+
+    // Fetch prescription
+    if (quoteData.prescription_id) {
+      const { data: prescription } = await supabaseServiceRole
+        .from("prescriptions")
+        .select("*")
+        .eq("id", quoteData.prescription_id)
+        .single();
+      relations.prescription = prescription || null;
+    }
+
+    // Fetch frame product
+    if (quoteData.frame_product_id) {
+      const { data: frameProduct } = await supabaseServiceRole
+        .from("products")
+        .select("id, name, price, frame_brand, frame_model")
+        .eq("id", quoteData.frame_product_id)
+        .single();
+      relations.frame_product = frameProduct || null;
+    }
+
+    // Fetch lens families (for far and near lenses)
+    if (quoteData.far_lens_family_id) {
+      const { data: farLensFamily } = await supabaseServiceRole
+        .from("lens_families")
+        .select("id, name")
+        .eq("id", quoteData.far_lens_family_id)
+        .single();
+      relations.far_lens_family = farLensFamily || null;
+    }
+
+    if (quoteData.near_lens_family_id) {
+      const { data: nearLensFamily } = await supabaseServiceRole
+        .from("lens_families")
+        .select("id, name")
+        .eq("id", quoteData.near_lens_family_id)
+        .single();
+      relations.near_lens_family = nearLensFamily || null;
+    }
+
+    // Combine quote data with relations
+    // Ensure customer is always present (even if null) to avoid undefined errors
+    const quote = {
+      ...quoteData,
+      customer: relations.customer || null,
+      prescription: relations.prescription || null,
+      frame_product: relations.frame_product || null,
+      far_lens_family: relations.far_lens_family || null,
+      near_lens_family: relations.near_lens_family || null,
+    };
+
+    logger.info("Quote fetched successfully:", {
+      quoteId: id,
+      hasCustomer: !!quote.customer,
+      customerId: quote.customer_id,
+      customerName: quote.customer
+        ? `${quote.customer.first_name} ${quote.customer.last_name}`
+        : "No customer",
+      presbyopia_solution: quote.presbyopia_solution,
+      far_lens_family_id: quote.far_lens_family_id,
+      near_lens_family_id: quote.near_lens_family_id,
+      far_lens_cost: quote.far_lens_cost,
+      near_lens_cost: quote.near_lens_cost,
+      near_frame_name: quote.near_frame_name,
+      near_frame_cost: quote.near_frame_cost,
+      near_frame_price: quote.near_frame_price,
+      frame_cost: quote.frame_cost,
+      frame_price: quote.frame_price,
+      // Log all near_frame fields
+      near_frame_fields: {
+        near_frame_product_id: quote.near_frame_product_id,
+        near_frame_name: quote.near_frame_name,
+        near_frame_brand: quote.near_frame_brand,
+        near_frame_model: quote.near_frame_model,
+        near_frame_color: quote.near_frame_color,
+        near_frame_size: quote.near_frame_size,
+        near_frame_sku: quote.near_frame_sku,
+        near_frame_price: quote.near_frame_price,
+        near_frame_price_includes_tax: quote.near_frame_price_includes_tax,
+        near_frame_cost: quote.near_frame_cost,
+        customer_own_near_frame: quote.customer_own_near_frame,
+      },
+    });
 
     return NextResponse.json({ quote });
   } catch (error) {

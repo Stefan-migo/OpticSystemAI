@@ -1,0 +1,46 @@
+[
+  {
+    "name": "POS/Caja - Frontend",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 5
+  },
+  {
+    "name": "POS/Caja - API Routes",
+    "deletedFiles": [
+      "src/app/api/admin/orders/[id]/cancel/route.ts",
+      "src/app/api/admin/orders/[id]/delete/route.ts",
+      "src/app/api/admin/orders/[id]/payments/route.ts"
+    ],
+    "modifiedFiles": [],
+    "totalFiles": 7
+  },
+  {
+    "name": "POS/Caja - Migraciones",
+    "deletedFiles": [
+      "supabase/migrations/20250127000000_fix_cash_register_status_and_reopen.sql",
+      "supabase/migrations/20250130000000_update_payment_methods_and_add_session.sql",
+      "supabase/migrations/20260122000000_add_lens_family_id_to_quotes_work_orders.sql",
+      "supabase/migrations/20260122000003_add_billing_fields_to_orders.sql",
+      "supabase/migrations/20260122000004_add_branch_id_to_orders.sql",
+      "supabase/migrations/20260122000006_create_order_payments.sql",
+      "supabase/migrations/20260122000007_add_on_hold_payment_status.sql",
+      "supabase/migrations/20260124000003_add_pos_session_to_closures.sql",
+      "supabase/migrations/20260124000004_add_cancellation_reason_to_orders.sql",
+      "supabase/migrations/20260126000000_create_pos_settings.sql",
+      "supabase/migrations/20260126000001_update_get_min_deposit_for_branch.sql",
+      "supabase/migrations/20260126000002_remove_order_notification_trigger.sql",
+      "supabase/migrations/20260127000000_update_orders_payment_status_for_partial.sql",
+      "supabase/migrations/20260127000001_update_orders_payment_method_type_for_deposit.sql",
+      "supabase/migrations/20260127000002_add_pos_session_to_orders.sql"
+    ],
+    "modifiedFiles": [],
+    "totalFiles": 26
+  },
+  {
+    "name": "POS/Caja - Hooks y Utilidades",
+    "deletedFiles": [],
+    "modifiedFiles": [],
+    "totalFiles": 0
+  }
+]

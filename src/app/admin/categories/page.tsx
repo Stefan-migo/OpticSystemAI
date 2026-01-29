@@ -22,6 +22,7 @@ interface Category {
   name: string;
   slug: string;
   description?: string;
+  is_default?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -182,6 +183,14 @@ export default function CategoriesPage() {
   const handleDelete = async () => {
     if (!categoryToDelete) return;
 
+    // Double check - prevent deletion of default categories
+    if (categoryToDelete.is_default === true) {
+      toast.error("No se puede eliminar una categoría por defecto del sistema");
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+      return;
+    }
+
     try {
       const response = await fetch(`/api/categories/${categoryToDelete.id}`, {
         method: "DELETE",
@@ -303,6 +312,12 @@ export default function CategoriesPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => openDeleteDialog(category)}
+                    disabled={category.is_default === true}
+                    title={
+                      category.is_default === true
+                        ? "Esta categoría por defecto no puede eliminarse"
+                        : "Eliminar categoría"
+                    }
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -424,11 +439,30 @@ export default function CategoriesPage() {
           <DialogHeader>
             <DialogTitle>Confirmar Eliminación</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que deseas eliminar la categoría &quot;
-              {categoryToDelete?.name}&quot;?
-              <br />
-              Esta acción no se puede deshacer y puede afectar los productos
-              asociados.
+              {categoryToDelete?.is_default === true ? (
+                <>
+                  <div className="flex items-center gap-2 text-amber-600 mb-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="font-semibold">
+                      Categoría por defecto protegida
+                    </span>
+                  </div>
+                  <p>
+                    La categoría &quot;{categoryToDelete?.name}&quot; es una
+                    categoría por defecto del sistema y no puede eliminarse. Las
+                    categorías por defecto son necesarias para el funcionamiento
+                    correcto del sistema.
+                  </p>
+                </>
+              ) : (
+                <>
+                  ¿Estás seguro de que deseas eliminar la categoría &quot;
+                  {categoryToDelete?.name}&quot;?
+                  <br />
+                  Esta acción no se puede deshacer y puede afectar los productos
+                  asociados.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -441,7 +475,11 @@ export default function CategoriesPage() {
             >
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={categoryToDelete?.is_default === true}
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               Eliminar Categoría
             </Button>

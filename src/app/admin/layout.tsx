@@ -178,6 +178,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   // Add ref to prevent multiple redirects
   const redirectInProgress = useRef(false);
 
+  // Add ref to track if we've already logged the render message
+  const hasLoggedRender = useRef(false);
+  const lastLoggedUserId = useRef<string | null>(null);
+
   // Debug mode - can be enabled via localStorage
   const debugMode =
     typeof window !== "undefined" &&
@@ -488,7 +492,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   // If we reach here, user is authenticated and is admin
-  console.log("🎉 Admin dashboard rendering for:", user.email);
+  // Only log once per user session to avoid console spam
+  if (user?.email && user?.id) {
+    // Reset if user changed
+    if (lastLoggedUserId.current !== user.id) {
+      hasLoggedRender.current = false;
+      lastLoggedUserId.current = user.id;
+    }
+
+    // Log only once per user
+    if (!hasLoggedRender.current) {
+      console.log("🎉 Admin dashboard rendering for:", user.email);
+      hasLoggedRender.current = true;
+    }
+  }
 
   return (
     <div className="admin-layout">

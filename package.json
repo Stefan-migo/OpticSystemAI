@@ -19,6 +19,7 @@
     "supabase:push:remote": "npx supabase db push --include-all --yes",
     "admin:create": "node scripts/create-admin-via-api.js",
     "admin:create-branch-users": "node scripts/create-branch-users.js",
+    "seed:test-data": "node scripts/seed-test-data.js",
     "migrate:chat": "node scripts/apply-chat-migrations.js",
     "migrate:notifications": "node scripts/apply-notification-migrations.js",
     "migrate:products-branch": "node scripts/apply-products-branch-migration.js",

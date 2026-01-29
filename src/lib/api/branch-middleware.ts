@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface BranchContext {
   branchId: string | null;
@@ -38,25 +39,77 @@ export async function getBranchFromRequest(
 
 /**
  * Get branch context for the current user
+ * @param request - NextRequest object
+ * @param userId - User ID
+ * @param supabaseClient - Optional Supabase client (if not provided, will use createClient())
  */
 export async function getBranchContext(
   request: NextRequest,
   userId: string,
+  supabaseClient?: SupabaseClient<any>,
 ): Promise<BranchContext> {
-  const supabase = await createClient();
+  let supabase: SupabaseClient<any>;
+  try {
+    supabase = supabaseClient || (await createClient());
+  } catch (clientError: any) {
+    console.error(
+      "Error creating Supabase client in getBranchContext:",
+      clientError,
+    );
+    // Return default values if client creation fails
+    return {
+      branchId: null,
+      isGlobalView: false,
+      isSuperAdmin: false,
+      accessibleBranches: [],
+    };
+  }
 
   // Check if user is super admin
-  const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
-    user_id: userId,
-  });
+  let isSuperAdmin = false;
+  try {
+    const { data: superAdminData, error: superAdminError } = await supabase.rpc(
+      "is_super_admin",
+      {
+        user_id: userId,
+      },
+    );
+    if (superAdminError) {
+      console.error("Error checking super admin status:", superAdminError);
+      // Continue with isSuperAdmin = false
+    } else {
+      isSuperAdmin = superAdminData || false;
+    }
+  } catch (err) {
+    console.error("Exception checking super admin status:", err);
+    // Continue with isSuperAdmin = false
+  }
 
   // Get user's accessible branches
-  const { data: branches, error } = await supabase.rpc("get_user_branches", {
-    user_id: userId,
-  });
+  let branches: any[] = [];
+  try {
+    const { data: branchesData, error: branchesError } = await supabase.rpc(
+      "get_user_branches",
+      {
+        user_id: userId,
+      },
+    );
 
-  if (error) {
-    console.error("Error fetching user branches:", error);
+    if (branchesError) {
+      console.error("Error fetching user branches:", branchesError);
+      // Return default values if error occurs
+      return {
+        branchId: null,
+        isGlobalView: false,
+        isSuperAdmin: false,
+        accessibleBranches: [],
+      };
+    }
+
+    branches = branchesData || [];
+  } catch (err) {
+    console.error("Exception fetching user branches:", err);
+    // Return default values if exception occurs
     return {
       branchId: null,
       isGlobalView: false,

@@ -57,22 +57,18 @@ export default function AddProductPage() {
   } = useProtectedForm({
     name: "",
     slug: "",
-    description: "",
     short_description: "",
     price: "",
-    compare_at_price: "",
     cost_price: "",
     price_includes_tax: false,
     category_id: "",
     featured_image: "",
-    gallery: [] as string[],
     tags: [] as string[],
-    inventory_quantity: "0",
+    stock_quantity: "0", // Changed from inventory_quantity - now managed in product_branch_stock
     is_featured: false,
     status: "active",
     // Optical product fields
     product_type: "frame",
-    optical_category: "",
     sku: "",
     barcode: "",
     brand: "",
@@ -141,15 +137,8 @@ export default function AddProductPage() {
     { value: "service", label: "Servicio" },
   ]);
 
-  const opticalCategories = getOptions("optical_category", [
-    { value: "sunglasses", label: "Lentes de Sol" },
-    { value: "prescription_glasses", label: "Lentes con Receta" },
-    { value: "reading_glasses", label: "Lentes de Lectura" },
-    { value: "safety_glasses", label: "Lentes de Seguridad" },
-    { value: "contact_lenses", label: "Lentes de Contacto" },
-    { value: "accessories", label: "Accesorios" },
-    { value: "services", label: "Servicios" },
-  ]);
+  // Filtered lens types - only for reading glasses, sunglasses, and safety glasses
+  const allowedLensTypes = ["reading", "sunglasses", "safety"];
 
   const frameTypes = getOptions("frame_type", [
     { value: "full_frame", label: "Marco Completo" },
@@ -223,7 +212,8 @@ export default function AddProductPage() {
     "memory_metal",
   ];
 
-  const lensTypes = getOptions("lens_type", [
+  // Lens types - filtered to only show reading, sunglasses, and safety glasses
+  const allLensTypes = getOptions("lens_type", [
     { value: "single_vision", label: "Monofocal" },
     { value: "bifocal", label: "Bifocal" },
     { value: "trifocal", label: "Trifocal" },
@@ -234,7 +224,17 @@ export default function AddProductPage() {
     { value: "sports", label: "Deportivo" },
     { value: "photochromic", label: "Fotocromático" },
     { value: "polarized", label: "Polarizado" },
+    { value: "sunglasses", label: "Lentes de Sol" },
+    { value: "safety", label: "Lentes de Seguridad" },
   ]);
+
+  // Filter lens types to only show allowed ones (reading, sunglasses, safety)
+  const lensTypes = allLensTypes.filter(
+    (type) =>
+      type.value === "reading" ||
+      type.value === "sunglasses" ||
+      type.value === "safety",
+  );
 
   const lensMaterials = getOptions("lens_material", [
     { value: "cr39", label: "CR-39" },
@@ -405,6 +405,8 @@ export default function AddProductPage() {
       // Validate branch selection
       if (!currentBranchId && !isSuperAdmin) {
         toast.error("Debes seleccionar una sucursal para crear productos");
+        setLoading(false);
+        markAsSaved();
         return;
       }
 
@@ -442,6 +444,8 @@ export default function AddProductPage() {
         toast.error(
           "El precio es requerido y debe ser un número válido mayor o igual a 0",
         );
+        setLoading(false);
+        markAsSaved();
         return;
       }
 
@@ -449,28 +453,25 @@ export default function AddProductPage() {
       const productData: any = {
         name: formData.name,
         slug: formData.slug,
-        description: formData.description || null,
         short_description: formData.short_description || null,
         price: priceValue, // Explicitly set as number
-        compare_at_price: formData.compare_at_price
-          ? parseFloat(String(formData.compare_at_price))
-          : null,
         cost_price: formData.cost_price
           ? parseFloat(String(formData.cost_price))
           : null,
         price_includes_tax: formData.price_includes_tax || false,
         category_id: formData.category_id || null,
         branch_id: currentBranchId, // Associate product with current branch
-        inventory_quantity: parseInt(String(formData.inventory_quantity)) || 0,
+        // Stock quantity for initial stock in product_branch_stock
+        stock_quantity: formData.stock_quantity
+          ? parseInt(String(formData.stock_quantity))
+          : 0,
         status: status,
         featured_image: formData.featured_image || null,
-        gallery: formData.gallery || [],
         tags: formData.tags || [],
         is_featured: formData.is_featured || false,
         published_at: status === "active" ? new Date().toISOString() : null,
         // Optical product fields
         product_type: formData.product_type || "frame",
-        optical_category: formData.optical_category || null,
         sku: formData.sku || null,
         barcode: formData.barcode || null,
         brand: formData.brand || null,
@@ -546,6 +547,8 @@ export default function AddProductPage() {
         toast.error(
           "Error: El precio no es válido. Por favor, verifica el formulario.",
         );
+        setLoading(false);
+        markAsSaved();
         return;
       }
 
@@ -624,6 +627,57 @@ export default function AddProductPage() {
 
       {/* Product Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Product Type & Category - MOVED TO FIRST POSITION */}
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <CardHeader>
+            <CardTitle>Tipo de Producto</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="product_type">Tipo de Producto *</Label>
+                <Select
+                  value={formData.product_type}
+                  onValueChange={(value) =>
+                    handleInputChange("product_type", value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="category">Categoría General</Label>
+                <Select
+                  value={formData.category_id}
+                  onValueChange={(value) =>
+                    handleInputChange("category_id", value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           <CardHeader>
             <CardTitle>Información Básica</CardTitle>
@@ -654,24 +708,14 @@ export default function AddProductPage() {
             </div>
 
             <div>
-              <Label htmlFor="short_description">Descripción Corta</Label>
+              <Label htmlFor="short_description">Descripción</Label>
               <RichTextEditor
                 value={formData.short_description}
                 onChange={(value) =>
                   handleInputChange("short_description", value)
                 }
-                placeholder="Descripción breve para listados"
-                rows={2}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="description">Descripción Detallada</Label>
-              <RichTextEditor
-                value={formData.description}
-                onChange={(value) => handleInputChange("description", value)}
-                placeholder="Descripción completa del producto"
-                rows={4}
+                placeholder="Descripción del producto"
+                rows={3}
               />
             </div>
           </CardContent>
@@ -682,7 +726,7 @@ export default function AddProductPage() {
             <CardTitle>Precios e Inventario</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="price">Precio *</Label>
                 <Input
@@ -697,31 +741,24 @@ export default function AddProductPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="compare_at_price">Precio Comparado</Label>
+                <Label htmlFor="stock_quantity">
+                  Cantidad en Stock (Sucursal Actual)
+                </Label>
                 <Input
-                  id="compare_at_price"
+                  id="stock_quantity"
                   type="number"
-                  step="0.01"
-                  value={formData.compare_at_price}
+                  value={formData.stock_quantity}
                   onChange={(e) =>
-                    handleInputChange("compare_at_price", e.target.value)
-                  }
-                  placeholder="0.00"
-                  className="border-black/20"
-                />
-              </div>
-              <div>
-                <Label htmlFor="inventory_quantity">Cantidad en Stock</Label>
-                <Input
-                  id="inventory_quantity"
-                  type="number"
-                  value={formData.inventory_quantity}
-                  onChange={(e) =>
-                    handleInputChange("inventory_quantity", e.target.value)
+                    handleInputChange("stock_quantity", e.target.value)
                   }
                   placeholder="0"
                   className="border-black/20"
+                  min="0"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Stock inicial para esta sucursal. Puede agregar más stock
+                  después de crear el producto.
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -744,119 +781,59 @@ export default function AddProductPage() {
           </CardContent>
         </Card>
 
-        {/* Product Type & Category */}
-        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-          <CardHeader>
-            <CardTitle>Tipo de Producto</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="product_type">Tipo de Producto *</Label>
-                <Select
-                  value={formData.product_type}
-                  onValueChange={(value) =>
-                    handleInputChange("product_type", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {productTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        {/* Brand & Model Information - Hidden for services */}
+        {formData.product_type !== "service" && (
+          <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+            <CardHeader>
+              <CardTitle>Marca y Modelo</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="brand">Marca</Label>
+                  <Input
+                    id="brand"
+                    value={formData.brand}
+                    onChange={(e) => handleInputChange("brand", e.target.value)}
+                    placeholder="Ej: Ray-Ban"
+                    className="border-black/20"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="manufacturer">Fabricante</Label>
+                  <Input
+                    id="manufacturer"
+                    value={formData.manufacturer}
+                    onChange={(e) =>
+                      handleInputChange("manufacturer", e.target.value)
+                    }
+                    placeholder="Ej: Luxottica"
+                    className="border-black/20"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="model_number">Número de Modelo</Label>
+                  <Input
+                    id="model_number"
+                    value={formData.model_number}
+                    onChange={(e) =>
+                      handleInputChange("model_number", e.target.value)
+                    }
+                    placeholder="Ej: RB2140"
+                    className="border-black/20"
+                  />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="optical_category">Categoría Óptica</Label>
-                <Select
-                  value={formData.optical_category}
-                  onValueChange={(value) =>
-                    handleInputChange("optical_category", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {opticalCategories.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="category">Categoría General</Label>
-              <Select
-                value={formData.category_id}
-                onValueChange={(value) =>
-                  handleInputChange("category_id", value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Brand & Model Information */}
+        {/* SKU and Barcode - Available for all product types */}
         <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           <CardHeader>
-            <CardTitle>Marca y Modelo</CardTitle>
+            <CardTitle>Códigos de Identificación</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="brand">Marca</Label>
-                <Input
-                  id="brand"
-                  value={formData.brand}
-                  onChange={(e) => handleInputChange("brand", e.target.value)}
-                  placeholder="Ej: Ray-Ban"
-                  className="border-black/20"
-                />
-              </div>
-              <div>
-                <Label htmlFor="manufacturer">Fabricante</Label>
-                <Input
-                  id="manufacturer"
-                  value={formData.manufacturer}
-                  onChange={(e) =>
-                    handleInputChange("manufacturer", e.target.value)
-                  }
-                  placeholder="Ej: Luxottica"
-                  className="border-black/20"
-                />
-              </div>
-              <div>
-                <Label htmlFor="model_number">Número de Modelo</Label>
-                <Input
-                  id="model_number"
-                  value={formData.model_number}
-                  onChange={(e) =>
-                    handleInputChange("model_number", e.target.value)
-                  }
-                  placeholder="Ej: RB2140"
-                  className="border-black/20"
-                />
-              </div>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="sku">SKU</Label>
@@ -884,57 +861,16 @@ export default function AddProductPage() {
 
         <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           <CardHeader>
-            <CardTitle>Imágenes del Producto</CardTitle>
-            <p className="text-sm text-gray-600">
-              Sube imágenes para el producto (máximo 5 imágenes)
-            </p>
+            <CardTitle>Imagen del Producto</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <Label htmlFor="featured_image">Imagen Principal</Label>
+              <Label htmlFor="featured_image">Imagen del Producto</Label>
               <ImageUpload
                 value={formData.featured_image}
                 onChange={(url) => handleInputChange("featured_image", url)}
-                placeholder="Seleccionar imagen principal del producto"
+                placeholder="Seleccionar imagen del producto"
               />
-            </div>
-
-            <div>
-              <Label htmlFor="gallery">Galería de Imágenes</Label>
-              <p className="text-sm text-gray-500 mb-3">
-                Puedes subir hasta 4 imágenes adicionales (máximo 5 en total)
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Array.from({ length: 4 }, (_, index) => (
-                  <div key={index} className="relative">
-                    <ImageUpload
-                      value={formData.gallery[index] || ""}
-                      onChange={(url) => {
-                        const newGallery = [...formData.gallery];
-                        newGallery[index] = url;
-                        handleInputChange("gallery", newGallery);
-                      }}
-                      placeholder={`Imagen ${index + 2}`}
-                    />
-                    {formData.gallery[index] && (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute -top-2 -right-2 h-6 w-6 p-0"
-                        onClick={() => {
-                          const newGallery = [...formData.gallery];
-                          newGallery[index] = "";
-                          handleInputChange("gallery", newGallery);
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
             </div>
           </CardContent>
         </Card>

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
+import {
+  createClient,
+  createClientFromRequest,
+  createServiceRoleClient,
+} from "@/utils/supabase/server";
+import { getBranchContext } from "@/lib/api/branch-middleware";
 import { EmailNotificationService } from "@/lib/email/notifications";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
@@ -221,17 +226,17 @@ export async function PATCH(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    logger.info("Admin Orders GET single order", { orderId: params.id });
-    const supabase = await createClient();
+    const { id } = await params;
+    logger.info("Admin Orders GET single order", { orderId: id });
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
 
     // Check admin authorization
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -246,8 +251,21 @@ export async function GET(
       );
     }
 
+    // Get branch context for multi-tenancy
+    const branchContext = await getBranchContext(request, user.id, supabase);
+
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
+
     // Get order details
-    const { data: order, error: orderError } = await supabase
+    let query = supabase
       .from("orders")
       .select(
         `
@@ -262,15 +280,37 @@ export async function GET(
         )
       `,
       )
-      .eq("id", params.id)
-      .single();
+      .eq("id", id);
+
+    // Filter by organization_id for multi-tenancy
+    if (userOrganizationId && !branchContext.isSuperAdmin) {
+      query = query.eq("organization_id", userOrganizationId);
+    }
+
+    const { data: order, error: orderError } = await query.single();
 
     if (orderError) {
       logger.error("Error fetching order", orderError);
+      // If order not found or doesn't belong to user's organization, return 404
+      if (
+        orderError.code === "PGRST116" ||
+        orderError.message.includes("No rows")
+      ) {
+        return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      }
       return NextResponse.json(
         { error: "Failed to fetch order" },
         { status: 500 },
       );
+    }
+
+    // Additional check: if order exists but doesn't belong to user's organization
+    if (
+      userOrganizationId &&
+      !branchContext.isSuperAdmin &&
+      order.organization_id !== userOrganizationId
+    ) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     return NextResponse.json({

@@ -1,0 +1,201 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
+import {
+  getBranchContext,
+  validateBranchAccess,
+} from "@/lib/api/branch-middleware";
+import { appLogger as logger } from "@/lib/logger";
+import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
+
+/**
+ * POST /api/admin/cash-register/reopen
+ * Reopen a closed cash register session (superadmin only)
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const supabaseServiceRole = createServiceRoleClient();
+
+    // Check admin authorization
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: isAdmin } = (await supabase.rpc("is_admin", {
+      user_id: user.id,
+    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
+    }
+
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id);
+
+    // Validate branch access for non-super admins
+    if (!branchContext.isSuperAdmin) {
+      return NextResponse.json(
+        {
+          error: "Solo superadmin puede reabrir cajas cerradas",
+        },
+        { status: 403 },
+      );
+    }
+
+    const body = await request.json();
+    const { session_id } = body;
+
+    if (!session_id) {
+      return NextResponse.json(
+        { error: "session_id is required" },
+        { status: 400 },
+      );
+    }
+
+    // Get the session to check its branch
+    const { data: session, error: sessionError } = await supabaseServiceRole
+      .from("pos_sessions")
+      .select("id, branch_id, status, reopen_count")
+      .eq("id", session_id)
+      .single();
+
+    if (sessionError || !session) {
+      logger.error("Error fetching session for reopen", sessionError);
+      return NextResponse.json(
+        {
+          error: "Sesión no encontrada",
+          details: sessionError?.message,
+        },
+        { status: 404 },
+      );
+    }
+
+    // Check if there's already an open session for this branch
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStart = today.toISOString();
+
+    const { data: openSessions, error: openSessionsError } =
+      await supabaseServiceRole
+        .from("pos_sessions")
+        .select("id, opening_time")
+        .eq("branch_id", session.branch_id)
+        .eq("status", "open")
+        .gte("opening_time", todayStart);
+
+    if (openSessionsError) {
+      logger.error("Error checking open sessions", openSessionsError);
+      return NextResponse.json(
+        {
+          error: "Error al verificar sesiones abiertas",
+          details: openSessionsError.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    // Filter out the current session if it's already open
+    const otherOpenSessions = (openSessions || []).filter(
+      (s) => s.id !== session_id,
+    );
+
+    if (otherOpenSessions.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Ya existe una caja abierta para esta sucursal. Debe cerrarla antes de reabrir otra.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Get the closure associated with this session
+    const { data: closure, error: closureError } = await supabaseServiceRole
+      .from("cash_register_closures")
+      .select("id, status, reopen_count")
+      .eq("pos_session_id", session_id)
+      .maybeSingle();
+
+    if (closureError && closureError.code !== "PGRST116") {
+      logger.error("Error fetching closure for reopen", closureError);
+      // Continue anyway - closure might not exist yet
+    }
+
+    // Update pos_session to reopen
+    const reopenCount = (session.reopen_count || 0) + 1;
+    const { data: updatedSession, error: updateError } =
+      await supabaseServiceRole
+        .from("pos_sessions")
+        .update({
+          status: "open",
+          reopened_at: new Date().toISOString(),
+          reopened_by: user.id,
+          reopen_count: reopenCount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", session_id)
+        .select()
+        .single();
+
+    if (updateError) {
+      logger.error("Error reopening cash session", updateError);
+      return NextResponse.json(
+        {
+          error: "Error al reabrir la caja",
+          details: updateError.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    // Update closure if it exists - change status to 'draft' to allow modifications
+    if (closure) {
+      const closureReopenCount = (closure.reopen_count || 0) + 1;
+      const { error: closureUpdateError } = await supabaseServiceRole
+        .from("cash_register_closures")
+        .update({
+          status: "draft", // Change to draft so it can be modified and closed again
+          reopened_at: new Date().toISOString(),
+          reopened_by: user.id,
+          reopen_count: closureReopenCount,
+          reopen_notes: `Reabierta por ${user.email} el ${new Date().toLocaleString("es-CL")}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", closure.id);
+
+      if (closureUpdateError) {
+        logger.error("Error updating closure on reopen", closureUpdateError);
+        // Log but don't fail - the session is already reopened
+      }
+    }
+
+    logger.info("Cash session reopened successfully", {
+      session_id,
+      branch_id: session.branch_id,
+      reopened_by: user.email,
+      reopen_count: reopenCount,
+      closure_id: closure?.id,
+    });
+
+    return NextResponse.json({
+      success: true,
+      session: updatedSession,
+      message: "Caja reabierta correctamente",
+    });
+  } catch (error: any) {
+    logger.error("Error in reopen cash register API:", { error });
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error.message,
+      },
+      { status: 500 },
+    );
+  }
+}

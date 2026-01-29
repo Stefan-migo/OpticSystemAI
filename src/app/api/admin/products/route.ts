@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
+import {
+  createClientFromRequest,
+  createServiceRoleClient,
+} from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
@@ -20,13 +23,12 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
 
     // Check authentication
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -42,10 +44,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get branch context
-    const branchContext = await getBranchContext(request, user.id);
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
 
     const { searchParams } = new URL(request.url);
+
+    // Check if branch_id was explicitly requested in the request
+    const requestedBranchId =
+      request.headers.get("x-branch-id") || searchParams.get("branch_id");
+
+    // Get branch context
+    const branchContext = await getBranchContext(request, user.id, supabase);
 
     // Pagination - Accept both page and offset parameters
     const limit = parseInt(searchParams.get("limit") || "12");
@@ -77,8 +93,15 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get("sort_order") || "desc";
 
     // Build query with count option
-    let query = supabase.from("products").select(
-      `
+    // Include stock from product_branch_stock for the current branch
+    // IMPORTANT: Only use currentBranchId for filtering if branch_id was explicitly requested
+    // When searching without branch_id, we want to show all products from the organization
+    // This ensures that search results include products from all branches within the organization
+    const currentBranchId = requestedBranchId ? branchContext.branchId : null;
+
+    // Build select string with proper filtering for nested relations
+    // Note: Use left join syntax (!inner) to avoid errors when no stock exists
+    let selectString = `
         *,
         categories:category_id (
           id,
@@ -94,37 +117,113 @@ export async function GET(request: NextRequest) {
           option2,
           option3,
           is_default
-        )
-      `,
-      { count: "exact" },
-    );
+        )`;
 
-    // Filter by branch if not super admin or if specific branch is selected
-    if (branchContext.branchId) {
-      query = query.eq("branch_id", branchContext.branchId);
-    } else if (!branchContext.isSuperAdmin) {
-      // Regular admin without branch selected - show only their accessible branches
-      // This will be handled by RLS, but we can also filter explicitly
-      const accessibleBranchIds = branchContext.accessibleBranches.map(
-        (b) => b.id,
-      );
-      if (accessibleBranchIds.length > 0) {
-        query = query.in("branch_id", accessibleBranchIds);
+    // Add product_branch_stock with branch filter if branch is selected
+    // Note: Without !inner, this is a left join - products without stock will still be returned
+    // We'll filter by branch_id in post-processing since Supabase doesn't support filtering nested relations directly
+    // Note: product_branch_stock table only has: id, product_id, branch_id, quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
+    if (currentBranchId) {
+      selectString += `,
+        product_branch_stock (
+          quantity,
+          reserved_quantity,
+          low_stock_threshold,
+          branch_id
+        )`;
+    }
+
+    let query = supabase
+      .from("products")
+      .select(selectString, { count: "exact" });
+
+    // IMPORTANT: Apply organization filter BEFORE search to ensure multi-tenancy isolation
+    // Filter by organization_id first (multi-tenancy isolation)
+    // Similar to customers API: filter by organization_id, then optionally by branch_id
+    if (userOrganizationId && !branchContext.isSuperAdmin) {
+      // Filter by organization_id - this ensures multi-tenancy isolation
+      // This MUST be applied before search to ensure it's combined correctly with .or()
+      query = query.eq("organization_id", userOrganizationId);
+      logger.debug("Filtering by organization_id", { userOrganizationId });
+
+      // If a specific branch is selected, also filter by branch_id
+      // Otherwise, show all products from the organization (including global and branch-specific)
+      // IMPORTANT: If we have a search query, we'll apply branch_id filter in post-processing
+      // to avoid conflicts with the search .or() condition (Supabase PostgREST only allows one .or() at a time)
+      if (currentBranchId && !search) {
+        // When a branch is selected and NO search, show:
+        // 1. Global products (branch_id IS NULL) - available to all branches
+        // 2. Products specific to this branch (branch_id = currentBranchId)
+        try {
+          query = query.or(`branch_id.is.null,branch_id.eq.${currentBranchId}`);
+          logger.debug("Filtering by branch_id in query", { currentBranchId });
+        } catch (error) {
+          // Fallback: filter in post-processing if .or() fails with nested relations
+          logger.warn(
+            "Error using .or() filter, will filter in post-processing",
+            { error },
+          );
+        }
+      }
+      // If no branch selected, show all products from organization (no branch_id filter)
+      // If search is present, branch filter will be applied in post-processing
+    } else if (branchContext.isSuperAdmin) {
+      // Super admin: use branch filter if branch is selected, otherwise show all
+      if (currentBranchId) {
+        try {
+          query = query.or(`branch_id.is.null,branch_id.eq.${currentBranchId}`);
+        } catch (error) {
+          logger.warn(
+            "Error using .or() filter, will filter in post-processing",
+            { error },
+          );
+        }
+      }
+      // If no branch selected, super admin sees all (no filter)
+    } else {
+      // Fallback: no organization_id found, use branch filter only
+      if (currentBranchId) {
+        try {
+          query = query.or(`branch_id.is.null,branch_id.eq.${currentBranchId}`);
+        } catch (error) {
+          logger.warn(
+            "Error using .or() filter, will filter in post-processing",
+            { error },
+          );
+        }
       } else {
-        // No accessible branches - return empty
-        return NextResponse.json({
-          products: [],
-          pagination: {
-            page: 1,
-            limit: parseInt(searchParams.get("limit") || "12"),
-            total: 0,
-            totalPages: 0,
-            hasMore: false,
-          },
-        });
+        // Regular admin without branch selected - show only their accessible branches
+        const accessibleBranchIds = branchContext.accessibleBranches.map(
+          (b) => b.id,
+        );
+        if (accessibleBranchIds.length > 0) {
+          // Show global products OR products from accessible branches
+          const branchConditions = accessibleBranchIds
+            .map((id) => `branch_id.eq.${id}`)
+            .join(",");
+          try {
+            query = query.or(`branch_id.is.null,${branchConditions}`);
+          } catch (error) {
+            logger.warn(
+              "Error using .or() filter, will filter in post-processing",
+              { error },
+            );
+          }
+        } else {
+          // No accessible branches - return empty
+          return NextResponse.json({
+            products: [],
+            pagination: {
+              page: 1,
+              limit: parseInt(searchParams.get("limit") || "12"),
+              total: 0,
+              totalPages: 0,
+              hasMore: false,
+            },
+          });
+        }
       }
     }
-    // Super admin in global view sees all products (no filter)
 
     // Apply filters
     if (category && category !== "all") {
@@ -132,7 +231,37 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+      // Apply search filter - must be applied after organization filter
+      // Use ilike for case-insensitive search
+      // Supabase PostgREST syntax: field.ilike.pattern (pattern should include %)
+      // Escape special characters in search term to prevent SQL injection
+      // Note: We escape % and _ because they are special characters in SQL LIKE patterns
+      const escapedSearch = search.replace(/%/g, "\\%").replace(/_/g, "\\_");
+      // Build OR condition for search across multiple fields
+      // Note: .or() creates an OR condition between the specified fields
+      // IMPORTANT: This .or() will override any previous .or() (like branch_id filter)
+      // That's why we apply branch_id filter in post-processing when search is present
+      // IMPORTANT: The .eq() filters (like organization_id) are NOT overridden by .or()
+      // They are combined with AND, so organization_id filter remains active
+      const searchCondition = `name.ilike.%${escapedSearch}%,description.ilike.%${escapedSearch}%,sku.ilike.%${escapedSearch}%,barcode.ilike.%${escapedSearch}%`;
+      query = query.or(searchCondition);
+
+      // Re-apply organization filter after search to ensure it's not lost
+      // This is a safety measure - .eq() filters should persist, but we ensure it here
+      if (userOrganizationId && !branchContext.isSuperAdmin) {
+        query = query.eq("organization_id", userOrganizationId);
+      }
+
+      logger.debug("Applied search filter", {
+        search,
+        escapedSearch,
+        searchCondition,
+        hasBranchFilter: !!currentBranchId,
+        userOrganizationId,
+        organizationFilterReapplied: !!(
+          userOrganizationId && !branchContext.isSuperAdmin
+        ),
+      });
     }
 
     if (skinType) {
@@ -151,19 +280,21 @@ export async function GET(request: NextRequest) {
       query = query.eq("is_featured", true);
     }
 
-    if (inStock === "true") {
-      query = query.gt("inventory_quantity", 0);
-    }
-
-    if (lowStockOnly) {
-      query = query.lte("inventory_quantity", 5);
-    }
+    // Stock filtering - will be done in post-processing since we can't filter nested relations directly
+    // Store filter flags for post-processing
+    const stockFilters = {
+      inStock: inStock === "true",
+      lowStockOnly: lowStockOnly,
+    };
 
     // Status filtering - Admin can see all products
+    // IMPORTANT: When searching, don't apply default status filter to avoid filtering out products
+    // that might match the search but have a different status
     if (status && status !== "all") {
       query = query.eq("status", status);
-    } else if (!includeArchived) {
+    } else if (!includeArchived && !search) {
       // Default to active products if no specific status requested
+      // BUT: Skip this default filter when searching to ensure search results are not limited
       query = query.eq("status", "active");
     }
     // If includeArchived is true, show all products regardless of status
@@ -181,24 +312,203 @@ export async function GET(request: NextRequest) {
       error,
     } = await query.range(offset, offset + limit - 1);
 
+    // Debug logging for search queries
+    if (search) {
+      logger.debug("Search query results - BEFORE post-processing", {
+        search,
+        productsCount: products?.length || 0,
+        totalCount: count,
+        currentBranchId,
+        requestedBranchId,
+        userOrganizationId,
+        productIds:
+          products?.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            branch_id: p.branch_id,
+            organization_id: p.organization_id,
+            status: p.status,
+            nameMatches: p.name?.toLowerCase().includes(search.toLowerCase()),
+          })) || [],
+      });
+    }
+
     if (error) {
-      logger.error("Database error fetching products", error);
+      // Log error with all available information
+      const errorInfo = {
+        message: error.message,
+        code: error.code,
+        hint: error.hint,
+        details: error.details,
+        status: error.status,
+      };
+
+      logger.error("Database error fetching products", {
+        error: errorInfo,
+        selectString,
+        currentBranchId,
+        branchContext: {
+          branchId: branchContext.branchId,
+          isSuperAdmin: branchContext.isSuperAdmin,
+        },
+        queryString: query.toString ? query.toString() : "N/A",
+      });
+
+      // Return detailed error in development, generic in production
+      const isDevelopment = process.env.NODE_ENV === "development";
       return NextResponse.json(
-        { error: "Failed to fetch products" },
+        {
+          error: "Failed to fetch products",
+          details: isDevelopment ? error.message : "Database error occurred",
+          code: error.code,
+          hint: isDevelopment ? error.hint : undefined,
+          ...(isDevelopment && { fullError: errorInfo }),
+        },
         { status: 500 },
       );
     }
 
+    // Post-process products to handle stock data and apply stock filters
+    // If branch is selected and we have stock data, filter and format it properly
+    // Also filter products by branch_id and organization_id (we do this in post-processing to avoid conflicts with search .or())
+    let processedProducts =
+      products
+        ?.map((product: any) => {
+          // CRITICAL: Filter by organization_id in post-processing when there's a search query
+          // This ensures multi-tenancy isolation even if the .or() search filter somehow interferes
+          // with the organization filter in the query
+          if (search && userOrganizationId && !branchContext.isSuperAdmin) {
+            if (product.organization_id !== userOrganizationId) {
+              return null; // Filter out products from other organizations
+            }
+          }
+
+          // Filter by branch_id in post-processing to ensure we only show:
+          // 1. Global products (branch_id IS NULL)
+          // 2. Products specific to the selected branch (branch_id = currentBranchId)
+          // This is especially important when we have a search query, as the search .or() would override the branch .or()
+          // IMPORTANT: Only filter by branch_id when it was EXPLICITLY requested in the request
+          // When no branch_id is explicitly requested, show ALL products from the organization
+          // (including products from all branches within that organization)
+          // This applies to both search and non-search queries
+          // CRITICAL: When searching, only filter by branch if branch_id was explicitly requested
+          // Otherwise, show all products from the organization (including branch-specific products)
+          if (currentBranchId && requestedBranchId) {
+            // Only filter by branch if it was explicitly requested
+            const productBranchId = product.branch_id;
+            const isGlobalProduct =
+              productBranchId === null || productBranchId === undefined;
+            const isBranchProduct = productBranchId === currentBranchId;
+
+            // Skip products that don't match the branch filter
+            if (!isGlobalProduct && !isBranchProduct) {
+              return null; // Will be filtered out
+            }
+          } else if (currentBranchId && !search) {
+            // When NOT searching and a branch is selected (even if not explicitly requested),
+            // filter to show only global products and products from that branch
+            // This is the default behavior for non-search queries
+            const productBranchId = product.branch_id;
+            const isGlobalProduct =
+              productBranchId === null || productBranchId === undefined;
+            const isBranchProduct = productBranchId === currentBranchId;
+
+            // Skip products that don't match the branch filter
+            if (!isGlobalProduct && !isBranchProduct) {
+              return null; // Will be filtered out
+            }
+          }
+          // If no branch was explicitly requested AND we're searching, show all products from organization (no branch filtering)
+          // This ensures that when searching without a specific branch, we see all products from the organization
+
+          if (currentBranchId && product.product_branch_stock) {
+            // Filter stock by branch_id and take the first match
+            let stockData = null;
+            if (Array.isArray(product.product_branch_stock)) {
+              stockData =
+                product.product_branch_stock.find(
+                  (s: any) => s.branch_id === currentBranchId,
+                ) || product.product_branch_stock[0]; // Fallback to first if no match
+            } else if (
+              product.product_branch_stock.branch_id === currentBranchId
+            ) {
+              stockData = product.product_branch_stock;
+            }
+
+            if (stockData) {
+              const quantity = stockData.quantity || 0;
+              const reservedQuantity = stockData.reserved_quantity || 0;
+              // Calculate available_quantity as quantity - reserved_quantity
+              const availableQuantity = Math.max(
+                0,
+                quantity - reservedQuantity,
+              );
+
+              product.total_inventory_quantity = quantity;
+              product.total_available_quantity = availableQuantity;
+              product.total_reserved_quantity = reservedQuantity;
+            } else {
+              // No stock record for this branch
+              product.total_inventory_quantity = 0;
+              product.total_available_quantity = 0;
+              product.total_reserved_quantity = 0;
+            }
+          }
+          return product;
+        })
+        .filter((p: any) => p !== null) || [];
+
+    // Debug logging for search queries after post-processing
+    if (search) {
+      logger.debug("Search query results - AFTER post-processing", {
+        search,
+        processedProductsCount: processedProducts.length,
+        processedProductIds: processedProducts.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          branch_id: p.branch_id,
+          organization_id: p.organization_id,
+          nameMatches: p.name?.toLowerCase().includes(search.toLowerCase()),
+        })),
+      });
+    }
+
+    // Apply stock filters in post-processing
+    if (stockFilters.inStock && currentBranchId) {
+      processedProducts = processedProducts.filter(
+        (p: any) => (p.total_available_quantity || 0) > 0,
+      );
+    }
+
+    if (stockFilters.lowStockOnly && currentBranchId) {
+      processedProducts = processedProducts.filter(
+        (p: any) => (p.total_available_quantity || 0) <= 5,
+      );
+    }
+
+    // Adjust count if we filtered in post-processing
+    // Note: This is not perfect but necessary since we can't filter nested relations in Supabase
+    let adjustedCount = count;
+    if (
+      (stockFilters.inStock || stockFilters.lowStockOnly) &&
+      currentBranchId
+    ) {
+      // We filtered after fetching, so the count is now the filtered array length
+      // For accurate pagination, we'd need to do a separate count query, but for now
+      // we'll use the filtered length as an approximation
+      adjustedCount = processedProducts.length;
+    }
+
     // Calculate pagination info
-    const totalPages = Math.ceil((count || 0) / limit);
+    const totalPages = Math.ceil((adjustedCount || 0) / limit);
     const hasMore = page < totalPages;
 
     return NextResponse.json({
-      products,
+      products: processedProducts,
       pagination: {
         page,
         limit,
-        total: count,
+        total: adjustedCount,
         totalPages,
         hasMore,
       },
@@ -219,13 +529,12 @@ export async function POST(request: NextRequest) {
       request,
       async () => {
         try {
-          const supabase = await createClient();
+          const { client: supabase, getUser } =
+            await createClientFromRequest(request);
 
           // Check authentication
-          const {
-            data: { user },
-            error: userError,
-          } = await supabase.auth.getUser();
+          const { data: userData, error: userError } = await getUser();
+          const user = userData?.user;
           if (userError || !user) {
             return NextResponse.json(
               { error: "Unauthorized" },
@@ -248,7 +557,28 @@ export async function POST(request: NextRequest) {
           }
 
           // Get branch context
-          const branchContext = await getBranchContext(request, user.id);
+          const branchContext = await getBranchContext(
+            request,
+            user.id,
+            supabase,
+          );
+
+          // Get user's organization_id from admin_users table
+          const { data: adminUser, error: adminUserError } = await supabase
+            .from("admin_users")
+            .select("organization_id")
+            .eq("id", user.id)
+            .single();
+
+          if (adminUserError || !adminUser?.organization_id) {
+            logger.error("Error getting user organization", adminUserError);
+            return NextResponse.json(
+              { error: "User organization not found" },
+              { status: 500 },
+            );
+          }
+
+          const userOrganizationId = adminUser.organization_id;
 
           // Get request body first (needed for fields not in Zod schema)
           let body: any;
@@ -421,7 +751,7 @@ export async function POST(request: NextRequest) {
             price_includes_tax: validatedBody.price_includes_tax ?? false,
             category_id: validatedBody.category_id || null,
             branch_id: productBranchId, // Associate product with branch
-            inventory_quantity: 0, // Will be managed in product_branch_stock
+            // inventory_quantity removed - managed in product_branch_stock table
             status: validatedBody.status || "draft",
             featured_image: validatedBody.featured_image || null,
             gallery: validatedBody.gallery || [],
@@ -582,7 +912,7 @@ export async function POST(request: NextRequest) {
             "price_includes_tax",
             "category_id",
             "branch_id",
-            "inventory_quantity",
+            // inventory_quantity removed
             "status",
             "featured_image",
             "gallery",
@@ -628,6 +958,9 @@ export async function POST(request: NextRequest) {
               logger.debug(`Skipping invalid column: ${key}`);
             }
           });
+
+          // Add organization_id for multi-tenancy
+          filteredProductData.organization_id = userOrganizationId;
 
           logger.debug("Prepared product data (sample)", {
             name: filteredProductData.name,
@@ -694,37 +1027,60 @@ export async function POST(request: NextRequest) {
 
           const createdProduct = data[0];
 
-          // Create stock entry in product_branch_stock if branch_id is provided
-          if (productBranchId && body.inventory_quantity !== undefined) {
-            const inventoryQty = parseInt(String(body.inventory_quantity)) || 0;
-            const serviceSupabase = createServiceRoleClient();
+          // Create stock entry in product_branch_stock if branch_id and stock_quantity are provided
+          if (productBranchId && body.stock_quantity !== undefined) {
+            const stockQty = parseInt(String(body.stock_quantity)) || 0;
+            if (stockQty > 0) {
+              const serviceSupabase = createServiceRoleClient();
 
-            const { error: stockError } = await serviceSupabase
-              .from("product_branch_stock")
-              .upsert(
+              // Use the update_product_stock function for consistency
+              const { error: stockError } = await serviceSupabase.rpc(
+                "update_product_stock",
                 {
-                  product_id: createdProduct.id,
-                  branch_id: productBranchId,
-                  quantity: inventoryQty,
-                  reserved_quantity: 0,
-                  low_stock_threshold: 5,
-                },
-                {
-                  onConflict: "product_id,branch_id",
+                  p_product_id: createdProduct.id,
+                  p_branch_id: productBranchId,
+                  p_quantity_change: stockQty,
+                  p_reserve: false,
                 },
               );
 
-            if (stockError) {
-              logger.error("Error creating product stock", stockError);
-              // Don't fail the product creation, just log the error
-              // The stock can be added later
+              if (stockError) {
+                logger.error("Error creating product stock", stockError);
+                // Fallback to direct insert if function fails
+                const { error: fallbackError } = await serviceSupabase
+                  .from("product_branch_stock")
+                  .upsert(
+                    {
+                      product_id: createdProduct.id,
+                      branch_id: productBranchId,
+                      quantity: stockQty,
+                      reserved_quantity: 0,
+                      low_stock_threshold: 5,
+                    },
+                    {
+                      onConflict: "product_id,branch_id",
+                    },
+                  );
+
+                if (fallbackError) {
+                  logger.error(
+                    "Error in fallback stock creation",
+                    fallbackError,
+                  );
+                  // Don't fail the product creation, just log the error
+                  // The stock can be added later
+                }
+              }
             }
           }
 
           logger.info("Product created successfully", {
             productId: createdProduct?.id,
           });
-          return NextResponse.json({ product: createdProduct });
+          return NextResponse.json(
+            { product: createdProduct },
+            { status: 201 },
+          );
         } catch (error) {
           logger.error(
             "Error in product creation handler",

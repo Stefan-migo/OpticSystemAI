@@ -42,10 +42,56 @@ export function BranchProvider({ children }: BranchProviderProps) {
   const [isGlobalView, setIsGlobalView] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  const fetchBranches = async () => {
+  // Función optimizada para inicializar desde localStorage (solo para super admins)
+  const initializeFromStorage = (availableBranches: Branch[]) => {
+    const savedBranchId = localStorage.getItem(STORAGE_KEY);
+
+    if (savedBranchId === "global") {
+      setCurrentBranchState(null);
+      setIsGlobalView(true);
+    } else if (savedBranchId) {
+      const branch = availableBranches.find((b) => b.id === savedBranchId);
+      if (branch) {
+        setCurrentBranchState(branch);
+        setIsGlobalView(false);
+      } else {
+        // Saved branch no longer exists, default to global view
+        setCurrentBranchState(null);
+        setIsGlobalView(true);
+        localStorage.setItem(STORAGE_KEY, "global");
+      }
+    } else {
+      // No saved selection, default to global view
+      setCurrentBranchState(null);
+      setIsGlobalView(true);
+      localStorage.setItem(STORAGE_KEY, "global");
+    }
+  };
+
+  const fetchBranches = async (forceRefresh: boolean = false) => {
     if (!user) {
       setIsLoading(false);
+      return;
+    }
+
+    // Para super admins: si ya está inicializado y no es un refresh forzado,
+    // solo validar que la sucursal guardada aún existe (sin hacer petición al servidor)
+    if (isSuperAdmin && isInitialized && !forceRefresh) {
+      const savedBranchId = localStorage.getItem(STORAGE_KEY);
+
+      // Si hay una sucursal guardada, verificar que aún existe en la lista actual
+      if (savedBranchId && savedBranchId !== "global") {
+        const branchExists = branches.some((b) => b.id === savedBranchId);
+        if (!branchExists) {
+          // La sucursal ya no existe, actualizar a global view
+          setCurrentBranchState(null);
+          setIsGlobalView(true);
+          localStorage.setItem(STORAGE_KEY, "global");
+        }
+      }
+      // No hacer petición al servidor - usar datos en memoria
       return;
     }
 
@@ -58,58 +104,15 @@ export function BranchProvider({ children }: BranchProviderProps) {
       }
 
       const data = await response.json();
+      const serverIsSuperAdmin = data.isSuperAdmin || false;
       setBranches(data.branches || []);
-      setIsSuperAdmin(data.isSuperAdmin || false);
+      setIsSuperAdmin(serverIsSuperAdmin);
 
       // For super admins, prioritize localStorage to maintain selection across page reloads
       // For regular admins, use server values (they have assigned branches)
-      if (data.isSuperAdmin) {
-        const savedBranchId = localStorage.getItem(STORAGE_KEY);
-
-        if (savedBranchId === "global") {
-          // Restore global view
-          setCurrentBranchState(null);
-          setIsGlobalView(true);
-        } else if (savedBranchId) {
-          // Restore saved branch selection
-          const branch = data.branches?.find(
-            (b: Branch) => b.id === savedBranchId,
-          );
-          if (branch) {
-            setCurrentBranchState(branch);
-            setIsGlobalView(false);
-          } else {
-            // Saved branch no longer exists, default to global view for super admin
-            setCurrentBranchState(null);
-            setIsGlobalView(true);
-            localStorage.setItem(STORAGE_KEY, "global");
-          }
-        } else {
-          // No saved selection, use server values or default to global view
-          if (data.currentBranch) {
-            const branch = data.branches?.find(
-              (b: Branch) => b.id === data.currentBranch,
-            );
-            if (branch) {
-              setCurrentBranchState(branch);
-              setIsGlobalView(false);
-              localStorage.setItem(STORAGE_KEY, branch.id);
-            } else {
-              setCurrentBranchState(null);
-              setIsGlobalView(true);
-              localStorage.setItem(STORAGE_KEY, "global");
-            }
-          } else if (data.isGlobalView) {
-            setCurrentBranchState(null);
-            setIsGlobalView(true);
-            localStorage.setItem(STORAGE_KEY, "global");
-          } else {
-            // Default to global view for super admin
-            setCurrentBranchState(null);
-            setIsGlobalView(true);
-            localStorage.setItem(STORAGE_KEY, "global");
-          }
-        }
+      if (serverIsSuperAdmin) {
+        // Para super admins, usar localStorage como fuente de verdad
+        initializeFromStorage(data.branches || []);
       } else {
         // Regular admin: use server values (they have assigned branches)
         setIsGlobalView(data.isGlobalView || false);
@@ -141,6 +144,8 @@ export function BranchProvider({ children }: BranchProviderProps) {
           }
         }
       }
+
+      setIsInitialized(true);
     } catch (error) {
       console.error("Error fetching branches:", error);
     } finally {
@@ -157,40 +162,31 @@ export function BranchProvider({ children }: BranchProviderProps) {
       setCurrentBranchState(null);
       setIsGlobalView(true);
       localStorage.setItem(STORAGE_KEY, "global");
-
-      // Notify server of branch change
-      await fetch("/api/admin/branches", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "set_branch", branch_id: null }),
-      });
+      // No need to notify server - localStorage is source of truth for super admins
     } else if (branchId) {
       const branch = branches.find((b) => b.id === branchId);
       if (branch) {
         setCurrentBranchState(branch);
         setIsGlobalView(false);
         localStorage.setItem(STORAGE_KEY, branch.id);
-
-        // Notify server of branch change
-        await fetch("/api/admin/branches", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "set_branch", branch_id: branchId }),
-        });
+        // No need to notify server - localStorage is source of truth for super admins
       }
     }
   };
 
+  // Inicializar solo una vez cuando el usuario se autentica
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && !isInitialized) {
       fetchBranches();
     } else if (!authLoading && !user) {
       setIsLoading(false);
       setBranches([]);
       setCurrentBranchState(null);
+      setIsInitialized(false);
       localStorage.removeItem(STORAGE_KEY);
     }
-  }, [user, authLoading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading, isInitialized]);
 
   return (
     <BranchContext.Provider
@@ -201,7 +197,7 @@ export function BranchProvider({ children }: BranchProviderProps) {
         isSuperAdmin,
         isLoading,
         setCurrentBranch,
-        refreshBranches: fetchBranches,
+        refreshBranches: () => fetchBranches(true),
       }}
     >
       {children}

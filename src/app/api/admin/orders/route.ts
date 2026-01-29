@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClientFromRequest } from "@/utils/supabase/server";
+import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
@@ -8,13 +9,12 @@ import { RateLimitError } from "@/lib/api/errors";
 export async function GET(request: NextRequest) {
   try {
     logger.info("Admin Orders API GET called");
-    const supabase = await createClient();
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
 
     // Check admin authorization
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
     if (userError || !user) {
       logger.error("User authentication failed", userError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,12 +41,32 @@ export async function GET(request: NextRequest) {
     }
     logger.debug("Admin access confirmed", { email: user.email });
 
+    // Get branch context for multi-tenancy
+    const branchContext = await getBranchContext(request, user.id, supabase);
+
+    // Get user's organization_id for filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
+
     const url = new URL(request.url);
     const status = url.searchParams.get("status");
+    const paymentStatus = url.searchParams.get("payment_status");
     const limit = parseInt(url.searchParams.get("limit") || "50");
     const offset = parseInt(url.searchParams.get("offset") || "0");
 
-    logger.debug("Query params", { status, limit, offset });
+    logger.debug("Query params", {
+      status,
+      paymentStatus,
+      limit,
+      offset,
+      userOrganizationId,
+    });
 
     // Build query
     let query = supabase
@@ -65,6 +85,8 @@ export async function GET(request: NextRequest) {
         mp_payment_id,
         mp_payment_method,
         mp_payment_type,
+        organization_id,
+        branch_id,
         order_items (
           id,
           product_name,
@@ -79,9 +101,33 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
+    // Filter by organization_id first (multi-tenancy isolation)
+    if (userOrganizationId && !branchContext.isSuperAdmin) {
+      query = query.eq("organization_id", userOrganizationId);
+      logger.debug("Filtering by organization_id", { userOrganizationId });
+
+      // If a specific branch is selected, also filter by branch_id
+      if (branchContext.branchId) {
+        query = query.eq("branch_id", branchContext.branchId);
+        logger.debug("Filtering by branch_id", {
+          branchId: branchContext.branchId,
+        });
+      }
+    } else if (branchContext.isSuperAdmin) {
+      // Super admin: use branch filter if branch is selected, otherwise show all
+      if (branchContext.branchId) {
+        query = query.eq("branch_id", branchContext.branchId);
+      }
+    }
+
     // Apply status filter
     if (status && status !== "all") {
       query = query.eq("status", status);
+    }
+
+    // Apply payment_status filter
+    if (paymentStatus && paymentStatus !== "all") {
+      query = query.eq("payment_status", paymentStatus);
     }
 
     const { data: orders, error: ordersError, count } = await query;
@@ -141,13 +187,12 @@ export async function POST(request: NextRequest) {
     async () => {
       try {
         logger.info("Admin Orders API POST called");
-        const supabase = await createClient();
+        const { client: supabase, getUser } =
+          await createClientFromRequest(request);
 
         // Check admin authorization
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+        const { data, error: userError } = await getUser();
+        const user = data?.user;
         if (userError || !user) {
           return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -162,90 +207,273 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const body = await request.json();
+        // Get branch context for multi-tenancy
+        let branchContext;
+        try {
+          branchContext = await getBranchContext(request, user.id, supabase);
+        } catch (branchError: any) {
+          logger.error("Error getting branch context", branchError);
+          return NextResponse.json(
+            {
+              error: "Failed to get branch context",
+              details: branchError?.message || "Unknown error",
+            },
+            { status: 500 },
+          );
+        }
+
+        // Get user's organization_id for filtering
+        const { data: adminUser, error: adminUserError } = await supabase
+          .from("admin_users")
+          .select("organization_id")
+          .eq("id", user.id)
+          .single();
+
+        if (adminUserError && adminUserError.code !== "PGRST116") {
+          // PGRST116 is "not found" which is acceptable
+          logger.error("Error fetching admin user", adminUserError);
+          return NextResponse.json(
+            { error: "Failed to fetch user information" },
+            { status: 500 },
+          );
+        }
+
+        const userOrganizationId = (adminUser as { organization_id?: string })
+          ?.organization_id;
+
+        let body: any;
+        try {
+          body = await request.json();
+        } catch (jsonError: any) {
+          logger.error("Error parsing request body", jsonError);
+          return NextResponse.json(
+            {
+              error: "Invalid request body",
+              details: jsonError?.message || "Failed to parse JSON",
+            },
+            { status: 400 },
+          );
+        }
+
         const { action } = body;
 
+        if (!action) {
+          return NextResponse.json(
+            { error: "Action is required" },
+            { status: 400 },
+          );
+        }
+
         if (action === "get_stats") {
-          logger.info("Getting order statistics");
+          try {
+            logger.info("Getting order statistics", {
+              userOrganizationId,
+              isSuperAdmin: branchContext.isSuperAdmin,
+              branchId: branchContext.branchId,
+            });
 
-          // Get order counts by status
-          const { data: allOrders, error: statusError } = await supabase
-            .from("orders")
-            .select("status");
+            // Filter by organization_id for multi-tenancy
+            // IMPORTANT: If user has no organization_id and is not super admin, return empty stats
+            if (!userOrganizationId && !branchContext.isSuperAdmin) {
+              logger.warn(
+                "User has no organization_id and is not super admin",
+                {
+                  userId: user.id,
+                },
+              );
+              return NextResponse.json({
+                success: true,
+                stats: {
+                  orderCounts: {},
+                  totalRevenue: 0,
+                  recentOrders: [],
+                },
+              });
+            }
 
-          if (statusError) {
-            logger.error("Error getting order stats", statusError);
-            throw statusError;
-          }
+            // Build base query with organization filter
+            let baseQuery = supabase.from("orders").select("status");
 
-          // Count by status manually
-          const statusCounts =
-            allOrders?.reduce(
-              (acc: Record<string, number>, order: { status: string }) => {
-                acc[order.status] = (acc[order.status] || 0) + 1;
-                return acc;
-              },
-              {} as Record<string, number>,
-            ) || {};
+            // Validate baseQuery is a valid query builder
+            if (!baseQuery || typeof baseQuery.eq !== "function") {
+              logger.error("Invalid query builder", {
+                baseQueryType: typeof baseQuery,
+                baseQueryConstructor: baseQuery?.constructor?.name,
+                supabaseType: typeof supabase,
+                supabaseFromType: typeof supabase?.from,
+              });
+              return NextResponse.json(
+                {
+                  error: "Failed to create database query",
+                  details: "baseQuery.eq is not a function",
+                },
+                { status: 500 },
+              );
+            }
 
-          // Get total revenue for current month
-          const startOfMonth = new Date();
-          startOfMonth.setDate(1);
-          startOfMonth.setHours(0, 0, 0, 0);
+            if (userOrganizationId && !branchContext.isSuperAdmin) {
+              baseQuery = baseQuery.eq("organization_id", userOrganizationId);
 
-          const { data: revenueData, error: revenueError } = await supabase
-            .from("orders")
-            .select("total_amount")
-            .eq("payment_status", "paid")
-            .gte("created_at", startOfMonth.toISOString());
+              // If a specific branch is selected, also filter by branch_id
+              if (branchContext.branchId) {
+                baseQuery = baseQuery.eq("branch_id", branchContext.branchId);
+              }
+            } else if (branchContext.isSuperAdmin && branchContext.branchId) {
+              baseQuery = baseQuery.eq("branch_id", branchContext.branchId);
+            }
 
-          if (revenueError) {
-            logger.error("Error getting revenue stats", revenueError);
-            throw revenueError;
-          }
+            // Get order counts by status
+            const { data: allOrders, error: statusError } = await baseQuery;
 
-          const totalRevenue =
-            revenueData?.reduce((sum, order) => sum + order.total_amount, 0) ||
-            0;
+            if (statusError) {
+              logger.error("Error getting order stats", statusError);
+              return NextResponse.json(
+                {
+                  error: "Failed to get order statistics",
+                  details: statusError.message,
+                },
+                { status: 500 },
+              );
+            }
 
-          // Get recent orders
-          const { data: recentOrders, error: recentError } = await supabase
-            .from("orders")
-            .select(
+            // Count by status manually
+            const statusCounts =
+              allOrders?.reduce(
+                (acc: Record<string, number>, order: { status: string }) => {
+                  acc[order.status] = (acc[order.status] || 0) + 1;
+                  return acc;
+                },
+                {} as Record<string, number>,
+              ) || {};
+
+            // Get total revenue for current month
+            const startOfMonth = new Date();
+            startOfMonth.setDate(1);
+            startOfMonth.setHours(0, 0, 0, 0);
+
+            // Build revenue query with organization filter
+            let revenueQuery = supabase.from("orders").select("total_amount");
+
+            // Filter by organization_id for multi-tenancy
+            if (userOrganizationId && !branchContext.isSuperAdmin) {
+              revenueQuery = revenueQuery.eq(
+                "organization_id",
+                userOrganizationId,
+              );
+
+              // If a specific branch is selected, also filter by branch_id
+              if (branchContext.branchId) {
+                revenueQuery = revenueQuery.eq(
+                  "branch_id",
+                  branchContext.branchId,
+                );
+              }
+            } else if (branchContext.isSuperAdmin && branchContext.branchId) {
+              revenueQuery = revenueQuery.eq(
+                "branch_id",
+                branchContext.branchId,
+              );
+            }
+
+            const { data: revenueData, error: revenueError } =
+              await revenueQuery
+                .eq("payment_status", "paid")
+                .gte("created_at", startOfMonth.toISOString());
+
+            if (revenueError) {
+              logger.error("Error getting revenue stats", revenueError);
+              return NextResponse.json(
+                {
+                  error: "Failed to get revenue statistics",
+                  details: revenueError.message,
+                },
+                { status: 500 },
+              );
+            }
+
+            const totalRevenue =
+              revenueData?.reduce(
+                (sum, order) => sum + (order.total_amount || 0),
+                0,
+              ) || 0;
+
+            // Build recent orders query with organization filter
+            let recentOrdersQuery = supabase.from("orders").select(
               `
-          id,
-          order_number,
-          email,
-          status,
-          total_amount,
-          created_at
-        `,
-            )
-            .order("created_at", { ascending: false })
-            .limit(10);
+            id,
+            order_number,
+            email,
+            status,
+            total_amount,
+            created_at
+          `,
+            );
 
-          if (recentError) {
-            logger.error("Error getting recent orders", recentError);
-            throw recentError;
+            // Filter by organization_id for multi-tenancy
+            if (userOrganizationId && !branchContext.isSuperAdmin) {
+              recentOrdersQuery = recentOrdersQuery.eq(
+                "organization_id",
+                userOrganizationId,
+              );
+
+              // If a specific branch is selected, also filter by branch_id
+              if (branchContext.branchId) {
+                recentOrdersQuery = recentOrdersQuery.eq(
+                  "branch_id",
+                  branchContext.branchId,
+                );
+              }
+            } else if (branchContext.isSuperAdmin && branchContext.branchId) {
+              recentOrdersQuery = recentOrdersQuery.eq(
+                "branch_id",
+                branchContext.branchId,
+              );
+            }
+
+            // Get recent orders
+            const { data: recentOrders, error: recentError } =
+              await recentOrdersQuery
+                .order("created_at", { ascending: false })
+                .limit(10);
+
+            if (recentError) {
+              logger.error("Error getting recent orders", recentError);
+              return NextResponse.json(
+                {
+                  error: "Failed to get recent orders",
+                  details: recentError.message,
+                },
+                { status: 500 },
+              );
+            }
+
+            return NextResponse.json({
+              success: true,
+              stats: {
+                orderCounts: statusCounts, // This is an object, not an array
+                totalRevenue,
+                recentOrders:
+                  recentOrders?.map((order) => ({
+                    id: order.id,
+                    order_number: order.order_number,
+                    customer_name: "Cliente", // Generic name for now
+                    customer_email: order.email,
+                    status: order.status,
+                    total_amount: order.total_amount,
+                    created_at: order.created_at,
+                  })) || [],
+              },
+            });
+          } catch (statsError: any) {
+            logger.error("Error in get_stats action", statsError);
+            return NextResponse.json(
+              {
+                error: "Failed to get order statistics",
+                details: statsError?.message || "Unknown error",
+              },
+              { status: 500 },
+            );
           }
-
-          return NextResponse.json({
-            success: true,
-            stats: {
-              orderCounts: statusCounts || [],
-              totalRevenue,
-              recentOrders:
-                recentOrders?.map((order) => ({
-                  id: order.id,
-                  order_number: order.order_number,
-                  customer_name: "Cliente", // Generic name for now
-                  customer_email: order.email,
-                  status: order.status,
-                  total_amount: order.total_amount,
-                  created_at: order.created_at,
-                })) || [],
-            },
-          });
         }
 
         if (action === "create_manual_order") {
@@ -383,20 +611,19 @@ export async function POST(request: NextRequest) {
         );
       }
     },
-  )(request);
+  );
 }
 
 // Delete all orders (for testing cleanup)
 export async function DELETE(request: NextRequest) {
   try {
     logger.warn("Admin Orders API DELETE called - Deleting all orders");
-    const supabase = await createClient();
+    const { client: supabase, getUser } =
+      await createClientFromRequest(request);
 
     // Check admin authorization
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data, error: userError } = await getUser();
+    const user = data?.user;
     if (userError || !user) {
       logger.error("User authentication failed", userError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

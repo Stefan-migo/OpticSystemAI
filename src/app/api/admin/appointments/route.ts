@@ -405,7 +405,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle guest customer (non-registered) - store data directly in appointment
-    let customerId = validatedBody.customer_id || null;
+    const customerId = validatedBody.customer_id || null;
     let guestData = null;
 
     if (body?.guest_customer) {

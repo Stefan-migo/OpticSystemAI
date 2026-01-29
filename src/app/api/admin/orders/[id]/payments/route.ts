@@ -44,7 +44,7 @@ export async function GET(
         const branchContext = await getBranchContext(request, user.id);
 
         // Verify order exists and belongs to branch (if applicable)
-        let orderQuery = supabaseServiceRole
+        const orderQuery = supabaseServiceRole
           .from("orders")
           .select("id, branch_id")
           .eq("id", id)

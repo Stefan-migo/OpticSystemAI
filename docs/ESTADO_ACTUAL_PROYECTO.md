@@ -124,9 +124,13 @@ BussinesManagementApp/
 │       └── integration/    # Tests de integración (12/34 tests)
 ├── supabase/
 │   └── migrations/          # Migraciones SQL (60+ archivos)
-├── docs/                    # Documentación completa
-└── scripts/                # Scripts de utilidad
+├── docs/                    # Documentación completa (toda la doc en docs/)
+├── scripts/                 # Scripts de utilidad
+│   └── sql-utils/          # Scripts SQL (create-admin, grant-admin-access)
+└── (root limpio: solo README, package.json, configs)
 ```
+
+**Nota (2026-01-28):** Reorganización ejecutada según `docs/PLAN_ORGANIZACION_PROYECTO.md`. Documentación consolidada en `docs/`, scripts SQL en `scripts/sql-utils/`, archivos temporales eliminados.
 
 ---
 

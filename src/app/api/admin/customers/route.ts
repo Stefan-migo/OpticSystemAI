@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
     // Calculate customer analytics
     const customerStats = customers?.map((customer: any) => {
       // Basic segment classification based on order count
-      let segment = "new";
+      const segment = "new";
       // Segment will be calculated based on orders in the detail endpoint
 
       return {

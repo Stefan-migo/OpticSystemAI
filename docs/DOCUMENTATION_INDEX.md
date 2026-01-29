@@ -83,6 +83,31 @@ Resumen ejecutivo de próximos pasos para tests
 
 ---
 
+### 7. **Cómo ejecutar tests**
+
+**Estructura:** `src/__tests__/unit/` (unitarios), `src/__tests__/integration/api/` (integración).
+
+**Comandos:**
+
+```bash
+# Todos los tests
+npm run test:run
+
+# Solo unitarios
+npm run test:run -- src/__tests__/unit
+
+# Integración: Customers, Products, Orders
+npm run test:run -- src/__tests__/integration/api/customers.test.ts
+npm run test:run -- src/__tests__/integration/api/products.test.ts
+npm run test:run -- src/__tests__/integration/api/orders.test.ts
+```
+
+**Helpers:** `src/__tests__/integration/helpers/test-setup.ts` (autenticación híbrida).
+
+**Guías:** `docs/TESTING_INTEGRATION_AUTH_FIX.md`, `docs/NEXT_STEPS_TESTING.md`, `docs/TESTING_ORDERS_API_VALIDATION.md`, `docs/TESTING_PRODUCTS_SEARCH_FIX.md`.
+
+---
+
 ## 🎯 Flujo de Trabajo Recomendado
 
 ### Para comenzar una nueva fase:
@@ -165,12 +190,17 @@ Phase SaaS 0 (Multi-tenant schema)
 
 ```
 root/
-├── PLAN_MEJORAS_ESTRUCTURALES.md     ← Detalles de cada fase
-├── PROGRESO_MEJORAS.md                ← Estado actual
-├── SAAS_IMPLEMENTATION_PLAN.md        ← Arquitectura SaaS ⭐
-├── GIT_BRANCHING_REFERENCE.md         ← Comandos Git ⭐
 ├── README.md                          ← Setup del proyecto
 └── docs/
+    ├── PLAN_MEJORAS_ESTRUCTURALES.md  ← Detalles de cada fase
+    ├── PROGRESO_MEJORAS.md            ← Estado actual
+    ├── SAAS_IMPLEMENTATION_PLAN.md    ← Arquitectura SaaS ⭐
+    ├── GIT_BRANCHING_REFERENCE.md     ← Comandos Git ⭐
+    ├── SETUP_GUIDE.md                 ← Guía de configuración
+    ├── QUICK_SETUP.md                 ← Inicio rápido
+    ├── ANALISIS_COMPLETO_PROYECTO.md ← Análisis técnico
+    ├── ANALISIS_SISTEMA.md            ← Análisis del sistema
+    ├── DOCKER_COMMANDS.md             ← Comandos Docker
     ├── phase-3-completion-summary.md
     ├── PlanDeRefraccionSecciones.md
     └── refactoring/

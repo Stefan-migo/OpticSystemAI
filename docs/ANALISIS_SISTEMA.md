@@ -39,6 +39,7 @@ Este es un sistema de gestión empresarial completo para ópticas y laboratorios
 ### Stack Tecnológico
 
 **Frontend:**
+
 - Next.js 14 con App Router
 - React 18 con TypeScript
 - Tailwind CSS + Radix UI
@@ -46,11 +47,13 @@ Este es un sistema de gestión empresarial completo para ópticas y laboratorios
 - React Hook Form + Zod para validación
 
 **Backend:**
+
 - Supabase (PostgreSQL + Auth + Storage)
 - Next.js API Routes
 - Row Level Security (RLS) para seguridad
 
 **Características Especiales:**
+
 - Sistema de IA multi-proveedor (OpenAI, Anthropic, Google, DeepSeek)
 - Agente AI con tool calling
 - Sistema multi-sucursal
@@ -78,12 +81,14 @@ Este es un sistema de gestión empresarial completo para ópticas y laboratorios
 ### 1. Arquitectura y Diseño
 
 #### ✅ **Arquitectura Moderna y Escalable**
+
 - **Next.js 14 App Router:** Uso correcto de la arquitectura moderna de Next.js
 - **TypeScript:** Tipado fuerte en todo el proyecto
 - **Separación de Concerns:** Estructura clara entre UI, lógica de negocio y acceso a datos
 - **API Routes Bien Organizadas:** Rutas API estructuradas por dominio (`/admin/customers`, `/admin/products`, etc.)
 
 #### ✅ **Sistema Multi-Sucursal Robusto**
+
 - Implementación completa de sistema multi-branch
 - Row Level Security (RLS) configurado correctamente
 - Context API para gestión de sucursal actual
@@ -91,16 +96,19 @@ Este es un sistema de gestión empresarial completo para ópticas y laboratorios
 - Filtrado automático por sucursal en queries
 
 **Ejemplo de Implementación:**
+
 ```typescript
 // src/lib/api/branch-middleware.ts
 export async function getBranchContext(
   request: NextRequest,
-  userId: string
-): Promise<BranchContext>
+  userId: string,
+): Promise<BranchContext>;
 ```
+
 - Middleware bien diseñado para gestión de contexto de sucursal
 
 #### ✅ **Sistema de Autenticación y Autorización**
+
 - Supabase Auth integrado correctamente
 - Sistema RBAC (Role-Based Access Control)
 - Función `is_admin()` en base de datos
@@ -110,6 +118,7 @@ export async function getBranchContext(
 ### 2. Funcionalidades del Negocio
 
 #### ✅ **Sistema Completo de Gestión Óptica**
+
 - **Clientes:** Gestión completa con RUT chileno, recetas, historial
 - **Citas:** Sistema de agenda con disponibilidad automática
 - **Presupuestos:** Con expiración automática y conversión a trabajos
@@ -119,6 +128,7 @@ export async function getBranchContext(
 - **Notificaciones:** Sistema configurable en tiempo real
 
 #### ✅ **Características Avanzadas**
+
 - **Chatbot AI:** Sistema multi-proveedor con fallback automático
 - **Tool Calling:** Agente AI puede ejecutar operaciones en BD
 - **Búsqueda Inteligente:** RUT chileno con normalización
@@ -127,26 +137,30 @@ export async function getBranchContext(
 ### 3. Calidad del Código
 
 #### ✅ **Buenas Prácticas TypeScript**
+
 - Tipos bien definidos en `src/types/`
 - Uso de generics donde corresponde
 - Interfaces claras y documentadas
 
 #### ✅ **Manejo de Errores**
+
 - Clases de error personalizadas (`APIError`, `ValidationError`, etc.)
 - Middleware de error handling (`withErrorHandler`)
 - Respuestas de error consistentes
 
 **Ejemplo:**
+
 ```typescript
 // src/lib/api/errors.ts
 export class APIError extends Error {
-  public statusCode: number
-  public code: string
-  public isOperational: boolean
+  public statusCode: number;
+  public code: string;
+  public isOperational: boolean;
 }
 ```
 
 #### ✅ **Validación de Datos**
+
 - Sistema de validación centralizado (`src/lib/api/validation.ts`)
 - Schemas reutilizables
 - Validación tanto en frontend como backend
@@ -154,11 +168,13 @@ export class APIError extends Error {
 ### 4. Base de Datos
 
 #### ✅ **Migraciones Bien Estructuradas**
+
 - 59 migraciones versionadas cronológicamente
 - Nombres descriptivos con timestamps
 - RLS habilitado en todas las tablas sensibles
 
 #### ✅ **Funciones de Base de Datos**
+
 - Funciones útiles: `is_admin()`, `normalize_rut_for_search()`, `check_appointment_availability()`
 - Triggers para actualización automática de timestamps
 - Índices apropiados
@@ -166,12 +182,14 @@ export class APIError extends Error {
 ### 5. UI/UX
 
 #### ✅ **Componentes Reutilizables**
+
 - Sistema de componentes UI basado en Radix UI
 - Theming con next-themes
 - Diseño responsive
 - Componentes accesibles
 
 #### ✅ **Experiencia de Usuario**
+
 - Loading states apropiados
 - Feedback visual con toasts (Sonner)
 - Formularios con validación en tiempo real
@@ -184,6 +202,7 @@ export class APIError extends Error {
 ### 🔴 CRÍTICO: Falta de Testing
 
 #### ❌ **Ausencia Total de Tests**
+
 - **0 archivos de test encontrados** (`.test.ts`, `.spec.ts`)
 - No hay cobertura de tests unitarios
 - No hay tests de integración
@@ -191,46 +210,39 @@ export class APIError extends Error {
 - No hay configuración de Jest/Vitest
 
 **Impacto:**
+
 - Alto riesgo de regresiones
 - Dificultad para refactorizar con confianza
 - No se puede validar funcionalidad antes de deploy
 - Bugs pueden pasar a producción
 
 **Recomendación Prioritaria:**
+
 ```typescript
 // Ejemplo de estructura sugerida:
-src/
-  __tests__/
-    unit/
-      lib/
-        utils/
-          rut.test.ts
-      components/
-        admin/
-          CreateWorkOrderForm.test.tsx
-    integration/
-      api/
-        admin/
-          customers.test.ts
-    e2e/
-      workflows/
-        customer-creation.spec.ts
+src / __tests__ / unit / lib / utils / rut.test.ts;
+components / admin / CreateWorkOrderForm.test.tsx;
+integration / api / admin / customers.test.ts;
+e2e / workflows / customer - creation.spec.ts;
 ```
 
 ### 🟡 ALTO: Componentes Demasiado Grandes
 
 #### ⚠️ **Componentes Monolíticos**
+
 - `CreateWorkOrderForm.tsx`: **1,286 líneas**
 - `products/page.tsx`: **1,971 líneas**
 - `CreateAppointmentForm.tsx`: ~900 líneas
 
 **Problemas:**
+
 - Difícil de mantener
 - Difícil de testear
 - Violación del principio de responsabilidad única
 - Re-renders innecesarios
 
 **Recomendación:**
+
 ```typescript
 // Dividir en componentes más pequeños:
 CreateWorkOrderForm/
@@ -248,23 +260,26 @@ CreateWorkOrderForm/
 ### 🟡 ALTO: Gestión de Estado
 
 #### ⚠️ **Estado Local Excesivo**
+
 - Muchos componentes con `useState` múltiples
 - Falta de gestión de estado global para datos compartidos
 - Duplicación de lógica de fetching
 
 **Ejemplo Problemático:**
+
 ```typescript
 // products/page.tsx tiene:
 const [products, setProducts] = useState<Product[]>([]);
 const [loading, setLoading] = useState(false);
-const [searchTerm, setSearchTerm] = useState('');
-const [selectedCategory, setSelectedCategory] = useState('');
-const [sortBy, setSortBy] = useState('');
-const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+const [searchTerm, setSearchTerm] = useState("");
+const [selectedCategory, setSelectedCategory] = useState("");
+const [sortBy, setSortBy] = useState("");
+const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 // ... y muchos más
 ```
 
 **Recomendación:**
+
 - Usar React Query o SWR para data fetching
 - Crear hooks personalizados para lógica reutilizable
 - Considerar Zustand o Jotai para estado global ligero
@@ -272,12 +287,14 @@ const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 ### 🟡 MEDIO: Performance
 
 #### ⚠️ **Falta de Optimización**
+
 - No hay memoización de componentes pesados
 - Posibles N+1 queries en algunas rutas
 - No hay paginación en algunas listas grandes
 - Imágenes no optimizadas (Next.js Image no usado consistentemente)
 
 **Ejemplo:**
+
 ```typescript
 // ❌ Sin memoización
 export default function ProductCard({ product }) {
@@ -285,16 +302,21 @@ export default function ProductCard({ product }) {
 }
 
 // ✅ Con memoización
-export default memo(function ProductCard({ product }) {
-  // Solo re-renderiza si product cambia
-}, (prev, next) => prev.product.id === next.product.id)
+export default memo(
+  function ProductCard({ product }) {
+    // Solo re-renderiza si product cambia
+  },
+  (prev, next) => prev.product.id === next.product.id,
+);
 ```
 
 #### ⚠️ **Falta de Lazy Loading**
+
 - Componentes grandes no están code-split
 - Todas las rutas cargan todo el código
 
 **Recomendación:**
+
 ```typescript
 // Usar dynamic imports
 const CreateWorkOrderForm = dynamic(
@@ -322,12 +344,13 @@ const CreateWorkOrderForm = dynamic(
    - Contenido de usuario renderizado sin sanitización en algunos lugares
 
 **Recomendación:**
+
 ```typescript
 // Agregar rate limiting
-import { rateLimit } from '@/lib/api/rate-limit'
+import { rateLimit } from "@/lib/api/rate-limit";
 
 export async function POST(request: NextRequest) {
-  await rateLimit(request, { max: 10, window: '1m' })
+  await rateLimit(request, { max: 10, window: "1m" });
   // ...
 }
 ```
@@ -335,21 +358,23 @@ export async function POST(request: NextRequest) {
 ### 🟡 MEDIO: Documentación
 
 #### ⚠️ **Documentación Técnica Limitada**
+
 - Falta JSDoc en funciones complejas
 - No hay documentación de arquitectura
 - Comentarios mínimos en código complejo
 - No hay guía de contribución para desarrolladores
 
 **Ejemplo de Mejora:**
+
 ```typescript
 /**
  * Calcula el precio final de un producto incluyendo impuestos
- * 
+ *
  * @param basePrice - Precio base del producto
  * @param taxPercentage - Porcentaje de impuesto (ej: 19 para 19%)
  * @param taxIncluded - Si el precio base ya incluye impuestos
  * @returns Precio final con impuestos aplicados
- * 
+ *
  * @example
  * calculatePriceWithTax(10000, 19, false) // 11900
  * calculatePriceWithTax(11900, 19, true) // 11900
@@ -357,7 +382,7 @@ export async function POST(request: NextRequest) {
 export function calculatePriceWithTax(
   basePrice: number,
   taxPercentage: number,
-  taxIncluded: boolean
+  taxIncluded: boolean,
 ): number {
   // ...
 }
@@ -366,21 +391,25 @@ export function calculatePriceWithTax(
 ### 🟢 BAJO: Código Duplicado
 
 #### ⚠️ **Duplicación de Lógica**
+
 - Lógica de búsqueda duplicada en múltiples componentes
 - Validación duplicada
 - Formateo de fechas/números repetido
 
 **Recomendación:**
+
 - Crear utilidades compartidas
 - Hooks personalizados para lógica común
 
 ### 🟢 BAJO: Manejo de Errores en Frontend
 
 #### ⚠️ **Error Boundaries Faltantes**
+
 - No hay Error Boundaries de React
 - Errores no manejados pueden romper toda la aplicación
 
 **Recomendación:**
+
 ```typescript
 // src/components/ErrorBoundary.tsx
 export class ErrorBoundary extends React.Component {
@@ -391,6 +420,7 @@ export class ErrorBoundary extends React.Component {
 ### 🟢 BAJO: Accesibilidad
 
 #### ⚠️ **Mejoras de A11y Necesarias**
+
 - Algunos componentes sin labels ARIA
 - Navegación por teclado no optimizada
 - Contraste de colores no verificado
@@ -402,12 +432,14 @@ export class ErrorBoundary extends React.Component {
 ### 1. Arquitectura de Base de Datos
 
 **Fortalezas:**
+
 - ✅ Esquema bien normalizado
 - ✅ RLS implementado correctamente
 - ✅ Migraciones versionadas
 - ✅ Funciones útiles en PostgreSQL
 
 **Debilidades:**
+
 - ⚠️ Falta de índices en algunas columnas frecuentemente consultadas
 - ⚠️ No hay estrategia de backup documentada
 - ⚠️ Falta de constraints de integridad en algunos casos
@@ -415,11 +447,13 @@ export class ErrorBoundary extends React.Component {
 ### 2. API Design
 
 **Fortalezas:**
+
 - ✅ Rutas RESTful bien estructuradas
 - ✅ Códigos de estado HTTP apropiados
 - ✅ Manejo de errores consistente
 
 **Debilidades:**
+
 - ⚠️ Falta versionado de API (`/api/v1/...`)
 - ⚠️ No hay documentación OpenAPI/Swagger
 - ⚠️ Algunas respuestas inconsistentes
@@ -427,11 +461,13 @@ export class ErrorBoundary extends React.Component {
 ### 3. Frontend Architecture
 
 **Fortalezas:**
+
 - ✅ Componentes reutilizables
 - ✅ Hooks personalizados
 - ✅ Context API bien usado
 
 **Debilidades:**
+
 - ⚠️ Componentes demasiado grandes
 - ⚠️ Estado local excesivo
 - ⚠️ Falta de state management global
@@ -439,11 +475,13 @@ export class ErrorBoundary extends React.Component {
 ### 4. Seguridad
 
 **Fortalezas:**
+
 - ✅ RLS en base de datos
 - ✅ Autenticación con Supabase
 - ✅ Validación de roles
 
 **Debilidades:**
+
 - ⚠️ Falta rate limiting
 - ⚠️ Validación inconsistente
 - ⚠️ No hay CSRF protection explícita
@@ -452,10 +490,12 @@ export class ErrorBoundary extends React.Component {
 ### 5. Performance
 
 **Fortalezas:**
+
 - ✅ Next.js con optimizaciones automáticas
 - ✅ Code splitting por rutas
 
 **Debilidades:**
+
 - ⚠️ Falta de memoización
 - ⚠️ No hay lazy loading de componentes
 - ⚠️ Posibles N+1 queries
@@ -464,19 +504,23 @@ export class ErrorBoundary extends React.Component {
 ### 6. Testing
 
 **Fortalezas:**
+
 - ❌ Ninguna
 
 **Debilidades:**
+
 - 🔴 **CRÍTICO:** Ausencia total de tests
 
 ### 7. Documentación
 
 **Fortalezas:**
+
 - ✅ README completo
 - ✅ SETUP_GUIDE detallado
 - ✅ Documentación de usuario
 
 **Debilidades:**
+
 - ⚠️ Falta documentación técnica de código
 - ⚠️ No hay guía de arquitectura
 - ⚠️ Comentarios mínimos en código
@@ -580,6 +624,7 @@ Este sistema demuestra **una base sólida y funcional** con arquitectura moderna
 **El sistema es funcional y está bien estructurado, pero requiere trabajo significativo en testing y refactorización antes de considerarlo production-ready para un entorno empresarial crítico.**
 
 **Prioridades Inmediatas:**
+
 1. Implementar suite de testing completa
 2. Refactorizar componentes grandes
 3. Agregar rate limiting y mejoras de seguridad
@@ -591,20 +636,21 @@ Con estas mejoras, el sistema puede alcanzar un nivel de calidad enterprise-grad
 
 ## Métricas de Calidad
 
-| Categoría | Puntuación | Estado |
-|-----------|-----------|--------|
-| Arquitectura | 8/10 | ✅ Bueno |
-| Código | 7/10 | ✅ Bueno |
-| Seguridad | 7.5/10 | ✅ Bueno |
-| Performance | 7/10 | ✅ Bueno |
-| Mantenibilidad | 6.5/10 | ⚠️ Mejorable |
-| Testing | 2/10 | 🔴 Crítico |
-| Documentación | 7/10 | ✅ Bueno |
-| **TOTAL** | **6.6/10** | ⚠️ **Mejorable** |
+| Categoría      | Puntuación | Estado           |
+| -------------- | ---------- | ---------------- |
+| Arquitectura   | 8/10       | ✅ Bueno         |
+| Código         | 7/10       | ✅ Bueno         |
+| Seguridad      | 7.5/10     | ✅ Bueno         |
+| Performance    | 7/10       | ✅ Bueno         |
+| Mantenibilidad | 6.5/10     | ⚠️ Mejorable     |
+| Testing        | 2/10       | 🔴 Crítico       |
+| Documentación  | 7/10       | ✅ Bueno         |
+| **TOTAL**      | **6.6/10** | ⚠️ **Mejorable** |
 
 ---
 
 **Nota:** Este análisis se basa en una revisión del código fuente, estructura del proyecto, y documentación disponible. Para un análisis más profundo, se recomienda:
+
 - Revisión de código por pares
 - Auditoría de seguridad profesional
 - Análisis de performance con herramientas especializadas

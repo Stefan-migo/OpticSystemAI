@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Get POS settings for the branch
-        let query = supabase
+        const query = supabase
           .from("pos_settings")
           .select("*")
           .eq("branch_id", branchContext.branchId!);

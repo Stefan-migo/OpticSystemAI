@@ -69,4 +69,3 @@ BEGIN
   RAISE NOTICE 'Password: %', user_password;
   RAISE NOTICE 'User ID: %', user_id;
 END $$;
-

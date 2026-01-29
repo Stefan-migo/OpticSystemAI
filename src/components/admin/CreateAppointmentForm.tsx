@@ -574,7 +574,7 @@ export default function CreateAppointmentForm({
                   placeholder="12.345.678-9 o 123456789"
                   value={guestCustomerData.rut}
                   onChange={(e) => {
-                    let value = e.target.value;
+                    const value = e.target.value;
                     // Format RUT automatically as user types
                     const formatted = formatRUT(value);
                     setGuestCustomerData((prev) => ({

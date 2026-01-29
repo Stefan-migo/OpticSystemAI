@@ -5,6 +5,7 @@ Un sistema completo de gestión para ópticas y laboratorios ópticos, construid
 ## 🎯 Características Principales
 
 ### Gestión de Clientes
+
 - **Perfiles Completos**: Información médica, recetas, historial de compras
 - **Búsqueda Inteligente**: Búsqueda por nombre, email, teléfono o RUT (con o sin formato)
 - **Formateo Automático de RUT**: Normaliza RUTs chilenos al formato estándar `xx.xxx.xxx-x`
@@ -12,6 +13,7 @@ Un sistema completo de gestión para ópticas y laboratorios ópticos, construid
 - **Clientes No Registrados**: Sistema para agendar citas sin registro previo
 
 ### Sistema de Citas (Agendas)
+
 - **Calendario Interactivo**: Vista semanal y mensual con slots de tiempo
 - **Gestión Completa**: Crear, editar, cancelar y gestionar estados de citas
 - **Clientes No Registrados**: Agendar citas con clientes no registrados (se registran al asistir)
@@ -20,6 +22,7 @@ Un sistema completo de gestión para ópticas y laboratorios ópticos, construid
 - **Tipos de Cita**: Examen de vista, consulta, ajuste, entrega, reparación, seguimiento, emergencia
 
 ### Sistema de Presupuestos (Quotes)
+
 - **Presupuestos Detallados**: Marcos, lentes, tratamientos y mano de obra
 - **Expiración Automática**: Configuración de tiempo de validez y expiración automática
 - **Conversión a Trabajos**: Convertir presupuestos aceptados en trabajos de laboratorio
@@ -28,6 +31,7 @@ Un sistema completo de gestión para ópticas y laboratorios ópticos, construid
 - **Estados**: Borrador, enviado, aceptado, rechazado, expirado
 
 ### Trabajos de Laboratorio (Work Orders)
+
 - **Gestión de Trabajos**: Seguimiento completo del ciclo de vida de trabajos
 - **Estados Detallados**: Ordenado, enviado a laboratorio, en proceso, listo, recibido, montado, control de calidad, entregado
 - **Timeline Visual**: Indicador visual del estado actual y progreso
@@ -36,6 +40,7 @@ Un sistema completo de gestión para ópticas y laboratorios ópticos, construid
 - **Relación con Presupuestos**: Vinculación con presupuestos originales
 
 ### Punto de Venta (POS)
+
 - **Ventas Rápidas**: Sistema de punto de venta integrado
 - **Búsqueda de Clientes**: Búsqueda inteligente por RUT, nombre, email o teléfono
 - **Carga de Presupuestos**: Cargar presupuestos existentes al carrito
@@ -44,6 +49,7 @@ Un sistema completo de gestión para ópticas y laboratorios ópticos, construid
 - **Cálculo Automático**: IVA, descuentos y totales calculados automáticamente
 
 ### Sistema de Recetas (Prescriptions)
+
 - **Recetas Médicas**: Gestión completa de recetas oftalmológicas
 - **Mediciones Detalladas**: Esfera, cilindro, eje, adición, distancia pupilar
 - **Ojo Derecho e Izquierdo**: Especificaciones independientes para cada ojo
@@ -51,6 +57,7 @@ Un sistema completo de gestión para ópticas y laboratorios ópticos, construid
 - **Historial**: Seguimiento de recetas por cliente
 
 ### Gestión de Productos Ópticos
+
 - **Catálogo Completo**: Marcos, lentes, accesorios y servicios
 - **Especificaciones Ópticas**: Tipo de marco, material, medidas, forma, color
 - **Especificaciones de Lente**: Tipo, material, índice de refracción, tratamientos
@@ -58,12 +65,14 @@ Un sistema completo de gestión para ópticas y laboratorios ópticos, construid
 - **Control de Inventario**: Stock, SKU, códigos de barras
 
 ### Sistema de Notificaciones
+
 - **Notificaciones en Tiempo Real**: Sistema completo de notificaciones para administradores
 - **Tipos de Notificación**: Nuevos clientes, presupuestos, cambios de estado, trabajos, citas, ventas
 - **Configuración Flexible**: Activar/desactivar tipos de notificación
 - **Prioridades**: Sistema de prioridades para notificaciones importantes
 
 ### Características Técnicas
+
 - **Next.js 14** con App Router
 - **TypeScript** para seguridad de tipos
 - **Supabase** para backend y base de datos (desarrollo local soportado)
@@ -109,6 +118,7 @@ npm run supabase:start
 ```
 
 **Primera vez:**
+
 - Descarga ~800MB de imágenes Docker
 - Toma 5-10 minutos
 - Inicios posteriores toman 10-30 segundos
@@ -120,6 +130,7 @@ npm run supabase:status
 ```
 
 Esto mostrará:
+
 - API URL (generalmente `http://127.0.0.1:54321`)
 - Anon Key (clave pública)
 - Service Role Key (clave privada)
@@ -161,6 +172,7 @@ npm run supabase:reset
 ```
 
 Esto:
+
 - Crea todas las tablas de base de datos
 - Configura políticas de Row Level Security (RLS)
 - Crea funciones y triggers necesarios
@@ -173,6 +185,7 @@ npm run dev
 ```
 
 La aplicación estará disponible en:
+
 - **Aplicación Principal**: http://localhost:3000
 - **Panel de Administración**: http://localhost:3000/admin
 - **Supabase Studio**: http://127.0.0.1:54323 (UI de Base de Datos)
@@ -191,26 +204,28 @@ Después de configurar la base de datos, necesitas crear un usuario administrado
 2. **Otorga acceso de administrador** usando el script SQL:
 
 ```bash
-docker exec -i supabase_db_web psql -U postgres -d postgres < grant-admin-access.sql
+docker exec -i supabase_db_web psql -U postgres -d postgres < scripts/sql-utils/grant-admin-access.sql
 ```
 
-Edita `grant-admin-access.sql` y cambia el email al de tu usuario antes de ejecutar.
+Edita `scripts/sql-utils/grant-admin-access.sql` y cambia el email al de tu usuario antes de ejecutar.
 
 ### Método 2: Usando Script Node.js (Solo Desarrollo)
 
 **⚠️ Advertencia**: Este método usa un script de desarrollo. Para producción, usa el Método 1.
 
 1. Configura variables de entorno (opcional, o pasa como argumentos):
+
    ```bash
    export ADMIN_EMAIL="tu-email@ejemplo.com"
    export ADMIN_PASSWORD="TuContraseñaSegura123!"
    ```
 
 2. Ejecuta el script:
+
    ```bash
    # Usando variables de entorno
    node scripts/create-admin-via-api.js
-   
+
    # O pasa credenciales como argumentos (menos seguro)
    node scripts/create-admin-via-api.js tu-email@ejemplo.com TuContraseña123!
    ```
@@ -241,7 +256,7 @@ BEGIN
   -- Agregar a tabla admin_users
   INSERT INTO public.admin_users (id, email, role, is_active, created_at, updated_at)
   VALUES (user_id, user_email, 'admin', true, now(), now())
-  ON CONFLICT (id) DO UPDATE SET 
+  ON CONFLICT (id) DO UPDATE SET
     role = 'admin',
     is_active = true,
     updated_at = now();
@@ -324,23 +339,27 @@ npm run supabase:reset   # Resetear base de datos (re-aplicar migraciones)
 ### Tablas Principales
 
 #### Gestión de Clientes
+
 - `profiles` - Perfiles de usuarios/clientes con información médica
 - `prescriptions` - Recetas oftalmológicas
 - `appointments` - Citas/agendas (soporta clientes registrados y no registrados)
 
 #### Sistema de Presupuestos y Trabajos
+
 - `quotes` - Presupuestos (presupuestos)
 - `lab_work_orders` - Trabajos de laboratorio
 - `lab_work_order_status_history` - Historial de estados de trabajos
 - `quote_settings` - Configuración de presupuestos
 
 #### Productos y Ventas
+
 - `products` - Catálogo de productos ópticos (marcos, lentes, accesorios)
 - `product_options` - Opciones personalizables de productos
 - `orders` - Pedidos/ventas
 - `order_items` - Items de pedidos
 
 #### Sistema y Configuración
+
 - `admin_users` - Usuarios administradores
 - `admin_notifications` - Notificaciones del sistema
 - `notification_settings` - Configuración de notificaciones
@@ -348,6 +367,7 @@ npm run supabase:reset   # Resetear base de datos (re-aplicar migraciones)
 - `system_config` - Configuración general del sistema
 
 ### Funciones Clave
+
 - `is_admin(user_id)` - Verificar privilegios de administrador
 - `normalize_rut_for_search(rut_text)` - Normalizar RUT para búsqueda
 - `search_customers_by_rut(rut_search_term)` - Buscar clientes por RUT
@@ -374,12 +394,14 @@ El estado de administrador se determina por la tabla `admin_users`. Los usuarios
 ## 🎨 Características Específicas del Sistema Óptico
 
 ### Sistema de Citas
+
 - **Calendario Visual**: Vista semanal y mensual con slots de tiempo configurables
 - **Clientes No Registrados**: Agendar citas sin crear cliente en el sistema
 - **Configuración Flexible**: Horarios de trabajo, duración de slots, días bloqueados
 - **Verificación de Disponibilidad**: Sistema automático de verificación de disponibilidad
 
 ### Sistema de Presupuestos
+
 - **Presupuestos Detallados**: Marcos, lentes, tratamientos, mano de obra
 - **Expiración Automática**: Configuración de tiempo de validez
 - **Envío por Email**: Enviar presupuestos directamente a clientes
@@ -387,18 +409,21 @@ El estado de administrador se determina por la tabla `admin_users`. Los usuarios
 - **Conversión a Trabajos**: Convertir presupuestos aceptados en trabajos
 
 ### Trabajos de Laboratorio
+
 - **Estados Detallados**: Seguimiento completo del ciclo de vida
 - **Timeline Visual**: Indicador visual del progreso
 - **Asignación de Personal**: Asignar trabajos a miembros del equipo
 - **Historial Completo**: Registro de todos los cambios de estado
 
 ### Punto de Venta (POS)
+
 - **Ventas Rápidas**: Sistema integrado de punto de venta
 - **Búsqueda Inteligente**: Búsqueda de clientes por RUT, nombre, email
 - **Carga de Presupuestos**: Cargar presupuestos existentes
 - **Múltiples Métodos de Pago**: Efectivo, tarjetas, cuotas
 
 ### Utilidades RUT Chileno
+
 - **Formateo Automático**: Normaliza RUTs al formato `xx.xxx.xxx-x`
 - **Búsqueda Inteligente**: Busca RUTs con o sin formato
 - **Búsqueda Parcial**: Encuentra clientes con búsquedas parciales de RUT
@@ -480,6 +505,7 @@ NODE_ENV=development
 ```
 
 Opcionales (para funcionalidades de producción):
+
 - `RESEND_API_KEY` - Para envío de emails (presupuestos, notificaciones)
 - `MERCADOPAGO_ACCESS_TOKEN` - Para procesamiento de pagos
 - `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY` - Para procesamiento de pagos
@@ -511,9 +537,9 @@ El chatbot soporta múltiples proveedores con fallback automático. Puedes cambi
 
 ## 📚 Documentación
 
-- [Guía de Configuración Local](./SETUP_GUIDE.md) - Configuración detallada para desarrollo local
-- [Comandos Docker](./DOCKER_COMMANDS.md) - Comandos útiles de Docker
-- [Inicio Rápido](./QUICK_SETUP.md) - Guía rápida de inicio
+- [Guía de Configuración Local](./docs/SETUP_GUIDE.md) - Configuración detallada para desarrollo local
+- [Comandos Docker](./docs/DOCKER_COMMANDS.md) - Comandos útiles de Docker
+- [Inicio Rápido](./docs/QUICK_SETUP.md) - Guía rápida de inicio
 - [Migraciones de Base de Datos](./supabase/migrations/) - Migraciones del esquema de base de datos
 
 ## 🤝 Contribuir
@@ -564,6 +590,7 @@ Configura al menos un proveedor LLM en tu archivo `.env.local`. El sistema sopor
 ## 🆘 Soporte
 
 Para problemas y preguntas:
+
 - Revisa la sección de solución de problemas arriba
 - Revisa los archivos de documentación
 - Abre un issue en GitHub: https://github.com/Stefan-migo/OpticSystemAI/issues
@@ -577,6 +604,7 @@ Para problemas y preguntas:
 **v2.0 - Sistema de Gestión Óptica Completo**
 
 Esta versión incluye:
+
 - ✅ Sistema completo de citas con clientes no registrados
 - ✅ Sistema de presupuestos con expiración automática
 - ✅ Sistema de trabajos de laboratorio con estados detallados

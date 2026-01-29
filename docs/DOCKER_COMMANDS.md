@@ -5,16 +5,19 @@ This guide shows you how to check and manage Supabase Docker containers.
 ## Quick Container Status
 
 ### Check All Supabase Containers (Running)
+
 ```bash
 docker ps --filter "name=supabase"
 ```
 
 ### Check All Supabase Containers (Including Stopped)
+
 ```bash
 docker ps -a --filter "name=supabase"
 ```
 
 ### Formatted View with Ports
+
 ```bash
 docker ps --filter "name=supabase" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
@@ -24,11 +27,13 @@ docker ps --filter "name=supabase" --format "table {{.Names}}\t{{.Status}}\t{{.P
 ## Detailed Container Information
 
 ### List All Container Names
+
 ```bash
 docker ps --filter "name=supabase" --format "{{.Names}}"
 ```
 
 ### Check Specific Container Status
+
 ```bash
 docker ps --filter "name=supabase_db_web"
 docker ps --filter "name=supabase_kong_web"
@@ -36,6 +41,7 @@ docker ps --filter "name=supabase_studio_web"
 ```
 
 ### Inspect Container Details
+
 ```bash
 # Get detailed information about a container
 docker inspect supabase_db_web
@@ -49,6 +55,7 @@ docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' sup
 ## Container Logs
 
 ### View Logs for a Specific Container
+
 ```bash
 # View last 50 lines
 docker logs supabase_db_web
@@ -64,6 +71,7 @@ docker logs -t supabase_db_web
 ```
 
 ### View Logs for All Supabase Containers
+
 ```bash
 # Get all container names and view logs
 for container in $(docker ps --filter "name=supabase" --format "{{.Names}}"); do
@@ -78,6 +86,7 @@ done
 ## Container Resource Usage
 
 ### Check Resource Usage (CPU, Memory, Network)
+
 ```bash
 # Real-time stats for all Supabase containers
 docker stats --filter "name=supabase"
@@ -94,6 +103,7 @@ docker stats supabase_db_web supabase_kong_web --no-stream --format "table {{.Na
 ## Container Health Checks
 
 ### Check Container Health Status
+
 ```bash
 # All containers with health status
 docker ps --filter "name=supabase" --format "table {{.Names}}\t{{.Status}}"
@@ -103,6 +113,7 @@ docker inspect --format='{{.State.Health.Status}}' supabase_db_web
 ```
 
 ### Common Health Status Values:
+
 - `healthy` - Container is running and healthy
 - `unhealthy` - Container is running but health check failed
 - `starting` - Health check is still running
@@ -113,21 +124,25 @@ docker inspect --format='{{.State.Health.Status}}' supabase_db_web
 ## Container Management Commands
 
 ### Stop a Specific Container
+
 ```bash
 docker stop supabase_db_web
 ```
 
 ### Start a Stopped Container
+
 ```bash
 docker start supabase_db_web
 ```
 
 ### Restart a Container
+
 ```bash
 docker restart supabase_db_web
 ```
 
 ### Remove a Container (⚠️ Use with caution)
+
 ```bash
 # Stop first
 docker stop supabase_db_web
@@ -141,11 +156,13 @@ docker rm supabase_db_web
 ## Using Supabase CLI Commands
 
 ### Check Status via Supabase CLI
+
 ```bash
 npm run supabase:status
 ```
 
 This shows:
+
 - API URL
 - Database URL
 - Studio URL
@@ -153,6 +170,7 @@ This shows:
 - All service URLs
 
 ### Start/Stop via Supabase CLI
+
 ```bash
 npm run supabase:start
 npm run supabase:stop
@@ -164,25 +182,26 @@ npm run supabase:stop
 
 Here are the main containers you'll see:
 
-| Container Name | Purpose | Port |
-|---------------|---------|------|
-| `supabase_db_web` | PostgreSQL database | 54322 |
-| `supabase_kong_web` | API Gateway | 54321 |
-| `supabase_studio_web` | Supabase Studio UI | 54323 |
-| `supabase_auth_web` | Authentication service | 9999 |
-| `supabase_rest_web` | REST API (PostgREST) | 3000 |
-| `supabase_realtime_web` | Realtime subscriptions | 4000 |
-| `supabase_storage_web` | Storage API | 5000 |
-| `supabase_inbucket_web` | Email testing (Mailpit) | 54324 |
-| `supabase_analytics_web` | Analytics service | 54327 |
-| `supabase_vector_web` | Logging (Vector) | 9001 |
-| `supabase_pg_meta_web` | Database metadata | 8080 |
+| Container Name           | Purpose                 | Port  |
+| ------------------------ | ----------------------- | ----- |
+| `supabase_db_web`        | PostgreSQL database     | 54322 |
+| `supabase_kong_web`      | API Gateway             | 54321 |
+| `supabase_studio_web`    | Supabase Studio UI      | 54323 |
+| `supabase_auth_web`      | Authentication service  | 9999  |
+| `supabase_rest_web`      | REST API (PostgREST)    | 3000  |
+| `supabase_realtime_web`  | Realtime subscriptions  | 4000  |
+| `supabase_storage_web`   | Storage API             | 5000  |
+| `supabase_inbucket_web`  | Email testing (Mailpit) | 54324 |
+| `supabase_analytics_web` | Analytics service       | 54327 |
+| `supabase_vector_web`    | Logging (Vector)        | 9001  |
+| `supabase_pg_meta_web`   | Database metadata       | 8080  |
 
 ---
 
 ## Troubleshooting
 
 ### Container Keeps Restarting
+
 ```bash
 # Check logs to see why
 docker logs supabase_vector_web --tail 50
@@ -192,6 +211,7 @@ docker ps -a --filter "name=supabase_vector_web"
 ```
 
 ### Container Won't Start
+
 ```bash
 # Check if port is already in use
 netstat -ano | findstr :54321  # Windows
@@ -202,6 +222,7 @@ docker logs supabase_db_web
 ```
 
 ### Check Container Network
+
 ```bash
 # List networks
 docker network ls
@@ -211,6 +232,7 @@ docker network inspect supabase_network_web
 ```
 
 ### Execute Commands Inside Container
+
 ```bash
 # Access database container shell
 docker exec -it supabase_db_web bash
@@ -278,6 +300,7 @@ done
 ```
 
 Save this as `check-supabase.sh` and run:
+
 ```bash
 chmod +x check-supabase.sh
 ./check-supabase.sh
@@ -286,7 +309,3 @@ chmod +x check-supabase.sh
 ---
 
 **Note:** The `supabase_vector_web` container may show as "Restarting" - this is a logging service and won't affect your application functionality. The main services (db, kong, studio, auth) should all show as "healthy".
-
-
-
-

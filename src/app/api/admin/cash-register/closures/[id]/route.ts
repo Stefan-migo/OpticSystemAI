@@ -92,7 +92,7 @@ export async function GET(
 
     // Get orders for this closure date
     const dateStr = closure.closure_date;
-    let ordersQuery = supabaseServiceRole
+    const ordersQuery = supabaseServiceRole
       .from("orders")
       .select(
         `

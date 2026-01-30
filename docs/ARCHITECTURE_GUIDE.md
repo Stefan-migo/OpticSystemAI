@@ -1,4 +1,4 @@
-# Guía de Arquitectura - Business Management App
+# Guía de Arquitectura - Opttius
 
 ## 📋 Tabla de Contenidos
 

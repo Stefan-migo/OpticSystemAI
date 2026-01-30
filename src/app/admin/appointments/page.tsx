@@ -434,7 +434,10 @@ export default function AppointmentsPage() {
       </Card>
 
       {/* Calendar View */}
-      <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+      <Card
+        className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
+        data-tour="appointments-calendar"
+      >
         <CardContent className="p-6">
           {loading ? (
             <div className="text-center py-12">

@@ -1,4 +1,4 @@
-# 📚 Documentación Completa - Roadmap SaaS
+# 📚 Documentación Completa - Opttius (Roadmap SaaS)
 
 ## 📋 Índice de Documentos
 
@@ -43,6 +43,20 @@ Plan de implementación SaaS completo
 
 ---
 
+### 3b. **SAAS_ONBOARDING_AND_NEW_USER_FLOW.md** ⭐ NUEVO (2026-01-28)
+
+Flujo completo de onboarding y alta de nuevos usuarios SaaS
+
+- Cómo se crea y asigna una organización (óptica) a un usuario
+- Flujos: self-signup, usuario invitado, super admin crea organización
+- Especificación detallada de UI/UX (pantallas, rutas, copy)
+- APIs a implementar (crear organización, invitaciones, /me)
+- Checklist de implementación y secuencia recomendada
+
+👉 **Usar cuando:** Necesitas implementar el alta de un nuevo usuario/óptica o el flujo signup → crear óptica → configurar
+
+---
+
 ### 4. **GIT_BRANCHING_REFERENCE.md** ⭐ NUEVO
 
 Guía rápida de comandos git
@@ -80,6 +94,137 @@ Resumen ejecutivo de próximos pasos para tests
 - Criterios de éxito
 
 👉 **Usar cuando:** Necesitas un resumen rápido de qué hacer con los tests
+
+---
+
+### 6b. **PAYMENT_GATEWAYS_ENV_SETUP.md** ⭐ (2026-01-29)
+
+Guía para darse de alta y obtener variables de entorno de pasarelas de pago
+
+- Flow (Chile): registro, API Key, Secret Key, webhooks — pasarela principal para Chile
+- Mercado Pago: panel developers, aplicación, credenciales y webhooks
+- PayPal: developer dashboard, aplicación, Client ID/Secret, webhooks
+- `NEXT_PUBLIC_BASE_URL` y ejemplo de `.env.local`
+- Producción (Vercel u otro host)
+
+👉 **Usar cuando:** Necesitas configurar Flow, Mercado Pago o PayPal y obtener las claves para `.env.local`
+
+---
+
+### 6c. **LENS_FAMILIES_AND_MATRICES_SCHEMA.md** ⭐ NUEVO (2026-01-29)
+
+Documentación completa del schema de base de datos para familias de lentes y matrices de precios
+
+- Schema detallado de `lens_families` y `lens_price_matrices`
+- Descripción de todos los campos, tipos y constraints
+- Función SQL `calculate_lens_price` con ejemplos
+- Políticas RLS (Row Level Security)
+- Índices y optimización (GIST para rangos)
+- Flujo de funcionamiento completo
+- Ejemplos de uso y consultas SQL
+- API endpoints disponibles
+- Relaciones con otras tablas (quotes, lab_work_orders)
+
+👉 **Usar cuando:** Necesitas entender el schema de familias de lentes, cómo funcionan las matrices de precios, o cómo calcular precios automáticamente según recetas
+
+---
+
+### 6d. **ONBOARDING_TOUR_GUIDE.md** ⭐ NUEVO (2026-01-29)
+
+Guía completa de implementación del sistema de tour de primera visita
+
+- Análisis del flujo del sistema y secciones principales
+- Diseño del tour interactivo con spotlight y tarjetas
+- Arquitectura técnica completa (DB, componentes, API)
+- Implementación paso a paso con código de ejemplo
+- **Sección completa de Testing** (unitarios, integración, E2E)
+- Configuración y personalización
+- Acceso y re-visitación del tour
+
+👉 **Usar cuando:** Necesitas implementar el sistema de guía interactiva para usuarios nuevos o entender cómo funciona el tour
+
+---
+
+### 6e. **CONTACT_LENSES_INTEGRATION_GUIDE.md** ⭐ NUEVO (2026-01-29)
+
+Guía completa de integración de lentes de contacto al sistema Opttius
+
+- Análisis del sistema actual y diferencias con lentes ópticos
+- Arquitectura propuesta con tablas paralelas
+- Schema completo de base de datos
+- Funciones SQL para cálculo de precios
+- Integración con módulos existentes (quotes, lab_work_orders)
+- API endpoints y componentes frontend
+- **Sección completa de Testing** (unitarios, integración)
+- Checklist de implementación
+
+👉 **Usar cuando:** Necesitas integrar la gestión de lentes de contacto al sistema o entender cómo funciona el módulo
+
+---
+
+### 6f. **AI_IMPLEMENTATION_GUIDE.md** ⭐ NUEVO (2026-01-29)
+
+Guía completa de implementación del sistema de IA mejorado
+
+- Visión general del sistema de IA como "Socio Gerente Activo"
+- Análisis del sistema actual y mejoras propuestas
+- Arquitectura con widgets contextuales por sección
+- Implementación detallada por módulo (Dashboard, POS, Productos, Clientes, Analíticas)
+- Mejoras del chatbot flotante
+- Remoción del chatbot del sidebar
+- **Sección completa de Testing** (unitarios, integración, E2E con mocking de LLMs)
+- Estrategia de costos y monitoreo
+
+👉 **Usar cuando:** Necesitas implementar el sistema de IA mejorado con widgets contextuales o entender cómo funciona
+
+---
+
+### 6g. **TESTING_STRATEGY_NEW_FEATURES.md** ⭐ NUEVO (2026-01-29)
+
+Estrategia de testing para las nuevas implementaciones
+
+- Análisis de prioridades de testing por implementación
+- Resumen de qué necesita tests y qué no
+- Estructura de tests propuesta
+- Recomendaciones de implementación
+- Cobertura objetivo por funcionalidad
+
+👉 **Usar cuando:** Necesitas entender qué tests implementar para las nuevas funcionalidades o planificar la estrategia de testing
+
+---
+
+### 6h. **SAAS_SUPPORT_SYSTEM_PLAN.md** ⭐ NUEVO (2026-01-30)
+
+Plan completo del sistema de soporte SaaS
+
+- Arquitectura del sistema de tickets
+- Base de datos (tablas, RLS, funciones SQL)
+- APIs backend (root/dev y públicas)
+- Portal público `/support`
+- Paneles de gestión (root/dev y organizaciones)
+- Sistema de notificaciones por email
+- Métricas y dashboard
+- Plan de testing
+
+👉 **Usar cuando:** Necesitas entender el sistema de soporte SaaS o implementar nuevas funcionalidades
+
+---
+
+### 6i. **SAAS_SUPPORT_IMPLEMENTATION_COMPLETE.md** ⭐ NUEVO (2026-01-30) ✅ COMPLETADO
+
+Resumen completo de la implementación del sistema de soporte SaaS
+
+- Estado de implementación (100% completado)
+- Arquitectura final implementada
+- Todas las APIs creadas
+- Frontend completo (portal público y paneles)
+- Sistema de notificaciones por email
+- Métricas y dashboard
+- Tests implementados (unitarios e integración)
+- Checklist final de verificación
+- Guía de uso del sistema
+
+👉 **Usar cuando:** Necesitas una referencia completa de lo que se implementó o cómo usar el sistema
 
 ---
 
@@ -124,21 +269,21 @@ npm run test:run -- src/__tests__/integration/api/orders.test.ts
 
 ---
 
-## 📊 Estado Actual (2026-01-27)
+## 📊 Estado Actual (2026-01-29)
 
 ```
 ✅ Completadas (Fases 0-5 + SaaS 0):  20 de 29 tareas
 ✅ Completada (Fase 6.2):              Tests de integración pasando (12/12 Customers API)
-⏳ Pendiente (Phase SaaS 1):           0 de 3 tareas
+🟡 En progreso (Phase SaaS 1):        DB, Backend Core, Flow, Env doc, UI checkout
 ─────────────────────────────────────────
-📈 Total: 69% (20/29 tareas)
-⏱️  Tiempo estimado restante: 4-5 semanas
+📈 Total: ~72% (Phase SaaS 1 ~60%: Flow + UI listos; pendiente MP/PayPal y tests)
+⏱️  Tiempo estimado restante: 3-4 semanas
 ```
 
-### ⚠️ Tarea Urgente: Tests de Integración
+### Phase SaaS 1 (Billing) — Estado
 
-**Estado:** Tests creados pero fallan por autenticación  
-**Documentación:** Ver `docs/TESTING_INTEGRATION_AUTH_FIX.md` y `docs/NEXT_STEPS_TESTING.md`
+**Completado:** Migración DB, tipos, PaymentService, Factory, Flow gateway (pasarela chilena), create-intent, webhook Flow, documentación de variables de entorno (`PAYMENT_GATEWAYS_ENV_SETUP.md`), UI checkout (`/admin/checkout` con redirección a Flow).  
+**Próximo:** Tests de integración (create-intent, webhook Flow); Mercado Pago y PayPal (gateways + webhooks).
 
 ---
 
@@ -162,27 +307,26 @@ Phase SaaS 0 (Multi-tenant schema)
 
 ## 🚀 Próximos 3 Pasos
 
-### 1️⃣ ⚠️ URGENTE: Ajustar Autenticación en Tests (Ahora)
+### 1️⃣ Phase SaaS 1: Tests de integración (create-intent + webhook Flow)
 
-- **Documentación:** `docs/TESTING_INTEGRATION_AUTH_FIX.md`
-- **Resumen:** `docs/NEXT_STEPS_TESTING.md`
-- Tareas: Modificar `makeAuthenticatedRequest()` para usar cookies
-- Tiempo: 2-4 horas
-- **Estado:** Tests creados pero fallan con 401
-
-### 2️⃣ Validar Tests de Integración
-
-- Ejecutar todos los tests (34 tests)
-- Verificar que multi-tenancy funciona
+- **Archivo:** `src/__tests__/integration/api/payments.test.ts`
+- Tareas: Ampliar tests (validación de body, 403 sin org, webhook idempotencia si aplica)
 - Tiempo: 1-2 horas
-- **Dependencia:** Paso 1 completado
+- **Estado:** Tests básicos (401, 200/403/500 create-intent, 500 webhook Flow campos faltantes) ya creados
 
-### 3️⃣ Iniciar Phase SaaS 1: Billing
+### 2️⃣ Phase SaaS 1: Mercado Pago y PayPal
 
-- Branch: `phase-saas-1-billing`
-- Tareas: Stripe integration + Subscription management
-- Tiempo: 2 semanas
-- **Dependencia:** Tests de integración pasando
+- Gateways: `src/lib/payments/mercadopago/gateway.ts`, `src/lib/payments/paypal/gateway.ts`
+- Webhooks: `src/app/api/webhooks/mercadopago/route.ts`, `src/app/api/webhooks/paypal/route.ts`
+- Actualizar `PaymentGatewayFactory` para devolver MercadoPagoGateway y PayPalGateway
+- Tiempo: 1-2 días
+- **Referencia:** `docs/PAYMENT_GATEWAYS_IMPLEMENTATION_GUIDE.md` secciones 6.2 y 6.3
+
+### 3️⃣ Phase SaaS 1: Gestión de suscripciones y Tier Enforcement
+
+- Tareas: Dashboard de suscripción, cambio de plan, notificaciones, middleware por tier
+- Tiempo: ~1 semana
+- **Dependencia:** Flow/MP/PayPal operativos
 
 ---
 
@@ -195,6 +339,7 @@ root/
     ├── PLAN_MEJORAS_ESTRUCTURALES.md  ← Detalles de cada fase
     ├── PROGRESO_MEJORAS.md            ← Estado actual
     ├── SAAS_IMPLEMENTATION_PLAN.md    ← Arquitectura SaaS ⭐
+    ├── SAAS_ONBOARDING_AND_NEW_USER_FLOW.md ← Onboarding / alta nuevo usuario y óptica ⭐
     ├── GIT_BRANCHING_REFERENCE.md     ← Comandos Git ⭐
     ├── SETUP_GUIDE.md                 ← Guía de configuración
     ├── QUICK_SETUP.md                 ← Inicio rápido
@@ -276,16 +421,24 @@ Ejemplo en commit:
 
 ## 📞 Quick Links
 
-| Necesito                   | Archivo                            |
-| -------------------------- | ---------------------------------- |
-| Detalles de una tarea      | PLAN_MEJORAS_ESTRUCTURALES.md      |
-| Saber qué hacer ahora      | PROGRESO_MEJORAS.md                |
-| Entender arquitectura SaaS | SAAS_IMPLEMENTATION_PLAN.md        |
-| Comandos git               | GIT_BRANCHING_REFERENCE.md         |
-| Fix tests de integración   | TESTING_INTEGRATION_AUTH_FIX.md ⭐ |
-| Resumen rápido de tests    | NEXT_STEPS_TESTING.md ⭐           |
-| Setup inicial              | README.md                          |
-| Analizar fase anterior     | docs/refactoring/                  |
+| Necesito                                     | Archivo                                    |
+| -------------------------------------------- | ------------------------------------------ |
+| Detalles de una tarea                        | PLAN_MEJORAS_ESTRUCTURALES.md              |
+| Saber qué hacer ahora                        | PROGRESO_MEJORAS.md                        |
+| Entender arquitectura SaaS                   | SAAS_IMPLEMENTATION_PLAN.md                |
+| Flujo onboarding / alta nuevo usuario/óptica | SAAS_ONBOARDING_AND_NEW_USER_FLOW.md ⭐    |
+| Comandos git                                 | GIT_BRANCHING_REFERENCE.md                 |
+| Fix tests de integración                     | TESTING_INTEGRATION_AUTH_FIX.md ⭐         |
+| Resumen rápido de tests                      | NEXT_STEPS_TESTING.md ⭐                   |
+| Schema familias de lentes                    | LENS_FAMILIES_AND_MATRICES_SCHEMA.md ⭐    |
+| Tour de primera visita                       | ONBOARDING_TOUR_GUIDE.md ⭐                |
+| Lentes de contacto                           | CONTACT_LENSES_INTEGRATION_GUIDE.md ⭐     |
+| Sistema de IA mejorado                       | AI_IMPLEMENTATION_GUIDE.md ⭐              |
+| Estrategia de testing                        | TESTING_STRATEGY_NEW_FEATURES.md ⭐        |
+| Sistema de soporte SaaS                      | SAAS_SUPPORT_SYSTEM_PLAN.md ⭐             |
+| Implementación soporte SaaS                  | SAAS_SUPPORT_IMPLEMENTATION_COMPLETE.md ⭐ |
+| Setup inicial                                | README.md                                  |
+| Analizar fase anterior                       | docs/refactoring/                          |
 
 ---
 
@@ -297,7 +450,7 @@ Ejemplo en commit:
 │                                                              │
 │  ✅ Multi-tenancy funcional                                │
 │  ✅ Tier system (Basic/Pro/Premium)                        │
-│  ✅ Stripe integration completada                          │
+│  ✅ Flow integration completada (Chile)                    │
 │  ✅ Tests coverage > 70%                                   │
 │  ✅ Performance optimizado                                 │
 │  ✅ RLS (Row Level Security) validado                     │
@@ -311,7 +464,8 @@ Ejemplo en commit:
 
 ---
 
-**Última Actualización:** 2026-01-27  
-**Estado:** 🟡 Tests de Integración Requieren Ajustes  
-**Estado Actual:** ✅ Fase 6.2 completada - 12/12 tests de Customers API pasando  
-**Próximo Paso:** Validar tests de Products y Orders API, luego Phase SaaS 1
+**Última Actualización:** 2026-01-30  
+**Estado:** Phase SaaS 1 (Billing) en progreso — Flow + UI checkout listos  
+**Estado Actual:** DB, Backend Core, Flow gateway/webhook, doc variables de entorno, UI checkout (`/admin/checkout`), documentación schema familias de lentes  
+**✅ COMPLETADO:** Sistema de Soporte SaaS (2026-01-30) - Portal público, paneles root/dev y organizaciones, notificaciones por email, métricas, tests  
+**Próximo Paso:** Tests de integración (create-intent, webhook Flow), Mercado Pago y PayPal (gateways + webhooks)

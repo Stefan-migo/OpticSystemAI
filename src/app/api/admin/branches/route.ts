@@ -21,15 +21,31 @@ export async function GET(request: NextRequest) {
     // Get branch context
     const branchContext = await getBranchContext(request, user.id);
 
+    // Get user's organization_id to filter branches appropriately
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = adminUser?.organization_id;
+
     // Get all branches (super admin) or user's accessible branches
     let branches;
 
     if (branchContext.isSuperAdmin) {
-      // Super admin sees all branches
-      const { data, error } = await supabase
-        .from("branches")
-        .select("*")
-        .order("name");
+      // Super admin: filter by organization if user belongs to one
+      // Only true global super admins (no organization) see all branches
+      let query = supabase.from("branches").select("*");
+
+      if (userOrganizationId) {
+        // Super admin with organization: only show branches from their organization
+        query = query.eq("organization_id", userOrganizationId);
+      }
+      // If no organization_id, show all branches (true global super admin)
+      // We'll filter out the global "Sucursal Principal" (code='MAIN' without organization_id) after fetching
+
+      const { data, error } = await query.order("name");
 
       if (error) {
         logger.error("Error fetching branches", error);
@@ -39,7 +55,11 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      branches = data;
+      // Filter out the global "Sucursal Principal" (legacy branch without organization_id)
+      // This branch should only be visible to true global super admins managing legacy data
+      branches = (data || []).filter(
+        (b) => !(b.code === "MAIN" && !b.organization_id),
+      );
     } else {
       // Regular admin sees only their accessible branches
       branches = branchContext.accessibleBranches.map((b) => ({

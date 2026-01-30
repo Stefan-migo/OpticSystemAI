@@ -310,7 +310,10 @@ export default function SystemAdministrationPage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">
+          <h1
+            className="text-3xl font-bold text-azul-profundo"
+            data-tour="system-header"
+          >
             Administración del Sistema
           </h1>
           <p className="text-tierra-media">

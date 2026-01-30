@@ -54,18 +54,45 @@ export const rutSchema = z
  * Permite string, null, o undefined
  */
 export const rutOptionalSchema = z
-  .union([
-    z.string().refine((rut) => isValidRUTFormat(rut), {
-      message: "El formato del RUT no es válido (debe ser xx.xxx.xxx-x)",
-    }),
-    z.null(),
-    z.undefined(),
-  ])
+  .union([z.string(), z.null(), z.undefined(), z.literal("")])
   .optional()
   .nullable()
-  .transform((rut) =>
-    rut && typeof rut === "string" ? normalizeRUT(rut) : null,
-  );
+  .transform((rut) => {
+    // Si es null, undefined, o string vacío, retornar null
+    if (!rut || (typeof rut === "string" && rut.trim() === "")) {
+      return null;
+    }
+    // Si es string válido, normalizar (la validación se hará con superRefine)
+    if (typeof rut === "string") {
+      const trimmed = rut.trim();
+      if (trimmed === "") return null;
+      return trimmed; // Retornar sin normalizar aún, se hará después de validar
+    }
+    return null;
+  })
+  .superRefine((rut, ctx) => {
+    // Si es null, es válido (opcional)
+    if (rut === null) {
+      return;
+    }
+    // Si es string, validar formato
+    if (typeof rut === "string" && rut.trim() !== "") {
+      if (!isValidRUTFormat(rut)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "El formato del RUT no es válido (debe ser xx.xxx.xxx-x o x.xxx.xxx-x, dígito verificador puede ser K)",
+        });
+      }
+    }
+  })
+  .transform((rut) => {
+    // Normalizar después de validar
+    if (rut && typeof rut === "string" && rut.trim() !== "") {
+      return normalizeRUT(rut);
+    }
+    return null;
+  });
 
 /**
  * Schema para validar teléfono
@@ -152,6 +179,26 @@ export const priceSchema = z.preprocess(
     .positive("El precio debe ser un número positivo")
     .finite("El precio debe ser un número finito"),
 );
+
+/**
+ * Schema para crear intento de pago (create-intent)
+ * Usado en POST /api/admin/payments/create-intent
+ */
+export const createPaymentIntentSchema = z.object({
+  amount: priceSchema,
+  currency: z
+    .string()
+    .min(1, "La moneda es requerida")
+    .max(10)
+    .default("CLP")
+    .transform((s) => s.toUpperCase()),
+  gateway: z.enum(["flow", "mercadopago", "paypal"], {
+    errorMap: () => ({
+      message: "gateway debe ser flow, mercadopago o paypal",
+    }),
+  }),
+  order_id: uuidOptionalSchema,
+});
 
 /**
  * Schema para validar precio que permite 0 (no negativo)
@@ -644,6 +691,7 @@ const posSaleItemSchema = z.object({
   unit_price: priceAllowNegativeSchema, // Allow negative prices for discounts
   total_price: priceAllowNegativeSchema.optional().nullable(), // Allow negative prices for discounts
   product_name: z.string().min(1).max(255).trim(),
+  product_type: z.string().optional().nullable(), // Product type for inventory and work order logic
 });
 
 /**
@@ -743,6 +791,35 @@ export const processSaleSchema = z
     near_lens_family_id: uuidOptionalSchema,
     far_lens_cost: priceOptionalSchema,
     near_lens_cost: priceOptionalSchema,
+    // Contact lens fields
+    contact_lens_family_id: uuidOptionalSchema,
+    contact_lens_rx_sphere_od: z.number().optional().nullable(),
+    contact_lens_rx_cylinder_od: z.number().optional().nullable(),
+    contact_lens_rx_axis_od: z
+      .number()
+      .int()
+      .min(0)
+      .max(180)
+      .optional()
+      .nullable(),
+    contact_lens_rx_add_od: z.number().optional().nullable(),
+    contact_lens_rx_base_curve_od: z.number().optional().nullable(),
+    contact_lens_rx_diameter_od: z.number().optional().nullable(),
+    contact_lens_rx_sphere_os: z.number().optional().nullable(),
+    contact_lens_rx_cylinder_os: z.number().optional().nullable(),
+    contact_lens_rx_axis_os: z
+      .number()
+      .int()
+      .min(0)
+      .max(180)
+      .optional()
+      .nullable(),
+    contact_lens_rx_add_os: z.number().optional().nullable(),
+    contact_lens_rx_base_curve_os: z.number().optional().nullable(),
+    contact_lens_rx_diameter_os: z.number().optional().nullable(),
+    contact_lens_quantity: z.number().int().positive().default(1).optional(),
+    contact_lens_cost: priceOptionalSchema,
+    contact_lens_price: priceOptionalSchema,
     quote_id: uuidOptionalSchema, // Quote ID if sale comes from a quote
   })
   .refine(
@@ -995,6 +1072,150 @@ export const updateLensPriceMatrixSchemaV2 = updateLensPriceMatrixSchema.refine(
 );
 
 // ============================================================================
+// Contact Lens Families Schemas
+// ============================================================================
+
+export const contactLensFamilyBaseSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido").max(255),
+  brand: z.string().max(255).optional().nullable(),
+  description: z.string().optional().nullable(),
+  use_type: z.enum(["daily", "bi_weekly", "monthly", "extended_wear"]),
+  modality: z.enum(["spherical", "toric", "multifocal", "cosmetic"]),
+  material: z
+    .enum(["silicone_hydrogel", "hydrogel", "rigid_gas_permeable"])
+    .optional()
+    .nullable(),
+  packaging: z.enum(["box_30", "box_6", "box_3", "bottle"]),
+  base_curve: z
+    .number()
+    .min(7.0)
+    .max(10.0)
+    .multipleOf(0.1)
+    .optional()
+    .nullable(),
+  diameter: z
+    .number()
+    .min(13.0)
+    .max(15.0)
+    .multipleOf(0.1)
+    .optional()
+    .nullable(),
+  is_active: z.boolean().default(true),
+});
+
+export const createContactLensFamilySchema = contactLensFamilyBaseSchema;
+export const updateContactLensFamilySchema =
+  contactLensFamilyBaseSchema.partial();
+
+// ============================================================================
+// Contact Lens Price Matrices Schemas
+// ============================================================================
+
+const contactLensPriceMatrixBaseObject = z.object({
+  contact_lens_family_id: uuidSchema,
+  sphere_min: z.number().min(-30).max(30).multipleOf(0.25),
+  sphere_max: z.number().min(-30).max(30).multipleOf(0.25),
+  cylinder_min: z.number().min(-6).max(6).multipleOf(0.25).default(0),
+  cylinder_max: z.number().min(-6).max(6).multipleOf(0.25).default(0),
+  axis_min: z.number().int().min(0).max(180).default(0),
+  axis_max: z.number().int().min(0).max(180).default(180),
+  addition_min: z.number().min(0).max(4).multipleOf(0.25).default(0),
+  addition_max: z.number().min(0).max(4).multipleOf(0.25).default(4.0),
+  base_price: z.number().min(0),
+  cost: z.number().min(0),
+  is_active: z.boolean().default(true),
+});
+
+export const contactLensPriceMatrixBaseSchema =
+  contactLensPriceMatrixBaseObject.refine(
+    (data) => data.sphere_min <= data.sphere_max,
+    {
+      message: "sphere_min debe ser menor o igual a sphere_max",
+      path: ["sphere_max"],
+    },
+  );
+
+export const contactLensPriceMatrixRangeRefine =
+  contactLensPriceMatrixBaseSchema
+    .refine((data) => data.cylinder_min <= data.cylinder_max, {
+      message: "cylinder_min debe ser menor o igual a cylinder_max",
+      path: ["cylinder_max"],
+    })
+    .refine((data) => data.axis_min <= data.axis_max, {
+      message: "axis_min debe ser menor o igual a axis_max",
+      path: ["axis_max"],
+    })
+    .refine((data) => data.addition_min <= data.addition_max, {
+      message: "addition_min debe ser menor o igual a addition_max",
+      path: ["addition_max"],
+    });
+
+export const createContactLensPriceMatrixSchema =
+  contactLensPriceMatrixRangeRefine;
+export const updateContactLensPriceMatrixSchema =
+  contactLensPriceMatrixBaseObject
+    .partial()
+    .refine(
+      (data) => {
+        if (data.sphere_min !== undefined && data.sphere_max !== undefined) {
+          return data.sphere_min <= data.sphere_max;
+        }
+        return true;
+      },
+      {
+        message: "sphere_min debe ser menor o igual a sphere_max",
+        path: ["sphere_max"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (
+          data.cylinder_min !== undefined &&
+          data.cylinder_max !== undefined
+        ) {
+          return data.cylinder_min <= data.cylinder_max;
+        }
+        return true;
+      },
+      {
+        message: "cylinder_min debe ser menor o igual a cylinder_max",
+        path: ["cylinder_max"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (data.axis_min !== undefined && data.axis_max !== undefined) {
+          return (
+            data.axis_min <= data.axis_max &&
+            data.axis_min >= 0 &&
+            data.axis_max <= 180
+          );
+        }
+        return true;
+      },
+      {
+        message:
+          "axis_min debe ser menor o igual a axis_max y ambos entre 0 y 180",
+        path: ["axis_max"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (
+          data.addition_min !== undefined &&
+          data.addition_max !== undefined
+        ) {
+          return data.addition_min <= data.addition_max;
+        }
+        return true;
+      },
+      {
+        message: "addition_min debe ser menor o igual a addition_max",
+        path: ["addition_max"],
+      },
+    );
+
+// ============================================================================
 // Quote Schemas
 // ============================================================================
 
@@ -1085,6 +1306,35 @@ export const createQuoteSchema = z.object({
   near_frame_price_includes_tax: z.boolean().default(false).optional(),
   near_frame_cost: priceNonNegativeSchema.default(0).optional(),
   customer_own_near_frame: z.boolean().default(false).optional(),
+  // Contact lens fields
+  contact_lens_family_id: uuidOptionalSchema,
+  contact_lens_rx_sphere_od: z.number().optional().nullable(),
+  contact_lens_rx_cylinder_od: z.number().optional().nullable(),
+  contact_lens_rx_axis_od: z
+    .number()
+    .int()
+    .min(0)
+    .max(180)
+    .optional()
+    .nullable(),
+  contact_lens_rx_add_od: z.number().optional().nullable(),
+  contact_lens_rx_base_curve_od: z.number().optional().nullable(),
+  contact_lens_rx_diameter_od: z.number().optional().nullable(),
+  contact_lens_rx_sphere_os: z.number().optional().nullable(),
+  contact_lens_rx_cylinder_os: z.number().optional().nullable(),
+  contact_lens_rx_axis_os: z
+    .number()
+    .int()
+    .min(0)
+    .max(180)
+    .optional()
+    .nullable(),
+  contact_lens_rx_add_os: z.number().optional().nullable(),
+  contact_lens_rx_base_curve_os: z.number().optional().nullable(),
+  contact_lens_rx_diameter_os: z.number().optional().nullable(),
+  contact_lens_quantity: z.number().int().positive().default(1).optional(),
+  contact_lens_cost: priceNonNegativeSchema.default(0).optional(),
+  contact_lens_price: priceNonNegativeSchema.default(0).optional(),
   frame_cost: priceNonNegativeSchema.default(0).optional(),
   lens_cost: priceNonNegativeSchema.default(0).optional(),
   treatments_cost: priceNonNegativeSchema.default(0).optional(),
@@ -1172,3 +1422,180 @@ export const createAppointmentSchema = z
       path: ["customer_id"],
     },
   );
+
+// ============================================================================
+// Schemas para SaaS Support System
+// ============================================================================
+
+/**
+ * Schema para categorías de tickets SaaS
+ */
+export const saasSupportCategorySchema = z.enum([
+  "technical",
+  "billing",
+  "feature_request",
+  "bug_report",
+  "account",
+  "other",
+]);
+
+/**
+ * Schema para prioridades de tickets SaaS
+ */
+export const saasSupportPrioritySchema = z.enum([
+  "low",
+  "medium",
+  "high",
+  "urgent",
+]);
+
+/**
+ * Schema para estados de tickets SaaS
+ */
+export const saasSupportStatusSchema = z.enum([
+  "open",
+  "assigned",
+  "in_progress",
+  "waiting_customer",
+  "resolved",
+  "closed",
+]);
+
+/**
+ * Schema para tipos de mensajes SaaS
+ */
+export const saasSupportMessageTypeSchema = z.enum([
+  "message",
+  "note",
+  "status_change",
+  "assignment",
+  "resolution",
+]);
+
+/**
+ * Schema para crear un ticket SaaS (desde organización)
+ */
+export const createSaasSupportTicketSchema = z.object({
+  subject: z
+    .string()
+    .min(1, "El asunto es requerido")
+    .max(255, "El asunto es demasiado largo")
+    .trim(),
+  description: z
+    .string()
+    .min(10, "La descripción debe tener al menos 10 caracteres")
+    .max(5000, "La descripción es demasiado larga")
+    .trim(),
+  category: saasSupportCategorySchema,
+  priority: saasSupportPrioritySchema.default("medium").optional(),
+  metadata: z.record(z.unknown()).optional().default({}),
+});
+
+/**
+ * Schema para crear un ticket SaaS público (sin login)
+ */
+export const createPublicSaasSupportTicketSchema = z.object({
+  requester_name: z
+    .string()
+    .min(1, "El nombre es requerido")
+    .max(255, "El nombre es demasiado largo")
+    .trim(),
+  requester_email: emailSchema,
+  organization_name: z.string().max(255).trim().optional(),
+  subject: z
+    .string()
+    .min(1, "El asunto es requerido")
+    .max(255, "El asunto es demasiado largo")
+    .trim(),
+  description: z
+    .string()
+    .min(10, "La descripción debe tener al menos 10 caracteres")
+    .max(5000, "La descripción es demasiado larga")
+    .trim(),
+  category: saasSupportCategorySchema,
+  priority: saasSupportPrioritySchema.default("medium").optional(),
+  metadata: z.record(z.unknown()).optional().default({}),
+});
+
+/**
+ * Schema para actualizar un ticket SaaS
+ */
+export const updateSaasSupportTicketSchema = z.object({
+  status: saasSupportStatusSchema.optional(),
+  priority: saasSupportPrioritySchema.optional(),
+  assigned_to: uuidOptionalSchema,
+  resolution: z.string().max(5000).trim().optional().nullable(),
+  customer_satisfaction_rating: z
+    .number()
+    .int()
+    .min(1)
+    .max(5)
+    .optional()
+    .nullable(),
+  customer_feedback: z.string().max(2000).trim().optional().nullable(),
+});
+
+/**
+ * Schema para crear un mensaje en un ticket SaaS
+ */
+export const createSaasSupportMessageSchema = z.object({
+  message: z
+    .string()
+    .min(1, "El mensaje es requerido")
+    .max(5000, "El mensaje es demasiado largo")
+    .trim(),
+  is_internal: z.boolean().default(false).optional(),
+  message_type: saasSupportMessageTypeSchema.default("message").optional(),
+  attachments: z.array(z.record(z.unknown())).optional().default([]),
+});
+
+/**
+ * Schema para crear un template SaaS
+ */
+export const createSaasSupportTemplateSchema = z.object({
+  name: z
+    .string()
+    .min(1, "El nombre es requerido")
+    .max(255, "El nombre es demasiado largo")
+    .trim(),
+  subject: z.string().max(255).trim().optional().nullable(),
+  content: z
+    .string()
+    .min(1, "El contenido es requerido")
+    .max(10000, "El contenido es demasiado largo")
+    .trim(),
+  category: saasSupportCategorySchema.optional().nullable(),
+  variables: z.array(z.string()).optional().default([]),
+  is_active: z.boolean().default(true).optional(),
+});
+
+/**
+ * Schema para actualizar un template SaaS
+ */
+export const updateSaasSupportTemplateSchema = z.object({
+  name: z.string().min(1).max(255).trim().optional(),
+  subject: z.string().max(255).trim().optional().nullable(),
+  content: z.string().min(1).max(10000).trim().optional(),
+  category: saasSupportCategorySchema.optional().nullable(),
+  variables: z.array(z.string()).optional(),
+  is_active: z.boolean().optional(),
+});
+
+/**
+ * Schema para filtros de búsqueda de tickets SaaS
+ */
+export const saasSupportTicketFiltersSchema = z.object({
+  organization_id: uuidOptionalSchema,
+  status: saasSupportStatusSchema.optional(),
+  priority: saasSupportPrioritySchema.optional(),
+  category: saasSupportCategorySchema.optional(),
+  assigned_to: uuidOptionalSchema,
+  search: z.string().max(255).trim().optional(),
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20).optional(),
+  sort_by: z
+    .enum(["created_at", "updated_at", "priority", "status"])
+    .default("created_at")
+    .optional(),
+  sort_order: z.enum(["asc", "desc"]).default("desc").optional(),
+});

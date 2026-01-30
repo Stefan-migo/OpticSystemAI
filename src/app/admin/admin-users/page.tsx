@@ -521,6 +521,12 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
+        <Link href="/admin/admin-users/register">
+          <Button variant="outline">
+            <UserPlus className="h-4 w-4 mr-2" />
+            Registrar Nuevo Usuario
+          </Button>
+        </Link>
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button>

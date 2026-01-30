@@ -153,21 +153,32 @@ export async function createTestUser(
     throw new Error(`Failed to create auth user: ${authError?.message}`);
   }
 
-  // Create admin_users entry
-  const { data: adminUser, error: adminError } = await supabase
-    .from("admin_users")
-    .insert({
-      id: authUser.user.id,
-      email,
-      role,
-      organization_id: organizationId,
-      is_active: true,
-    })
-    .select()
-    .single();
+  // Create admin_users entry (role: 'admin' after simplify_admin_roles; otherwise 'store_manager' for old schema)
+  let adminUser: unknown = null;
+  let adminError: { message?: string; code?: string } | null = null;
+  const insertAdmin = (r: string) =>
+    supabase
+      .from("admin_users")
+      .insert({
+        id: authUser.user.id,
+        email,
+        role: r,
+        organization_id: organizationId,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+  let result = await insertAdmin(role);
+  adminUser = result.data;
+  adminError = result.error;
+  if (adminError?.code === "23514" && role === "admin") {
+    result = await insertAdmin("store_manager");
+    adminUser = result.data;
+    adminError = result.error;
+  }
 
   if (adminError || !adminUser) {
-    // Cleanup auth user if admin_users creation fails
     await supabase.auth.admin.deleteUser(authUser.user.id);
     throw new Error(`Failed to create admin user: ${adminError?.message}`);
   }
@@ -366,6 +377,74 @@ export async function createTestOrder(
 }
 
 /**
+ * Create a root/dev user for testing
+ */
+export async function createTestRootUser(
+  email: string = `root-${Date.now()}@opttius.com`,
+  role: "root" | "dev" = "root",
+): Promise<TestUser> {
+  const supabase = createTestServiceRoleClient();
+
+  // Create auth user
+  const { data: authUser, error: authError } =
+    await supabase.auth.admin.createUser({
+      email,
+      password: "TestPassword123!",
+      email_confirm: true,
+    });
+
+  if (authError || !authUser.user) {
+    throw new Error(`Failed to create auth user: ${authError?.message}`);
+  }
+
+  // Create admin_users entry with root/dev role (no organization_id for root/dev)
+  const { data: adminUser, error: adminError } = await supabase
+    .from("admin_users")
+    .insert({
+      id: authUser.user.id,
+      email,
+      role,
+      organization_id: null, // Root/dev users don't belong to an organization
+      is_active: true,
+    })
+    .select()
+    .single();
+
+  if (adminError || !adminUser) {
+    await supabase.auth.admin.deleteUser(authUser.user.id);
+    throw new Error(`Failed to create root user: ${adminError?.message}`);
+  }
+
+  // Get auth token for API calls
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.signInWithPassword({
+      email,
+      password: "TestPassword123!",
+    });
+
+  if (sessionError || !sessionData?.session) {
+    await supabase.auth.admin.deleteUser(authUser.user.id);
+    throw new Error(`Failed to create session: ${sessionError?.message}`);
+  }
+
+  return {
+    id: authUser.user.id,
+    email,
+    organization_id: "", // Root users don't have organization
+    authToken: sessionData.session.access_token,
+    sessionData: {
+      session: {
+        access_token: sessionData.session.access_token,
+        refresh_token: sessionData.session.refresh_token,
+        expires_at: sessionData.session.expires_at,
+        token_type: sessionData.session.token_type,
+      },
+      user: sessionData.user,
+    },
+  };
+}
+
+/**
  * Cleanup test data
  */
 export async function cleanupTestData(organizationId: string): Promise<void> {
@@ -386,6 +465,14 @@ export async function cleanupTestData(organizationId: string): Promise<void> {
 
   // Delete organization (cascade will delete related data)
   await supabase.from("organizations").delete().eq("id", organizationId);
+}
+
+/**
+ * Cleanup root user
+ */
+export async function cleanupRootUser(userId: string): Promise<void> {
+  const supabase = createTestServiceRoleClient();
+  await supabase.auth.admin.deleteUser(userId);
 }
 
 /**

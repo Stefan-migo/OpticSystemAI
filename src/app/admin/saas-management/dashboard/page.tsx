@@ -1,0 +1,392 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Loader2,
+  Building2,
+  Users,
+  CreditCard,
+  TrendingUp,
+  DollarSign,
+  Settings,
+  HelpCircle,
+  ArrowRight,
+} from "lucide-react";
+
+interface SaasMetrics {
+  totalOrganizations: number;
+  activeOrganizations: number;
+  totalUsers: number;
+  activeUsers: number;
+  totalSubscriptions: number;
+  activeSubscriptions: number;
+  monthlyRevenue: number;
+  annualRevenue: number;
+  organizationGrowth: number;
+  trialConversionRate: number;
+  tierDistribution?: Record<string, number>;
+  organizationsLast30Days?: number;
+}
+
+export default function SaasManagementDashboardPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [metrics, setMetrics] = useState<SaasMetrics | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/admin/saas-management/analytics");
+
+        if (!response.ok) {
+          throw new Error("Error al cargar métricas");
+        }
+
+        const data = await response.json();
+        setMetrics(data.metrics);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error desconocido");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMetrics();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
+          <p className="text-gray-600">Cargando métricas del SaaS...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center text-red-600">
+              <p>Error: {error}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const formatPrice = (value: number) => {
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+    }).format(value);
+  };
+
+  return (
+    <div className="space-y-6 p-6">
+      <div>
+        <h1 className="text-3xl font-bold text-azul-profundo">
+          Gestión SaaS Opttius
+        </h1>
+        <p className="text-tierra-media mt-2">
+          Dashboard principal con métricas del sistema completo
+        </p>
+      </div>
+
+      {/* Métricas principales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Organizaciones Activas
+            </CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metrics?.activeOrganizations || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              de {metrics?.totalOrganizations || 0} totales
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Usuarios Activos
+            </CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metrics?.activeUsers || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              de {metrics?.totalUsers || 0} totales
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Suscripciones Activas
+            </CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metrics?.activeSubscriptions || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              de {metrics?.totalSubscriptions || 0} totales
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Ingresos Mensuales
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatPrice(metrics?.monthlyRevenue || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {metrics?.organizationGrowth || 0}% crecimiento
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Métricas adicionales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Ingresos Anuales
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {formatPrice(metrics?.annualRevenue || 0)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tasa de Conversión de Trials</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {metrics?.trialConversionRate || 0}%
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Distribución por tier */}
+      {metrics?.tierDistribution && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribución por Tier</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Object.entries(metrics.tierDistribution).map(([tier, count]) => (
+                <div key={tier} className="p-4 border rounded-lg text-center">
+                  <div className="text-2xl font-bold">{count}</div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {tier === "basic"
+                      ? "Básico"
+                      : tier === "pro"
+                        ? "Pro"
+                        : tier === "premium"
+                          ? "Premium"
+                          : tier}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Crecimiento */}
+      {metrics?.organizationsLast30Days !== undefined && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Crecimiento</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <div className="text-sm text-gray-600">
+                  Organizaciones creadas (últimos 30 días)
+                </div>
+                <div className="text-2xl font-bold">
+                  {metrics.organizationsLast30Days}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Crecimiento mensual</div>
+                <div className="text-2xl font-bold">
+                  {metrics.organizationGrowth > 0 ? "+" : ""}
+                  {metrics.organizationGrowth.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Navegación rápida a secciones de gestión */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Gestión del Sistema</CardTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            Acceso rápido a las herramientas de administración SaaS
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Organizaciones */}
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() =>
+                router.push("/admin/saas-management/organizations")
+              }
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                      <Building2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">Organizaciones</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Gestionar todas las organizaciones
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Usuarios */}
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => router.push("/admin/saas-management/users")}
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                      <Users className="h-6 w-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">Usuarios</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Administrar usuarios globales
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Suscripciones */}
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() =>
+                router.push("/admin/saas-management/subscriptions")
+              }
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                      <CreditCard className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">Suscripciones</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Gestionar suscripciones activas
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tiers */}
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => router.push("/admin/saas-management/tiers")}
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                      <Settings className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">Tiers</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Configurar planes de suscripción
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Soporte */}
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => router.push("/admin/saas-management/support")}
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
+                      <HelpCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">Soporte</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Búsqueda rápida y resolución
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

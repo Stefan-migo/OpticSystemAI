@@ -33,20 +33,26 @@ import {
 
 const signupSchema = z
   .object({
-    firstName: z.string().min(2, "First name must be at least 2 characters"),
-    lastName: z.string().min(2, "Last name must be at least 2 characters"),
-    email: z.string().email("Please enter a valid email"),
+    firstName: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
+    lastName: z.string().min(2, "El apellido debe tener al menos 2 caracteres"),
+    email: z.string().email("Por favor ingresa un email válido"),
     phone: z.string().optional().or(z.literal("")),
     password: z
       .string()
-      .min(6, "Password must be at least 6 characters")
-      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-      .regex(/[0-9]/, "Password must contain at least one number"),
+      .min(6, "La contraseña debe tener al menos 6 caracteres")
+      .regex(
+        /[A-Z]/,
+        "La contraseña debe contener al menos una letra mayúscula",
+      )
+      .regex(
+        /[a-z]/,
+        "La contraseña debe contener al menos una letra minúscula",
+      )
+      .regex(/[0-9]/, "La contraseña debe contener al menos un número"),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
+    message: "Las contraseñas no coinciden",
     path: ["confirmPassword"],
   });
 
@@ -59,6 +65,8 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [requiresEmailConfirmation, setRequiresEmailConfirmation] =
+    useState(false);
 
   const {
     register,
@@ -71,6 +79,9 @@ export default function SignupPage() {
   const onSubmit = async (data: SignupForm) => {
     try {
       setError(null);
+
+      console.log("🚀 Starting signup process for:", data.email);
+
       const result = await signUp(data.email, data.password, {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -78,14 +89,128 @@ export default function SignupPage() {
       });
 
       if (result.error) {
+        console.error("❌ Signup error:", result.error);
         setError(result.error.message || "Signup failed");
-      } else {
-        setIsSuccess(true);
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          router.push("/login");
-        }, 3000);
+        return;
       }
+
+      console.log("📝 Signup result:", {
+        hasUser: !!result.data?.user,
+        userId: result.data?.user?.id,
+        email: result.data?.user?.email,
+        emailConfirmedAt: result.data?.user?.email_confirmed_at,
+        createdAt: result.data?.user?.created_at,
+        lastSignInAt: result.data?.user?.last_sign_in_at,
+      });
+
+      // Check if this is a NEW user or an EXISTING user
+      // If created_at and last_sign_in_at are very close, it's likely a new user
+      // If last_sign_in_at exists and is different from created_at, it's an existing user
+      const user = result.data?.user;
+      const isNewUser =
+        user &&
+        (!user.last_sign_in_at ||
+          (user.created_at &&
+            user.last_sign_in_at &&
+            new Date(user.last_sign_in_at).getTime() -
+              new Date(user.created_at).getTime() <
+              5000)); // Less than 5 seconds difference
+
+      console.log("🔍 User analysis:", {
+        isNewUser,
+        createdAt: user?.created_at,
+        lastSignInAt: user?.last_sign_in_at,
+        timeDifference:
+          user?.created_at && user?.last_sign_in_at
+            ? new Date(user.last_sign_in_at).getTime() -
+              new Date(user.created_at).getTime()
+            : null,
+      });
+
+      // Check if email confirmation is required
+      // For NEW users with enable_confirmations=true, email should NOT be confirmed
+      // However, Supabase local may auto-confirm emails in development
+      // So we need to check if this is truly a new user AND if email is confirmed
+      const emailNeedsConfirmation = user && !user.email_confirmed_at;
+
+      // IMPORTANT: Supabase local may auto-confirm emails in development
+      // So we ALWAYS require confirmation flow for NEW users, regardless of what Supabase returns
+      // This ensures consistent behavior and proper user flow
+      const shouldRequireConfirmationFlow = isNewUser;
+
+      console.log("🔍 Email confirmation check:", {
+        emailNeedsConfirmation,
+        isNewUser,
+        shouldRequireConfirmationFlow,
+        emailConfirmedAt: user?.email_confirmed_at,
+        userCreatedAt: user?.created_at,
+        userLastSignInAt: user?.last_sign_in_at,
+      });
+
+      // Store the state - ALWAYS require confirmation flow for new users
+      // This ensures users see the confirmation message even if Supabase auto-confirmed
+      setRequiresEmailConfirmation(shouldRequireConfirmationFlow);
+      setIsSuccess(true);
+
+      // ALWAYS require confirmation flow for new users
+      // Even if Supabase auto-confirmed, we want users to see the message
+      if (shouldRequireConfirmationFlow) {
+        // User needs to confirm email - don't redirect, show message
+        console.log("📧 Email confirmation flow required for new user.");
+        console.log("📧 User email_confirmed_at:", user?.email_confirmed_at);
+        console.log(
+          "📧 Note: Supabase may have auto-confirmed, but we're enforcing the flow",
+        );
+
+        // Don't redirect - user must confirm email first
+        // Sign out the user to prevent automatic redirects
+        try {
+          const { createClient } = await import("@/utils/supabase/client");
+          const supabase = createClient();
+          await supabase.auth.signOut();
+          console.log("🔒 Signed out user to prevent automatic redirects");
+        } catch (signOutError) {
+          console.warn("⚠️ Could not sign out user:", signOutError);
+        }
+        return;
+      }
+
+      // Email already confirmed
+      // Check if this is an existing user trying to sign up again
+      if (!isNewUser && user?.email_confirmed_at) {
+        console.warn(
+          "⚠️ User already exists and is confirmed. This email is already registered.",
+        );
+        setError(
+          "Este email ya está registrado. Por favor, inicia sesión en lugar de crear una nueva cuenta.",
+        );
+        setIsSuccess(false);
+        // Sign out the user
+        try {
+          const { createClient } = await import("@/utils/supabase/client");
+          const supabase = createClient();
+          await supabase.auth.signOut();
+          console.log("🔒 Signed out existing user");
+        } catch (signOutError) {
+          console.warn("⚠️ Could not sign out user:", signOutError);
+        }
+        return;
+      }
+
+      // Email already confirmed - this should only happen for truly new users
+      // in development mode or if email was auto-confirmed
+      if (isNewUser && user?.email_confirmed_at) {
+        console.log(
+          "✅ New user email already confirmed (development mode or auto-confirmed)",
+        );
+      }
+
+      console.log("✅ Email already confirmed, redirecting to onboarding");
+      console.log("✅ User email_confirmed_at:", user?.email_confirmed_at);
+      // Only redirect if email is confirmed
+      setTimeout(() => {
+        router.push("/onboarding/choice");
+      }, 2000);
     } catch (err: any) {
       setError(err.message || "An error occurred during signup");
       console.error("Signup error:", err);
@@ -101,28 +226,59 @@ export default function SignupPage() {
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
             <CardTitle className="text-2xl font-bold text-gray-900">
-              Account Created!
+              ¡Cuenta Creada!
             </CardTitle>
             <CardDescription className="text-gray-600">
-              Your account has been successfully created
+              Tu cuenta ha sido creada exitosamente
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center space-y-4">
-            <Alert className="border-green-200 bg-green-50">
-              <AlertDescription className="text-green-800">
-                Please check your email to confirm your account. You&apos;ll be
-                redirected to login shortly.
-              </AlertDescription>
-            </Alert>
-            <Button
-              asChild
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-            >
-              <Link href="/login">
-                Go to Login
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            {requiresEmailConfirmation ? (
+              <>
+                <Alert className="border-blue-200 bg-blue-50">
+                  <AlertDescription className="text-blue-800">
+                    <strong>¡Cuenta creada exitosamente!</strong>
+                    <br />
+                    <br />
+                    Por favor, revisa tu correo electrónico y haz clic en el
+                    enlace de confirmación para activar tu cuenta.
+                    <br />
+                    <br />
+                    Una vez que confirmes tu email, podrás iniciar sesión y
+                    configurar tu óptica.
+                  </AlertDescription>
+                </Alert>
+                <Button
+                  onClick={() => router.push("/login")}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                >
+                  Ir a Iniciar Sesión
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <p className="text-xs text-center text-gray-500 mt-4">
+                  Después de confirmar tu email, podrás iniciar sesión y
+                  configurar tu óptica
+                </p>
+              </>
+            ) : (
+              <>
+                <Alert className="border-green-200 bg-green-50">
+                  <AlertDescription className="text-green-800">
+                    <strong>¡Cuenta creada exitosamente!</strong>
+                    <br />
+                    <br />
+                    Serás redirigido al onboarding en breve...
+                  </AlertDescription>
+                </Alert>
+                <Button
+                  onClick={() => router.push("/onboarding/choice")}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                >
+                  Continuar al Onboarding
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -138,18 +294,18 @@ export default function SignupPage() {
             <Shield className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Create Account
+            Crear Cuenta
           </h1>
-          <p className="text-gray-600">Join us to get started</p>
+          <p className="text-gray-600">Únete para comenzar</p>
         </div>
 
         <Card className="border-0 shadow-2xl">
           <CardHeader className="space-y-1 pb-6">
             <CardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Get Started
+              Comienza Ahora
             </CardTitle>
             <CardDescription className="text-center text-gray-600">
-              Fill in your information to create an account
+              Completa tu información para crear una cuenta
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -172,12 +328,12 @@ export default function SignupPage() {
                     className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                   >
                     <User className="h-4 w-4" />
-                    First Name
+                    Nombre
                   </Label>
                   <Input
                     id="firstName"
                     type="text"
-                    placeholder="John"
+                    placeholder="Juan"
                     {...register("firstName")}
                     className={`h-11 ${errors.firstName ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
                     disabled={loading}
@@ -219,13 +375,13 @@ export default function SignupPage() {
                   className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                 >
                   <Mail className="h-4 w-4" />
-                  Email Address
+                  Correo Electrónico
                 </Label>
                 <div className="relative">
                   <Input
                     id="email"
                     type="email"
-                    placeholder="john.doe@example.com"
+                    placeholder="tu@email.com"
                     {...register("email")}
                     className={`h-11 pl-10 ${errors.email ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
                     disabled={loading}
@@ -243,13 +399,13 @@ export default function SignupPage() {
                   className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                 >
                   <Phone className="h-4 w-4" />
-                  Phone (Optional)
+                  Teléfono (Opcional)
                 </Label>
                 <div className="relative">
                   <Input
                     id="phone"
                     type="tel"
-                    placeholder="+1 (555) 123-4567"
+                    placeholder="+56 9 1234 5678"
                     {...register("phone")}
                     className={`h-11 pl-10 ${errors.phone ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
                     disabled={loading}
@@ -267,13 +423,13 @@ export default function SignupPage() {
                   className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                 >
                   <Lock className="h-4 w-4" />
-                  Password
+                  Contraseña
                 </Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Minimum 6 characters"
+                    placeholder="Mínimo 6 caracteres"
                     {...register("password")}
                     className={`h-11 pl-10 pr-10 ${errors.password ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
                     disabled={loading}
@@ -307,13 +463,13 @@ export default function SignupPage() {
                   className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                 >
                   <Lock className="h-4 w-4" />
-                  Confirm Password
+                  Confirmar Contraseña
                 </Label>
                 <div className="relative">
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Confirm your password"
+                    placeholder="Confirma tu contraseña"
                     {...register("confirmPassword")}
                     className={`h-11 pl-10 pr-10 ${errors.confirmPassword ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
                     disabled={loading}
@@ -349,11 +505,11 @@ export default function SignupPage() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating account...
+                    Creando cuenta...
                   </>
                 ) : (
                   <>
-                    Create Account
+                    Crear Cuenta
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
@@ -386,7 +542,7 @@ export default function SignupPage() {
         </Card>
 
         <p className="mt-6 text-center text-xs text-gray-500">
-          By creating an account, you agree to our terms of service
+          Al crear una cuenta, aceptas nuestros términos de servicio
         </p>
       </div>
     </div>

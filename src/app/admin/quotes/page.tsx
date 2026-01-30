@@ -240,7 +240,10 @@ export default function QuotesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">
+          <h1
+            className="text-3xl font-bold text-azul-profundo"
+            data-tour="quotes-header"
+          >
             Presupuestos
           </h1>
           <p className="text-tierra-media">

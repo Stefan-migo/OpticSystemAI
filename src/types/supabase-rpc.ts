@@ -50,6 +50,34 @@ export interface IsSuperAdminParams {
 export type IsSuperAdminResult = boolean;
 
 /**
+ * RPC function: is_root_user
+ *
+ * Checks if a user has root or dev role for SaaS management access.
+ *
+ * @param user_id - The UUID of the user to check (defaults to auth.uid())
+ * @returns boolean - true if user is root or dev, false otherwise
+ */
+export interface IsRootUserParams {
+  user_id: string;
+}
+
+export type IsRootUserResult = boolean;
+
+/**
+ * RPC function: is_employee
+ *
+ * Checks if a user has employee role (operational access only).
+ *
+ * @param user_id - The UUID of the user to check (defaults to auth.uid())
+ * @returns boolean - true if user is employee, false otherwise
+ */
+export interface IsEmployeeParams {
+  user_id: string;
+}
+
+export type IsEmployeeResult = boolean;
+
+/**
  * RPC function: log_admin_activity
  *
  * Logs an admin activity for audit purposes.
@@ -135,6 +163,14 @@ export type RPCFunctionMap = {
   is_super_admin: {
     params: IsSuperAdminParams;
     result: IsSuperAdminResult;
+  };
+  is_root_user: {
+    params: IsRootUserParams;
+    result: IsRootUserResult;
+  };
+  is_employee: {
+    params: IsEmployeeParams;
+    result: IsEmployeeResult;
   };
   log_admin_activity: {
     params: LogAdminActivityParams;

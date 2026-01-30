@@ -59,6 +59,6 @@ export function isValidRUTFormat(rut: string): boolean {
   if (!rut) return false;
 
   const normalized = normalizeRUT(rut);
-  // RUT should have 8-9 digits + 1 verification digit (K or 0-9)
-  return /^[0-9]{8,9}[0-9Kk]$/.test(normalized);
+  // RUT should have 7-8 digits + 1 verification digit (K or 0-9)
+  return /^[0-9]{7,8}[0-9Kk]$/.test(normalized);
 }

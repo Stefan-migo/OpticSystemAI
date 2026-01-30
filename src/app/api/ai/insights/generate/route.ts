@@ -1,0 +1,218 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClientFromRequest } from "@/utils/supabase/server";
+import { appLogger as logger } from "@/lib/logger";
+import { generateInsights } from "@/lib/ai/insights/generator";
+import {
+  InsightSectionSchema,
+  CreateInsightSchema,
+} from "@/lib/ai/insights/schemas";
+import {
+  parseAndValidateBody,
+  parseAndValidateQuery,
+} from "@/lib/api/validation/zod-helpers";
+import { z } from "zod";
+import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
+
+const generateQuerySchema = z.object({
+  section: InsightSectionSchema.optional(),
+});
+
+const generateBodySchema = z.object({
+  section: InsightSectionSchema,
+  data: z.any(), // Data to analyze
+  additionalContext: z.record(z.any()).optional(),
+});
+
+/**
+ * POST /api/ai/insights/generate
+ * Generate insights for a specific section
+ * This endpoint is used by cron jobs or manual triggers
+ */
+export async function POST(request: NextRequest) {
+  return withRateLimit(rateLimitConfigs.general)(request, async () => {
+    try {
+      // Validate body
+      const body = await parseAndValidateBody(request, generateBodySchema);
+      const { section, data, additionalContext } = body;
+
+      const { client: supabase, getUser } =
+        await createClientFromRequest(request);
+
+      // Check authentication
+      const { data: userData, error: userError } = await getUser();
+      const user = userData?.user;
+      if (userError || !user) {
+        logger.error("User authentication failed", userError);
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      // Get user's organization
+      const { data: adminUser, error: adminError } = await supabase
+        .from("admin_users")
+        .select("organization_id")
+        .eq("id", user.id)
+        .eq("is_active", true)
+        .single();
+
+      if (adminError || !adminUser?.organization_id) {
+        logger.error("Organization not found", { userId: user.id });
+        return NextResponse.json(
+          { error: "Organization not found" },
+          { status: 404 },
+        );
+      }
+
+      // Get organization name
+      const { data: organization, error: orgError } = await supabase
+        .from("organizations")
+        .select("name")
+        .eq("id", adminUser.organization_id)
+        .single();
+
+      if (orgError || !organization) {
+        logger.error("Failed to fetch organization", { error: orgError });
+        return NextResponse.json(
+          { error: "Failed to fetch organization" },
+          { status: 500 },
+        );
+      }
+
+      // Generate insights using LLM
+      logger.info("Generating insights", {
+        section,
+        organizationId: adminUser.organization_id,
+      });
+
+      const insights = await generateInsights({
+        section,
+        data,
+        organizationName: organization.name,
+        additionalContext,
+        temperature: 0.7,
+      });
+
+      // Save insights to database
+      const insightsToInsert = insights.map((insight) => ({
+        organization_id: adminUser.organization_id,
+        section,
+        ...insight,
+      }));
+
+      const { data: insertedInsights, error: insertError } = await supabase
+        .from("ai_insights")
+        .insert(insightsToInsert)
+        .select();
+
+      if (insertError) {
+        logger.error("Error saving insights", { error: insertError, section });
+        return NextResponse.json(
+          { error: "Failed to save insights" },
+          { status: 500 },
+        );
+      }
+
+      logger.info("Insights generated and saved", {
+        section,
+        count: insertedInsights?.length || 0,
+        organizationId: adminUser.organization_id,
+      });
+
+      return NextResponse.json({
+        success: true,
+        insights: insertedInsights || [],
+        count: insertedInsights?.length || 0,
+      });
+    } catch (error: any) {
+      logger.error("Generate insights API error", {
+        error: error.message,
+        stack: error.stack,
+      });
+
+      // Return user-friendly error message
+      if (error.message.includes("No available LLM providers")) {
+        return NextResponse.json(
+          {
+            error:
+              "AI service is not configured. Please configure at least one LLM provider.",
+          },
+          { status: 503 },
+        );
+      }
+
+      return NextResponse.json(
+        { error: error.message || "Internal server error" },
+        { status: 500 },
+      );
+    }
+  });
+}
+
+/**
+ * GET /api/ai/insights/generate
+ * Get information about insight generation (for debugging/monitoring)
+ */
+export async function GET(request: NextRequest) {
+  return withRateLimit(rateLimitConfigs.general)(request, async () => {
+    try {
+      const queryParams = parseAndValidateQuery(request, generateQuerySchema);
+      const section = queryParams.section;
+
+      const { client: supabase, getUser } =
+        await createClientFromRequest(request);
+
+      // Check authentication
+      const { data, error: userError } = await getUser();
+      const user = data?.user;
+      if (userError || !user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      // Get user's organization
+      const { data: adminUser } = await supabase
+        .from("admin_users")
+        .select("organization_id")
+        .eq("id", user.id)
+        .eq("is_active", true)
+        .single();
+
+      if (!adminUser?.organization_id) {
+        return NextResponse.json(
+          { error: "Organization not found" },
+          { status: 404 },
+        );
+      }
+
+      // Get latest insights generation info
+      let query = supabase
+        .from("ai_insights")
+        .select("section, created_at, count")
+        .eq("organization_id", adminUser.organization_id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (section) {
+        query = query.eq("section", section);
+      }
+
+      const { data: recentInsights, error } = await query;
+
+      if (error) {
+        logger.error("Error fetching insight generation info", { error });
+        return NextResponse.json(
+          { error: "Failed to fetch generation info" },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({
+        recentGenerations: recentInsights || [],
+      });
+    } catch (error: any) {
+      logger.error("Get generation info error", { error: error.message });
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 },
+      );
+    }
+  });
+}

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { message, provider, model, sessionId, config } = body;
+    const { message, provider, model, sessionId, config, section } = body;
 
     if (!message || typeof message !== "string") {
       return NextResponse.json(
@@ -120,12 +120,32 @@ export async function POST(request: NextRequest) {
           const providerToolCalls: ToolCall[] = [];
 
           try {
+            // Map section to context for agent config
+            const contextMap: Record<string, string> = {
+              dashboard: "analytics",
+              inventory: "products",
+              clients: "orders", // Using orders context for customer management
+              pos: "orders",
+              analytics: "analytics",
+            };
+            const agentContext = section ? contextMap[section] : undefined;
+
+            // Enhance system prompt with section context
+            const baseConfig = config || {};
+            const enhancedSystemPrompt = section
+              ? `Eres un asistente experto de Opttius. El usuario está en la sección: ${section === "dashboard" ? "Dashboard" : section === "inventory" ? "Inventario" : section === "clients" ? "Clientes" : section === "pos" ? "Punto de Venta" : "Analíticas"}. Proporciona ayuda específica para esta sección. Si el usuario pregunta sobre otra sección, puedes ayudar pero también sugiere navegar a esa sección.\n\n${baseConfig.systemPrompt || ""}`
+              : baseConfig.systemPrompt;
+
             const fallbackAgent = await createAgent({
               userId: user.id,
               provider: providerToTry,
               model: modelToTry,
               sessionId: currentSessionId,
-              config: config,
+              context: agentContext,
+              config: {
+                ...baseConfig,
+                systemPrompt: enhancedSystemPrompt,
+              },
             });
 
             // Load session history if we have a session ID

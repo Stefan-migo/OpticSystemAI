@@ -7,7 +7,9 @@ interface Product {
   id: string;
   price: number;
   status: string;
-  inventory_quantity: number;
+  inventory_quantity: number; // Legacy field
+  total_inventory_quantity?: number; // Stock for current branch
+  total_available_quantity?: number; // Available stock (quantity - reserved) for current branch
 }
 
 interface ProductStats {
@@ -57,12 +59,20 @@ const fetchProductStats = async ({
     activeProducts: allProducts.filter(
       (p) => p.status === "active" || !p.status,
     ).length,
-    lowStockCount: allProducts.filter((p) => (p.inventory_quantity || 0) <= 5)
-      .length,
-    totalValue: allProducts.reduce(
-      (sum, p) => sum + (p.price || 0) * (p.inventory_quantity || 0),
-      0,
-    ),
+    lowStockCount: allProducts.filter((p) => {
+      const stock =
+        p.total_inventory_quantity !== undefined
+          ? p.total_inventory_quantity
+          : p.inventory_quantity || 0;
+      return stock > 0 && stock <= 5; // Only count products with stock > 0
+    }).length,
+    totalValue: allProducts.reduce((sum, p) => {
+      const stock =
+        p.total_inventory_quantity !== undefined
+          ? p.total_inventory_quantity
+          : p.inventory_quantity || 0;
+      return sum + (p.price || 0) * stock;
+    }, 0),
   };
 };
 

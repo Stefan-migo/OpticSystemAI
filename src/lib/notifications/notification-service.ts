@@ -1,32 +1,32 @@
-import { createServiceRoleClient } from '@/utils/supabase/server';
+import { createServiceRoleClient } from "@/utils/supabase/server";
 
-export type NotificationType = 
-  | 'order_new'
-  | 'order_status_change'
-  | 'low_stock'
-  | 'out_of_stock'
-  | 'new_customer'
-  | 'new_review'
-  | 'review_pending'
-  | 'support_ticket_new'
-  | 'support_ticket_update'
-  | 'payment_received'
-  | 'payment_failed'
-  | 'system_alert'
-  | 'system_update'
-  | 'security_alert'
-  | 'custom'
-  | 'quote_new'
-  | 'quote_status_change'
-  | 'quote_converted'
-  | 'work_order_new'
-  | 'work_order_status_change'
-  | 'work_order_completed'
-  | 'appointment_new'
-  | 'appointment_cancelled'
-  | 'sale_new';
+export type NotificationType =
+  | "order_new"
+  | "order_status_change"
+  | "low_stock"
+  | "out_of_stock"
+  | "new_customer"
+  | "new_review"
+  | "review_pending"
+  | "support_ticket_new"
+  | "support_ticket_update"
+  | "payment_received"
+  | "payment_failed"
+  | "system_alert"
+  | "system_update"
+  | "security_alert"
+  | "custom"
+  | "quote_new"
+  | "quote_status_change"
+  | "quote_converted"
+  | "work_order_new"
+  | "work_order_status_change"
+  | "work_order_completed"
+  | "appointment_new"
+  | "appointment_cancelled"
+  | "sale_new";
 
-export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type NotificationPriority = "low" | "medium" | "high" | "urgent";
 
 export interface CreateNotificationParams {
   type: NotificationType;
@@ -46,34 +46,39 @@ export class NotificationService {
   /**
    * Create a notification if the notification type is enabled
    */
-  static async createNotification(params: CreateNotificationParams): Promise<{ success: boolean; error?: string }> {
+  static async createNotification(
+    params: CreateNotificationParams,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const supabase = createServiceRoleClient();
 
       // Check if notification type is enabled
       const { data: settingsData, error: settingsError } = await supabase
-        .from('notification_settings')
-        .select('enabled, priority')
-        .eq('notification_type', params.type)
+        .from("notification_settings")
+        .select("enabled, priority")
+        .eq("notification_type", params.type)
         .single();
 
-      if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 = not found
-        console.error('Error checking notification settings:', settingsError);
+      if (settingsError && settingsError.code !== "PGRST116") {
+        // PGRST116 = not found
+        console.error("Error checking notification settings:", settingsError);
         // Continue anyway - default to enabled
       }
 
       // If notification is disabled, skip creation
       if (settingsData && settingsData.enabled === false) {
-        console.log(`Notification type ${params.type} is disabled, skipping...`);
+        console.log(
+          `Notification type ${params.type} is disabled, skipping...`,
+        );
         return { success: true }; // Return success but don't create notification
       }
 
       // Get priority (with override support)
-      const priority = settingsData?.priority || params.priority || 'medium';
+      const priority = settingsData?.priority || params.priority || "medium";
 
       // Create notification
       const { error: insertError } = await supabase
-        .from('admin_notifications')
+        .from("admin_notifications")
         .insert({
           type: params.type,
           priority: priority,
@@ -86,20 +91,20 @@ export class NotificationService {
           metadata: params.metadata || {},
           target_admin_id: params.targetAdminId || null,
           target_admin_role: params.targetAdminRole || null,
-          created_by_system: true
+          created_by_system: true,
         });
 
       if (insertError) {
-        console.error('Error creating notification:', insertError);
+        console.error("Error creating notification:", insertError);
         return { success: false, error: insertError.message };
       }
 
       return { success: true };
     } catch (error) {
-      console.error('Error in NotificationService.createNotification:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      console.error("Error in NotificationService.createNotification:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }
@@ -107,21 +112,26 @@ export class NotificationService {
   /**
    * Create notification for new quote
    */
-  static async notifyNewQuote(quoteId: string, quoteNumber: string, customerName: string, totalAmount: number): Promise<void> {
+  static async notifyNewQuote(
+    quoteId: string,
+    quoteNumber: string,
+    customerName: string,
+    totalAmount: number,
+  ): Promise<void> {
     await this.createNotification({
-      type: 'quote_new',
-      priority: 'high',
-      title: 'Nuevo Presupuesto',
+      type: "quote_new",
+      priority: "high",
+      title: "Nuevo Presupuesto",
       message: `Presupuesto ${quoteNumber} creado para ${customerName} - ${this.formatCurrency(totalAmount)}`,
-      relatedEntityType: 'quote',
+      relatedEntityType: "quote",
       relatedEntityId: quoteId,
       actionUrl: `/admin/quotes/${quoteId}`,
-      actionLabel: 'Ver Presupuesto',
+      actionLabel: "Ver Presupuesto",
       metadata: {
         quote_number: quoteNumber,
         customer_name: customerName,
-        total_amount: totalAmount
-      }
+        total_amount: totalAmount,
+      },
     });
   }
 
@@ -129,33 +139,33 @@ export class NotificationService {
    * Create notification for quote status change
    */
   static async notifyQuoteStatusChange(
-    quoteId: string, 
-    quoteNumber: string, 
-    oldStatus: string, 
-    newStatus: string
+    quoteId: string,
+    quoteNumber: string,
+    oldStatus: string,
+    newStatus: string,
   ): Promise<void> {
     const statusLabels: Record<string, string> = {
-      draft: 'Borrador',
-      sent: 'Enviado',
-      accepted: 'Aceptado',
-      rejected: 'Rechazado',
-      expired: 'Expirado'
+      draft: "Borrador",
+      sent: "Enviado",
+      accepted: "Aceptado",
+      rejected: "Rechazado",
+      expired: "Expirado",
     };
 
     await this.createNotification({
-      type: 'quote_status_change',
-      priority: 'medium',
-      title: 'Cambio de Estado en Presupuesto',
+      type: "quote_status_change",
+      priority: "medium",
+      title: "Cambio de Estado en Presupuesto",
       message: `Presupuesto ${quoteNumber} cambió de ${statusLabels[oldStatus] || oldStatus} a ${statusLabels[newStatus] || newStatus}`,
-      relatedEntityType: 'quote',
+      relatedEntityType: "quote",
       relatedEntityId: quoteId,
       actionUrl: `/admin/quotes/${quoteId}`,
-      actionLabel: 'Ver Presupuesto',
+      actionLabel: "Ver Presupuesto",
       metadata: {
         quote_number: quoteNumber,
         old_status: oldStatus,
-        new_status: newStatus
-      }
+        new_status: newStatus,
+      },
     });
   }
 
@@ -166,23 +176,23 @@ export class NotificationService {
     quoteId: string,
     quoteNumber: string,
     workOrderId: string,
-    workOrderNumber: string
+    workOrderNumber: string,
   ): Promise<void> {
     await this.createNotification({
-      type: 'quote_converted',
-      priority: 'high',
-      title: 'Presupuesto Convertido a Trabajo',
+      type: "quote_converted",
+      priority: "high",
+      title: "Presupuesto Convertido a Trabajo",
       message: `Presupuesto ${quoteNumber} convertido a trabajo ${workOrderNumber}`,
-      relatedEntityType: 'work_order',
+      relatedEntityType: "work_order",
       relatedEntityId: workOrderId,
       actionUrl: `/admin/work-orders/${workOrderId}`,
-      actionLabel: 'Ver Trabajo',
+      actionLabel: "Ver Trabajo",
       metadata: {
         quote_id: quoteId,
         quote_number: quoteNumber,
         work_order_id: workOrderId,
-        work_order_number: workOrderNumber
-      }
+        work_order_number: workOrderNumber,
+      },
     });
   }
 
@@ -193,22 +203,22 @@ export class NotificationService {
     workOrderId: string,
     workOrderNumber: string,
     customerName: string,
-    totalAmount: number
+    totalAmount: number,
   ): Promise<void> {
     await this.createNotification({
-      type: 'work_order_new',
-      priority: 'high',
-      title: 'Nuevo Trabajo',
+      type: "work_order_new",
+      priority: "high",
+      title: "Nuevo Trabajo",
       message: `Trabajo ${workOrderNumber} creado para ${customerName} - ${this.formatCurrency(totalAmount)}`,
-      relatedEntityType: 'work_order',
+      relatedEntityType: "work_order",
       relatedEntityId: workOrderId,
       actionUrl: `/admin/work-orders/${workOrderId}`,
-      actionLabel: 'Ver Trabajo',
+      actionLabel: "Ver Trabajo",
       metadata: {
         work_order_number: workOrderNumber,
         customer_name: customerName,
-        total_amount: totalAmount
-      }
+        total_amount: totalAmount,
+      },
     });
   }
 
@@ -219,37 +229,37 @@ export class NotificationService {
     workOrderId: string,
     workOrderNumber: string,
     oldStatus: string,
-    newStatus: string
+    newStatus: string,
   ): Promise<void> {
     const statusLabels: Record<string, string> = {
-      quote: 'Presupuesto',
-      ordered: 'Ordenado',
-      sent_to_lab: 'Enviado al Lab',
-      in_progress_lab: 'En Lab',
-      ready_at_lab: 'Listo en Lab',
-      received_from_lab: 'Recibido',
-      mounted: 'Montado',
-      quality_check: 'Control Calidad',
-      ready_for_pickup: 'Listo para Retiro',
-      delivered: 'Entregado',
-      cancelled: 'Cancelado',
-      returned: 'Devuelto'
+      quote: "Presupuesto",
+      ordered: "Ordenado",
+      sent_to_lab: "Enviado al Lab",
+      in_progress_lab: "En Lab",
+      ready_at_lab: "Listo en Lab",
+      received_from_lab: "Recibido",
+      mounted: "Montado",
+      quality_check: "Control Calidad",
+      ready_for_pickup: "Listo para Retiro",
+      delivered: "Entregado",
+      cancelled: "Cancelado",
+      returned: "Devuelto",
     };
 
     await this.createNotification({
-      type: 'work_order_status_change',
-      priority: 'medium',
-      title: 'Cambio de Estado en Trabajo',
+      type: "work_order_status_change",
+      priority: "medium",
+      title: "Cambio de Estado en Trabajo",
       message: `Trabajo ${workOrderNumber} cambió de ${statusLabels[oldStatus] || oldStatus} a ${statusLabels[newStatus] || newStatus}`,
-      relatedEntityType: 'work_order',
+      relatedEntityType: "work_order",
       relatedEntityId: workOrderId,
       actionUrl: `/admin/work-orders/${workOrderId}`,
-      actionLabel: 'Ver Trabajo',
+      actionLabel: "Ver Trabajo",
       metadata: {
         work_order_number: workOrderNumber,
         old_status: oldStatus,
-        new_status: newStatus
-      }
+        new_status: newStatus,
+      },
     });
   }
 
@@ -259,41 +269,45 @@ export class NotificationService {
   static async notifyWorkOrderCompleted(
     workOrderId: string,
     workOrderNumber: string,
-    customerName: string
+    customerName: string,
   ): Promise<void> {
     await this.createNotification({
-      type: 'work_order_completed',
-      priority: 'high',
-      title: 'Trabajo Completado',
+      type: "work_order_completed",
+      priority: "high",
+      title: "Trabajo Completado",
       message: `Trabajo ${workOrderNumber} para ${customerName} ha sido entregado`,
-      relatedEntityType: 'work_order',
+      relatedEntityType: "work_order",
       relatedEntityId: workOrderId,
       actionUrl: `/admin/work-orders/${workOrderId}`,
-      actionLabel: 'Ver Trabajo',
+      actionLabel: "Ver Trabajo",
       metadata: {
         work_order_number: workOrderNumber,
-        customer_name: customerName
-      }
+        customer_name: customerName,
+      },
     });
   }
 
   /**
    * Create notification for new customer
    */
-  static async notifyNewCustomer(customerId: string, customerName: string, email?: string): Promise<void> {
+  static async notifyNewCustomer(
+    customerId: string,
+    customerName: string,
+    email?: string,
+  ): Promise<void> {
     await this.createNotification({
-      type: 'new_customer',
-      priority: 'medium',
-      title: 'Nuevo Cliente',
-      message: `Nuevo cliente registrado: ${customerName}${email ? ` (${email})` : ''}`,
-      relatedEntityType: 'customer',
+      type: "new_customer",
+      priority: "medium",
+      title: "Nuevo Cliente",
+      message: `Nuevo cliente registrado: ${customerName}${email ? ` (${email})` : ""}`,
+      relatedEntityType: "customer",
       relatedEntityId: customerId,
       actionUrl: `/admin/customers/${customerId}`,
-      actionLabel: 'Ver Cliente',
+      actionLabel: "Ver Cliente",
       metadata: {
         customer_name: customerName,
-        email: email
-      }
+        email: email,
+      },
     });
   }
 
@@ -304,22 +318,22 @@ export class NotificationService {
     orderId: string,
     orderNumber: string,
     customerEmail: string,
-    totalAmount: number
+    totalAmount: number,
   ): Promise<void> {
     await this.createNotification({
-      type: 'sale_new',
-      priority: 'high',
-      title: 'Nueva Venta',
+      type: "sale_new",
+      priority: "high",
+      title: "Nueva Venta",
       message: `Nueva venta ${orderNumber} - ${this.formatCurrency(totalAmount)}`,
-      relatedEntityType: 'order',
+      relatedEntityType: "order",
       relatedEntityId: orderId,
       actionUrl: `/admin/orders/${orderId}`,
-      actionLabel: 'Ver Pedido',
+      actionLabel: "Ver Pedido",
       metadata: {
         order_number: orderNumber,
         customer_email: customerEmail,
-        total_amount: totalAmount
-      }
+        total_amount: totalAmount,
+      },
     });
   }
 
@@ -330,22 +344,108 @@ export class NotificationService {
     appointmentId: string,
     customerName: string,
     appointmentDate: string,
-    appointmentTime: string
+    appointmentTime: string,
   ): Promise<void> {
     await this.createNotification({
-      type: 'appointment_new',
-      priority: 'medium',
-      title: 'Nueva Cita',
+      type: "appointment_new",
+      priority: "medium",
+      title: "Nueva Cita",
       message: `Nueva cita para ${customerName} el ${appointmentDate} a las ${appointmentTime}`,
-      relatedEntityType: 'appointment',
+      relatedEntityType: "appointment",
       relatedEntityId: appointmentId,
       actionUrl: `/admin/appointments`,
-      actionLabel: 'Ver Citas',
+      actionLabel: "Ver Citas",
       metadata: {
         customer_name: customerName,
         appointment_date: appointmentDate,
-        appointment_time: appointmentTime
-      }
+        appointment_time: appointmentTime,
+      },
+    });
+  }
+
+  /**
+   * Create notification for new SaaS support ticket (visible to root/dev only)
+   */
+  static async notifySaasSupportTicketNew(
+    ticketId: string,
+    ticketNumber: string,
+    subject: string,
+    requesterEmail: string,
+    organizationName?: string,
+  ): Promise<void> {
+    await this.createNotification({
+      type: "support_ticket_new",
+      priority: "high",
+      title: "Nuevo ticket de soporte SaaS",
+      message: organizationName
+        ? `#${ticketNumber}: ${subject} — ${requesterEmail} (${organizationName})`
+        : `#${ticketNumber}: ${subject} — ${requesterEmail}`,
+      relatedEntityType: "saas_support_ticket",
+      relatedEntityId: ticketId,
+      actionUrl: `/admin/saas-management/support/tickets/${ticketId}`,
+      actionLabel: "Ver ticket",
+      targetAdminRole: "root",
+      metadata: {
+        ticket_number: ticketNumber,
+        subject,
+        requester_email: requesterEmail,
+        organization_name: organizationName,
+      },
+    });
+  }
+
+  /**
+   * Create notification when SaaS support ticket is assigned (visible to assigned user)
+   */
+  static async notifySaasSupportTicketAssigned(
+    ticketId: string,
+    ticketNumber: string,
+    subject: string,
+    assignedToAdminId: string,
+  ): Promise<void> {
+    await this.createNotification({
+      type: "support_ticket_update",
+      priority: "high",
+      title: "Ticket de soporte asignado",
+      message: `Te han asignado el ticket #${ticketNumber}: ${subject}`,
+      relatedEntityType: "saas_support_ticket",
+      relatedEntityId: ticketId,
+      actionUrl: `/admin/saas-management/support/tickets/${ticketId}`,
+      actionLabel: "Ver ticket",
+      targetAdminId: assignedToAdminId,
+      metadata: {
+        ticket_number: ticketNumber,
+        subject,
+      },
+    });
+  }
+
+  /**
+   * Create notification when customer adds message to SaaS ticket (visible to root/dev)
+   */
+  static async notifySaasSupportNewMessage(
+    ticketId: string,
+    ticketNumber: string,
+    subject: string,
+    fromCustomer: boolean,
+  ): Promise<void> {
+    await this.createNotification({
+      type: "support_ticket_update",
+      priority: fromCustomer ? "high" : "medium",
+      title: fromCustomer
+        ? "Nueva respuesta del cliente (SaaS)"
+        : "Nueva actividad en ticket SaaS",
+      message: `#${ticketNumber}: ${subject}`,
+      relatedEntityType: "saas_support_ticket",
+      relatedEntityId: ticketId,
+      actionUrl: `/admin/saas-management/support/tickets/${ticketId}`,
+      actionLabel: "Ver ticket",
+      targetAdminRole: "root",
+      metadata: {
+        ticket_number: ticketNumber,
+        subject,
+        from_customer: fromCustomer,
+      },
     });
   }
 
@@ -353,10 +453,10 @@ export class NotificationService {
    * Helper to format currency
    */
   private static formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      minimumFractionDigits: 0,
     }).format(amount);
   }
 }

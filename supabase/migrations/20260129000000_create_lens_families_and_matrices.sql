@@ -90,11 +90,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_lens_families_updated_at ON public.lens_families;
 CREATE TRIGGER update_lens_families_updated_at
   BEFORE UPDATE ON public.lens_families
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_lens_price_matrices_updated_at ON public.lens_price_matrices;
 CREATE TRIGGER update_lens_price_matrices_updated_at
   BEFORE UPDATE ON public.lens_price_matrices
   FOR EACH ROW
@@ -106,6 +108,7 @@ ALTER TABLE public.lens_price_matrices ENABLE ROW LEVEL SECURITY;
 
 -- ===== RLS POLICIES FOR LENS_FAMILIES =====
 -- Admins can view all lens families
+DROP POLICY IF EXISTS "Admins can view lens families" ON public.lens_families;
 CREATE POLICY "Admins can view lens families"
 ON public.lens_families
 FOR SELECT
@@ -118,6 +121,7 @@ USING (
 );
 
 -- Admins can insert lens families
+DROP POLICY IF EXISTS "Admins can insert lens families" ON public.lens_families;
 CREATE POLICY "Admins can insert lens families"
 ON public.lens_families
 FOR INSERT
@@ -130,6 +134,7 @@ WITH CHECK (
 );
 
 -- Admins can update lens families
+DROP POLICY IF EXISTS "Admins can update lens families" ON public.lens_families;
 CREATE POLICY "Admins can update lens families"
 ON public.lens_families
 FOR UPDATE
@@ -142,6 +147,7 @@ USING (
 );
 
 -- Admins can delete lens families (soft delete via is_active)
+DROP POLICY IF EXISTS "Admins can delete lens families" ON public.lens_families;
 CREATE POLICY "Admins can delete lens families"
 ON public.lens_families
 FOR DELETE
@@ -155,6 +161,7 @@ USING (
 
 -- ===== RLS POLICIES FOR LENS_PRICE_MATRICES =====
 -- Admins can view all price matrices
+DROP POLICY IF EXISTS "Admins can view lens price matrices" ON public.lens_price_matrices;
 CREATE POLICY "Admins can view lens price matrices"
 ON public.lens_price_matrices
 FOR SELECT
@@ -167,6 +174,7 @@ USING (
 );
 
 -- Admins can insert price matrices
+DROP POLICY IF EXISTS "Admins can insert lens price matrices" ON public.lens_price_matrices;
 CREATE POLICY "Admins can insert lens price matrices"
 ON public.lens_price_matrices
 FOR INSERT
@@ -179,6 +187,7 @@ WITH CHECK (
 );
 
 -- Admins can update price matrices
+DROP POLICY IF EXISTS "Admins can update lens price matrices" ON public.lens_price_matrices;
 CREATE POLICY "Admins can update lens price matrices"
 ON public.lens_price_matrices
 FOR UPDATE
@@ -191,6 +200,7 @@ USING (
 );
 
 -- Admins can delete price matrices
+DROP POLICY IF EXISTS "Admins can delete lens price matrices" ON public.lens_price_matrices;
 CREATE POLICY "Admins can delete lens price matrices"
 ON public.lens_price_matrices
 FOR DELETE
@@ -205,7 +215,7 @@ USING (
 -- ===== COMMENTS =====
 COMMENT ON TABLE public.lens_families IS 'Familias de lentes ópticos definidas por tipo y material';
 COMMENT ON TABLE public.lens_price_matrices IS 'Matrices de precios para familias de lentes según rangos de esfera y cilindro';
-COMMENT ON FUNCTION public.calculate_lens_price IS 'Calcula el precio de un lente según familia, receta y tipo de sourcing';
+-- Comment removed - function signature varies across migrations, comment is set in earlier migration
 COMMENT ON COLUMN public.lens_families.lens_type IS 'Tipo de lente: single_vision, bifocal, trifocal, progressive, reading, computer, sports';
 COMMENT ON COLUMN public.lens_families.lens_material IS 'Material del lente: cr39, polycarbonate, high_index_1_67, high_index_1_74, trivex, glass';
 COMMENT ON COLUMN public.lens_price_matrices.sourcing_type IS 'Tipo de sourcing: stock (en inventario) o surfaced (surfaced a pedido)';

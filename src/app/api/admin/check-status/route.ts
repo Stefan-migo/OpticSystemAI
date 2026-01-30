@@ -6,7 +6,14 @@ import type {
   IsAdminResult,
   GetAdminRoleParams,
   GetAdminRoleResult,
+  IsSuperAdminParams,
+  IsSuperAdminResult,
+  IsRootUserParams,
+  IsRootUserResult,
 } from "@/types/supabase-rpc";
+
+const DEMO_ORG_ID =
+  process.env.NEXT_PUBLIC_DEMO_ORG_ID || "00000000-0000-0000-0000-000000000001";
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,12 +48,43 @@ export async function GET(request: NextRequest) {
       } as GetAdminRoleParams,
     )) as { data: GetAdminRoleResult | null; error: Error | null };
 
+    // Check if user is super admin (has global branch access)
+    const { data: isSuperAdminRPC, error: superAdminError } =
+      (await supabase.rpc("is_super_admin", {
+        user_id: user.id,
+      } as IsSuperAdminParams)) as {
+        data: IsSuperAdminResult | null;
+        error: Error | null;
+      };
+
     // Check admin_users table directly
     const { data: adminRecord, error: adminRecordError } = await supabase
       .from("admin_users")
       .select("*")
       .eq("id", user.id)
       .single();
+
+    // Get organization_id from admin_users
+    const organizationId = adminRecord?.organization_id || null;
+    // isSuperAdmin puede venir del role O de la función is_super_admin (acceso global)
+    const isSuperAdmin = adminRole === "super_admin" || !!isSuperAdminRPC;
+    // Check if user is root/dev (no necesita organización)
+    const { data: isRoot, error: rootError } = (await supabase.rpc(
+      "is_root_user",
+      {
+        user_id: user.id,
+      } as IsRootUserParams,
+    )) as {
+      data: IsRootUserResult | null;
+      error: Error | null;
+    };
+    const isRootUser = !!isRoot;
+    const isDemoMode = organizationId === DEMO_ORG_ID;
+
+    // Determine if onboarding is required
+    // Onboarding required if: user is admin but has no organization_id (and not super_admin and not root/dev)
+    const onboardingRequired =
+      isAdmin && !organizationId && !isSuperAdmin && !isRootUser;
 
     // Test products query
     const {
@@ -71,6 +109,14 @@ export async function GET(request: NextRequest) {
         roleError: roleError?.message,
         adminRecord: adminRecord,
         adminRecordError: adminRecordError?.message,
+      },
+      organization: {
+        organizationId,
+        hasOrganization: !!organizationId,
+        isDemoMode,
+        isSuperAdmin,
+        isRootUser,
+        onboardingRequired,
       },
       productsTest: {
         count: count,

@@ -3,8 +3,8 @@
 ## Tracking Detallado del Avance
 
 **Fecha de Inicio:** 2025-01-27  
-**Última Actualización:** 2026-01-27  
-**Estado General:** 🟢 Fase 6.2 Completada - Tests de Integración Pasando (12/12)
+**Última Actualización:** 2026-01-28  
+**Estado General:** 🟢 Fase 6.2 Completada — Phase SaaS 1 (Billing) en progreso: DB, Backend, Flow, Env doc, UI checkout
 
 ---
 
@@ -518,25 +518,45 @@ PRÓXIMO: Validar tests de Products y Orders API, luego Phase SaaS 1
 
 ## 💳 Phase SaaS 1: Billing y Suscripciones
 
-**Estado:** 🔴 No Iniciada  
+**Estado:** 🟡 En Progreso  
 **Duración Estimada:** 2 semanas  
-**Fecha de Inicio:** Después de Phase SaaS 0 + Testing  
+**Fecha de Inicio:** 2026-01-28  
 **Fecha de Finalización:** -  
 **Branch:** `phase-saas-1-billing`  
-**Dependencia:** Phase SaaS 0 completada y testeada
+**Dependencia:** Phase SaaS 0 completada y testeada  
+**Guía paso a paso:** `docs/PAYMENT_GATEWAYS_IMPLEMENTATION_GUIDE.md`
 
-### Tarea SaaS 1.1: Integración Stripe/MercadoPago
+### Avance Fase 1 (Preparación) — Completada
 
-- **Estado:** 🔴 No Iniciada
+- **Estado:** 🟢 Completada
+- **Notas:**
+  - [x] Migración DB: `20260131000000_create_payments_and_webhook_events.sql` (tablas `payments`, `webhook_events`, RLS, índices, función `get_user_organization_id`). Aplicada en local (Docker).
+  - [x] Estructura de directorios: `src/lib/payments/`, `src/types/payment.ts`, interfaces y tipos definidos.
+  - [x] Variables de entorno: documentado en `docs/PAYMENT_GATEWAYS_ENV_SETUP.md` (alta Flow, Mercado Pago, PayPal y obtención de claves; `NEXT_PUBLIC_BASE_URL`; ejemplo `.env.local` y producción). Configurar en `.env.local` según la guía cuando se usen las pasarelas.
+
+### Avance Fase 2 (Backend Core) — Completada
+
+- **Estado:** 🟢 Completada
+- **Notas:**
+  - [x] `PaymentService` implementado (`src/lib/payments/services/payment-service.ts`).
+  - [x] `PaymentGatewayFactory` e interfaz `IPaymentGateway` (`src/lib/payments/index.ts`, `interfaces.ts`).
+  - [x] Endpoint POST `/api/admin/payments/create-intent` con validación Zod, auth admin y contexto de organización.
+  - [x] Integración Flow: `FlowGateway` (createPaymentIntent, processWebhookEvent, mapStatus) — pasarela chilena con soporte completo en Chile.
+  - [x] Webhook Flow: POST `/api/webhooks/flow` — verificación de firma HMAC-SHA256, idempotencia con `webhook_events`, actualización de pago y fulfill de orden (`src/app/api/webhooks/flow/route.ts`).
+
+### Tarea SaaS 1.1: Integración Flow/MercadoPago/PayPal
+
+- **Estado:** 🟢 Completada (Flow); Mercado Pago y PayPal implementados
 - **Prioridad:** 🔴 CRÍTICA
 - **Tiempo Estimado:** 5 días
-- **Progreso:** 0/5 pasos
+- **Progreso:** 5/5 pasos (Flow)
 - **Notas:**
-  - [ ] Instalar dependencias
-  - [ ] Crear archivo de configuración
-  - [ ] Crear API endpoints
-  - [ ] Crear componentes de UI
-  - [ ] Configurar webhooks
+  - [x] Flow implementado (pasarela chilena, reemplaza Stripe que no tiene soporte en Chile)
+  - [x] Crear archivo de configuración / abstracción (PaymentGatewayFactory, interfaces)
+  - [x] Crear API endpoint create-intent (Flow)
+  - [x] Configurar webhook endpoint Flow (`/api/webhooks/flow`)
+  - [x] Crear componentes de UI (checkout: `CheckoutForm`, página `/admin/checkout` con redirección a Flow)
+  - [x] Mercado Pago y PayPal: gateways + webhooks (misma estructura que Flow) — `src/lib/payments/mercadopago/gateway.ts`, `src/lib/payments/paypal/gateway.ts`, `src/app/api/webhooks/mercadopago/route.ts`, `src/app/api/webhooks/paypal/route.ts`; Factory actualizado.
 
 ### Tarea SaaS 1.2: Gestión de Suscripciones
 
@@ -758,7 +778,7 @@ Razón: Los tests validarán que el aislamiento de datos por tenant funciona cor
    - Mergear Phase SaaS 0 a main
 
 5. **Iniciar Phase SaaS 1 (2 semanas)**
-   - Stripe integration
+   - Flow integration (Chile)
    - Subscription management
    - Tier enforcement
 
@@ -773,6 +793,36 @@ Razón: Los tests validarán que el aislamiento de datos por tenant funciona cor
 2. ✅ **COMPLETADO:** Validar tests de Customers API - 12/12 tests pasando
 3. **PRÓXIMO:** Validar tests de Products y Orders API (22 tests restantes)
 4. Continuar con Phase SaaS 1: Billing y Suscripciones
+
+### 2026-01-28 (Phase SaaS 1: Billing — DB + Backend Core + Webhook Stripe)
+
+- ✅ **Fase 1 Preparación (Billing):**
+  - ✅ Migración `20260131000000_create_payments_and_webhook_events.sql`: tablas `payments`, `webhook_events`, RLS, índices, función `get_user_organization_id`. Aplicada en Supabase local (Docker).
+- ✅ **Fase 2 Backend Core (Billing):**
+  - ✅ Tipos e interfaces: `src/types/payment.ts`, `src/lib/payments/interfaces.ts` (Payment, WebhookEvent, IPaymentGateway, PaymentIntentResponse).
+  - ✅ `PaymentService`: createPayment, updatePaymentStatus, getPaymentById, getPaymentByGatewayPaymentIntentId, recordWebhookEvent, markWebhookEventAsProcessed, fulfillOrder.
+  - ✅ `PaymentGatewayFactory` e integración Stripe: `StripeGateway` (createPaymentIntent, processWebhookEvent, mapStatus).
+  - ✅ Endpoint POST `/api/admin/payments/create-intent`: validación Zod, auth admin, contexto organización, rate limiting.
+- ✅ **Webhook Stripe:**
+  - ✅ POST `/api/webhooks/stripe`: verificación de firma (`StripeGateway.processWebhookEvent`), idempotencia con `webhook_events`, búsqueda de pago por `gateway_payment_intent_id`, actualización de estado, fulfill de orden si status `succeeded` y hay `order_id`. Sin rate limiting (según guía).
+- 📝 Documentación: sección "Pasos completados hasta la fecha" en `PAYMENT_GATEWAYS_IMPLEMENTATION_GUIDE.md`; checklist y avance en `PROGRESO_MEJORAS.md` actualizados.
+- **Próximo:** Variables de entorno, UI checkout, tests de integración Stripe.
+
+### 2026-01-28 (Phase SaaS 1: Variables de entorno + UI checkout)
+
+- ✅ **Variables de entorno:** Guía `docs/PAYMENT_GATEWAYS_ENV_SETUP.md` creada y referenciada: alta en Flow (Chile), Mercado Pago y PayPal; obtención de API keys y webhook secrets; `NEXT_PUBLIC_BASE_URL`; ejemplo `.env.local` y configuración en producción (Vercel).
+- ✅ **UI checkout:** Página `/admin/checkout` con `CheckoutForm` (llamada a create-intent, selector de gateway, redirección a `approvalUrl` de Flow). Enlace "Checkout" en el layout de admin.
+- **Próximo:** Tests de integración create-intent y webhook Flow; implementación Mercado Pago y PayPal (gateways + webhooks).
+
+### 2026-01-29 (Phase SaaS 1: Migración de Stripe a Flow)
+
+- ✅ **Migración completa:** Stripe removido (no tiene soporte en Chile), Flow implementado como pasarela principal.
+- ✅ **Código eliminado:** `src/lib/payments/stripe/gateway.ts`, `src/app/api/webhooks/stripe/route.ts`, `src/components/checkout/StripePaymentForm.tsx`.
+- ✅ **Flow implementado:** `src/lib/payments/flow/gateway.ts` (createPaymentIntent con firma HMAC-SHA256, processWebhookEvent, mapStatus), `src/app/api/webhooks/flow/route.ts`.
+- ✅ **UI actualizada:** `CheckoutForm` ahora redirige a `approvalUrl` de Flow en lugar de usar Stripe Elements.
+- ✅ **Tipos y schemas:** `PaymentGateway` actualizado de `"stripe"` a `"flow"`; `createPaymentIntentSchema` actualizado.
+- ✅ **Tests actualizados:** Referencias a Stripe reemplazadas por Flow en `src/__tests__/integration/api/payments.test.ts`.
+- ✅ **Documentación actualizada:** `PAYMENT_GATEWAYS_IMPLEMENTATION_GUIDE.md` (sección 6.1 ahora es Flow), `PAYMENT_GATEWAYS_ENV_SETUP.md` (sección 2 ahora es Flow), `PROGRESO_MEJORAS.md`.
 
 ### 2026-01-29 (Proceso de Salvataje de Código)
 

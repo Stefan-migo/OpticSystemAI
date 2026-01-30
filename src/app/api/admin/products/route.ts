@@ -421,18 +421,20 @@ export async function GET(request: NextRequest) {
           // If no branch was explicitly requested AND we're searching, show all products from organization (no branch filtering)
           // This ensures that when searching without a specific branch, we see all products from the organization
 
-          if (currentBranchId && product.product_branch_stock) {
+          if (currentBranchId) {
             // Filter stock by branch_id and take the first match
             let stockData = null;
-            if (Array.isArray(product.product_branch_stock)) {
-              stockData =
-                product.product_branch_stock.find(
-                  (s: any) => s.branch_id === currentBranchId,
-                ) || product.product_branch_stock[0]; // Fallback to first if no match
-            } else if (
-              product.product_branch_stock.branch_id === currentBranchId
-            ) {
-              stockData = product.product_branch_stock;
+            if (product.product_branch_stock) {
+              if (Array.isArray(product.product_branch_stock)) {
+                stockData =
+                  product.product_branch_stock.find(
+                    (s: any) => s.branch_id === currentBranchId,
+                  ) || product.product_branch_stock[0]; // Fallback to first if no match
+              } else if (
+                product.product_branch_stock.branch_id === currentBranchId
+              ) {
+                stockData = product.product_branch_stock;
+              }
             }
 
             if (stockData) {
@@ -448,11 +450,19 @@ export async function GET(request: NextRequest) {
               product.total_available_quantity = availableQuantity;
               product.total_reserved_quantity = reservedQuantity;
             } else {
-              // No stock record for this branch
-              product.total_inventory_quantity = 0;
-              product.total_available_quantity = 0;
+              // No stock record for this branch - check if product has legacy inventory_quantity
+              // This handles products that were created before the stock refactor
+              const legacyQuantity = product.inventory_quantity || 0;
+              product.total_inventory_quantity = legacyQuantity;
+              product.total_available_quantity = legacyQuantity;
               product.total_reserved_quantity = 0;
             }
+          } else {
+            // No branch selected - use legacy inventory_quantity if available
+            const legacyQuantity = product.inventory_quantity || 0;
+            product.total_inventory_quantity = legacyQuantity;
+            product.total_available_quantity = legacyQuantity;
+            product.total_reserved_quantity = 0;
           }
           return product;
         })

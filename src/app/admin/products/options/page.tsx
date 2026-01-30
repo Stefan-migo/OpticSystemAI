@@ -22,7 +22,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Edit2, Trash2, GripVertical, Eye, EyeOff } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Edit2,
+  Trash2,
+  GripVertical,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface OptionField {
@@ -54,7 +62,11 @@ export default function ProductOptionsPage() {
   const [showAddValueDialog, setShowAddValueDialog] = useState(false);
   const [showEditValueDialog, setShowEditValueDialog] = useState(false);
   const [editingValue, setEditingValue] = useState<OptionValue | null>(null);
-  const [newValue, setNewValue] = useState({ value: "", label: "", is_default: false });
+  const [newValue, setNewValue] = useState({
+    value: "",
+    label: "",
+    is_default: false,
+  });
   const [categories] = useState([
     { value: "general", label: "General" },
     { value: "frame", label: "Armazón" },
@@ -69,7 +81,9 @@ export default function ProductOptionsPage() {
   const fetchFields = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/product-options?include_inactive=true");
+      const response = await fetch(
+        "/api/admin/product-options?include_inactive=true",
+      );
       const data = await response.json();
       if (response.ok) {
         setFields(data.fields || []);
@@ -166,7 +180,7 @@ export default function ProductOptionsPage() {
     try {
       const response = await fetch(
         `/api/admin/product-options?type=value&id=${value.id}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
 
       const data = await response.json();
@@ -196,7 +210,7 @@ export default function ProductOptionsPage() {
 
       if (response.ok) {
         toast.success(
-          value.is_active ? "Opción desactivada" : "Opción activada"
+          value.is_active ? "Opción desactivada" : "Opción activada",
         );
         fetchFields();
       } else {
@@ -244,7 +258,9 @@ export default function ProductOptionsPage() {
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold">Personalizar Opciones de Productos</h1>
+          <h1 className="text-3xl font-bold">
+            Personalizar Opciones de Productos
+          </h1>
         </div>
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -254,8 +270,9 @@ export default function ProductOptionsPage() {
 
       <div className="mb-6">
         <p className="text-gray-600">
-          Personaliza las opciones disponibles en los menús desplegables del formulario de productos.
-          Puedes agregar, editar, eliminar y activar/desactivar opciones.
+          Personaliza las opciones disponibles en los menús desplegables del
+          formulario de productos. Puedes agregar, editar, eliminar y
+          activar/desactivar opciones.
         </p>
       </div>
 
@@ -267,15 +284,22 @@ export default function ProductOptionsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {category.fields.length === 0 ? (
-                <p className="text-gray-500 text-sm">No hay campos en esta categoría</p>
+                <p className="text-gray-500 text-sm">
+                  No hay campos en esta categoría
+                </p>
               ) : (
                 category.fields.map((field) => (
                   <div key={field.id} className="border rounded-lg p-4">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h3 className="font-semibold text-lg">{field.field_label}</h3>
+                        <h3 className="font-semibold text-lg">
+                          {field.field_label}
+                        </h3>
                         <p className="text-sm text-gray-500">
-                          Campo: <code className="bg-gray-100 px-1 rounded">{field.field_key}</code>
+                          Campo:{" "}
+                          <code className="bg-gray-100 px-1 rounded">
+                            {field.field_key}
+                          </code>
                           {field.is_array && (
                             <Badge variant="secondary" className="ml-2">
                               Múltiples valores
@@ -299,7 +323,9 @@ export default function ProductOptionsPage() {
                           <div
                             key={value.id}
                             className={`flex items-center justify-between p-2 rounded border ${
-                              !value.is_active ? "bg-gray-50 opacity-60" : "bg-white"
+                              !value.is_active
+                                ? "bg-gray-50 opacity-60"
+                                : "bg-white"
                             }`}
                           >
                             <div className="flex items-center gap-3 flex-1">
@@ -324,7 +350,9 @@ export default function ProductOptionsPage() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleToggleValueActive(value)}
-                                title={value.is_active ? "Desactivar" : "Activar"}
+                                title={
+                                  value.is_active ? "Desactivar" : "Activar"
+                                }
                               >
                                 {value.is_active ? (
                                   <Eye className="h-4 w-4" />
@@ -375,7 +403,10 @@ export default function ProductOptionsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="new_value">Valor (código interno)</Label>
+              <Label htmlFor="new_value">Valor</Label>
+              <p className="text-xs text-gray-500 mb-1">
+                Código interno utilizado por el sistema
+              </p>
               <Input
                 id="new_value"
                 value={newValue.value}
@@ -438,7 +469,10 @@ export default function ProductOptionsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit_value">Valor (código interno)</Label>
+              <Label htmlFor="edit_value">Valor</Label>
+              <p className="text-xs text-gray-500 mb-1">
+                Código interno utilizado por el sistema
+              </p>
               <Input
                 id="edit_value"
                 value={newValue.value}
@@ -470,7 +504,9 @@ export default function ProductOptionsPage() {
                 }
                 className="rounded"
               />
-              <Label htmlFor="edit_is_default">Marcar como opción por defecto</Label>
+              <Label htmlFor="edit_is_default">
+                Marcar como opción por defecto
+              </Label>
             </div>
           </div>
           <DialogFooter>
@@ -487,4 +523,3 @@ export default function ProductOptionsPage() {
     </div>
   );
 }
-

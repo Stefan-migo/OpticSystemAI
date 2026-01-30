@@ -1,4 +1,4 @@
-# Plan de Mejoras Estructurales - OpticSystemAI
+# Plan de Mejoras Estructurales - Opttius
 
 ## Proceso Sistemático, Minucioso y Quirúrgico
 

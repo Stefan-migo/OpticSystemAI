@@ -103,6 +103,23 @@ export async function POST(request: NextRequest) {
             near_lens_family_id,
             far_lens_cost,
             near_lens_cost,
+            // Contact lens fields
+            contact_lens_family_id,
+            contact_lens_rx_sphere_od,
+            contact_lens_rx_cylinder_od,
+            contact_lens_rx_axis_od,
+            contact_lens_rx_add_od,
+            contact_lens_rx_base_curve_od,
+            contact_lens_rx_diameter_od,
+            contact_lens_rx_sphere_os,
+            contact_lens_rx_cylinder_os,
+            contact_lens_rx_axis_os,
+            contact_lens_rx_add_os,
+            contact_lens_rx_base_curve_os,
+            contact_lens_rx_diameter_os,
+            contact_lens_quantity,
+            contact_lens_cost,
+            contact_lens_price,
             quote_id,
           } = validatedBody;
 
@@ -773,8 +790,33 @@ export async function POST(request: NextRequest) {
             // The order is still created, just without billing document
           }
 
-          // ✅ REDUCIR STOCK PARA TODOS LOS PRODUCTOS VENDIDOS (antes de verificar work order)
-          // Esto asegura que el stock se reduce para TODOS los productos, independientemente de si requieren work order o no
+          // ✅ REDUCIR STOCK PARA PRODUCTOS FÍSICOS VENDIDOS (antes de verificar work order)
+          // Solo reducir stock para productos físicos que tienen stock (no servicios)
+          // Obtener tipos de productos para determinar cuáles requieren stock
+          const productIdsForStock = items
+            .map((item) => item.product_id)
+            .filter(
+              (id): id is string =>
+                !!id &&
+                !id.includes("frame-manual") &&
+                !id.includes("lens-") &&
+                !id.includes("treatments-") &&
+                !id.includes("labor-") &&
+                !id.includes("discount-"),
+            );
+
+          let productsForStockCheck: Array<{
+            id: string;
+            product_type?: string;
+          }> = [];
+          if (productIdsForStock.length > 0) {
+            const { data: products } = await supabaseServiceRole
+              .from("products")
+              .select("id, product_type")
+              .in("id", productIdsForStock);
+            productsForStockCheck = products || [];
+          }
+
           for (const item of items) {
             if (
               item.product_id &&
@@ -784,6 +826,18 @@ export async function POST(request: NextRequest) {
               !item.product_id.includes("labor-") &&
               !item.product_id.includes("discount-")
             ) {
+              // Verificar si el producto es de tipo "service" (no requiere stock)
+              const product = productsForStockCheck.find(
+                (p) => p.id === item.product_id,
+              );
+              if (product?.product_type === "service") {
+                // Los servicios no requieren stock
+                logger.info("Skipping stock update for service product", {
+                  product_id: item.product_id,
+                });
+                continue;
+              }
+
               const branchId = branchContext.branchId;
               if (!branchId) {
                 logger.warn(
@@ -792,27 +846,81 @@ export async function POST(request: NextRequest) {
                 continue;
               }
 
-              const { error: inventoryError } = await supabaseServiceRole.rpc(
-                "update_product_stock",
-                {
+              // Verificar stock actual antes de reducir
+              const { data: currentStock } = await supabaseServiceRole
+                .from("product_branch_stock")
+                .select("quantity")
+                .eq("product_id", item.product_id)
+                .eq("branch_id", branchId)
+                .maybeSingle();
+
+              const currentQuantity = currentStock?.quantity || 0;
+
+              // Si no hay stock registrado y se intenta reducir, crear registro con 0 y luego reducir
+              // Esto maneja el caso donde un producto se vende por primera vez sin stock inicial
+              if (!currentStock && currentQuantity === 0) {
+                logger.info("Creating initial stock record for product", {
+                  product_id: item.product_id,
+                  branch_id: branchId,
+                });
+
+                // Crear registro inicial con cantidad 0
+                const { error: createError } = await supabaseServiceRole
+                  .from("product_branch_stock")
+                  .insert({
+                    product_id: item.product_id,
+                    branch_id: branchId,
+                    quantity: 0,
+                    reserved_quantity: 0,
+                    low_stock_threshold: 5,
+                  });
+
+                if (createError) {
+                  logger.error(
+                    `Error creating initial stock record for product ${item.product_id}`,
+                    {
+                      error: createError,
+                      product_id: item.product_id,
+                      branch_id: branchId,
+                    },
+                  );
+                  // Continue anyway - the RPC function will handle it
+                }
+              }
+
+              logger.info("Attempting to update inventory", {
+                product_id: item.product_id,
+                branch_id: branchId,
+                quantity: item.quantity,
+                product_type: product?.product_type,
+                current_quantity: currentQuantity,
+              });
+
+              const { data: stockUpdateResult, error: inventoryError } =
+                await supabaseServiceRole.rpc("update_product_stock", {
                   p_product_id: item.product_id,
                   p_branch_id: branchId,
                   p_quantity_change: -item.quantity, // Negative to decrease
                   p_reserve: false, // Decrease actual quantity, not reserved
-                },
-              );
+                });
 
               if (inventoryError) {
                 logger.error(
                   `Error updating inventory for product ${item.product_id}`,
-                  inventoryError,
+                  {
+                    error: inventoryError,
+                    product_id: item.product_id,
+                    branch_id: branchId,
+                    quantity: item.quantity,
+                  },
                 );
                 // Don't fail the transaction, but log the error
               } else {
-                logger.info("Inventory updated", {
+                logger.info("Inventory updated successfully", {
                   product_id: item.product_id,
                   branch_id: branchId,
                   quantity_decreased: item.quantity,
+                  result: stockUpdateResult,
                 });
               }
             }
@@ -828,9 +936,14 @@ export async function POST(request: NextRequest) {
               item.product_id.includes("frame-manual-"),
           );
 
-          // Verificar si hay un marco (frame) en los items
-          // Necesitamos obtener el product_type de los productos en la base de datos
+          // Verificar tipos de productos en los items
+          // Necesitamos obtener el product_type y category de los productos en la base de datos
           let hasFrameInItems = false;
+          let productTypesInItems: string[] = [];
+          let productCategories: Array<{
+            id: string;
+            category_name: string | null;
+          }> = [];
           if (items.length > 0) {
             const productIds = items
               .map((item) => item.product_id)
@@ -840,37 +953,93 @@ export async function POST(request: NextRequest) {
                   !id.includes("lens-") &&
                   !id.includes("treatments-") &&
                   !id.includes("labor-") &&
-                  !id.includes("frame-manual-"),
+                  !id.includes("frame-manual-") &&
+                  !id.includes("discount-"),
               );
 
             if (productIds.length > 0) {
               const { data: products } = await supabaseServiceRole
                 .from("products")
-                .select("id, product_type")
+                .select(
+                  "id, product_type, category_id, categories:category_id(name)",
+                )
                 .in("id", productIds);
 
               hasFrameInItems = (products || []).some(
                 (p: any) => p.product_type === "frame",
               );
+              productTypesInItems = (products || []).map(
+                (p: any) => p.product_type,
+              );
+              // Extraer nombres de categorías
+              productCategories = (products || []).map((p: any) => ({
+                id: p.id,
+                category_name: p.categories?.name || null,
+              }));
             }
           }
 
+          // Productos que NO requieren cliente registrado ni trabajo de laboratorio
+          const nonWorkOrderTypes = [
+            "accessory",
+            "sunglasses",
+            "service",
+            "lens",
+          ];
+          // Categorías que no requieren trabajo de laboratorio
+          const nonWorkOrderCategoryNames = [
+            "accesorio",
+            "accesorios",
+            "lente de sol",
+            "lentes de sol",
+            "servicio",
+            "servicios",
+          ];
+
+          // Verificar si todos los productos son de tipos que no requieren trabajo
+          const hasOnlyNonWorkOrderProductTypes =
+            productTypesInItems.length > 0 &&
+            productTypesInItems.every(
+              (type) => !type || nonWorkOrderTypes.includes(type),
+            );
+
+          // Verificar si todos los productos tienen categorías que no requieren trabajo
+          const hasOnlyNonWorkOrderProductCategories =
+            productCategories.length > 0 &&
+            productCategories.every((cat) => {
+              if (!cat.category_name) return false;
+              const categoryNameLower = cat.category_name.toLowerCase();
+              return nonWorkOrderCategoryNames.some((nonWorkCat) =>
+                categoryNameLower.includes(nonWorkCat),
+              );
+            });
+
+          // Si todos los productos son de tipos o categorías que no requieren trabajo, no se necesita cliente
+          const hasOnlyNonWorkOrderProducts =
+            hasOnlyNonWorkOrderProductTypes ||
+            hasOnlyNonWorkOrderProductCategories;
+
           // Verificar si hay datos de lentes que requieren montaje (con receta)
           const hasLensDataForMounting =
-            lens_data &&
-            (lens_data.lens_family_id ||
-              lens_data.lens_type ||
-              lens_data.lens_material ||
-              lens_data.prescription_id ||
-              presbyopia_solution !== "none");
+            (lens_data &&
+              (lens_data.lens_family_id ||
+                lens_data.lens_type ||
+                lens_data.lens_material ||
+                lens_data.prescription_id ||
+                presbyopia_solution !== "none")) ||
+            contact_lens_family_id ||
+            contact_lens_cost;
 
           // Solo se requiere trabajo de laboratorio si:
           // 1. Hay items temporales de lentes/labor (siempre requieren trabajo)
           // 2. Hay un marco EN LOS ITEMS Y hay datos de lentes para montar
-          // Los productos de tipo "accessory", "lens", "service" NO requieren trabajo
+          // Los productos de tipo "accessory", "sunglasses", "service", "lens" NO requieren trabajo
+          // Los productos con categorías "accesorio", "lente de sol", "servicio" NO requieren trabajo
+          // Si solo hay productos que no requieren trabajo, no se necesita cliente
           const actuallyRequiresWorkOrder =
-            hasTemporaryLensItems ||
-            (hasFrameInItems && hasLensDataForMounting);
+            !hasOnlyNonWorkOrderProducts &&
+            (hasTemporaryLensItems ||
+              (hasFrameInItems && hasLensDataForMounting));
 
           // Validar que si se requiere trabajo de laboratorio, hay un cliente registrado
           if (actuallyRequiresWorkOrder && !customer_id) {
@@ -1017,6 +1186,24 @@ export async function POST(request: NextRequest) {
               presbyopia_solution === "two_separate"
                 ? near_lens_cost || 0
                 : null,
+            // Contact lens fields
+            contact_lens_family_id: contact_lens_family_id || null,
+            contact_lens_rx_sphere_od: contact_lens_rx_sphere_od || null,
+            contact_lens_rx_cylinder_od: contact_lens_rx_cylinder_od || null,
+            contact_lens_rx_axis_od: contact_lens_rx_axis_od || null,
+            contact_lens_rx_add_od: contact_lens_rx_add_od || null,
+            contact_lens_rx_base_curve_od:
+              contact_lens_rx_base_curve_od || null,
+            contact_lens_rx_diameter_od: contact_lens_rx_diameter_od || null,
+            contact_lens_rx_sphere_os: contact_lens_rx_sphere_os || null,
+            contact_lens_rx_cylinder_os: contact_lens_rx_cylinder_os || null,
+            contact_lens_rx_axis_os: contact_lens_rx_axis_os || null,
+            contact_lens_rx_add_os: contact_lens_rx_add_os || null,
+            contact_lens_rx_base_curve_os:
+              contact_lens_rx_base_curve_os || null,
+            contact_lens_rx_diameter_os: contact_lens_rx_diameter_os || null,
+            contact_lens_quantity: contact_lens_quantity || 1,
+            contact_lens_cost: contact_lens_cost || null,
             prescription_snapshot: null,
             lab_name: null,
             lab_contact: null,
@@ -1027,7 +1214,7 @@ export async function POST(request: NextRequest) {
             lens_cost:
               presbyopia_solution === "two_separate"
                 ? (far_lens_cost || 0) + (near_lens_cost || 0)
-                : lensInfo.lens_cost,
+                : contact_lens_cost || lensInfo.lens_cost || 0,
             treatments_cost: treatmentsCost,
             labor_cost: laborCost,
             lab_cost: 0,

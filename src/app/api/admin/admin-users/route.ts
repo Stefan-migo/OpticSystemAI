@@ -5,6 +5,8 @@ import { appLogger as logger } from "@/lib/logger";
 import type {
   GetAdminRoleParams,
   GetAdminRoleResult,
+  IsSuperAdminParams,
+  IsSuperAdminResult,
 } from "@/types/supabase-rpc";
 
 export async function GET(request: NextRequest) {
@@ -31,14 +33,51 @@ export async function GET(request: NextRequest) {
       data: GetAdminRoleResult | null;
       error: Error | null;
     };
-    if (adminRole !== "admin") {
+
+    // Verificar que el usuario tiene algún rol administrativo
+    if (
+      !adminRole ||
+      !["admin", "super_admin", "root", "dev", "employee"].includes(adminRole)
+    ) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },
       );
     }
 
-    // Build the query - include branch access info
+    // Obtener información del usuario actual para determinar si es root/dev o super admin
+    const { data: currentAdminUser, error: currentAdminError } = await supabase
+      .from("admin_users")
+      .select("role, organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (currentAdminError) {
+      logger.error("Error fetching current admin user", currentAdminError);
+      return NextResponse.json(
+        { error: "Failed to verify user permissions" },
+        { status: 500 },
+      );
+    }
+
+    // Verificar si es root/dev (tiene acceso a todas las organizaciones)
+    const isRoot =
+      currentAdminUser?.role === "root" || currentAdminUser?.role === "dev";
+
+    // Verificar si es super admin (basado en admin_branch_access)
+    const { data: isSuperAdmin } = (await supabase.rpc("is_super_admin", {
+      user_id: user.id,
+    } as IsSuperAdminParams)) as {
+      data: IsSuperAdminResult | null;
+      error: Error | null;
+    };
+
+    // Obtener organization_id del usuario actual
+    const { data: userOrgId } = await supabase.rpc("get_user_organization_id", {
+      user_id: user.id,
+    });
+
+    // Build the query - include branch access info and organization_id
     let query = supabase.from("admin_users").select(`
         id,
         email,
@@ -48,6 +87,7 @@ export async function GET(request: NextRequest) {
         last_login,
         created_at,
         updated_at,
+        organization_id,
         admin_branch_access (
           id,
           branch_id,
@@ -60,6 +100,12 @@ export async function GET(request: NextRequest) {
           )
         )
       `);
+
+    // Aplicar filtro por organización SOLO si no es root/dev ni super admin
+    if (!isRoot && !isSuperAdmin && userOrgId) {
+      query = query.eq("organization_id", userOrgId);
+    }
+    // Si es root/dev o super admin, no aplicar filtro (ver todos los usuarios)
 
     // Apply filters
     if (role && role !== "all") {
@@ -410,17 +456,73 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Helper function to get default permissions for admin role
+// Helper function to get default permissions by role
 function getDefaultPermissions(role: string) {
-  // Simplified: all admins have full access
-  return {
-    orders: ["read", "create", "update", "delete"],
-    products: ["read", "create", "update", "delete"],
-    customers: ["read", "create", "update", "delete"],
-    analytics: ["read"],
-    settings: ["read", "create", "update", "delete"],
-    admin_users: ["read", "create", "update", "delete"],
-    support: ["read", "create", "update", "delete"],
-    bulk_operations: ["read", "create", "update", "delete"],
+  // Permisos por defecto según rol
+  const rolePermissions: Record<string, any> = {
+    root: {
+      orders: ["read", "create", "update", "delete"],
+      products: ["read", "create", "update", "delete"],
+      customers: ["read", "create", "update", "delete"],
+      analytics: ["read"],
+      settings: ["read", "create", "update", "delete"],
+      admin_users: ["read", "create", "update", "delete"],
+      support: ["read", "create", "update", "delete"],
+      bulk_operations: ["read", "create", "update", "delete"],
+      saas_management: ["read", "create", "update", "delete"],
+    },
+    dev: {
+      // Igual que root
+      orders: ["read", "create", "update", "delete"],
+      products: ["read", "create", "update", "delete"],
+      customers: ["read", "create", "update", "delete"],
+      analytics: ["read"],
+      settings: ["read", "create", "update", "delete"],
+      admin_users: ["read", "create", "update", "delete"],
+      support: ["read", "create", "update", "delete"],
+      bulk_operations: ["read", "create", "update", "delete"],
+      saas_management: ["read", "create", "update", "delete"],
+    },
+    super_admin: {
+      orders: ["read", "create", "update", "delete"],
+      products: ["read", "create", "update", "delete"],
+      customers: ["read", "create", "update", "delete"],
+      analytics: ["read"],
+      settings: ["read", "create", "update", "delete"],
+      admin_users: ["read", "create", "update", "delete"],
+      support: ["read", "create", "update", "delete"],
+      bulk_operations: ["read", "create", "update", "delete"],
+      branches: ["read", "create", "update", "delete"],
+    },
+    admin: {
+      orders: ["read", "create", "update", "delete"],
+      products: ["read", "create", "update", "delete"],
+      customers: ["read", "create", "update", "delete"],
+      analytics: ["read"],
+      settings: ["read", "update"], // No puede eliminar config críticas
+      admin_users: ["read"], // Solo ver, no crear/modificar
+      support: ["read", "create", "update"],
+      bulk_operations: ["read", "create"],
+      appointments: ["read", "create", "update", "delete"],
+      quotes: ["read", "create", "update", "delete"],
+      work_orders: ["read", "create", "update", "delete"],
+    },
+    employee: {
+      // Acceso operativo sin administración
+      orders: ["read", "create", "update"], // No puede eliminar órdenes
+      products: ["read"], // Solo lectura de catálogo
+      customers: ["read", "create", "update"], // No puede eliminar clientes
+      analytics: [], // Sin acceso a analytics
+      settings: [], // Sin acceso a configuración
+      admin_users: [], // Sin acceso a usuarios
+      support: ["read", "create"], // Puede crear tickets, no resolver
+      bulk_operations: [], // Sin operaciones masivas
+      appointments: ["read", "create", "update"], // Puede agendar, no eliminar
+      quotes: ["read", "create", "update"], // Puede crear presupuestos
+      work_orders: ["read", "update"], // Puede actualizar estado, no crear/eliminar
+      pos: ["read", "create"], // Acceso completo a POS para ventas
+    },
   };
+
+  return rolePermissions[role] || rolePermissions.admin;
 }

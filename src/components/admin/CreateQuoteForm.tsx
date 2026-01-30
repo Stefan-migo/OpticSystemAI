@@ -52,8 +52,10 @@ import {
   getRecommendedLensTypes,
   type PresbyopiaSolution,
 } from "@/lib/presbyopia-helpers";
+import { translatePrescriptionType } from "@/lib/prescription-helpers";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 
 interface CreateQuoteFormProps {
   onSuccess: () => void;
@@ -114,6 +116,14 @@ export default function CreateQuoteForm({
   const { calculateLensPrice, loading: calculatingPrice } =
     useLensPriceCalculation();
 
+  // Contact lens families and price calculation
+  const [contactLensFamilies, setContactLensFamilies] = useState<any[]>([]);
+  const [loadingContactLensFamilies, setLoadingContactLensFamilies] =
+    useState(false);
+  const [lensType, setLensType] = useState<"optical" | "contact">("optical"); // Toggle between optical and contact lenses
+  const [calculatingContactLensPrice, setCalculatingContactLensPrice] =
+    useState(false);
+
   // Presbyopia solution
   const [presbyopiaSolution, setPresbyopiaSolution] =
     useState<PresbyopiaSolution>("none");
@@ -157,6 +167,23 @@ export default function CreateQuoteForm({
     near_lens_family_id: "",
     far_lens_cost: 0,
     near_lens_cost: 0,
+    // Contact lens fields
+    contact_lens_family_id: "",
+    contact_lens_rx_sphere_od: null as number | null,
+    contact_lens_rx_cylinder_od: null as number | null,
+    contact_lens_rx_axis_od: null as number | null,
+    contact_lens_rx_add_od: null as number | null,
+    contact_lens_rx_base_curve_od: null as number | null,
+    contact_lens_rx_diameter_od: null as number | null,
+    contact_lens_rx_sphere_os: null as number | null,
+    contact_lens_rx_cylinder_os: null as number | null,
+    contact_lens_rx_axis_os: null as number | null,
+    contact_lens_rx_add_os: null as number | null,
+    contact_lens_rx_base_curve_os: null as number | null,
+    contact_lens_rx_diameter_os: null as number | null,
+    contact_lens_quantity: 1,
+    contact_lens_cost: 0,
+    contact_lens_price: 0,
     // Second frame for two separate lenses
     near_frame_product_id: "",
     near_frame_name: "",
@@ -189,6 +216,8 @@ export default function CreateQuoteForm({
     getTaxPercentage(19.0).then(setTaxPercentage);
     // Fetch lens families
     fetchLensFamilies();
+    // Fetch contact lens families
+    fetchContactLensFamilies();
   }, [currentBranchId]);
 
   // Listen for settings updates from other tabs/windows
@@ -251,6 +280,35 @@ export default function CreateQuoteForm({
       console.error("Error fetching lens families:", error);
     } finally {
       setLoadingFamilies(false);
+    }
+  };
+
+  // Fetch contact lens families
+  const fetchContactLensFamilies = async () => {
+    try {
+      setLoadingContactLensFamilies(true);
+      const response = await fetch("/api/admin/contact-lens-families");
+      if (response.ok) {
+        const data = await response.json();
+        console.log(
+          "Contact lens families loaded:",
+          data.families?.length || 0,
+          "families",
+        );
+        setContactLensFamilies(data.families || []);
+      } else {
+        console.error(
+          "Failed to fetch contact lens families:",
+          response.status,
+          response.statusText,
+        );
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Error details:", errorData);
+      }
+    } catch (error) {
+      console.error("Error fetching contact lens families:", error);
+    } finally {
+      setLoadingContactLensFamilies(false);
     }
   };
 
@@ -347,6 +405,71 @@ export default function CreateQuoteForm({
     }
   };
 
+  // Calculate contact lens price from matrix
+  const calculateContactLensPriceFromMatrix = async () => {
+    if (!formData.contact_lens_family_id || !selectedPrescription) {
+      return;
+    }
+
+    // Validate contact_lens_family_id is a valid UUID
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(formData.contact_lens_family_id)) {
+      return;
+    }
+
+    try {
+      setCalculatingContactLensPrice(true);
+
+      // Get sphere value from prescription (use OD sphere for calculation)
+      const sphereOD = selectedPrescription.od_sphere || 0;
+      const cylinderOD = selectedPrescription.od_cylinder || 0;
+      const axisOD = selectedPrescription.od_axis || null;
+      const additionOD = selectedPrescription.od_add || null;
+
+      const response = await fetch(
+        "/api/admin/contact-lens-matrices/calculate",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contact_lens_family_id: formData.contact_lens_family_id,
+            sphere: sphereOD,
+            cylinder: cylinderOD,
+            axis: axisOD,
+            addition: additionOD,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Error calculating contact lens price");
+      }
+
+      const data = await response.json();
+      if (data.calculation && data.calculation.price) {
+        // Calculate total price: price per box * quantity
+        const quantity = formData.contact_lens_quantity || 1;
+        const totalPrice = data.calculation.price * quantity;
+        const totalCost = data.calculation.cost * quantity;
+
+        setFormData((prev) => ({
+          ...prev,
+          contact_lens_price: totalPrice,
+          contact_lens_cost: totalCost,
+        }));
+      }
+    } catch (error) {
+      console.warn(
+        "Could not calculate contact lens price from matrix:",
+        error,
+      );
+      toast.error("No se pudo calcular el precio del lente de contacto");
+    } finally {
+      setCalculatingContactLensPrice(false);
+    }
+  };
+
   // Detect presbyopia and set default solution
   useEffect(() => {
     if (selectedPrescription) {
@@ -405,9 +528,33 @@ export default function CreateQuoteForm({
   // Recalculate price when relevant fields change
   useEffect(() => {
     if (formData.lens_family_id && selectedPrescription) {
-      calculateLensPriceFromMatrix();
+      // Use a small delay to ensure state is updated
+      const timer = setTimeout(() => {
+        calculateLensPriceFromMatrix();
+      }, 50);
+      return () => clearTimeout(timer);
     }
   }, [formData.lens_family_id, selectedPrescription?.id, presbyopiaSolution]);
+
+  // Recalculate contact lens price when relevant fields change
+  useEffect(() => {
+    if (
+      formData.contact_lens_family_id &&
+      selectedPrescription &&
+      lensType === "contact"
+    ) {
+      // Use a small delay to ensure state is updated
+      const timer = setTimeout(() => {
+        calculateContactLensPriceFromMatrix();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    formData.contact_lens_family_id,
+    formData.contact_lens_quantity,
+    selectedPrescription?.id,
+    lensType,
+  ]);
 
   // Calculate prices for two separate lenses
   useEffect(() => {
@@ -873,10 +1020,13 @@ export default function CreateQuoteForm({
     // Calculate lens, treatments, and labor with tax consideration
     // Use costos internos (lens_cost, treatments_cost, labor_cost) for calculation
     // For two_separate solution, lens_cost should be the sum of far_lens_cost and near_lens_cost
+    // For contact lenses, use contact_lens_cost instead of lens_cost
     const effectiveLensCost =
-      presbyopiaSolution === "two_separate"
-        ? (formData.far_lens_cost || 0) + (formData.near_lens_cost || 0)
-        : formData.lens_cost || 0;
+      lensType === "contact"
+        ? formData.contact_lens_cost || 0
+        : presbyopiaSolution === "two_separate"
+          ? (formData.far_lens_cost || 0) + (formData.near_lens_cost || 0)
+          : formData.lens_cost || 0;
 
     const lensBreakdown = calculatePriceWithTax(
       effectiveLensCost,
@@ -987,6 +1137,8 @@ export default function CreateQuoteForm({
     formData.near_frame_price_includes_tax,
     formData.near_frame_cost,
     formData.lens_cost,
+    formData.contact_lens_cost,
+    formData.contact_lens_price,
     formData.treatments_cost,
     formData.labor_cost,
     formData.discount_percentage,
@@ -994,6 +1146,8 @@ export default function CreateQuoteForm({
     discountType,
     quoteSettings,
     taxPercentage,
+    lensType,
+    presbyopiaSolution,
     customerOwnFrame,
     customerOwnNearFrame,
     presbyopiaSolution,
@@ -1073,23 +1227,35 @@ export default function CreateQuoteForm({
       return;
     }
 
-    // Validate lens configuration based on presbyopia solution
-    if (presbyopiaSolution === "two_separate") {
-      if (!farLensFamilyId && !nearLensFamilyId) {
-        // If no families selected, require manual price entry
-        if (formData.lens_cost === 0) {
+    // Validate lens configuration based on lens type and presbyopia solution
+    if (lensType === "contact") {
+      if (
+        !formData.contact_lens_family_id &&
+        formData.contact_lens_cost === 0
+      ) {
+        toast.error(
+          "Selecciona una familia de lentes de contacto o ingresa el precio manualmente",
+        );
+        return;
+      }
+    } else {
+      if (presbyopiaSolution === "two_separate") {
+        if (!farLensFamilyId && !nearLensFamilyId) {
+          // If no families selected, require manual price entry
+          if (formData.lens_cost === 0) {
+            toast.error(
+              "Selecciona familias de lentes o ingresa el precio manualmente",
+            );
+            return;
+          }
+        }
+      } else {
+        if (!formData.lens_family_id && formData.lens_cost === 0) {
           toast.error(
-            "Selecciona familias de lentes o ingresa el precio manualmente",
+            "Selecciona una familia de lentes o ingresa el precio manualmente",
           );
           return;
         }
-      }
-    } else {
-      if (!formData.lens_family_id && formData.lens_cost === 0) {
-        toast.error(
-          "Selecciona una familia de lentes o ingresa el precio manualmente",
-        );
-        return;
       }
     }
 
@@ -1218,8 +1384,55 @@ export default function CreateQuoteForm({
             presbyopiaSolution === "two_separate"
               ? nearLensCost || 0
               : undefined,
+          // Contact lens fields
+          contact_lens_family_id:
+            lensType === "contact"
+              ? formData.contact_lens_family_id || null
+              : null,
+          contact_lens_rx_sphere_od:
+            lensType === "contact" ? formData.contact_lens_rx_sphere_od : null,
+          contact_lens_rx_cylinder_od:
+            lensType === "contact"
+              ? formData.contact_lens_rx_cylinder_od
+              : null,
+          contact_lens_rx_axis_od:
+            lensType === "contact" ? formData.contact_lens_rx_axis_od : null,
+          contact_lens_rx_add_od:
+            lensType === "contact" ? formData.contact_lens_rx_add_od : null,
+          contact_lens_rx_base_curve_od:
+            lensType === "contact"
+              ? formData.contact_lens_rx_base_curve_od
+              : null,
+          contact_lens_rx_diameter_od:
+            lensType === "contact"
+              ? formData.contact_lens_rx_diameter_od
+              : null,
+          contact_lens_rx_sphere_os:
+            lensType === "contact" ? formData.contact_lens_rx_sphere_os : null,
+          contact_lens_rx_cylinder_os:
+            lensType === "contact"
+              ? formData.contact_lens_rx_cylinder_os
+              : null,
+          contact_lens_rx_axis_os:
+            lensType === "contact" ? formData.contact_lens_rx_axis_os : null,
+          contact_lens_rx_add_os:
+            lensType === "contact" ? formData.contact_lens_rx_add_os : null,
+          contact_lens_rx_base_curve_os:
+            lensType === "contact"
+              ? formData.contact_lens_rx_base_curve_os
+              : null,
+          contact_lens_rx_diameter_os:
+            lensType === "contact"
+              ? formData.contact_lens_rx_diameter_os
+              : null,
+          contact_lens_quantity:
+            lensType === "contact" ? formData.contact_lens_quantity || 1 : null,
+          contact_lens_cost:
+            lensType === "contact" ? formData.contact_lens_cost || 0 : null,
+          contact_lens_price:
+            lensType === "contact" ? formData.contact_lens_price || 0 : null,
           frame_cost: formData.frame_cost,
-          lens_cost: formData.lens_cost,
+          lens_cost: lensType === "contact" ? 0 : formData.lens_cost,
           treatments_cost: formData.treatments_cost,
           labor_cost: formData.labor_cost,
           subtotal: formData.subtotal,
@@ -1385,7 +1598,9 @@ export default function CreateQuoteForm({
                   {prescriptions.map((prescription) => (
                     <SelectItem key={prescription.id} value={prescription.id}>
                       {prescription.prescription_date} -{" "}
-                      {prescription.prescription_type || "Sin tipo"}
+                      {translatePrescriptionType(
+                        prescription.prescription_type,
+                      )}
                       {prescription.is_current && " (Actual)"}
                     </SelectItem>
                   ))}
@@ -1600,9 +1815,13 @@ export default function CreateQuoteForm({
                 <div className="text-sm text-tierra-media">
                   {selectedFrame.frame_brand} {selectedFrame.frame_model} ·
                   Stock:{" "}
-                  {selectedFrame.available_quantity ??
-                    selectedFrame.inventory_quantity ??
-                    0}
+                  {selectedFrame.total_available_quantity !== undefined
+                    ? selectedFrame.total_available_quantity
+                    : selectedFrame.total_inventory_quantity !== undefined
+                      ? selectedFrame.total_inventory_quantity
+                      : (selectedFrame.available_quantity ??
+                        selectedFrame.inventory_quantity ??
+                        0)}
                 </div>
                 <div className="text-sm font-semibold text-verde-suave">
                   {formatPrice(selectedFrame.price)}
@@ -1914,191 +2133,524 @@ export default function CreateQuoteForm({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {presbyopiaSolution === "two_separate" ? (
-              <div className="grid grid-cols-2 gap-4">
-                {/* Far Lens */}
-                <div className="space-y-2">
-                  <Label>Lente de Lejos</Label>
-                  <Select
-                    value={farLensFamilyId || "none"}
-                    onValueChange={(value) => {
-                      const familyId = value === "none" ? "" : value;
-                      setFarLensFamilyId(familyId);
-                      setFormData((prev) => ({
-                        ...prev,
-                        far_lens_family_id: familyId,
-                      }));
-                    }}
-                    disabled={loadingFamilies}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          loadingFamilies ? "Cargando..." : "Selecciona familia"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">
-                        Sin familia (precio manual)
-                      </SelectItem>
-                      {lensFamilies
-                        .filter((f) => f.lens_type === "single_vision")
-                        .map((family) => (
-                          <SelectItem key={family.id} value={family.id}>
-                            {family.name} {family.brand && `(${family.brand})`}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {farLensCost > 0 && (
-                    <p className="text-sm text-green-600 font-medium">
-                      Precio: ${farLensCost.toLocaleString()}
-                    </p>
-                  )}
-                </div>
-
-                {/* Near Lens */}
-                <div className="space-y-2">
-                  <Label>Lente de Cerca</Label>
-                  <Select
-                    value={nearLensFamilyId || "none"}
-                    onValueChange={(value) => {
-                      const familyId = value === "none" ? "" : value;
-                      setNearLensFamilyId(familyId);
-                      setFormData((prev) => ({
-                        ...prev,
-                        near_lens_family_id: familyId,
-                      }));
-                    }}
-                    disabled={loadingFamilies}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          loadingFamilies ? "Cargando..." : "Selecciona familia"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">
-                        Sin familia (precio manual)
-                      </SelectItem>
-                      {lensFamilies
-                        .filter(
-                          (f) =>
-                            f.lens_type === "single_vision" ||
-                            f.lens_type === "reading",
-                        )
-                        .map((family) => (
-                          <SelectItem key={family.id} value={family.id}>
-                            {family.name} {family.brand && `(${family.brand})`}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {nearLensCost > 0 && (
-                    <p className="text-sm text-green-600 font-medium">
-                      Precio: ${nearLensCost.toLocaleString()}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <Label>Familia de Lentes</Label>
-                <Select
-                  value={formData.lens_family_id || "none"}
-                  onValueChange={(value) => {
+            {/* Lens Type Toggle: Optical vs Contact */}
+            <div className="flex items-center gap-4 p-4 border rounded-lg bg-gray-50">
+              <Label className="font-medium">Tipo de Lente:</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={lensType === "optical" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setLensType("optical");
+                    // Reset contact lens fields when switching to optical
                     setFormData((prev) => ({
                       ...prev,
-                      lens_family_id: value === "none" ? "" : value,
+                      contact_lens_family_id: "",
+                      contact_lens_quantity: 1,
+                      contact_lens_cost: 0,
+                      contact_lens_price: 0,
                     }));
                   }}
-                  disabled={loadingFamilies}
                 >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        loadingFamilies
-                          ? "Cargando..."
-                          : "Selecciona familia (opcional)"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">
-                      Sin familia (precio manual)
-                    </SelectItem>
-                    {lensFamilies
-                      .filter((f) => {
-                        if (presbyopiaSolution === "none") return true;
-                        const recommended =
-                          getRecommendedLensTypes(presbyopiaSolution);
-                        return recommended.includes(f.lens_type);
-                      })
-                      .map((family) => (
-                        <SelectItem key={family.id} value={family.id}>
-                          {family.name} {family.brand && `(${family.brand})`}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Si seleccionas una familia, el precio se calculará
-                  automáticamente según la prescripción
-                  {presbyopiaSolution !== "none" &&
-                    ` y adición (+${getMaxAddition(selectedPrescription)} D)`}
-                </p>
+                  Lentes Ópticos
+                </Button>
+                <Button
+                  type="button"
+                  variant={lensType === "contact" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setLensType("contact");
+                    // Reset optical lens fields when switching to contact
+                    setFormData((prev) => ({
+                      ...prev,
+                      lens_family_id: "",
+                      lens_cost: 0,
+                    }));
+                  }}
+                >
+                  Lentes de Contacto
+                </Button>
               </div>
-            )}
-            {/* Hide manual lens configuration when two_separate and families are selected */}
-            {presbyopiaSolution === "two_separate" ? (
-              farLensFamilyId || nearLensFamilyId ? (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    La configuración de lentes se determina automáticamente
-                    según las familias seleccionadas.
-                  </p>
+            </div>
+
+            {/* Contact Lens Configuration */}
+            {lensType === "contact" ? (
+              <div className="space-y-4">
+                <div>
+                  <Label>Familia de Lentes de Contacto</Label>
+                  <Select
+                    value={formData.contact_lens_family_id || "none"}
+                    onValueChange={(value) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        contact_lens_family_id: value === "none" ? "" : value,
+                        contact_lens_cost: 0,
+                        contact_lens_price: 0,
+                      }));
+                    }}
+                    disabled={loadingContactLensFamilies}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          loadingContactLensFamilies
+                            ? "Cargando..."
+                            : "Selecciona familia (opcional)"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        Sin familia (precio manual)
+                      </SelectItem>
+                      {contactLensFamilies
+                        .filter((f) => f.is_active)
+                        .map((family) => (
+                          <SelectItem key={family.id} value={family.id}>
+                            {family.name} {family.brand && `(${family.brand})`}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              ) : (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800 mb-2">
-                    No hay familias de lentes seleccionadas. Los precios de los
-                    lentes deben ingresarse manualmente en la sección de
-                    "Precios y Costos".
-                  </p>
-                  <p className="text-xs text-yellow-700">
-                    Tip: Selecciona familias de lentes para calcular los precios
-                    automáticamente según la prescripción.
-                  </p>
+
+                {formData.contact_lens_family_id && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Cantidad de Cajas</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={formData.contact_lens_quantity || 1}
+                          onChange={(e) => {
+                            const quantity = parseInt(e.target.value) || 1;
+                            setFormData((prev) => ({
+                              ...prev,
+                              contact_lens_quantity: quantity,
+                            }));
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label>Precio Total</Label>
+                        <Input
+                          type="number"
+                          value={formData.contact_lens_price || ""}
+                          onChange={(e) => {
+                            const price = parseFloat(e.target.value) || 0;
+                            setFormData((prev) => ({
+                              ...prev,
+                              contact_lens_price: price,
+                            }));
+                          }}
+                          placeholder="Se calcula automáticamente"
+                        />
+                      </div>
+                    </div>
+                    {calculatingContactLensPrice && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Calculando precio del lente de contacto...</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Contact Lens RX Fields */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div>
+                    <Label className="font-medium mb-2">
+                      Receta Ojo Derecho (OD)
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Esfera"
+                        type="number"
+                        step="0.25"
+                        value={formData.contact_lens_rx_sphere_od || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_lens_rx_sphere_od: e.target.value
+                              ? parseFloat(e.target.value)
+                              : null,
+                          }))
+                        }
+                      />
+                      <Input
+                        placeholder="Cilindro"
+                        type="number"
+                        step="0.25"
+                        value={formData.contact_lens_rx_cylinder_od || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_lens_rx_cylinder_od: e.target.value
+                              ? parseFloat(e.target.value)
+                              : null,
+                          }))
+                        }
+                      />
+                      <Input
+                        placeholder="Eje (0-180)"
+                        type="number"
+                        min="0"
+                        max="180"
+                        value={formData.contact_lens_rx_axis_od || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_lens_rx_axis_od: e.target.value
+                              ? parseInt(e.target.value)
+                              : null,
+                          }))
+                        }
+                      />
+                      <Input
+                        placeholder="Adición"
+                        type="number"
+                        step="0.25"
+                        value={formData.contact_lens_rx_add_od || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_lens_rx_add_od: e.target.value
+                              ? parseFloat(e.target.value)
+                              : null,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="font-medium mb-2">
+                      Receta Ojo Izquierdo (OS)
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Esfera"
+                        type="number"
+                        step="0.25"
+                        value={formData.contact_lens_rx_sphere_os || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_lens_rx_sphere_os: e.target.value
+                              ? parseFloat(e.target.value)
+                              : null,
+                          }))
+                        }
+                      />
+                      <Input
+                        placeholder="Cilindro"
+                        type="number"
+                        step="0.25"
+                        value={formData.contact_lens_rx_cylinder_os || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_lens_rx_cylinder_os: e.target.value
+                              ? parseFloat(e.target.value)
+                              : null,
+                          }))
+                        }
+                      />
+                      <Input
+                        placeholder="Eje (0-180)"
+                        type="number"
+                        min="0"
+                        max="180"
+                        value={formData.contact_lens_rx_axis_os || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_lens_rx_axis_os: e.target.value
+                              ? parseInt(e.target.value)
+                              : null,
+                          }))
+                        }
+                      />
+                      <Input
+                        placeholder="Adición"
+                        type="number"
+                        step="0.25"
+                        value={formData.contact_lens_rx_add_os || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_lens_rx_add_os: e.target.value
+                              ? parseFloat(e.target.value)
+                              : null,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
-              )
-            ) : formData.lens_family_id ? (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  Tipo: {formData.lens_type || "—"} · Material:{" "}
-                  {formData.lens_material || "—"} (heredados de la familia)
-                </p>
               </div>
             ) : (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800 mb-2">
-                  No hay familia de lentes seleccionada. El precio del lente
-                  debe ingresarse manualmente en la sección de "Precios y
-                  Costos" → "Costo interno de Lente".
-                </p>
-                <p className="text-xs text-yellow-700">
-                  Tip: Selecciona una familia de lentes para calcular el precio
-                  automáticamente según la prescripción.
-                </p>
-              </div>
-            )}
-            {calculatingPrice && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Calculando precio del lente...</span>
-              </div>
+              /* Optical Lens Configuration (existing code) */
+              <>
+                {presbyopiaSolution === "two_separate" ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Far Lens */}
+                    <div className="space-y-2">
+                      <Label>Lente de Lejos</Label>
+                      <Select
+                        value={farLensFamilyId || "none"}
+                        onValueChange={(value) => {
+                          const familyId = value === "none" ? "" : value;
+                          setFarLensFamilyId(familyId);
+                          setFormData((prev) => ({
+                            ...prev,
+                            far_lens_family_id: familyId,
+                          }));
+                        }}
+                        disabled={loadingFamilies}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              loadingFamilies
+                                ? "Cargando..."
+                                : "Selecciona familia"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            Sin familia (precio manual)
+                          </SelectItem>
+                          {lensFamilies
+                            .filter((f) => f.lens_type === "single_vision")
+                            .map((family) => (
+                              <SelectItem key={family.id} value={family.id}>
+                                {family.name}{" "}
+                                {family.brand && `(${family.brand})`}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      {farLensCost > 0 && (
+                        <p className="text-sm text-green-600 font-medium">
+                          Precio: ${farLensCost.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Near Lens */}
+                    <div className="space-y-2">
+                      <Label>Lente de Cerca</Label>
+                      <Select
+                        value={nearLensFamilyId || "none"}
+                        onValueChange={(value) => {
+                          const familyId = value === "none" ? "" : value;
+                          setNearLensFamilyId(familyId);
+                          setFormData((prev) => ({
+                            ...prev,
+                            near_lens_family_id: familyId,
+                          }));
+                        }}
+                        disabled={loadingFamilies}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              loadingFamilies
+                                ? "Cargando..."
+                                : "Selecciona familia"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            Sin familia (precio manual)
+                          </SelectItem>
+                          {lensFamilies
+                            .filter(
+                              (f) =>
+                                f.lens_type === "single_vision" ||
+                                f.lens_type === "reading",
+                            )
+                            .map((family) => (
+                              <SelectItem key={family.id} value={family.id}>
+                                {family.name}{" "}
+                                {family.brand && `(${family.brand})`}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      {nearLensCost > 0 && (
+                        <p className="text-sm text-green-600 font-medium">
+                          Precio: ${nearLensCost.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Label>Familia de Lentes</Label>
+                      <div className="group relative">
+                        <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 top-6 z-50 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg">
+                          Selecciona una familia de lentes para calcular
+                          automáticamente el precio según la prescripción. Cada
+                          familia tiene características específicas (tipo,
+                          material) que se aplicarán al presupuesto.
+                        </div>
+                      </div>
+                    </div>
+                    <Select
+                      value={formData.lens_family_id || "none"}
+                      onValueChange={(value) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          lens_family_id: value === "none" ? "" : value,
+                          // Reset lens_cost when changing family to trigger recalculation
+                          lens_cost: 0,
+                        }));
+                      }}
+                      disabled={loadingFamilies}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            loadingFamilies
+                              ? "Cargando..."
+                              : "Selecciona familia (opcional)"
+                          }
+                        >
+                          {formData.lens_family_id &&
+                            (() => {
+                              const selectedFamily = lensFamilies.find(
+                                (f) => f.id === formData.lens_family_id,
+                              );
+                              return selectedFamily
+                                ? `${selectedFamily.name}${selectedFamily.brand ? ` (${selectedFamily.brand})` : ""}`
+                                : "Selecciona familia (opcional)";
+                            })()}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          Sin familia (precio manual)
+                        </SelectItem>
+                        {lensFamilies
+                          .filter((f) => {
+                            if (presbyopiaSolution === "none") return true;
+                            const recommended =
+                              getRecommendedLensTypes(presbyopiaSolution);
+                            return recommended.includes(f.lens_type);
+                          })
+                          .map((family) => {
+                            const lensTypeLabels: Record<string, string> = {
+                              single_vision: "Monofocal",
+                              progressive: "Progresivo",
+                              bifocal: "Bifocal",
+                              trifocal: "Trifocal",
+                              reading: "Lectura",
+                              computer: "Computadora",
+                              sports: "Deportivo",
+                            };
+                            return (
+                              <SelectItem key={family.id} value={family.id}>
+                                <div className="flex flex-col">
+                                  <span>
+                                    {family.name}{" "}
+                                    {family.brand && `(${family.brand})`}
+                                  </span>
+                                  {family.description && (
+                                    <span className="text-xs text-gray-500 mt-1">
+                                      {family.description}
+                                    </span>
+                                  )}
+                                  {family.lens_type && (
+                                    <span className="text-xs text-gray-400 mt-0.5">
+                                      Tipo:{" "}
+                                      {lensTypeLabels[family.lens_type] ||
+                                        family.lens_type}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                      </SelectContent>
+                    </Select>
+                    {formData.lens_family_id &&
+                      (() => {
+                        const selectedFamily = lensFamilies.find(
+                          (f) => f.id === formData.lens_family_id,
+                        );
+                        return selectedFamily?.description ? (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                            <p className="font-semibold mb-1">
+                              {selectedFamily.name}
+                            </p>
+                            <p>{selectedFamily.description}</p>
+                          </div>
+                        ) : null;
+                      })()}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Si seleccionas una familia, el precio se calculará
+                      automáticamente según la prescripción
+                      {presbyopiaSolution !== "none" &&
+                        ` y adición (+${getMaxAddition(selectedPrescription)} D)`}
+                    </p>
+                  </div>
+                )}
+                {/* Hide manual lens configuration when two_separate and families are selected */}
+                {presbyopiaSolution === "two_separate" ? (
+                  farLensFamilyId || nearLensFamilyId ? (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        La configuración de lentes se determina automáticamente
+                        según las familias seleccionadas.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800 mb-2">
+                        No hay familias de lentes seleccionadas. Los precios de
+                        los lentes deben ingresarse manualmente en la sección de
+                        "Precios y Costos".
+                      </p>
+                      <p className="text-xs text-yellow-700">
+                        Tip: Selecciona familias de lentes para calcular los
+                        precios automáticamente según la prescripción.
+                      </p>
+                    </div>
+                  )
+                ) : formData.lens_family_id ? (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      Tipo: {formData.lens_type || "—"} · Material:{" "}
+                      {formData.lens_material || "—"} (heredados de la familia)
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800 mb-2">
+                      No hay familia de lentes seleccionada. El precio del lente
+                      debe ingresarse manualmente en la sección de "Precios y
+                      Costos" → "Costo interno de Lente".
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      Tip: Selecciona una familia de lentes para calcular el
+                      precio automáticamente según la prescripción.
+                    </p>
+                  </div>
+                )}
+                {calculatingPrice && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Calculando precio del lente...</span>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Hide manual lens index when two_separate and families are selected */}

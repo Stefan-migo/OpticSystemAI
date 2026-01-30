@@ -689,12 +689,30 @@ export async function POST(request: NextRequest) {
     const openedAt = new Date(`${dateStr}T00:00:00`);
 
     // Check if closure already exists for this branch and date
-    const { data: existingClosure } = await supabaseServiceRole
-      .from("cash_register_closures")
-      .select("id, status")
-      .eq("branch_id", branchContext.branchId)
-      .eq("closure_date", dateStr)
-      .maybeSingle();
+    const { data: existingClosure, error: existingClosureError } =
+      await supabaseServiceRole
+        .from("cash_register_closures")
+        .select("id, status")
+        .eq("branch_id", branchContext.branchId)
+        .eq("closure_date", dateStr)
+        .maybeSingle();
+
+    if (existingClosureError) {
+      logger.error("Error checking existing closure:", {
+        error: existingClosureError.message || existingClosureError,
+        code: existingClosureError.code,
+        details: existingClosureError.details,
+        branchId: branchContext.branchId,
+        dateStr,
+      });
+      return NextResponse.json(
+        {
+          error: "Error al verificar cierres existentes",
+          details: existingClosureError.message,
+        },
+        { status: 500 },
+      );
+    }
 
     // If a closure exists and is "closed", reject (can't close twice)
     if (existingClosure && existingClosure.status === "closed") {
@@ -706,107 +724,114 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If a draft closure exists (from a previous reopening), update it instead of inserting
+    // Validate branch_id is not null before inserting
+    if (!branchContext.branchId) {
+      logger.error("branch_id is null when trying to create closure", {
+        isSuperAdmin: branchContext.isSuperAdmin,
+        branchId: branchContext.branchId,
+      });
+      return NextResponse.json(
+        {
+          error: "Debe seleccionar una sucursal para cerrar la caja",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate user.id exists (should always be true if we got here, but double-check)
+    if (!user.id) {
+      logger.error("user.id is null when trying to create closure");
+      return NextResponse.json(
+        {
+          error: "Error de autenticación",
+        },
+        { status: 401 },
+      );
+    }
+
+    // Log closure data before insert/update
+    const closureData = {
+      branch_id: branchContext.branchId,
+      closure_date: dateStr,
+      closed_by: user.id,
+      pos_session_id: sessionIdForClosure || null,
+      opening_cash_amount: Number(opening_cash_amount),
+      total_sales: totalSales,
+      total_transactions:
+        sessionPayments.length > 0
+          ? sessionPayments.length
+          : orders?.length || 0,
+      cash_sales: cashSales,
+      debit_card_sales: debitCardSales,
+      credit_card_sales: creditCardSales,
+      installments_sales: installmentsSales,
+      other_payment_sales: otherPaymentSales + transferSales,
+      expected_cash: expectedCash,
+      actual_cash:
+        actual_cash !== undefined && actual_cash !== null
+          ? Number(actual_cash)
+          : null,
+      cash_difference: cashDifference,
+      card_machine_debit_total:
+        card_machine_debit_total !== undefined &&
+        card_machine_debit_total !== null
+          ? Number(card_machine_debit_total)
+          : 0,
+      card_machine_credit_total:
+        card_machine_credit_total !== undefined &&
+        card_machine_credit_total !== null
+          ? Number(card_machine_credit_total)
+          : 0,
+      card_machine_difference: cardMachineDifference,
+      total_subtotal: totalSubtotal,
+      total_tax: totalTax,
+      total_discounts: totalDiscounts,
+      closing_cash_amount:
+        actual_cash !== undefined && actual_cash !== null
+          ? Number(actual_cash)
+          : null,
+      notes: notes || null,
+      discrepancies: discrepancies || null,
+      status: "closed",
+      opened_at: openedAt.toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    logger.info("Preparing to create/update closure", {
+      existingClosure: existingClosure
+        ? { id: existingClosure.id, status: existingClosure.status }
+        : null,
+      closureData: {
+        ...closureData,
+        closed_by: user.id.substring(0, 8) + "...", // Log partial user ID for privacy
+      },
+    });
+
+    // If a closure exists (any status except "closed"), update it instead of inserting
+    // This handles draft closures and any other non-closed status
     let closureResponse;
-    if (existingClosure && existingClosure.status === "draft") {
-      // Update existing draft closure
+    if (existingClosure && existingClosure.status !== "closed") {
+      // Update existing closure (draft, confirmed, reviewed, etc.)
+      logger.info("Updating existing closure", {
+        closureId: existingClosure.id,
+        currentStatus: existingClosure.status,
+        newStatus: "closed",
+      });
       closureResponse = await supabaseServiceRole
         .from("cash_register_closures")
-        .update({
-          closed_by: user.id,
-          pos_session_id: sessionIdForClosure || null,
-          opening_cash_amount: Number(opening_cash_amount),
-          total_sales: totalSales,
-          total_transactions:
-            sessionPayments.length > 0
-              ? sessionPayments.length
-              : orders?.length || 0,
-          cash_sales: cashSales,
-          debit_card_sales: debitCardSales,
-          credit_card_sales: creditCardSales,
-          installments_sales: installmentsSales,
-          other_payment_sales: otherPaymentSales + transferSales, // Include transfers
-          expected_cash: expectedCash,
-          actual_cash:
-            actual_cash !== undefined && actual_cash !== null
-              ? Number(actual_cash)
-              : null,
-          cash_difference: cashDifference,
-          card_machine_debit_total:
-            card_machine_debit_total !== undefined &&
-            card_machine_debit_total !== null
-              ? Number(card_machine_debit_total)
-              : 0,
-          card_machine_credit_total:
-            card_machine_credit_total !== undefined &&
-            card_machine_credit_total !== null
-              ? Number(card_machine_credit_total)
-              : 0,
-          card_machine_difference: cardMachineDifference,
-          total_subtotal: totalSubtotal,
-          total_tax: totalTax,
-          total_discounts: totalDiscounts,
-          closing_cash_amount:
-            actual_cash !== undefined && actual_cash !== null
-              ? Number(actual_cash)
-              : null,
-          notes: notes || null,
-          discrepancies: discrepancies || null,
-          status: "closed",
-          opened_at: openedAt.toISOString(),
-        })
+        .update(closureData)
         .eq("id", existingClosure.id)
         .select()
         .single();
     } else {
-      // Insert new closure (normal case)
+      // Insert new closure (normal case - no existing closure)
+      logger.info("Inserting new closure", {
+        branchId: branchContext.branchId,
+        closureDate: dateStr,
+      });
       closureResponse = await supabaseServiceRole
         .from("cash_register_closures")
-        .insert({
-          branch_id: branchContext.branchId,
-          closure_date: dateStr,
-          closed_by: user.id,
-          pos_session_id: sessionIdForClosure || null,
-          opening_cash_amount: Number(opening_cash_amount),
-          total_sales: totalSales,
-          total_transactions:
-            sessionPayments.length > 0
-              ? sessionPayments.length
-              : orders?.length || 0,
-          cash_sales: cashSales,
-          debit_card_sales: debitCardSales,
-          credit_card_sales: creditCardSales,
-          installments_sales: installmentsSales,
-          other_payment_sales: otherPaymentSales + transferSales, // Include transfers
-          expected_cash: expectedCash,
-          actual_cash:
-            actual_cash !== undefined && actual_cash !== null
-              ? Number(actual_cash)
-              : null,
-          cash_difference: cashDifference,
-          card_machine_debit_total:
-            card_machine_debit_total !== undefined &&
-            card_machine_debit_total !== null
-              ? Number(card_machine_debit_total)
-              : 0,
-          card_machine_credit_total:
-            card_machine_credit_total !== undefined &&
-            card_machine_credit_total !== null
-              ? Number(card_machine_credit_total)
-              : 0,
-          card_machine_difference: cardMachineDifference,
-          total_subtotal: totalSubtotal,
-          total_tax: totalTax,
-          total_discounts: totalDiscounts,
-          closing_cash_amount:
-            actual_cash !== undefined && actual_cash !== null
-              ? Number(actual_cash)
-              : null,
-          notes: notes || null,
-          discrepancies: discrepancies || null,
-          status: "closed",
-          opened_at: openedAt.toISOString(),
-        })
+        .insert(closureData)
         .select()
         .single();
     }
@@ -818,13 +843,23 @@ export async function POST(request: NextRequest) {
         error: closureError.message || closureError,
         code: closureError.code,
         details: closureError.details,
+        hint: closureError.hint,
         closureDate: closure_date,
         branchId: branchContext.branchId,
+        existingClosure: existingClosure
+          ? { id: existingClosure.id, status: existingClosure.status }
+          : null,
+        closureData: {
+          ...closureData,
+          closed_by: user.id.substring(0, 8) + "...", // Log partial user ID for privacy
+        },
       });
       return NextResponse.json(
         {
           error: "Error al crear el cierre de caja",
           details: closureError.message,
+          code: closureError.code,
+          hint: closureError.hint,
         },
         { status: 500 },
       );

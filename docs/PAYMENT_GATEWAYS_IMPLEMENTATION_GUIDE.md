@@ -2,8 +2,32 @@
 
 **Proyecto:** Business Management App  
 **Tecnologías:** Next.js 14, TypeScript, Supabase, React 18  
-**Pasarelas:** Stripe, Mercado Pago, PayPal  
-**Fase:** SaaS 1 (Billing) - Parte del Plan de Mejoras Estructurales
+**Pasarelas:** Flow (Chile), Mercado Pago, PayPal  
+**Fase:** SaaS 1 (Billing) - Parte del Plan de Mejoras Estructurales  
+**Última actualización:** 2026-01-29
+
+---
+
+## ✅ Pasos completados hasta la fecha
+
+| Paso                        | Descripción                             | Archivos / Notas                                                                                                                                                                                              |
+| --------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. DB**                   | Migración `payments` y `webhook_events` | `supabase/migrations/20260131000000_create_payments_and_webhook_events.sql` — RLS, índices, `get_user_organization_id`. Aplicada en Supabase local (Docker).                                                  |
+| **2. Tipos**                | Tipos e interfaces de pagos             | `src/types/payment.ts` — Payment, PaymentStatus, PaymentGateway, WebhookEvent, PaymentCreationAttributes. `src/lib/payments/interfaces.ts` — IPaymentGateway, PaymentIntentResponse.                          |
+| **3. PaymentService**       | Lógica de negocio en DB                 | `src/lib/payments/services/payment-service.ts` — createPayment, updatePaymentStatus, getPaymentById, getPaymentByGatewayPaymentIntentId, recordWebhookEvent, markWebhookEventAsProcessed, fulfillOrder.       |
+| **4. Factory y Flow**       | Abstracción y pasarelas                 | `src/lib/payments/index.ts` — PaymentGatewayFactory (Flow, Mercado Pago, PayPal). `src/lib/payments/flow/gateway.ts` — createPaymentIntent, processWebhookEvent, mapStatus.                                   |
+| **5. create-intent**        | Endpoint para crear intento de pago     | `src/app/api/admin/payments/create-intent/route.ts` — POST con auth admin, organization_id, Zod (`createPaymentIntentSchema`), rate limit. Respuesta: paymentId, approvalUrl, gatewayPaymentIntentId, status. |
+| **6. Webhook Flow**         | Endpoint para eventos Flow              | `src/app/api/webhooks/flow/route.ts` — POST sin rate limit; verificación de firma HMAC-SHA256, idempotencia con `webhook_events`, actualización de pago y fulfill de orden.                                   |
+| **7. Variables de entorno** | Documentación y configuración de claves | `docs/PAYMENT_GATEWAYS_ENV_SETUP.md` — Alta en Flow (Chile), Mercado Pago, PayPal; obtención de API keys, webhook secrets; `NEXT_PUBLIC_BASE_URL`; ejemplo `.env.local` y producción (Vercel).                |
+| **8. UI checkout**          | Página y componentes para Flow          | `src/app/admin/checkout/page.tsx`, `src/components/checkout/CheckoutForm.tsx` — Llama a create-intent, redirige a `approvalUrl` de Flow para completar el pago. Enlace en menú admin.                         |
+| **9. Mercado Pago**         | Gateway + webhook                       | `src/lib/payments/mercadopago/gateway.ts` (Preference + Payment SDK v2), GET `/api/webhooks/mercadopago` (topic + id en query).                                                                               |
+| **10. PayPal**              | Gateway + webhook                       | `src/lib/payments/paypal/gateway.ts` (OAuth + Orders v2), POST `/api/webhooks/paypal` (CHECKOUT.ORDER.COMPLETED, PAYMENT.CAPTURE.COMPLETED).                                                                  |
+
+**Próximos pasos (en orden):**
+
+| #   | Paso                                                                      | Estado              | Referencia                                                                                                                                 |
+| --- | ------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 11  | **Tests** — Tests de integración para create-intent y webhooks (opcional) | Opcional / En curso | `src/__tests__/integration/api/payments.test.ts` — 401, 400 (body inválido), 200/403/500 create-intent; 500 webhook Flow campos faltantes. |
 
 ---
 
@@ -12,10 +36,10 @@
 1. [Resumen Ejecutivo](#1-resumen-ejecutivo)
 2. [Principios de Diseño y Seguridad](#2-principios-de-diseño-y-seguridad)
 3. [Pre-requisitos](#3-pre-requisitos)
-4. [Configuración Inicial (Supabase y Variables de Entorno)](#4-configuración-inicial-supabase-y-variables-de-entorno)
+4. [Configuración Inicial (Supabase y Variables de Entorno)](#4-configuración-inicial-supabase-y-variables-de-entorno) — **Ver también:** [Guía de alta y variables (Flow, Mercado Pago, PayPal)](./PAYMENT_GATEWAYS_ENV_SETUP.md)
 5. [Estructura de Directorios y Abstracción de Pasarelas](#5-estructura-de-directorios-y-abstracción-de-pasarelas)
 6. [Implementación de Pasarelas](#6-implementación-de-pasarelas)
-   - [6.1. Stripe](#61-stripe)
+   - [6.1. Flow (Chile)](#61-flow-chile)
    - [6.2. Mercado Pago](#62-mercado-pago)
    - [6.3. PayPal](#63-paypal)
 7. [Componentes Frontend de Checkout](#7-componentes-frontend-de-checkout)
@@ -30,7 +54,7 @@
 
 ## 1. Resumen Ejecutivo
 
-Esta guía detalla la integración de las pasarelas de pago Stripe, Mercado Pago y PayPal en la Business Management App, adaptada específicamente a la arquitectura actual del proyecto. El objetivo es proporcionar una cobertura máxima de métodos de pago, optimizar la conversión y garantizar la máxima seguridad y mantenibilidad, integrando con el sistema multi-tenant existente.
+Esta guía detalla la integración de las pasarelas de pago Stripe, Mercado Pago y PayPal en Opttius, adaptada específicamente a la arquitectura actual del proyecto. El objetivo es proporcionar una cobertura máxima de métodos de pago, optimizar la conversión y garantizar la máxima seguridad y mantenibilidad, integrando con el sistema multi-tenant existente.
 
 **Diferencias clave con la guía genérica:**
 
@@ -646,30 +670,51 @@ export class PaymentService {
 
 Cada pasarela tendrá su propia implementación de `IPaymentGateway`, siguiendo los patrones del proyecto.
 
-### 6.1. Stripe
+### 6.1. Flow (Chile)
+
+**Nota:** Flow es la pasarela de pago principal para Chile, ya que Stripe no tiene soporte en Chile.
 
 **Dependencias:**
 
-```bash
-npm install stripe @stripe/react-stripe-js @stripe/stripe-js
-npm install -D @types/stripe
-```
+Flow usa la API REST nativa de Node.js (no requiere SDK adicional). Solo necesitas `node:crypto` para la firma HMAC-SHA256 (incluido en Node.js).
 
-**`src/lib/payments/stripe/gateway.ts`:**
+**`src/lib/payments/flow/gateway.ts`:**
 
 ```typescript
-// src/lib/payments/stripe/gateway.ts
-import Stripe from "stripe";
-import { NextRequest } from "next/server";
-import { IPaymentGateway, PaymentIntentResponse } from "../interfaces";
-import { PaymentStatus, WebhookEvent } from "@/types/payment";
+// src/lib/payments/flow/gateway.ts
+import { createHmac } from "node:crypto";
+import type { NextRequest } from "next/server";
+import type { IPaymentGateway, PaymentIntentResponse } from "../interfaces";
+import type { PaymentStatus, WebhookEvent } from "@/types/payment";
 import { appLogger as logger } from "@/lib/logger";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2023-10-16",
-});
+function getFlowConfig() {
+  const apiKey = process.env.FLOW_API_KEY;
+  const secretKey = process.env.FLOW_SECRET_KEY;
+  if (!apiKey || !secretKey) {
+    throw new Error(
+      "FLOW_API_KEY and FLOW_SECRET_KEY must be set. Configure them in .env.local for Flow payments.",
+    );
+  }
+  return { apiKey, secretKey };
+}
 
-export class StripeGateway implements IPaymentGateway {
+/**
+ * Genera la firma HMAC-SHA256 requerida por Flow para crear órdenes.
+ */
+function generateFlowSignature(
+  params: Record<string, string>,
+  secretKey: string,
+): string {
+  const keys = Object.keys(params).sort();
+  let toSign = "";
+  for (const key of keys) {
+    toSign += key + params[key];
+  }
+  return createHmac("sha256", secretKey).update(toSign).digest("hex");
+}
+
+export class FlowGateway implements IPaymentGateway {
   async createPaymentIntent(
     orderId: string | null,
     amount: number,
@@ -677,142 +722,181 @@ export class StripeGateway implements IPaymentGateway {
     userId: string,
     organizationId: string,
   ): Promise<PaymentIntentResponse> {
+    const { apiKey, secretKey } = getFlowConfig();
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const flowApiUrl = process.env.FLOW_API_URL || "https://www.flow.cl/api";
+
     try {
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Stripe usa centavos
-        currency: currency.toLowerCase(),
-        metadata: {
-          order_id: orderId || "",
-          user_id: userId,
-          organization_id: organizationId,
+      const commerceOrder = `order_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const subject = `Pago orden ${orderId || "directo"}`;
+      const email = process.env.FLOW_DEFAULT_EMAIL || "test@example.com";
+
+      const urlConfirmation = `${baseUrl}/api/webhooks/flow`;
+      const urlReturn = `${baseUrl}/admin/checkout?success=true&orderId=${orderId ?? ""}`;
+
+      const params: Record<string, string> = {
+        apiKey,
+        commerceOrder,
+        subject,
+        amount: Math.round(amount).toString(),
+        email,
+        urlConfirmation,
+        urlReturn,
+      };
+
+      const signature = generateFlowSignature(params, secretKey);
+      params.s = signature;
+
+      const response = await fetch(`${flowApiUrl}/payment/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        payment_method_types: ["card", "webpay"], // Ejemplo, incluye Webpay si está habilitado
+        body: new URLSearchParams(params).toString(),
       });
 
-      logger.info("Stripe PaymentIntent created", {
-        paymentIntentId: paymentIntent.id,
-        orderId,
+      const data = (await response.json()) as {
+        token?: string;
+        url?: string;
+        flowOrder?: string;
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok || !data.token || !data.url) {
+        logger.error("Error creating Flow payment order", undefined, {
+          orderId,
+          error: data,
+        });
+        throw new Error(
+          `Flow error: ${data.message ?? data.error ?? response.statusText}`,
+        );
+      }
+
+      logger.info("Flow payment order created", {
+        flowOrder: data.flowOrder ?? data.token,
+        commerceOrder,
         amount,
         organizationId,
       });
 
       return {
-        clientSecret: paymentIntent.client_secret || undefined,
-        gatewayPaymentIntentId: paymentIntent.id,
-        status: this.mapStatus(paymentIntent.status),
+        approvalUrl: data.url,
+        gatewayPaymentIntentId: data.flowOrder ?? data.token,
+        status: "pending",
       };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       logger.error(
-        "Error creating Stripe PaymentIntent",
+        "Error creating Flow payment order",
         error instanceof Error ? error : new Error(errorMessage),
-        {
-          orderId,
-          amount,
-          organizationId,
-        },
+        { orderId, amount, organizationId },
       );
-      throw new Error(`Stripe error: ${errorMessage}`);
+      throw new Error(`Flow error: ${errorMessage}`);
     }
   }
 
   async processWebhookEvent(request: NextRequest): Promise<WebhookEvent> {
-    const sig = request.headers.get("stripe-signature");
-    const body = await request.text(); // Leer el cuerpo como texto para verificar la firma
+    const formData = await request.formData();
+    const token = formData.get("token")?.toString();
+    const status = formData.get("status")?.toString();
+    const flowOrder = formData.get("flowOrder")?.toString();
+    const commerceOrder = formData.get("commerceOrder")?.toString();
+    const amount = formData.get("amount")?.toString();
 
-    let event: Stripe.Event;
-
-    try {
-      event = stripe.webhooks.constructEvent(
-        body,
-        sig!,
-        process.env.STRIPE_WEBHOOK_SECRET!,
-      );
-      logger.info("Stripe Webhook received", {
-        eventType: event.type,
-        eventId: event.id,
+    if (!token || !status) {
+      logger.warn("Flow Webhook: missing token or status", {
+        token,
+        status,
       });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      logger.warn("Stripe Webhook signature verification failed", undefined, {
-        error: errorMessage,
-        signature: sig,
-      });
-      throw new Error(`Webhook Error: ${errorMessage}`);
+      throw new Error("Flow Webhook: missing required fields");
     }
 
-    const eventData = event.data.object as Stripe.PaymentIntent | Stripe.Charge;
-    const paymentIntent =
-      eventData.object === "payment_intent"
-        ? (eventData as Stripe.PaymentIntent)
-        : null;
-    const charge =
-      eventData.object === "charge" ? (eventData as Stripe.Charge) : null;
-
-    let orderId: string | null = null;
-    let organizationId: string | null = null;
-    let amount = 0;
-    let currency = "CLP"; // Default
-
-    if (paymentIntent) {
-      orderId = paymentIntent.metadata?.order_id || null;
-      organizationId = paymentIntent.metadata?.organization_id || null;
-      amount = paymentIntent.amount / 100;
-      currency = paymentIntent.currency.toUpperCase();
-    } else if (charge) {
-      orderId = charge.metadata?.order_id || null;
-      organizationId = charge.metadata?.organization_id || null;
-      amount = charge.amount / 100;
-      currency = charge.currency.toUpperCase();
+    // Verificar firma si está presente
+    const signature = formData.get("s")?.toString();
+    if (signature) {
+      const { secretKey } = getFlowConfig();
+      const params: Record<string, string> = {};
+      for (const [key, value] of formData.entries()) {
+        if (key !== "s" && typeof value === "string") {
+          params[key] = value;
+        }
+      }
+      const expectedSignature = generateFlowSignature(params, secretKey);
+      if (signature !== expectedSignature) {
+        logger.warn("Flow Webhook signature verification failed", {
+          received: signature,
+          expected: expectedSignature,
+        });
+        throw new Error("Flow Webhook: Invalid signature");
+      }
     }
+
+    logger.info("Flow Webhook received", {
+      token,
+      status,
+      flowOrder,
+      commerceOrder,
+    });
+
+    const amountNum = amount ? parseFloat(amount) : 0;
 
     return {
-      gateway: "stripe",
-      gatewayEventId: event.id,
-      type: event.type,
-      status: this.mapStatus(
-        (paymentIntent?.status || charge?.status || "unknown") as string,
-      ),
-      gatewayTransactionId:
-        charge?.id ||
-        (paymentIntent?.latest_charge as string | undefined) ||
-        null,
-      gatewayPaymentIntentId:
-        paymentIntent?.id ||
-        (charge?.payment_intent as string | undefined) ||
-        null,
-      amount: amount,
-      currency: currency,
-      orderId: orderId,
-      organizationId: organizationId,
-      metadata: eventData as unknown as Record<string, unknown>,
+      gateway: "flow",
+      gatewayEventId: token,
+      type: "payment_status",
+      status: this.mapStatus(status),
+      gatewayTransactionId: flowOrder ?? token,
+      gatewayPaymentIntentId: flowOrder ?? token,
+      amount: amountNum,
+      currency: "CLP",
+      orderId: commerceOrder ? commerceOrder.replace(/^order_/, "") : null,
+      organizationId: null,
+      metadata: {
+        token,
+        flowOrder,
+        commerceOrder,
+        status,
+      },
     };
   }
 
-  mapStatus(stripeStatus: string): PaymentStatus {
-    switch (stripeStatus) {
-      case "requires_payment_method":
-      case "requires_confirmation":
-      case "requires_action":
-        return "pending";
-      case "succeeded":
+  mapStatus(flowStatus: string): PaymentStatus {
+    switch (flowStatus?.toLowerCase()) {
+      case "1":
       case "paid":
+      case "pagado":
         return "succeeded";
-      case "canceled":
+      case "2":
+      case "pending":
+      case "pendiente":
+        return "pending";
+      case "3":
+      case "rejected":
+      case "rechazado":
       case "failed":
         return "failed";
-      case "refunded":
-        return "refunded";
+      case "4":
+      case "canceled":
+      case "cancelado":
+        return "failed";
       default:
-        logger.warn("Unknown Stripe status mapped to pending", {
-          stripeStatus,
+        logger.warn("Unknown Flow status mapped to pending", {
+          flowStatus,
         });
         return "pending";
     }
   }
 }
 ```
+
+**Notas importantes sobre Flow:**
+
+- Flow requiere una firma HMAC-SHA256 para todas las solicitudes de creación de órdenes.
+- Flow redirige al usuario a su página de pago (`approvalUrl`), no usa formularios embebidos.
+- Los webhooks de Flow llegan como `application/x-www-form-urlencoded` (FormData).
+- Flow soporta múltiples métodos de pago en Chile (tarjetas, transferencias, etc.).
 
 ### 6.2. Mercado Pago
 
@@ -1722,22 +1806,22 @@ Esta implementación forma parte de la **Phase SaaS 1 (Billing)** del Plan de Me
 
 #### Fase 1: Preparación
 
-- [ ] Crear migración de base de datos (`payments`, `webhook_events`)
-- [ ] Configurar variables de entorno
-- [ ] Crear estructura de directorios
-- [ ] Definir tipos e interfaces
+- [x] Crear migración de base de datos (`payments`, `webhook_events`) — **2026-01-28:** Migración `20260131000000_create_payments_and_webhook_events.sql` creada y aplicada (RLS, índices, `get_user_organization_id` incluido).
+- [ ] Configurar variables de entorno (Stripe, Mercado Pago, PayPal, `NEXT_PUBLIC_BASE_URL`)
+- [x] Crear estructura de directorios (`src/lib/payments/`, `src/types/payment.ts`)
+- [x] Definir tipos e interfaces (`Payment`, `WebhookEvent`, `IPaymentGateway`, etc.)
 
 #### Fase 2: Backend Core
 
-- [ ] Implementar `PaymentService`
-- [ ] Implementar `PaymentGatewayFactory`
-- [ ] Crear endpoint `create-intent`
-- [ ] Implementar validación y autenticación
+- [x] Implementar `PaymentService`
+- [x] Implementar `PaymentGatewayFactory`
+- [x] Crear endpoint `create-intent` (POST `/api/admin/payments/create-intent`)
+- [x] Implementar validación y autenticación (Zod, admin + organization context)
 
 #### Fase 3: Integración Stripe
 
-- [ ] Implementar `StripeGateway`
-- [ ] Crear webhook endpoint de Stripe
+- [x] Implementar `StripeGateway` (createPaymentIntent, processWebhookEvent, mapStatus)
+- [x] Crear webhook endpoint de Stripe (`/api/webhooks/stripe`) — **2026-01-28:** `src/app/api/webhooks/stripe/route.ts` (firma, idempotencia, actualización pago, fulfill orden)
 - [ ] Testing de integración con Stripe
 - [ ] Documentación de Stripe
 

@@ -25,9 +25,10 @@ export default function UserHeader() {
     }
   };
 
-  const userInitials = profile?.first_name && profile?.last_name
-    ? `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
-    : user?.email?.[0].toUpperCase() || "U";
+  const userInitials =
+    profile?.first_name && profile?.last_name
+      ? `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
+      : user?.email?.[0].toUpperCase() || "U";
 
   if (loading) {
     return null;
@@ -39,7 +40,7 @@ export default function UserHeader() {
         <div className="flex items-center justify-between">
           {/* Logo/Brand */}
           <Link href="/" className="flex items-center space-x-2">
-            <h1 className="text-xl font-bold">Business Management</h1>
+            <h1 className="text-xl font-bold">Opttius</h1>
           </Link>
 
           {/* Navigation */}
@@ -52,12 +53,18 @@ export default function UserHeader() {
                     Home
                   </Button>
                 </Link>
-                
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                    <Button
+                      variant="ghost"
+                      className="relative h-10 w-10 rounded-full"
+                    >
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={profile?.avatar_url || undefined} alt={user.email || "User"} />
+                        <AvatarImage
+                          src={profile?.avatar_url || undefined}
+                          alt={user.email || "User"}
+                        />
                         <AvatarFallback>{userInitials}</AvatarFallback>
                       </Avatar>
                     </Button>
@@ -83,13 +90,19 @@ export default function UserHeader() {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/profile?tab=settings" className="cursor-pointer">
+                      <Link
+                        href="/profile?tab=settings"
+                        className="cursor-pointer"
+                      >
                         <Settings className="mr-2 h-4 w-4" />
                         <span>Settings</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive">
+                    <DropdownMenuItem
+                      onClick={handleSignOut}
+                      className="cursor-pointer text-destructive"
+                    >
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Log out</span>
                     </DropdownMenuItem>
@@ -104,9 +117,7 @@ export default function UserHeader() {
                   </Button>
                 </Link>
                 <Link href="/signup">
-                  <Button size="sm">
-                    Sign up
-                  </Button>
+                  <Button size="sm">Sign up</Button>
                 </Link>
               </div>
             )}
@@ -116,4 +127,3 @@ export default function UserHeader() {
     </header>
   );
 }
-

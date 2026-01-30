@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { SmartContextWidget } from "@/components/ai/SmartContextWidget";
 import {
   Select,
   SelectContent,
@@ -96,6 +97,7 @@ interface Product {
   barcode?: string;
   featured_image?: string;
   brand?: string;
+  product_type?: string; // frame, accessory, sunglasses, service, lens, etc.
   category?: {
     id: string;
     name: string;
@@ -228,6 +230,14 @@ export default function POSPage() {
   const [lensFamilies, setLensFamilies] = useState<any[]>([]);
   const [loadingFamilies, setLoadingFamilies] = useState(false);
 
+  // Contact lens families and price calculation
+  const [contactLensFamilies, setContactLensFamilies] = useState<any[]>([]);
+  const [loadingContactLensFamilies, setLoadingContactLensFamilies] =
+    useState(false);
+  const [lensType, setLensType] = useState<"optical" | "contact">("optical"); // Toggle between optical and contact lenses
+  const [calculatingContactLensPrice, setCalculatingContactLensPrice] =
+    useState(false);
+
   // Presbyopia solution
   const [presbyopiaSolution, setPresbyopiaSolution] =
     useState<PresbyopiaSolution>("none");
@@ -297,6 +307,23 @@ export default function POSPage() {
     near_lens_family_id: "",
     far_lens_cost: 0,
     near_lens_cost: 0,
+    // Contact lens fields
+    contact_lens_family_id: "",
+    contact_lens_rx_sphere_od: null as number | null,
+    contact_lens_rx_cylinder_od: null as number | null,
+    contact_lens_rx_axis_od: null as number | null,
+    contact_lens_rx_add_od: null as number | null,
+    contact_lens_rx_base_curve_od: null as number | null,
+    contact_lens_rx_diameter_od: null as number | null,
+    contact_lens_rx_sphere_os: null as number | null,
+    contact_lens_rx_cylinder_os: null as number | null,
+    contact_lens_rx_axis_os: null as number | null,
+    contact_lens_rx_add_os: null as number | null,
+    contact_lens_rx_base_curve_os: null as number | null,
+    contact_lens_rx_diameter_os: null as number | null,
+    contact_lens_quantity: 1,
+    contact_lens_cost: 0,
+    contact_lens_price: 0,
     // Second frame for two separate lenses (near vision)
     near_frame_product_id: "",
     near_frame_name: "",
@@ -496,37 +523,8 @@ export default function POSPage() {
         const allQuotes = data.quotes || [];
         setCustomerQuotes(allQuotes);
 
-        // Only auto-load if skipAutoLoad is false and no quote is already selected
-        if (!skipAutoLoad && !selectedQuote) {
-          // Filter active quotes for auto-loading
-          const activeQuotes = allQuotes.filter(
-            (q: Quote) =>
-              q.status !== "expired" &&
-              q.status !== "converted_to_work" &&
-              q.status !== "accepted",
-          );
-
-          // If there's exactly one active quote, load it automatically into cart
-          if (activeQuotes.length === 1) {
-            toast.info(
-              `Presupuesto encontrado: ${activeQuotes[0].quote_number}. Cargando automáticamente...`,
-            );
-            await handleLoadQuoteToForm(activeQuotes[0]);
-          }
-          // If there are multiple active quotes, load the most recent one automatically
-          else if (activeQuotes.length > 1) {
-            // Sort by created_at descending and load the most recent
-            const sortedQuotes = [...activeQuotes].sort(
-              (a, b) =>
-                new Date(b.created_at).getTime() -
-                new Date(a.created_at).getTime(),
-            );
-            toast.info(
-              `Presupuesto encontrado: ${sortedQuotes[0].quote_number}. Cargando automáticamente...`,
-            );
-            await handleLoadQuoteToForm(sortedQuotes[0]);
-          }
-        }
+        // Don't auto-load quotes - user must manually select a quote
+        // This prevents automatic loading when customer is selected
       }
     } catch (error) {
       console.error("Error fetching customer quotes:", error);
@@ -821,6 +819,14 @@ export default function POSPage() {
   }, [selectedProductIndex]);
 
   const addToCart = (product: Product) => {
+    // Debug: Log product being added
+    console.log("🛒 Adding product to cart:", {
+      id: product.id,
+      name: product.name,
+      product_type: (product as any)?.product_type,
+      category: (product as any)?.category?.name,
+    });
+
     const existingItem = cart.find((item) => item.product.id === product.id);
 
     if (existingItem) {
@@ -1238,6 +1244,7 @@ export default function POSPage() {
     };
     fetchSettings();
     fetchLensFamilies();
+    fetchContactLensFamilies();
   }, []);
 
   // Fetch lens families
@@ -1253,6 +1260,32 @@ export default function POSPage() {
       console.error("Error fetching lens families:", error);
     } finally {
       setLoadingFamilies(false);
+    }
+  };
+
+  // Fetch contact lens families
+  const fetchContactLensFamilies = async () => {
+    try {
+      setLoadingContactLensFamilies(true);
+      const response = await fetch("/api/admin/contact-lens-families");
+      if (response.ok) {
+        const data = await response.json();
+        console.log(
+          "Contact lens families loaded in POS:",
+          data.families?.length || 0,
+          "families",
+        );
+        setContactLensFamilies(data.families || []);
+      } else {
+        console.error(
+          "Failed to fetch contact lens families:",
+          response.status,
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching contact lens families:", error);
+    } finally {
+      setLoadingContactLensFamilies(false);
     }
   };
 
@@ -1279,6 +1312,90 @@ export default function POSPage() {
       treatments_cost: 0,
     }));
   }, [orderFormData.lens_family_id, lensFamilies]);
+
+  // Calculate contact lens price from matrix
+  const calculateContactLensPriceFromMatrix = async () => {
+    if (!orderFormData.contact_lens_family_id || !selectedPrescription) {
+      return;
+    }
+
+    // Validate contact_lens_family_id is a valid UUID
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(orderFormData.contact_lens_family_id)) {
+      return;
+    }
+
+    try {
+      setCalculatingContactLensPrice(true);
+
+      // Get sphere value from prescription (use OD sphere for calculation)
+      const sphereOD = selectedPrescription.od_sphere || 0;
+      const cylinderOD = selectedPrescription.od_cylinder || 0;
+      const axisOD = selectedPrescription.od_axis || null;
+      const additionOD = selectedPrescription.od_add || null;
+
+      const response = await fetch(
+        "/api/admin/contact-lens-matrices/calculate",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contact_lens_family_id: orderFormData.contact_lens_family_id,
+            sphere: sphereOD,
+            cylinder: cylinderOD,
+            axis: axisOD,
+            addition: additionOD,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Error calculating contact lens price");
+      }
+
+      const data = await response.json();
+      if (data.calculation && data.calculation.price) {
+        // Calculate total price: price per box * quantity
+        const quantity = orderFormData.contact_lens_quantity || 1;
+        const totalPrice = data.calculation.price * quantity;
+        const totalCost = data.calculation.cost * quantity;
+
+        setOrderFormData((prev) => ({
+          ...prev,
+          contact_lens_price: totalPrice,
+          contact_lens_cost: totalCost,
+        }));
+      }
+    } catch (error) {
+      console.warn(
+        "Could not calculate contact lens price from matrix:",
+        error,
+      );
+      toast.error("No se pudo calcular el precio del lente de contacto");
+    } finally {
+      setCalculatingContactLensPrice(false);
+    }
+  };
+
+  // Recalculate contact lens price when relevant fields change
+  useEffect(() => {
+    if (
+      orderFormData.contact_lens_family_id &&
+      selectedPrescription &&
+      lensType === "contact"
+    ) {
+      const timer = setTimeout(() => {
+        calculateContactLensPriceFromMatrix();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    orderFormData.contact_lens_family_id,
+    orderFormData.contact_lens_quantity,
+    selectedPrescription?.id,
+    lensType,
+  ]);
 
   // Detect presbyopia and set default solution
   useEffect(() => {
@@ -1339,7 +1456,7 @@ export default function POSPage() {
           const result = await calculateLensPrice({
             lens_family_id: nearLensFamilyId,
             sphere: nearSphere,
-            cylinder: cylinder !== 0 ? cylinder : undefined,
+            cylinder: cylinder, // Always send cylinder, even if 0, to match ranges that include 0
           });
           if (result && result.price) {
             setNearLensCost(result.price);
@@ -1397,7 +1514,7 @@ export default function POSPage() {
       const result = await calculateLensPrice({
         lens_family_id: orderFormData.lens_family_id,
         sphere: farSphere,
-        cylinder: cylinder !== 0 ? cylinder : undefined,
+        cylinder: cylinder, // Always send cylinder, even if 0, to match ranges that include 0
         addition: addition,
       });
 
@@ -1648,11 +1765,24 @@ export default function POSPage() {
 
   // Add complete order to cart (individual items, don't clear cart)
   const handleAddCompleteOrderToCart = () => {
-    if (!orderFormData.lens_family_id && orderFormData.lens_cost === 0) {
-      toast.error(
-        "Selecciona una familia de lentes o ingresa el precio manualmente",
-      );
-      return;
+    // Validate lens configuration based on lens type
+    if (lensType === "contact") {
+      if (
+        !orderFormData.contact_lens_family_id &&
+        orderFormData.contact_lens_cost === 0
+      ) {
+        toast.error(
+          "Selecciona una familia de lentes de contacto o ingresa el precio manualmente",
+        );
+        return;
+      }
+    } else {
+      if (!orderFormData.lens_family_id && orderFormData.lens_cost === 0) {
+        toast.error(
+          "Selecciona una familia de lentes o ingresa el precio manualmente",
+        );
+        return;
+      }
     }
 
     console.log("🛒 Adding complete order to cart");
@@ -1791,8 +1921,29 @@ export default function POSPage() {
         itemsAdded++;
         console.log("✅ Two separate lenses prepared:", lensProduct);
       }
+    } else if (lensType === "contact") {
+      // Contact lens
+      const contactLensName = orderFormData.contact_lens_family_id
+        ? `Lentes de Contacto (${contactLensFamilies.find((f) => f.id === orderFormData.contact_lens_family_id)?.name || "N/A"}) - ${orderFormData.contact_lens_quantity || 1} caja(s)`
+        : `Lentes de Contacto (Precio manual) - ${orderFormData.contact_lens_quantity || 1} caja(s)`;
+      const contactLensProduct: Product = {
+        id: `contact-lens-${baseTimestamp}`,
+        name: contactLensName,
+        price:
+          orderFormData.contact_lens_price ||
+          orderFormData.contact_lens_cost ||
+          0,
+        price_includes_tax: true, // IVA incluido por defecto
+        inventory_quantity: 999,
+        sku: orderFormData.contact_lens_family_id
+          ? `CL-FAMILY-${orderFormData.contact_lens_family_id.substring(0, 8).toUpperCase()}`
+          : `CL-MANUAL-${baseTimestamp}`,
+      };
+      itemsToAdd.push(contactLensProduct);
+      itemsAdded++;
+      console.log("✅ Contact lens prepared:", contactLensProduct);
     } else if (orderFormData.lens_family_id || orderFormData.lens_cost > 0) {
-      // Single lens
+      // Single optical lens
       const lensName = orderFormData.lens_family_id
         ? `Lente (Familia: ${lensFamilies.find((f) => f.id === orderFormData.lens_family_id)?.name || "N/A"})`
         : `Lente (Precio manual)`;
@@ -2039,6 +2190,7 @@ export default function POSPage() {
               sku: item.sku,
               barcode: item.barcode,
               featured_image: item.featured_image,
+              product_type: item.product_type || "frame", // Preserve product_type from quote item
             };
             addToCart(product);
           } else if (item.type === "lens_complete") {
@@ -2163,10 +2315,68 @@ export default function POSPage() {
         return isTemporaryLensItem;
       });
 
+      // Verificar tipos de productos en el carrito
+      const productTypesInCart = cart.map((item) => {
+        const product = item.product as any;
+        return product?.product_type;
+      });
+
+      // Productos que NO requieren cliente registrado ni trabajo de laboratorio
+      const nonWorkOrderTypes = ["accessory", "sunglasses", "service", "lens"];
+
+      // Debug: Log product types in cart
+      console.log(
+        "🔍 POS Debug - Cart items:",
+        cart.map((item) => ({
+          id: item.product.id,
+          name: item.product.name,
+          product_type: (item.product as any)?.product_type,
+          category: (item.product as any)?.category?.name,
+        })),
+      );
+
+      const hasOnlyNonWorkOrderProducts = cart.every((item) => {
+        const product = item.product as any;
+        const productType = product?.product_type;
+
+        // Si el producto tiene una categoría que indica que no requiere trabajo, también permitirlo
+        const categoryName =
+          product?.category?.name?.toLowerCase() ||
+          product?.categories?.name?.toLowerCase() ||
+          null;
+        const isNonWorkOrderCategory =
+          categoryName &&
+          (categoryName.includes("accesorio") ||
+            categoryName.includes("accesorios") ||
+            categoryName.includes("lente de sol") ||
+            categoryName.includes("lentes de sol") ||
+            categoryName.includes("servicio") ||
+            categoryName.includes("servicios"));
+
+        // Solo productos con tipos específicos que no requieren trabajo están permitidos sin cliente
+        // Los descuentos siempre están permitidos
+        // Si tiene categoría que indica que no requiere trabajo, también permitirlo
+        // Si el producto es de tipo "frame" pero tiene categoría de accesorio, también permitirlo
+        const isNonWorkOrderType =
+          productType && nonWorkOrderTypes.includes(productType);
+        const isFrameButAccessory =
+          productType === "frame" && isNonWorkOrderCategory;
+
+        return (
+          item.product.id.startsWith("discount-") ||
+          isNonWorkOrderType ||
+          isNonWorkOrderCategory ||
+          isFrameButAccessory
+        );
+      });
+
+      console.log(
+        "🔍 POS Debug - hasOnlyNonWorkOrderProducts:",
+        hasOnlyNonWorkOrderProducts,
+      );
+
       // Verificar si hay un marco (frame) en el carrito
       const hasFrameInCart = cart.some((item) => {
-        // Verificar si el producto es de tipo "frame"
-        // product_type existe en runtime aunque no esté en el tipo TypeScript
         const product = item.product as any;
         return product?.product_type === "frame";
       });
@@ -2182,9 +2392,11 @@ export default function POSPage() {
       // Solo se requiere trabajo de laboratorio si:
       // 1. Hay items temporales de lentes/labor (siempre requieren trabajo)
       // 2. Hay un marco EN EL CARRITO Y hay datos de lentes para montar
-      // Los productos de tipo "accessory", "lens", "service" NO requieren trabajo
+      // Los productos de tipo "accessory", "sunglasses", "service", "lens" NO requieren trabajo
+      // Si solo hay productos que no requieren trabajo, no se necesita cliente
       const requiresWorkOrder =
-        hasTemporaryLensItems || (hasFrameInCart && hasLensDataForMounting);
+        !hasOnlyNonWorkOrderProducts &&
+        (hasTemporaryLensItems || (hasFrameInCart && hasLensDataForMounting));
 
       if (requiresWorkOrder && !selectedCustomer?.id) {
         toast.error(
@@ -2227,7 +2439,10 @@ export default function POSPage() {
         customer_name: selectedCustomer
           ? `${selectedCustomer.first_name || ""} ${selectedCustomer.last_name || ""}`.trim()
           : customerBusinessName || null,
-        customer_rut: selectedCustomer?.rut || customerRUT || null,
+        customer_rut:
+          selectedCustomer?.rut ||
+          (customerRUT && customerRUT.trim() !== "" ? customerRUT : null) ||
+          null,
         payment_method_type: paymentMethod,
         payment_status: finalPaymentStatus,
         status: "delivered", // POS sales are immediately fulfilled
@@ -2237,23 +2452,30 @@ export default function POSPage() {
         currency: "CLP", // Chilean Peso
         installments_count: 1, // Ya no se usa, mantener para compatibilidad
         sii_invoice_type: siiInvoiceType,
-        sii_rut: selectedCustomer?.rut || customerRUT || null,
+        sii_rut:
+          selectedCustomer?.rut ||
+          (customerRUT && customerRUT.trim() !== "" ? customerRUT : null) ||
+          null,
         sii_business_name:
           selectedCustomer?.business_name || customerBusinessName || null,
-        items: cart.map((item) => ({
-          product_id:
-            item.product.id.startsWith("lens-") ||
-            item.product.id.startsWith("treatments-") ||
-            item.product.id.startsWith("labor-") ||
-            item.product.id.startsWith("frame-manual-") ||
-            /-\d+$/.test(item.product.id) // Filter IDs with timestamp suffix (e.g., "uuid-1234567890")
-              ? null
-              : item.product.id,
-          product_name: item.product.name,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          total_price: item.subtotal,
-        })),
+        items: cart.map((item) => {
+          const product = item.product as any;
+          return {
+            product_id:
+              item.product.id.startsWith("lens-") ||
+              item.product.id.startsWith("treatments-") ||
+              item.product.id.startsWith("labor-") ||
+              item.product.id.startsWith("frame-manual-") ||
+              item.product.id.length > 36 // Filter IDs with timestamp suffix (e.g., "uuid-1234567890")
+                ? null
+                : item.product.id,
+            product_name: item.product.name,
+            quantity: item.quantity,
+            unit_price: item.unitPrice,
+            total_price: item.subtotal,
+            product_type: product?.product_type || null, // Include product_type for backend processing
+          };
+        }),
         cash_received:
           paymentMethod === "cash"
             ? isCashPartial
@@ -2267,12 +2489,13 @@ export default function POSPage() {
             ? Math.max(0, change)
             : null, // Ensure change is never negative (solo para efectivo completo)
         deposit_amount: paymentAmount < total ? paymentAmount : null, // Monto de abono si es pago parcial
-        // Datos estructurados de lentes y marcos
+        // Datos estructurados de lentes y marcos (solo para lentes ópticos)
         lens_data:
-          orderFormData.lens_family_id ||
-          orderFormData.lens_type ||
-          orderFormData.lens_material ||
-          presbyopiaSolution !== "none"
+          lensType === "optical" &&
+          (orderFormData.lens_family_id ||
+            orderFormData.lens_type ||
+            orderFormData.lens_material ||
+            presbyopiaSolution !== "none")
             ? {
                 lens_family_id:
                   presbyopiaSolution === "two_separate"
@@ -2308,6 +2531,59 @@ export default function POSPage() {
           presbyopiaSolution === "two_separate" ? farLensCost || 0 : null,
         near_lens_cost:
           presbyopiaSolution === "two_separate" ? nearLensCost || 0 : null,
+        // Contact lens fields
+        contact_lens_family_id:
+          lensType === "contact"
+            ? orderFormData.contact_lens_family_id || null
+            : null,
+        contact_lens_rx_sphere_od:
+          lensType === "contact"
+            ? orderFormData.contact_lens_rx_sphere_od
+            : null,
+        contact_lens_rx_cylinder_od:
+          lensType === "contact"
+            ? orderFormData.contact_lens_rx_cylinder_od
+            : null,
+        contact_lens_rx_axis_od:
+          lensType === "contact" ? orderFormData.contact_lens_rx_axis_od : null,
+        contact_lens_rx_add_od:
+          lensType === "contact" ? orderFormData.contact_lens_rx_add_od : null,
+        contact_lens_rx_base_curve_od:
+          lensType === "contact"
+            ? orderFormData.contact_lens_rx_base_curve_od
+            : null,
+        contact_lens_rx_diameter_od:
+          lensType === "contact"
+            ? orderFormData.contact_lens_rx_diameter_od
+            : null,
+        contact_lens_rx_sphere_os:
+          lensType === "contact"
+            ? orderFormData.contact_lens_rx_sphere_os
+            : null,
+        contact_lens_rx_cylinder_os:
+          lensType === "contact"
+            ? orderFormData.contact_lens_rx_cylinder_os
+            : null,
+        contact_lens_rx_axis_os:
+          lensType === "contact" ? orderFormData.contact_lens_rx_axis_os : null,
+        contact_lens_rx_add_os:
+          lensType === "contact" ? orderFormData.contact_lens_rx_add_os : null,
+        contact_lens_rx_base_curve_os:
+          lensType === "contact"
+            ? orderFormData.contact_lens_rx_base_curve_os
+            : null,
+        contact_lens_rx_diameter_os:
+          lensType === "contact"
+            ? orderFormData.contact_lens_rx_diameter_os
+            : null,
+        contact_lens_quantity:
+          lensType === "contact"
+            ? orderFormData.contact_lens_quantity || 1
+            : null,
+        contact_lens_cost:
+          lensType === "contact" ? orderFormData.contact_lens_cost || 0 : null,
+        contact_lens_price:
+          lensType === "contact" ? orderFormData.contact_lens_price || 0 : null,
         frame_data:
           orderFormData.frame_name || selectedFrame?.id
             ? {
@@ -2468,7 +2744,10 @@ export default function POSPage() {
           {/* First row: Branch selector and Caja button */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1
+                className="text-2xl font-bold text-gray-900"
+                data-tour="pos-header"
+              >
                 Punto de Venta (POS)
               </h1>
               <p className="text-sm text-gray-600">
@@ -2511,6 +2790,9 @@ export default function POSPage() {
           </div>
         </div>
       </div>
+
+      {/* AI Insights Widget */}
+      {currentBranchId && <SmartContextWidget section="pos" />}
 
       {/* Cash Status Alert */}
       {!isSuperAdmin && currentBranchId && (
@@ -2663,6 +2945,7 @@ export default function POSPage() {
                       )}
 
                     {!searchingCustomers &&
+                      !selectedCustomer &&
                       customerSearchTerm.trim().length > 0 &&
                       customerSearchResults.length === 0 && (
                         <div className="border rounded-lg bg-white p-3 text-center text-gray-500 text-sm">
@@ -4008,237 +4291,593 @@ export default function POSPage() {
                       </div>
                     ) : null}
 
-                    {/* Single Lens Family Selection */}
+                    {/* Lens Type Toggle: Optical vs Contact */}
                     {presbyopiaSolution !== "two_separate" && (
-                      <div>
-                        <Label>Familia de Lentes</Label>
-                        <Select
-                          value={orderFormData.lens_family_id || "none"}
-                          onValueChange={(value) => {
-                            if (value === "none") {
+                      <div className="flex items-center gap-4 p-3 border rounded-lg bg-gray-50">
+                        <Label className="font-medium text-sm">
+                          Tipo de Lente:
+                        </Label>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant={
+                              lensType === "optical" ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => {
+                              setLensType("optical");
+                              // Reset contact lens fields when switching to optical
+                              setOrderFormData((prev) => ({
+                                ...prev,
+                                contact_lens_family_id: "",
+                                contact_lens_quantity: 1,
+                                contact_lens_cost: 0,
+                                contact_lens_price: 0,
+                              }));
+                            }}
+                          >
+                            Lentes Ópticos
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={
+                              lensType === "contact" ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => {
+                              setLensType("contact");
+                              // Reset optical lens fields when switching to contact
                               setOrderFormData((prev) => ({
                                 ...prev,
                                 lens_family_id: "",
+                                lens_cost: 0,
                               }));
-                              setManualLensPrice(false);
-                            } else {
-                              setOrderFormData((prev) => ({
-                                ...prev,
-                                lens_family_id: value,
-                              }));
-                              setManualLensPrice(false);
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="h-9 text-sm">
-                            <SelectValue placeholder="Selecciona una familia (opcional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">
-                              Sin familia (manual)
-                            </SelectItem>
-                            {loadingFamilies ? (
-                              <SelectItem value="loading" disabled>
-                                Cargando...
-                              </SelectItem>
-                            ) : (
-                              lensFamilies
-                                .filter((f) => {
-                                  if (presbyopiaSolution === "none")
-                                    return true;
-                                  const recommended =
-                                    getRecommendedLensTypes(presbyopiaSolution);
-                                  return recommended.includes(f.lens_type);
-                                })
-                                .map((family) => (
-                                  <SelectItem key={family.id} value={family.id}>
-                                    {family.name} ({family.brand || "Sin marca"}
-                                    )
-                                  </SelectItem>
-                                ))
-                            )}
-                          </SelectContent>
-                        </Select>
+                            }}
+                          >
+                            Lentes de Contacto
+                          </Button>
+                        </div>
                       </div>
                     )}
 
-                    {/* Lens Configuration */}
-                    <div>
-                      <Label>Tipo de Lente *</Label>
-                      {orderFormData.lens_family_id ? (
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mt-1">
-                          <p className="text-sm text-blue-800">
-                            Tipo: {orderFormData.lens_type || "—"} · Material:{" "}
-                            {orderFormData.lens_material || "—"} (heredados de
-                            la familia)
-                          </p>
+                    {/* Contact Lens Configuration */}
+                    {presbyopiaSolution !== "two_separate" &&
+                    lensType === "contact" ? (
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Familia de Lentes de Contacto</Label>
+                          <Select
+                            value={
+                              orderFormData.contact_lens_family_id || "none"
+                            }
+                            onValueChange={(value) => {
+                              setOrderFormData((prev) => ({
+                                ...prev,
+                                contact_lens_family_id:
+                                  value === "none" ? "" : value,
+                                contact_lens_cost: 0,
+                                contact_lens_price: 0,
+                              }));
+                            }}
+                            disabled={loadingContactLensFamilies}
+                          >
+                            <SelectTrigger className="h-9 text-sm">
+                              <SelectValue
+                                placeholder={
+                                  loadingContactLensFamilies
+                                    ? "Cargando..."
+                                    : "Selecciona familia (opcional)"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">
+                                Sin familia (precio manual)
+                              </SelectItem>
+                              {contactLensFamilies
+                                .filter((f) => f.is_active)
+                                .map((family) => (
+                                  <SelectItem key={family.id} value={family.id}>
+                                    {family.name}{" "}
+                                    {family.brand && `(${family.brand})`}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                      ) : (
-                        <div className="space-y-2 mt-1">
-                          <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                            <p className="text-xs text-yellow-800">
-                              No hay familia seleccionada. Ingresa el precio del
-                              lente manualmente.
-                            </p>
-                          </div>
+
+                        {orderFormData.contact_lens_family_id && (
+                          <>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-sm">
+                                  Cantidad de Cajas
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={
+                                    orderFormData.contact_lens_quantity || 1
+                                  }
+                                  onChange={(e) => {
+                                    const quantity =
+                                      parseInt(e.target.value) || 1;
+                                    setOrderFormData((prev) => ({
+                                      ...prev,
+                                      contact_lens_quantity: quantity,
+                                    }));
+                                  }}
+                                  className="h-9 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm">Precio Total</Label>
+                                <Input
+                                  type="number"
+                                  value={orderFormData.contact_lens_price || ""}
+                                  onChange={(e) => {
+                                    const price =
+                                      parseFloat(e.target.value) || 0;
+                                    setOrderFormData((prev) => ({
+                                      ...prev,
+                                      contact_lens_price: price,
+                                    }));
+                                  }}
+                                  placeholder="Se calcula automáticamente"
+                                  className="h-9 text-sm"
+                                />
+                              </div>
+                            </div>
+                            {calculatingContactLensPrice && (
+                              <div className="flex items-center gap-2 text-xs text-gray-600">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span>
+                                  Calculando precio del lente de contacto...
+                                </span>
+                              </div>
+                            )}
+                            {orderFormData.contact_lens_price > 0 && (
+                              <div className="p-2 bg-green-50 border border-green-200 rounded">
+                                <p className="text-xs font-medium text-green-800">
+                                  Precio Total:{" "}
+                                  {formatCurrency(
+                                    orderFormData.contact_lens_price,
+                                  )}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {!orderFormData.contact_lens_family_id && (
                           <div>
-                            <Label className="text-sm">Costo del Lente</Label>
+                            <Label className="text-sm">
+                              Costo del Lente de Contacto (Manual)
+                            </Label>
                             <Input
                               type="number"
                               placeholder="Ej: 30000"
-                              value={orderFormData.lens_cost || ""}
+                              value={orderFormData.contact_lens_cost || ""}
                               onChange={(e) => {
                                 const newValue =
                                   parseFloat(e.target.value) || 0;
                                 setOrderFormData((prev) => ({
                                   ...prev,
-                                  lens_cost: newValue,
+                                  contact_lens_cost: newValue,
+                                  contact_lens_price: newValue,
                                 }));
                               }}
                               className="h-9 text-sm mt-1"
                             />
                           </div>
-                        </div>
-                      )}
-                      {orderFormData.lens_index && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          Índice: {orderFormData.lens_index}
-                        </div>
-                      )}
-                      {orderFormData.lens_family_id &&
-                        orderFormData.lens_cost > 0 && (
-                          <div className="flex items-center justify-between mt-1">
-                            <div className="text-xs text-gray-600">
-                              Costo lente:{" "}
-                              {formatCurrency(orderFormData.lens_cost)}
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 text-xs"
-                              onClick={() =>
-                                setManualLensPrice(!manualLensPrice)
-                              }
-                            >
-                              {manualLensPrice ? "Auto" : "Manual"}
-                            </Button>
-                          </div>
                         )}
-                      {orderFormData.lens_family_id && manualLensPrice && (
-                        <div className="mt-2">
-                          <Label className="text-sm">
-                            Costo del Lente (Manual)
-                          </Label>
-                          <Input
-                            type="number"
-                            placeholder="Ej: 30000"
-                            value={orderFormData.lens_cost || ""}
-                            onChange={(e) => {
-                              const newValue = parseFloat(e.target.value) || 0;
-                              setOrderFormData((prev) => ({
-                                ...prev,
-                                lens_cost: newValue,
-                              }));
+
+                        {/* Contact Lens RX Fields */}
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                          <div>
+                            <Label className="font-medium mb-2 text-sm">
+                              Receta Ojo Derecho (OD)
+                            </Label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                placeholder="Esfera"
+                                type="number"
+                                step="0.25"
+                                value={
+                                  orderFormData.contact_lens_rx_sphere_od || ""
+                                }
+                                onChange={(e) =>
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    contact_lens_rx_sphere_od: e.target.value
+                                      ? parseFloat(e.target.value)
+                                      : null,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                              <Input
+                                placeholder="Cilindro"
+                                type="number"
+                                step="0.25"
+                                value={
+                                  orderFormData.contact_lens_rx_cylinder_od ||
+                                  ""
+                                }
+                                onChange={(e) =>
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    contact_lens_rx_cylinder_od: e.target.value
+                                      ? parseFloat(e.target.value)
+                                      : null,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                              <Input
+                                placeholder="Eje (0-180)"
+                                type="number"
+                                min="0"
+                                max="180"
+                                value={
+                                  orderFormData.contact_lens_rx_axis_od || ""
+                                }
+                                onChange={(e) =>
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    contact_lens_rx_axis_od: e.target.value
+                                      ? parseInt(e.target.value)
+                                      : null,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                              <Input
+                                placeholder="Adición"
+                                type="number"
+                                step="0.25"
+                                value={
+                                  orderFormData.contact_lens_rx_add_od || ""
+                                }
+                                onChange={(e) =>
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    contact_lens_rx_add_od: e.target.value
+                                      ? parseFloat(e.target.value)
+                                      : null,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="font-medium mb-2 text-sm">
+                              Receta Ojo Izquierdo (OS)
+                            </Label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                placeholder="Esfera"
+                                type="number"
+                                step="0.25"
+                                value={
+                                  orderFormData.contact_lens_rx_sphere_os || ""
+                                }
+                                onChange={(e) =>
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    contact_lens_rx_sphere_os: e.target.value
+                                      ? parseFloat(e.target.value)
+                                      : null,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                              <Input
+                                placeholder="Cilindro"
+                                type="number"
+                                step="0.25"
+                                value={
+                                  orderFormData.contact_lens_rx_cylinder_os ||
+                                  ""
+                                }
+                                onChange={(e) =>
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    contact_lens_rx_cylinder_os: e.target.value
+                                      ? parseFloat(e.target.value)
+                                      : null,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                              <Input
+                                placeholder="Eje (0-180)"
+                                type="number"
+                                min="0"
+                                max="180"
+                                value={
+                                  orderFormData.contact_lens_rx_axis_os || ""
+                                }
+                                onChange={(e) =>
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    contact_lens_rx_axis_os: e.target.value
+                                      ? parseInt(e.target.value)
+                                      : null,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                              <Input
+                                placeholder="Adición"
+                                type="number"
+                                step="0.25"
+                                value={
+                                  orderFormData.contact_lens_rx_add_os || ""
+                                }
+                                onChange={(e) =>
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    contact_lens_rx_add_os: e.target.value
+                                      ? parseFloat(e.target.value)
+                                      : null,
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : presbyopiaSolution !== "two_separate" &&
+                      lensType === "optical" ? (
+                      /* Optical Lens Configuration (existing code) */
+                      <>
+                        {/* Single Lens Family Selection */}
+                        <div>
+                          <Label>Familia de Lentes</Label>
+                          <Select
+                            value={orderFormData.lens_family_id || "none"}
+                            onValueChange={(value) => {
+                              if (value === "none") {
+                                setOrderFormData((prev) => ({
+                                  ...prev,
+                                  lens_family_id: "",
+                                }));
+                                setManualLensPrice(false);
+                              } else {
+                                setOrderFormData((prev) => ({
+                                  ...prev,
+                                  lens_family_id: value,
+                                }));
+                                setManualLensPrice(false);
+                              }
                             }}
-                            className="h-9 text-sm mt-1"
-                          />
+                          >
+                            <SelectTrigger className="h-9 text-sm">
+                              <SelectValue placeholder="Selecciona una familia (opcional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">
+                                Sin familia (manual)
+                              </SelectItem>
+                              {loadingFamilies ? (
+                                <SelectItem value="loading" disabled>
+                                  Cargando...
+                                </SelectItem>
+                              ) : (
+                                lensFamilies
+                                  .filter((f) => {
+                                    if (presbyopiaSolution === "none")
+                                      return true;
+                                    const recommended =
+                                      getRecommendedLensTypes(
+                                        presbyopiaSolution,
+                                      );
+                                    return recommended.includes(f.lens_type);
+                                  })
+                                  .map((family) => (
+                                    <SelectItem
+                                      key={family.id}
+                                      value={family.id}
+                                    >
+                                      {family.name} (
+                                      {family.brand || "Sin marca"})
+                                    </SelectItem>
+                                  ))
+                              )}
+                            </SelectContent>
+                          </Select>
                         </div>
-                      )}
-                      {calculatingPrice && (
-                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Calculando precio...
+
+                        {/* Lens Configuration */}
+                        <div>
+                          <Label>Tipo de Lente *</Label>
+                          {orderFormData.lens_family_id ? (
+                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mt-1">
+                              <p className="text-sm text-blue-800">
+                                Tipo: {orderFormData.lens_type || "—"} ·
+                                Material: {orderFormData.lens_material || "—"}{" "}
+                                (heredados de la familia)
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2 mt-1">
+                              <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-xs text-yellow-800">
+                                  No hay familia seleccionada. Ingresa el precio
+                                  del lente manualmente.
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-sm">
+                                  Costo del Lente
+                                </Label>
+                                <Input
+                                  type="number"
+                                  placeholder="Ej: 30000"
+                                  value={orderFormData.lens_cost || ""}
+                                  onChange={(e) => {
+                                    const newValue =
+                                      parseFloat(e.target.value) || 0;
+                                    setOrderFormData((prev) => ({
+                                      ...prev,
+                                      lens_cost: newValue,
+                                    }));
+                                  }}
+                                  className="h-9 text-sm mt-1"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {orderFormData.lens_index && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Índice: {orderFormData.lens_index}
+                            </div>
+                          )}
+                          {orderFormData.lens_family_id &&
+                            orderFormData.lens_cost > 0 && (
+                              <div className="flex items-center justify-between mt-1">
+                                <div className="text-xs text-gray-600">
+                                  Costo lente:{" "}
+                                  {formatCurrency(orderFormData.lens_cost)}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs"
+                                  onClick={() =>
+                                    setManualLensPrice(!manualLensPrice)
+                                  }
+                                >
+                                  {manualLensPrice ? "Auto" : "Manual"}
+                                </Button>
+                              </div>
+                            )}
+                          {orderFormData.lens_family_id && manualLensPrice && (
+                            <div className="mt-2">
+                              <Label className="text-sm">
+                                Costo del Lente (Manual)
+                              </Label>
+                              <Input
+                                type="number"
+                                placeholder="Ej: 30000"
+                                value={orderFormData.lens_cost || ""}
+                                onChange={(e) => {
+                                  const newValue =
+                                    parseFloat(e.target.value) || 0;
+                                  setOrderFormData((prev) => ({
+                                    ...prev,
+                                    lens_cost: newValue,
+                                  }));
+                                }}
+                                className="h-9 text-sm mt-1"
+                              />
+                            </div>
+                          )}
+                          {calculatingPrice && (
+                            <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Calculando precio...
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </>
+                    ) : null}
 
                     {/* Treatments */}
-                    {/* Hide treatments when two_separate solution */}
-                    {presbyopiaSolution !== "two_separate" && (
-                      <>
-                        {/* Show all treatments when no family is selected */}
-                        {!orderFormData.lens_family_id && (
-                          <div>
-                            <Label>Tratamientos</Label>
-                            <div className="grid grid-cols-2 gap-2 mt-1">
-                              {availableTreatments
-                                .slice(0, 6)
-                                .map((treatment) => (
-                                  <Button
-                                    key={treatment.value}
-                                    type="button"
-                                    variant={
-                                      orderFormData.lens_treatments.includes(
-                                        treatment.value,
-                                      )
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    size="sm"
-                                    className="h-8 text-xs"
-                                    onClick={() =>
-                                      handleTreatmentToggle(treatment)
-                                    }
-                                  >
-                                    {treatment.label}
-                                  </Button>
-                                ))}
-                            </div>
-                            {orderFormData.treatments_cost > 0 && (
-                              <div className="text-xs text-gray-600 mt-1">
-                                Costo tratamientos:{" "}
-                                {formatCurrency(orderFormData.treatments_cost)}
+                    {/* Hide treatments when two_separate solution or contact lenses */}
+                    {presbyopiaSolution !== "two_separate" &&
+                      lensType === "optical" && (
+                        <>
+                          {/* Show all treatments when no family is selected */}
+                          {!orderFormData.lens_family_id && (
+                            <div>
+                              <Label>Tratamientos</Label>
+                              <div className="grid grid-cols-2 gap-2 mt-1">
+                                {availableTreatments
+                                  .slice(0, 6)
+                                  .map((treatment) => (
+                                    <Button
+                                      key={treatment.value}
+                                      type="button"
+                                      variant={
+                                        orderFormData.lens_treatments.includes(
+                                          treatment.value,
+                                        )
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      size="sm"
+                                      className="h-8 text-xs"
+                                      onClick={() =>
+                                        handleTreatmentToggle(treatment)
+                                      }
+                                    >
+                                      {treatment.label}
+                                    </Button>
+                                  ))}
                               </div>
-                            )}
-                          </div>
-                        )}
-                        {/* Show only extras when family is selected */}
-                        {orderFormData.lens_family_id && (
-                          <div>
-                            <Label>Extras</Label>
-                            <div className="text-xs text-gray-500 mb-2">
-                              Los tratamientos estándar están incluidos en la
-                              familia. Solo extras:
+                              {orderFormData.treatments_cost > 0 && (
+                                <div className="text-xs text-gray-600 mt-1">
+                                  Costo tratamientos:{" "}
+                                  {formatCurrency(
+                                    orderFormData.treatments_cost,
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div className="grid grid-cols-2 gap-2 mt-1">
-                              {availableTreatments
-                                .filter(
-                                  (t) =>
-                                    t.value === "tint" ||
-                                    t.value === "prism_extra",
-                                )
-                                .map((treatment) => (
-                                  <Button
-                                    key={treatment.value}
-                                    type="button"
-                                    variant={
-                                      orderFormData.lens_treatments.includes(
-                                        treatment.value,
-                                      )
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    size="sm"
-                                    className="h-8 text-xs"
-                                    onClick={() =>
-                                      handleTreatmentToggle(treatment)
-                                    }
-                                  >
-                                    {treatment.label}
-                                  </Button>
-                                ))}
-                            </div>
-                            {orderFormData.treatments_cost > 0 && (
-                              <div className="text-xs text-gray-600 mt-1">
-                                Costo extras:{" "}
-                                {formatCurrency(orderFormData.treatments_cost)}
+                          )}
+                          {/* Show only extras when family is selected */}
+                          {orderFormData.lens_family_id && (
+                            <div>
+                              <Label>Extras</Label>
+                              <div className="text-xs text-gray-500 mb-2">
+                                Los tratamientos estándar están incluidos en la
+                                familia. Solo extras:
                               </div>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
+                              <div className="grid grid-cols-2 gap-2 mt-1">
+                                {availableTreatments
+                                  .filter(
+                                    (t) =>
+                                      t.value === "tint" ||
+                                      t.value === "prism_extra",
+                                  )
+                                  .map((treatment) => (
+                                    <Button
+                                      key={treatment.value}
+                                      type="button"
+                                      variant={
+                                        orderFormData.lens_treatments.includes(
+                                          treatment.value,
+                                        )
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      size="sm"
+                                      className="h-8 text-xs"
+                                      onClick={() =>
+                                        handleTreatmentToggle(treatment)
+                                      }
+                                    >
+                                      {treatment.label}
+                                    </Button>
+                                  ))}
+                              </div>
+                              {orderFormData.treatments_cost > 0 && (
+                                <div className="text-xs text-gray-600 mt-1">
+                                  Costo extras:{" "}
+                                  {formatCurrency(
+                                    orderFormData.treatments_cost,
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
                   </TabsContent>
 
                   {/* Pricing Tab */}

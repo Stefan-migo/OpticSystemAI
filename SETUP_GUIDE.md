@@ -1,6 +1,6 @@
-# Business Management App - Complete Setup Guide
+# Opttius - Complete Setup Guide
 
-This guide will walk you through setting up the Business Management App from scratch, including cloning the repository, setting up Docker Supabase, and creating your first admin user.
+This guide will walk you through setting up Opttius from scratch, including cloning the repository, setting up Docker Supabase, and creating your first admin user.
 
 ## Prerequisites
 
@@ -388,7 +388,7 @@ You should see your admin user listed.
 
 ## 🎉 Setup Complete!
 
-Your Business Management App is now running locally with:
+Opttius is now running locally with:
 
 - ✅ Local Supabase database
 - ✅ All migrations applied

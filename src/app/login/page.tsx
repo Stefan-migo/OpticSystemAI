@@ -10,13 +10,27 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Eye, EyeOff, Lock, Mail, ArrowRight, Shield } from "lucide-react";
+import {
+  Loader2,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  ArrowRight,
+  Shield,
+} from "lucide-react";
 
 const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().email("Por favor ingresa un email válido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -43,24 +57,145 @@ export default function LoginPage() {
         setError(result.error.message || "Login failed");
       } else {
         // Check if user is admin and redirect accordingly
+        console.log("✅ Login successful, checking admin status...");
         try {
-          const { createClient } = await import('@/utils/supabase/client');
+          const { createClient } = await import("@/utils/supabase/client");
           const supabase = createClient();
-          const { data: { user } } = await supabase.auth.getUser();
-          
+          const {
+            data: { user },
+            error: userError,
+          } = await supabase.auth.getUser();
+
+          if (userError) {
+            console.error("❌ Error getting user after login:", userError);
+            router.push("/profile");
+            return;
+          }
+
           if (user) {
-            const { data: isAdmin } = await supabase.rpc('is_admin', { user_id: user.id });
-            if (isAdmin) {
-              router.push("/admin");
+            console.log("👤 User found:", user.email, "ID:", user.id);
+            const { data: isAdmin, error: adminError } = await supabase.rpc(
+              "is_admin",
+              { user_id: user.id },
+            );
+
+            if (adminError) {
+              console.error("❌ Error checking admin status:", adminError);
+              router.push("/profile");
+              return;
+            }
+
+            console.log("🔐 Admin check result:", isAdmin);
+
+            // Ensure user has admin_users record (needed for onboarding)
+            // This creates the record if it doesn't exist
+            let adminUser = null;
+            try {
+              const ensureResponse = await fetch(
+                "/api/onboarding/ensure-admin-user",
+                {
+                  method: "POST",
+                },
+              );
+              if (!ensureResponse.ok) {
+                console.warn(
+                  "⚠️ Could not ensure admin_user record, but continuing...",
+                );
+              } else {
+                const ensureData = await ensureResponse.json();
+                if (ensureData.created) {
+                  console.log("✅ Created admin_users record for user");
+                }
+                // Use the adminUser from the response if available
+                if (ensureData.adminUser) {
+                  adminUser = ensureData.adminUser;
+                }
+              }
+            } catch (ensureError) {
+              console.warn("⚠️ Error ensuring admin_user record:", ensureError);
+            }
+
+            // If we don't have adminUser from ensure endpoint, fetch it
+            if (!adminUser) {
+              const { data: fetchedAdminUser, error: adminUserError } =
+                await supabase
+                  .from("admin_users")
+                  .select("organization_id")
+                  .eq("id", user.id)
+                  .maybeSingle();
+
+              adminUser = fetchedAdminUser;
+
+              if (adminUserError && adminUserError.code !== "PGRST116") {
+                console.warn("⚠️ Error fetching admin_user:", adminUserError);
+              }
+            }
+
+            // Check if user is root/dev (should go to SaaS Management)
+            const isRootUser =
+              adminUser?.role === "root" || adminUser?.role === "dev";
+
+            // Check if user needs onboarding (has no organization)
+            const hasOrganization = !!adminUser?.organization_id;
+            const needsOnboarding = !hasOrganization && !isRootUser; // Root/dev don't need onboarding
+
+            console.log("🔍 Onboarding check:", {
+              hasAdminUser: !!adminUser,
+              hasOrganization,
+              needsOnboarding,
+              isRootUser,
+              organizationId: adminUser?.organization_id,
+            });
+
+            // Priority: onboarding > root/dev (SaaS Management) > admin dashboard > profile
+            if (needsOnboarding) {
+              console.log(
+                "🔄 User needs onboarding, redirecting to /onboarding/choice",
+              );
+              router.push("/onboarding/choice");
+              return;
+            } else if (isAdmin || adminUser) {
+              if (isRootUser) {
+                // Root/dev users go directly to SaaS Management
+                console.log(
+                  "✅ User is root/dev, redirecting to SaaS Management",
+                );
+                router.replace("/admin/saas-management/dashboard");
+                setTimeout(() => {
+                  if (
+                    window.location.pathname !==
+                    "/admin/saas-management/dashboard"
+                  ) {
+                    console.log(
+                      "⚠️ Router.replace didn't work, trying window.location",
+                    );
+                    window.location.href = "/admin/saas-management/dashboard";
+                  }
+                }, 100);
+              } else {
+                // Regular admin users go to admin dashboard
+                console.log("✅ User is admin, redirecting to /admin");
+                router.replace("/admin");
+                setTimeout(() => {
+                  if (window.location.pathname !== "/admin") {
+                    console.log(
+                      "⚠️ Router.replace didn't work, trying window.location",
+                    );
+                    window.location.href = "/admin";
+                  }
+                }, 100);
+              }
             } else {
+              console.log("ℹ️ User is not admin, redirecting to /profile");
               router.push("/profile");
             }
           } else {
+            console.warn("⚠️ No user found after login");
             router.push("/profile");
           }
         } catch (checkError) {
           // If admin check fails, redirect to profile
-          console.error("Error checking admin status:", checkError);
+          console.error("❌ Exception checking admin status:", checkError);
           router.push("/profile");
         }
       }
@@ -78,37 +213,45 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg mb-4">
             <Shield className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Portal</h1>
-          <p className="text-gray-600">Sign in to access your dashboard</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Opttius</h1>
+          <p className="text-gray-600">Inicia sesión para acceder a tu panel</p>
         </div>
 
         <Card className="border-0 shadow-2xl">
           <CardHeader className="space-y-1 pb-6">
             <CardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Welcome Back
+              Bienvenido de Nuevo
             </CardTitle>
             <CardDescription className="text-center text-gray-600">
-              Enter your credentials to continue
+              Ingresa tus credenciales para continuar
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {error && (
-                <Alert variant="destructive" className="border-red-200 bg-red-50">
-                  <AlertDescription className="text-red-800">{error}</AlertDescription>
+                <Alert
+                  variant="destructive"
+                  className="border-red-200 bg-red-50"
+                >
+                  <AlertDescription className="text-red-800">
+                    {error}
+                  </AlertDescription>
                 </Alert>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Label
+                  htmlFor="email"
+                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                >
                   <Mail className="h-4 w-4" />
-                  Email Address
+                  Correo Electrónico
                 </Label>
                 <div className="relative">
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@example.com"
+                    placeholder="tu@email.com"
                     {...register("email")}
                     className={`h-11 pl-10 ${errors.email ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
                     disabled={loading}
@@ -123,15 +266,18 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Label
+                  htmlFor="password"
+                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                >
                   <Lock className="h-4 w-4" />
-                  Password
+                  Contraseña
                 </Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
+                    placeholder="Ingresa tu contraseña"
                     {...register("password")}
                     className={`h-11 pl-10 pr-10 ${errors.password ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
                     disabled={loading}
@@ -164,7 +310,7 @@ export default function LoginPage() {
                   href="/reset-password"
                   className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
                 >
-                  Forgot password?
+                  ¿Olvidaste tu contraseña?
                 </Link>
               </div>
 
@@ -176,11 +322,11 @@ export default function LoginPage() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
+                    Iniciando sesión...
                   </>
                 ) : (
                   <>
-                    Sign In
+                    Iniciar Sesión
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
@@ -193,7 +339,9 @@ export default function LoginPage() {
                   <div className="w-full border-t border-gray-300"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-gray-500">New to the platform?</span>
+                  <span className="px-4 bg-white text-gray-500">
+                    ¿Nuevo en la plataforma?
+                  </span>
                 </div>
               </div>
 
@@ -202,7 +350,7 @@ export default function LoginPage() {
                   href="/signup"
                   className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                 >
-                  Create an account
+                  Crear una cuenta
                   <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
               </div>
@@ -211,7 +359,7 @@ export default function LoginPage() {
         </Card>
 
         <p className="mt-6 text-center text-xs text-gray-500">
-          Secure admin access powered by Supabase
+          Acceso seguro administrado por Supabase
         </p>
       </div>
     </div>

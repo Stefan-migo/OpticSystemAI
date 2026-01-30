@@ -1,0 +1,161 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requireRoot } from "@/lib/api/root-middleware";
+import { createServiceRoleClient } from "@/utils/supabase/service-role";
+import { appLogger as logger } from "@/lib/logger";
+import { AuthorizationError } from "@/lib/api/errors";
+
+/**
+ * GET /api/admin/saas-management/subscriptions/[id]
+ * Obtener detalles completos de una suscripción
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    await requireRoot(request);
+    const supabaseServiceRole = createServiceRoleClient();
+
+    const { id } = params;
+
+    // Obtener suscripción (sin relaciones complejas)
+    const { data: subscription, error } = await supabaseServiceRole
+      .from("subscriptions")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !subscription) {
+      logger.error("Error fetching subscription", error);
+      return NextResponse.json(
+        { error: "Subscription not found", details: error?.message },
+        { status: 404 },
+      );
+    }
+
+    // Obtener organización si existe
+    let organization = null;
+    if (subscription.organization_id) {
+      const { data: org } = await supabaseServiceRole
+        .from("organizations")
+        .select(
+          "id, name, slug, subscription_tier, status, owner_id, created_at",
+        )
+        .eq("id", subscription.organization_id)
+        .maybeSingle();
+      organization = org;
+    }
+
+    return NextResponse.json({
+      subscription: {
+        ...subscription,
+        organization: organization || null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    logger.error("Error fetching subscription details", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * PATCH /api/admin/saas-management/subscriptions/[id]
+ * Actualizar suscripción
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    await requireRoot(request);
+    const supabaseServiceRole = createServiceRoleClient();
+
+    const { id } = params;
+    const body = await request.json();
+    const { status, current_period_start, current_period_end, cancel_at } =
+      body;
+
+    // Verificar que la suscripción existe
+    const { data: existingSub } = await supabaseServiceRole
+      .from("subscriptions")
+      .select("id")
+      .eq("id", id)
+      .single();
+
+    if (!existingSub) {
+      return NextResponse.json(
+        { error: "Subscription not found" },
+        { status: 404 },
+      );
+    }
+
+    // Preparar updates
+    const updates: any = {};
+
+    if (status !== undefined) {
+      if (
+        !["active", "past_due", "cancelled", "trialing", "incomplete"].includes(
+          status,
+        )
+      ) {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
+      updates.status = status;
+    }
+
+    if (current_period_start !== undefined) {
+      updates.current_period_start = current_period_start;
+    }
+
+    if (current_period_end !== undefined) {
+      updates.current_period_end = current_period_end;
+    }
+
+    if (cancel_at !== undefined) {
+      updates.cancel_at = cancel_at;
+      if (cancel_at) {
+        updates.canceled_at = new Date().toISOString();
+      } else {
+        updates.canceled_at = null;
+      }
+    }
+
+    // Actualizar
+    const { data: updatedSub, error: updateError } = await supabaseServiceRole
+      .from("subscriptions")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) {
+      logger.error("Error updating subscription", updateError);
+      return NextResponse.json(
+        {
+          error: "Failed to update subscription",
+          details: updateError.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    logger.info(`Subscription updated: ${id}`);
+
+    return NextResponse.json({ subscription: updatedSub });
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    logger.error("Error updating subscription", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}

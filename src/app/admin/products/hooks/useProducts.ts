@@ -10,7 +10,10 @@ export interface Product {
   slug: string;
   price: number;
   status: string;
-  inventory_quantity: number;
+  inventory_quantity: number; // Legacy field, deprecated
+  total_inventory_quantity?: number; // Stock for current branch
+  total_available_quantity?: number; // Available stock (quantity - reserved) for current branch
+  total_reserved_quantity?: number; // Reserved stock for current branch
   category?: { name: string };
   categories?: { name: string };
   is_featured: boolean;

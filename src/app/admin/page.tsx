@@ -42,6 +42,7 @@ import businessConfig from "@/config/business";
 import { DashboardSearch } from "@/components/admin/DashboardSearch";
 import { useBranch } from "@/hooks/useBranch";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { SmartContextWidget } from "@/components/ai/SmartContextWidget";
 
 // Colors from the brand palette
 const COLORS = {
@@ -169,6 +170,8 @@ const defaultDashboardData: DashboardData = {
 };
 
 export default function AdminDashboard() {
+  console.log("📊 AdminDashboard page component mounted");
+
   const { currentBranchId, isSuperAdmin, branches } = useBranch();
   const isGlobalView = !currentBranchId && isSuperAdmin;
 
@@ -304,7 +307,10 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-azul-profundo">
+          <h1
+            className="text-2xl md:text-3xl font-bold text-azul-profundo"
+            data-tour="dashboard-header"
+          >
             Dashboard
           </h1>
           <p className="text-sm md:text-base text-tierra-media">
@@ -333,6 +339,9 @@ export default function AdminDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* AI Insights Widget */}
+      <SmartContextWidget section="dashboard" />
 
       {/* Stock Alert Banner - Compact */}
       {data.lowStockProducts.length > 0 && (

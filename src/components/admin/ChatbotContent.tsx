@@ -22,11 +22,51 @@ interface Message {
   metadata?: any;
 }
 
+import type { InsightSection } from "@/lib/ai/insights/schemas";
+
 interface ChatbotContentProps {
   className?: string;
+  currentSection?: InsightSection | null;
 }
 
-export function ChatbotContent({ className }: ChatbotContentProps) {
+// Quick suggestions based on section
+const quickSuggestions: Record<InsightSection, string[]> = {
+  dashboard: [
+    "¿Cómo puedo mejorar mis ventas?",
+    "Muéstrame los trabajos atrasados",
+    "¿Qué productos tienen stock bajo?",
+    "Dame un resumen del día de hoy",
+  ],
+  pos: [
+    "¿Qué material de lente recomiendas para esta dioptría?",
+    "¿Cómo calcular el precio con descuento?",
+    "¿Qué tratamientos van bien con este tipo de lente?",
+    "Muéstrame productos similares",
+  ],
+  inventory: [
+    "¿Qué productos necesitan reposición?",
+    "Muéstrame productos sin movimiento",
+    "¿Cómo crear una oferta de liquidación?",
+    "Dame estadísticas de inventario",
+  ],
+  clients: [
+    "¿Qué clientes necesitan seguimiento?",
+    "¿Cómo crear un nuevo cliente?",
+    "¿Cómo buscar por RUT?",
+    "Muéstrame clientes inactivos",
+  ],
+  analytics: [
+    "Explica las tendencias de ventas",
+    "¿Cuál es el producto más vendido?",
+    "Muéstrame comparación de períodos",
+    "¿Qué categoría genera más ingresos?",
+  ],
+};
+
+export function ChatbotContent({
+  className,
+  currentSection,
+}: ChatbotContentProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTools, setShowTools] = useState(false);
@@ -262,6 +302,7 @@ export function ChatbotContent({ className }: ChatbotContentProps) {
           model: config.model,
           sessionId: sessionToUse?.id,
           config: apiConfig,
+          section: currentSection, // Pass current section for context
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -582,7 +623,35 @@ export function ChatbotContent({ className }: ChatbotContentProps) {
 
         {/* Fixed Input at Bottom */}
         <div className="flex-shrink-0 z-10 bg-admin-bg-primary border-t border-admin-border-primary">
-          <ChatInput onSend={sendMessage} disabled={isStreaming} />
+          {/* Quick Suggestions */}
+          {currentSection && messages.length === 0 && (
+            <div className="p-4 border-b border-admin-border-primary">
+              <p className="text-xs text-admin-text-secondary mb-2">
+                Sugerencias rápidas:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {quickSuggestions[currentSection].map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => sendMessage(suggestion)}
+                    disabled={isStreaming}
+                    className="text-xs px-3 py-1.5 rounded-md bg-admin-bg-secondary hover:bg-admin-bg-tertiary border border-admin-border-primary text-admin-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <ChatInput
+            onSend={sendMessage}
+            disabled={isStreaming}
+            placeholder={
+              currentSection
+                ? `Pregunta sobre ${currentSection === "dashboard" ? "el dashboard" : currentSection === "inventory" ? "inventario" : currentSection === "clients" ? "clientes" : currentSection === "pos" ? "ventas" : "analíticas"}...`
+                : "Escribe tu mensaje..."
+            }
+          />
         </div>
       </div>
 

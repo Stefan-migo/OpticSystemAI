@@ -1,4 +1,4 @@
-# Documentación Completa del Sistema - OpticSystemAI
+# Documentación Completa del Sistema - Opttius
 
 **Versión:** 2.0  
 **Fecha:** 2025-01-27  
@@ -26,7 +26,7 @@
 
 ### Descripción
 
-OpticSystemAI es un sistema completo de gestión para ópticas y laboratorios ópticos. Proporciona funcionalidad integral para administrar clientes, citas, presupuestos, trabajos de laboratorio, productos ópticos, ventas, y operaciones multi-sucursal.
+Opttius es un sistema completo de gestión para ópticas y laboratorios ópticos. Proporciona funcionalidad integral para administrar clientes, citas, presupuestos, trabajos de laboratorio, productos ópticos, ventas, y operaciones multi-sucursal.
 
 ### Stack Tecnológico
 
@@ -1097,11 +1097,11 @@ npm run test:ui       # UI de tests
 
 ## Conclusión
 
-Este documento proporciona una visión completa del sistema OpticSystemAI, cubriendo todos los módulos principales, arquitectura técnica, y flujos de trabajo. El sistema está diseñado para ser escalable, mantenible y extensible, con una base sólida para futuras mejoras y expansión a SaaS.
+Este documento proporciona una visión completa del sistema Opttius, cubriendo todos los módulos principales, arquitectura técnica, y flujos de trabajo. El sistema está diseñado para ser escalable, mantenible y extensible, con una base sólida para futuras mejoras y expansión a SaaS.
 
 Para más detalles sobre implementación específica, consultar el código fuente y la documentación inline.
 
 ---
 
 **Última Actualización:** 2025-01-27  
-**Mantenido por:** Equipo de Desarrollo OpticSystemAI
+**Mantenido por:** Equipo de Desarrollo Opttius

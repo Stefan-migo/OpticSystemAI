@@ -1,5 +1,5 @@
 {
-  "name": "business-management-app",
+  "name": "opttius",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -19,10 +19,12 @@
     "supabase:push:remote": "npx supabase db push --include-all --yes",
     "admin:create": "node scripts/create-admin-via-api.js",
     "admin:create-branch-users": "node scripts/create-branch-users.js",
+    "admin:confirm-email": "node scripts/confirm-user-email.js",
     "seed:test-data": "node scripts/seed-test-data.js",
     "migrate:chat": "node scripts/apply-chat-migrations.js",
     "migrate:notifications": "node scripts/apply-notification-migrations.js",
     "migrate:products-branch": "node scripts/apply-products-branch-migration.js",
+    "ai:generate-insights": "node scripts/generate-ai-insights-direct.js",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
@@ -76,6 +78,7 @@
     "recharts": "^3.2.1",
     "resend": "^2.1.0",
     "sonner": "^2.0.6",
+    "stripe": "^20.3.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.25.76"

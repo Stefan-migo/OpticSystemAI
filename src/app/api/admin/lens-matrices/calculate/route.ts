@@ -98,13 +98,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Parse addition if provided
+    const addition = additionParam ? parseFloat(additionParam) : null;
+    const validAddition =
+      addition !== null && !isNaN(addition) && addition >= 0 ? addition : null;
+
     // Call the SQL function to calculate lens price
+    // The function signature supports: p_lens_family_id, p_sphere, p_cylinder, p_addition, p_sourcing_type
     const { data: calculation, error } = await supabase.rpc(
       "calculate_lens_price",
       {
         p_lens_family_id: lensFamilyId,
-        p_sphere: effectiveSphere,
+        p_sphere: sphere, // Use sphere directly (far sphere for progressive lenses)
         p_cylinder: cylinder,
+        p_addition: validAddition,
         p_sourcing_type: sourcingType || null,
       },
     );

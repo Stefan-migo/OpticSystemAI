@@ -574,7 +574,17 @@ export default function CashRegisterPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Error al cerrar la caja");
+        const errorMessage = error.details
+          ? `${error.error || "Error al cerrar la caja"}: ${error.details}`
+          : error.error || "Error al cerrar la caja";
+        console.error("Error closing cash register:", {
+          error,
+          status: response.status,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();

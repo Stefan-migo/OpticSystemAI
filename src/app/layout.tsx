@@ -16,10 +16,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Business Management System - Admin Panel",
-    template: "%s | Business Management System",
+    default: "Opttius - Sistema de Gestión Óptica",
+    template: "%s | Opttius",
   },
-  description: "Business management system admin panel",
+  description:
+    "Opttius - Sistema de gestión para ópticas y laboratorios ópticos",
   robots: {
     index: false,
     follow: false,

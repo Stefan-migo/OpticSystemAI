@@ -6,8 +6,8 @@ A condensed version of the setup process for quick reference.
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/Stefan-migo/businessManagementApp.git
-cd businessManagementApp
+git clone https://github.com/Stefan-migo/OpticSystemAI.git
+cd Opttius
 
 # 2. Install dependencies
 npm install

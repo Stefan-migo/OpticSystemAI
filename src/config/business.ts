@@ -1,17 +1,17 @@
 /**
  * Business Configuration
- * 
+ *
  * This file contains all business-specific configuration that should be
  * customized when adapting this system to a new business.
  */
 
 export const businessConfig = {
   // Business Information
-  name: "Your Business Name",
-  displayName: "Your Business Display Name",
-  tagline: "Your Business Tagline",
+  name: "Opttius",
+  displayName: "Opttius",
+  tagline: "Sistema de Gestión Óptica",
   contactEmail: "admin@yourbusiness.com",
-  
+
   // Branding
   colors: {
     primary: "#8B5A3C",
@@ -22,14 +22,14 @@ export const businessConfig = {
     danger: "#ef4444",
     info: "#60a5fa",
   },
-  
+
   // Admin Panel
   admin: {
     title: "Admin Panel",
-    subtitle: "Business Management System",
+    subtitle: "Opttius - Sistema de Gestión Óptica",
     logo: "/logo.svg", // Path to your logo
   },
-  
+
   // Features
   features: {
     products: true,
@@ -39,14 +39,14 @@ export const businessConfig = {
     analytics: true,
     categories: true,
   },
-  
+
   // Currency
   currency: {
     code: "USD",
     symbol: "$",
     locale: "en-US",
   },
-  
+
   // Email Configuration
   emailConfig: {
     from: "noreply@yourbusiness.com",
@@ -59,7 +59,7 @@ export const businessConfig = {
       supportTicketUpdated: true,
     },
   },
-  
+
   // Support System
   support: {
     enabled: true,
@@ -72,13 +72,13 @@ export const businessConfig = {
       "Other",
     ],
   },
-  
+
   // Shipping
   shipping: {
     enabled: true,
     defaultCarrier: "Standard Shipping",
   },
-  
+
   // Analytics
   analytics: {
     enabled: true,
@@ -89,4 +89,3 @@ export const businessConfig = {
 };
 
 export default businessConfig;
-

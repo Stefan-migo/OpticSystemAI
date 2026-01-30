@@ -40,8 +40,11 @@ function ProductGridComponent({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {products.map((product) => {
-        const isLowStock = (product.inventory_quantity || 0) <= 5;
-        const stockQuantity = product.inventory_quantity || 0;
+        const stockQuantity =
+          product.total_inventory_quantity !== undefined
+            ? product.total_inventory_quantity
+            : product.inventory_quantity || 0;
+        const isLowStock = stockQuantity <= 5;
         const hasImage =
           (product as any).featured_image || (product as any).gallery?.[0];
 

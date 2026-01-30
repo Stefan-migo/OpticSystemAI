@@ -221,26 +221,32 @@ export function useAuth() {
         throw authError;
       }
 
-      // If user was created, also create their profile
-      if (authData.user && !authData.user.email_confirmed_at) {
-        // Profile will be created via database trigger when user confirms email
-        setAuthState((prev) => ({ ...prev, loading: false }));
-        return { data: authData, error: null };
-      }
-
-      // If user is immediately confirmed, create profile now
-      if (authData.user && authData.user.email_confirmed_at) {
-        const { error: profileError } = await supabase.from("profiles").insert({
-          id: authData.user.id,
-          email: authData.user.email!,
-          first_name: userData?.firstName || "",
-          last_name: userData?.lastName || "",
-          phone: userData?.phone || "",
-        });
+      // Profile is automatically created by database trigger (handle_new_user)
+      // We only need to update it if additional data is provided (like phone)
+      // or if the user is immediately confirmed and we want to ensure data consistency
+      if (authData.user) {
+        // The trigger already creates the profile, so we use upsert to update
+        // if it exists or create if it doesn't (though it should always exist)
+        const { error: profileError } = await supabase.from("profiles").upsert(
+          {
+            id: authData.user.id,
+            email: authData.user.email!,
+            first_name: userData?.firstName || "",
+            last_name: userData?.lastName || "",
+            phone: userData?.phone || "",
+          },
+          {
+            onConflict: "id",
+          },
+        );
 
         if (profileError) {
-          console.error("Error creating profile:", profileError);
-          // Don't fail the signup for profile creation errors
+          // Log but don't fail - profile might already exist from trigger
+          // or might be created later when email is confirmed
+          console.warn(
+            "Profile upsert warning (this is usually fine):",
+            profileError,
+          );
         }
       }
 

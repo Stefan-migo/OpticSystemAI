@@ -1,4 +1,4 @@
-# Estado Actual del Proyecto - Business Management App
+# Estado Actual del Proyecto - Opttius
 
 **Fecha de Análisis:** 2026-01-28  
 **Versión:** 0.1.0  
@@ -101,7 +101,7 @@ El proyecto está en un estado sólido con la mayoría de las mejoras estructura
 ## 📁 Estructura del Proyecto
 
 ```
-BussinesManagementApp/
+Opttius/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── admin/             # Panel de administración

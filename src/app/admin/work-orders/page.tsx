@@ -353,7 +353,12 @@ export default function WorkOrdersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">Trabajos</h1>
+          <h1
+            className="text-3xl font-bold text-azul-profundo"
+            data-tour="work-orders-header"
+          >
+            Trabajos
+          </h1>
           <p className="text-tierra-media">
             {isGlobalView
               ? "Gestión de trabajos de laboratorio - Todas las sucursales"

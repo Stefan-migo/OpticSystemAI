@@ -1,4 +1,4 @@
-# OpticSystemAI - Sistema de Gestión Óptica
+# Opttius - Sistema de Gestión Óptica
 
 Un sistema completo de gestión para ópticas y laboratorios ópticos, construido con Next.js 14, TypeScript y Supabase. Este sistema proporciona funcionalidad completa de administración para gestionar clientes, citas, presupuestos, trabajos de laboratorio, productos ópticos, ventas y más.
 
@@ -98,7 +98,7 @@ Antes de comenzar, asegúrate de tener instalado:
 
 ```bash
 git clone https://github.com/Stefan-migo/OpticSystemAI.git
-cd OpticSystemAI
+cd Opttius
 ```
 
 ### 2. Instalar Dependencias
@@ -271,7 +271,7 @@ END $$;
 ## 📁 Estructura del Proyecto
 
 ```
-OpticSystemAI/
+Opttius/
 ├── src/
 │   ├── app/
 │   │   ├── admin/              # Páginas de administración
@@ -593,7 +593,7 @@ Para problemas y preguntas:
 
 - Revisa la sección de solución de problemas arriba
 - Revisa los archivos de documentación
-- Abre un issue en GitHub: https://github.com/Stefan-migo/OpticSystemAI/issues
+- Abre un issue en GitHub: https://github.com/Stefan-migo/OpticSystemAI/issues (repositorio Opttius)
 
 ---
 

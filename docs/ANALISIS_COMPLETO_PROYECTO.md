@@ -1,4 +1,4 @@
-# Análisis Completo del Proyecto - Business Management App
+# Análisis Completo del Proyecto - Opttius
 
 ## Revisión Técnica como Ingeniero de Software Senior
 

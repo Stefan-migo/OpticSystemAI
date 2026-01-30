@@ -48,6 +48,13 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useBranch } from "@/hooks/useBranch";
+import { Pagination } from "@/components/ui/pagination";
+import type {
+  ContactLensFamily,
+  ContactLensUseType,
+  ContactLensModality,
+  ContactLensPackaging,
+} from "@/types/contact-lens";
 import { BranchSelector } from "@/components/admin/BranchSelector";
 import { useProducts } from "./hooks/useProducts";
 import { useProductStats } from "./hooks/useProductStats";
@@ -60,6 +67,7 @@ import ProductList from "./components/ProductList";
 import ProductPagination from "./components/ProductPagination";
 import QuickActions from "./components/QuickActions";
 import { formatCurrency } from "@/lib/utils";
+import { SmartContextWidget } from "@/components/ai/SmartContextWidget";
 
 export default function ProductsPage() {
   const { currentBranchId, isSuperAdmin, branches } = useBranch();
@@ -763,7 +771,10 @@ export default function ProductsPage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">
+          <h1
+            className="text-3xl font-bold text-azul-profundo"
+            data-tour="products-header"
+          >
             Gestión de Productos
           </h1>
           <p className="text-tierra-media">
@@ -826,6 +837,9 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* AI Insights Widget */}
+      {currentBranchId && <SmartContextWidget section="inventory" />}
 
       {/* Tabs for Products, Categories, Lens Families, and Lens Matrices */}
       <Tabs
@@ -1254,12 +1268,23 @@ export default function ProductsPage() {
 
 // Lens Families Tab Content Component
 function LensFamiliesTabContent() {
+  // Toggle between optical and contact lenses
+  const [lensType, setLensType] = useState<"optical" | "contact">("optical");
+
+  // Common state
   const [families, setFamilies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingFamily, setEditingFamily] = useState<any>(null);
-  const [formData, setFormData] = useState({
+  const [includeInactive, setIncludeInactive] = useState(false);
+
+  // Pagination state (for contact lenses)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // Optical lens form data
+  const [opticalFormData, setOpticalFormData] = useState({
     name: "",
     brand: "",
     lens_type: "single_vision",
@@ -1267,7 +1292,59 @@ function LensFamiliesTabContent() {
     description: "",
     is_active: true,
   });
-  const [includeInactive, setIncludeInactive] = useState(false);
+
+  // Contact lens form data
+  const [contactFormData, setContactFormData] = useState<{
+    name: string;
+    brand: string;
+    use_type: ContactLensUseType;
+    modality: ContactLensModality;
+    material: string | undefined;
+    packaging: ContactLensPackaging;
+    base_curve: string;
+    diameter: string;
+    description: string;
+    is_active: boolean;
+  }>({
+    name: "",
+    brand: "",
+    use_type: "monthly",
+    modality: "spherical",
+    material: undefined,
+    packaging: "box_6",
+    base_curve: "",
+    diameter: "",
+    description: "",
+    is_active: true,
+  });
+
+  // Constants for contact lenses
+  const USE_TYPES = [
+    { value: "daily", label: "Diario" },
+    { value: "bi_weekly", label: "Quincenal" },
+    { value: "monthly", label: "Mensual" },
+    { value: "extended_wear", label: "Uso Prolongado" },
+  ];
+
+  const MODALITIES = [
+    { value: "spherical", label: "Esférico" },
+    { value: "toric", label: "Tórico" },
+    { value: "multifocal", label: "Multifocal" },
+    { value: "cosmetic", label: "Cosmético" },
+  ];
+
+  const MATERIALS = [
+    { value: "silicone_hydrogel", label: "Hidrogel de Silicona" },
+    { value: "hydrogel", label: "Hidrogel" },
+    { value: "rigid_gas_permeable", label: "RGP" },
+  ];
+
+  const PACKAGING_TYPES = [
+    { value: "box_30", label: "Caja de 30 lentes" },
+    { value: "box_6", label: "Caja de 6 lentes" },
+    { value: "box_3", label: "Caja de 3 lentes" },
+    { value: "bottle", label: "Botella" },
+  ];
 
   const LENS_TYPES = [
     { value: "single_vision", label: "Monofocal" },
@@ -1290,7 +1367,7 @@ function LensFamiliesTabContent() {
 
   useEffect(() => {
     fetchFamilies();
-  }, [includeInactive]);
+  }, [includeInactive, lensType]);
 
   const fetchFamilies = async () => {
     try {
@@ -1299,9 +1376,11 @@ function LensFamiliesTabContent() {
       if (includeInactive) {
         params.append("include_inactive", "true");
       }
-      const response = await fetch(
-        `/api/admin/lens-families?${params.toString()}`,
-      );
+      const apiEndpoint =
+        lensType === "optical"
+          ? "/api/admin/lens-families"
+          : "/api/admin/contact-lens-families";
+      const response = await fetch(`${apiEndpoint}?${params.toString()}`);
       if (!response.ok) {
         throw new Error("Error al cargar familias");
       }
@@ -1309,7 +1388,9 @@ function LensFamiliesTabContent() {
       setFamilies(data.families || []);
     } catch (error) {
       console.error("Error fetching families:", error);
-      toast.error("Error al cargar familias de lentes");
+      toast.error(
+        `Error al cargar familias de lentes ${lensType === "optical" ? "ópticos" : "de contacto"}`,
+      );
     } finally {
       setLoading(false);
     }
@@ -1318,24 +1399,54 @@ function LensFamiliesTabContent() {
   const handleOpenDialog = (family?: any) => {
     if (family) {
       setEditingFamily(family);
-      setFormData({
-        name: family.name,
-        brand: family.brand || "",
-        lens_type: family.lens_type || "single_vision",
-        lens_material: family.lens_material || "cr39",
-        description: family.description || "",
-        is_active: family.is_active,
-      });
+      if (lensType === "optical") {
+        setOpticalFormData({
+          name: family.name,
+          brand: family.brand || "",
+          lens_type: family.lens_type || "single_vision",
+          lens_material: family.lens_material || "cr39",
+          description: family.description || "",
+          is_active: family.is_active,
+        });
+      } else {
+        setContactFormData({
+          name: family.name,
+          brand: family.brand || "",
+          use_type: family.use_type,
+          modality: family.modality,
+          material: family.material || undefined,
+          packaging: family.packaging,
+          base_curve: family.base_curve?.toString() || "",
+          diameter: family.diameter?.toString() || "",
+          description: family.description || "",
+          is_active: family.is_active,
+        });
+      }
     } else {
       setEditingFamily(null);
-      setFormData({
-        name: "",
-        brand: "",
-        lens_type: "single_vision",
-        lens_material: "cr39",
-        description: "",
-        is_active: true,
-      });
+      if (lensType === "optical") {
+        setOpticalFormData({
+          name: "",
+          brand: "",
+          lens_type: "single_vision",
+          lens_material: "cr39",
+          description: "",
+          is_active: true,
+        });
+      } else {
+        setContactFormData({
+          name: "",
+          brand: "",
+          use_type: "monthly",
+          modality: "spherical",
+          material: undefined,
+          packaging: "box_6",
+          base_curve: "",
+          diameter: "",
+          description: "",
+          is_active: true,
+        });
+      }
     }
     setShowDialog(true);
   };
@@ -1343,35 +1454,76 @@ function LensFamiliesTabContent() {
   const handleCloseDialog = () => {
     setShowDialog(false);
     setEditingFamily(null);
-    setFormData({
-      name: "",
-      brand: "",
-      lens_type: "single_vision",
-      lens_material: "cr39",
-      description: "",
-      is_active: true,
-    });
+    if (lensType === "optical") {
+      setOpticalFormData({
+        name: "",
+        brand: "",
+        lens_type: "single_vision",
+        lens_material: "cr39",
+        description: "",
+        is_active: true,
+      });
+    } else {
+      setContactFormData({
+        name: "",
+        brand: "",
+        use_type: "monthly",
+        modality: "spherical",
+        material: undefined,
+        packaging: "box_6",
+        base_curve: "",
+        diameter: "",
+        description: "",
+        is_active: true,
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingFamily
-        ? `/api/admin/lens-families/${editingFamily.id}`
-        : "/api/admin/lens-families";
+      const baseUrl =
+        lensType === "optical"
+          ? "/api/admin/lens-families"
+          : "/api/admin/contact-lens-families";
+      const url = editingFamily ? `${baseUrl}/${editingFamily.id}` : baseUrl;
       const method = editingFamily ? "PUT" : "POST";
+
+      let body: any;
+      if (lensType === "optical") {
+        body = {
+          name: opticalFormData.name,
+          brand: opticalFormData.brand || null,
+          lens_type: opticalFormData.lens_type,
+          lens_material: opticalFormData.lens_material,
+          description: opticalFormData.description || null,
+          is_active: opticalFormData.is_active,
+        };
+      } else {
+        body = {
+          name: contactFormData.name,
+          brand: contactFormData.brand || null,
+          use_type: contactFormData.use_type,
+          modality: contactFormData.modality,
+          packaging: contactFormData.packaging,
+          description: contactFormData.description || null,
+          is_active: contactFormData.is_active,
+        };
+        if (contactFormData.material) {
+          body.material = contactFormData.material;
+        }
+        if (contactFormData.base_curve) {
+          body.base_curve = parseFloat(contactFormData.base_curve);
+        }
+        if (contactFormData.diameter) {
+          body.diameter = parseFloat(contactFormData.diameter);
+        }
+      }
 
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name,
-          brand: formData.brand || null,
-          lens_type: formData.lens_type,
-          lens_material: formData.lens_material,
-          description: formData.description || null,
-          is_active: formData.is_active,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -1392,35 +1544,69 @@ function LensFamiliesTabContent() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Estás seguro de que deseas desactivar esta familia?")) {
+    const message =
+      lensType === "optical"
+        ? "¿Estás seguro de que deseas desactivar esta familia?"
+        : "¿Estás seguro de que deseas eliminar esta familia?";
+    if (!confirm(message)) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/admin/lens-families/${id}`, {
+      const baseUrl =
+        lensType === "optical"
+          ? "/api/admin/lens-families"
+          : "/api/admin/contact-lens-families";
+      const response = await fetch(`${baseUrl}/${id}`, {
         method: "DELETE",
       });
 
       if (!response.ok) {
-        throw new Error("Error al desactivar familia");
+        throw new Error("Error al eliminar/desactivar familia");
       }
 
-      toast.success("Familia desactivada exitosamente");
+      toast.success(
+        lensType === "optical"
+          ? "Familia desactivada exitosamente"
+          : "Familia eliminada exitosamente",
+      );
       fetchFamilies();
     } catch (error) {
-      toast.error("Error al desactivar familia");
+      toast.error("Error al eliminar/desactivar familia");
     }
   };
 
   const filteredFamilies = families.filter((family) => {
     const searchLower = searchTerm.toLowerCase();
-    return (
-      family.name.toLowerCase().includes(searchLower) ||
-      (family.brand && family.brand.toLowerCase().includes(searchLower)) ||
-      (family.description &&
-        family.description.toLowerCase().includes(searchLower))
-    );
+    if (lensType === "optical") {
+      return (
+        family.name.toLowerCase().includes(searchLower) ||
+        (family.brand && family.brand.toLowerCase().includes(searchLower)) ||
+        (family.description &&
+          family.description.toLowerCase().includes(searchLower))
+      );
+    } else {
+      return (
+        family.name.toLowerCase().includes(searchLower) ||
+        (family.brand && family.brand.toLowerCase().includes(searchLower))
+      );
+    }
   });
+
+  // Pagination for contact lenses
+  const totalPages = Math.ceil(filteredFamilies.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedFamilies =
+    lensType === "contact"
+      ? filteredFamilies.slice(startIndex, endIndex)
+      : filteredFamilies;
+
+  // Reset page when switching lens types
+  useEffect(() => {
+    setCurrentPage(1);
+    setSearchTerm("");
+  }, [lensType]);
 
   return (
     <div className="space-y-6">
@@ -1435,6 +1621,29 @@ function LensFamiliesTabContent() {
           <Plus className="h-4 w-4 mr-2" />
           Nueva Familia
         </Button>
+      </div>
+
+      {/* Toggle between Optical and Contact Lenses */}
+      <div className="flex items-center gap-4 p-3 border rounded-lg bg-gray-50">
+        <Label className="font-medium text-sm">Tipo de Lente:</Label>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={lensType === "optical" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setLensType("optical")}
+          >
+            Lentes Ópticos
+          </Button>
+          <Button
+            type="button"
+            variant={lensType === "contact" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setLensType("contact")}
+          >
+            Lentes de Contacto
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -1480,46 +1689,101 @@ function LensFamiliesTabContent() {
 
           {loading ? (
             <div className="text-center py-8">Cargando...</div>
-          ) : filteredFamilies.length === 0 ? (
+          ) : paginatedFamilies.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No se encontraron familias de lentes
+              No se encontraron familias de lentes{" "}
+              {lensType === "optical" ? "ópticos" : "de contacto"}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Marca</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFamilies.map((family) => (
-                  <TableRow key={family.id}>
-                    <TableCell className="font-medium">{family.name}</TableCell>
-                    <TableCell>{family.brand || "-"}</TableCell>
-                    <TableCell className="max-w-md truncate">
-                      {family.description || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={family.is_active ? "default" : "secondary"}
-                      >
-                        {family.is_active ? "Activa" : "Inactiva"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenDialog(family)}
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Marca</TableHead>
+                    {lensType === "optical" ? (
+                      <>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Material</TableHead>
+                        <TableHead>Descripción</TableHead>
+                      </>
+                    ) : (
+                      <>
+                        <TableHead>Uso</TableHead>
+                        <TableHead>Modalidad</TableHead>
+                        <TableHead>Embalaje</TableHead>
+                      </>
+                    )}
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedFamilies.map((family) => (
+                    <TableRow key={family.id}>
+                      <TableCell className="font-medium">
+                        {family.name}
+                      </TableCell>
+                      <TableCell>{family.brand || "-"}</TableCell>
+                      {lensType === "optical" ? (
+                        <>
+                          <TableCell>
+                            {LENS_TYPES.find(
+                              (t) => t.value === family.lens_type,
+                            )?.label || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {LENS_MATERIALS.find(
+                              (m) => m.value === family.lens_material,
+                            )?.label || "-"}
+                          </TableCell>
+                          <TableCell className="max-w-md truncate">
+                            {family.description || "-"}
+                          </TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell>
+                            {USE_TYPES.find((t) => t.value === family.use_type)
+                              ?.label || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {MODALITIES.find((m) => m.value === family.modality)
+                              ?.label || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {PACKAGING_TYPES.find(
+                              (p) => p.value === family.packaging,
+                            )?.label || "-"}
+                          </TableCell>
+                        </>
+                      )}
+                      <TableCell>
+                        <Badge
+                          variant={family.is_active ? "default" : "secondary"}
                         >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {family.is_active && (
+                          {family.is_active ? (
+                            <>
+                              <Eye className="h-3 w-3 mr-1" />
+                              Activa
+                            </>
+                          ) : (
+                            <>
+                              <EyeOff className="h-3 w-3 mr-1" />
+                              Inactiva
+                            </>
+                          )}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenDialog(family)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1527,13 +1791,24 @@ function LensFamiliesTabContent() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {lensType === "contact" && totalPages > 1 && (
+                <div className="mt-4">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={filteredFamilies.length}
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -1547,103 +1822,337 @@ function LensFamiliesTabContent() {
             </DialogTitle>
             <DialogDescription>
               {editingFamily
-                ? "Modifica los datos de la familia de lentes"
-                : "Crea una nueva familia comercial de lentes"}
+                ? `Modifica los datos de la familia de lentes ${lensType === "optical" ? "ópticos" : "de contacto"}`
+                : `Crea una nueva familia comercial de lentes ${lensType === "optical" ? "ópticos" : "de contacto"}`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="name">Nombre *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="Ej: Poly Blue Defense"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="brand">Marca</Label>
-                <Input
-                  id="brand"
-                  value={formData.brand}
-                  onChange={(e) =>
-                    setFormData({ ...formData, brand: e.target.value })
-                  }
-                  placeholder="Ej: Essilor, Zeiss, Rodenstock"
-                />
-              </div>
+            <div
+              className={`space-y-4 py-4 ${lensType === "contact" ? "max-h-[70vh] overflow-y-auto" : ""}`}
+            >
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Tipo de Lente *</Label>
-                  <Select
-                    value={formData.lens_type}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, lens_type: value })
+                  <Label htmlFor="name">
+                    Nombre <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    value={
+                      lensType === "optical"
+                        ? opticalFormData.name
+                        : contactFormData.name
                     }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LENS_TYPES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(e) =>
+                      lensType === "optical"
+                        ? setOpticalFormData({
+                            ...opticalFormData,
+                            name: e.target.value,
+                          })
+                        : setContactFormData({
+                            ...contactFormData,
+                            name: e.target.value,
+                          })
+                    }
+                    placeholder={
+                      lensType === "optical"
+                        ? "Ej: Poly Blue Defense"
+                        : "Ej: Acuvue Oasys"
+                    }
+                    required
+                  />
                 </div>
                 <div>
-                  <Label>Material *</Label>
-                  <Select
-                    value={formData.lens_material}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, lens_material: value })
+                  <Label htmlFor="brand">Marca</Label>
+                  <Input
+                    id="brand"
+                    value={
+                      lensType === "optical"
+                        ? opticalFormData.brand
+                        : contactFormData.brand
                     }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona material" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LENS_MATERIALS.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>
-                          {m.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(e) =>
+                      lensType === "optical"
+                        ? setOpticalFormData({
+                            ...opticalFormData,
+                            brand: e.target.value,
+                          })
+                        : setContactFormData({
+                            ...contactFormData,
+                            brand: e.target.value,
+                          })
+                    }
+                    placeholder={
+                      lensType === "optical"
+                        ? "Ej: Essilor, Zeiss"
+                        : "Ej: Johnson & Johnson, Alcon"
+                    }
+                  />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="description">Descripción</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  placeholder="Descripción de la familia de lentes"
-                  rows={3}
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active}
-                  onChange={(e) =>
-                    setFormData({ ...formData, is_active: e.target.checked })
-                  }
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <Label htmlFor="is_active" className="cursor-pointer">
-                  Activa
-                </Label>
-              </div>
+
+              {lensType === "optical" ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Tipo de Lente *</Label>
+                      <Select
+                        value={opticalFormData.lens_type}
+                        onValueChange={(value) =>
+                          setOpticalFormData({
+                            ...opticalFormData,
+                            lens_type: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LENS_TYPES.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Material *</Label>
+                      <Select
+                        value={opticalFormData.lens_material}
+                        onValueChange={(value) =>
+                          setOpticalFormData({
+                            ...opticalFormData,
+                            lens_material: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona material" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LENS_MATERIALS.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>
+                              {m.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="description">Descripción</Label>
+                    <Textarea
+                      id="description"
+                      value={opticalFormData.description}
+                      onChange={(e) =>
+                        setOpticalFormData({
+                          ...opticalFormData,
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Descripción de la familia de lentes"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      checked={opticalFormData.is_active}
+                      onChange={(e) =>
+                        setOpticalFormData({
+                          ...opticalFormData,
+                          is_active: e.target.checked,
+                        })
+                      }
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="is_active" className="cursor-pointer">
+                      Activa
+                    </Label>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="use_type">
+                        Tipo de Uso <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={contactFormData.use_type}
+                        onValueChange={(value: any) =>
+                          setContactFormData({
+                            ...contactFormData,
+                            use_type: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {USE_TYPES.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="modality">
+                        Modalidad <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={contactFormData.modality}
+                        onValueChange={(value: any) =>
+                          setContactFormData({
+                            ...contactFormData,
+                            modality: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MODALITIES.map((mod) => (
+                            <SelectItem key={mod.value} value={mod.value}>
+                              {mod.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="material">Material</Label>
+                      <Select
+                        value={contactFormData.material || ""}
+                        onValueChange={(value) =>
+                          setContactFormData({
+                            ...contactFormData,
+                            material: value || undefined,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar material" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Ninguno</SelectItem>
+                          {MATERIALS.map((mat) => (
+                            <SelectItem key={mat.value} value={mat.value}>
+                              {mat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="packaging">
+                        Embalaje <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={contactFormData.packaging}
+                        onValueChange={(value: any) =>
+                          setContactFormData({
+                            ...contactFormData,
+                            packaging: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PACKAGING_TYPES.map((pkg) => (
+                            <SelectItem key={pkg.value} value={pkg.value}>
+                              {pkg.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="base_curve">Curva Base (BC)</Label>
+                      <Input
+                        id="base_curve"
+                        type="number"
+                        step="0.1"
+                        min="7.0"
+                        max="10.0"
+                        value={contactFormData.base_curve}
+                        onChange={(e) =>
+                          setContactFormData({
+                            ...contactFormData,
+                            base_curve: e.target.value,
+                          })
+                        }
+                        placeholder="Ej: 8.4"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="diameter">Diámetro (DIA)</Label>
+                      <Input
+                        id="diameter"
+                        type="number"
+                        step="0.1"
+                        min="13.0"
+                        max="15.0"
+                        value={contactFormData.diameter}
+                        onChange={(e) =>
+                          setContactFormData({
+                            ...contactFormData,
+                            diameter: e.target.value,
+                          })
+                        }
+                        placeholder="Ej: 14.0"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="description">Descripción</Label>
+                    <Textarea
+                      id="description"
+                      value={contactFormData.description}
+                      onChange={(e) =>
+                        setContactFormData({
+                          ...contactFormData,
+                          description: e.target.value,
+                        })
+                      }
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      checked={contactFormData.is_active}
+                      onChange={(e) =>
+                        setContactFormData({
+                          ...contactFormData,
+                          is_active: e.target.checked,
+                        })
+                      }
+                      className="rounded"
+                    />
+                    <Label htmlFor="is_active" className="cursor-pointer">
+                      Activa
+                    </Label>
+                  </div>
+                </>
+              )}
             </div>
             <DialogFooter>
               <Button
@@ -1666,6 +2175,12 @@ function LensFamiliesTabContent() {
 
 // Lens Matrices Tab Content Component
 function LensMatricesTabContent() {
+  // Toggle between optical and contact lens matrices
+  const [matrixType, setMatrixType] = useState<"optical" | "contact">(
+    "optical",
+  );
+
+  // Common state
   const [matrices, setMatrices] = useState<any[]>([]);
   const [families, setFamilies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1675,7 +2190,13 @@ function LensMatricesTabContent() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [editingMatrix, setEditingMatrix] = useState<any>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
-  const [formData, setFormData] = useState({
+
+  // Pagination state (for contact lens matrices)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // Optical lens matrix form data
+  const [opticalFormData, setOpticalFormData] = useState({
     lens_family_id: "",
     sphere_min: "",
     sphere_max: "",
@@ -1685,6 +2206,22 @@ function LensMatricesTabContent() {
     addition_max: "4.0",
     base_price: "",
     sourcing_type: "surfaced" as "stock" | "surfaced",
+    cost: "",
+    is_active: true,
+  });
+
+  // Contact lens matrix form data
+  const [contactFormData, setContactFormData] = useState({
+    contact_lens_family_id: "",
+    sphere_min: "",
+    sphere_max: "",
+    cylinder_min: "0",
+    cylinder_max: "0",
+    axis_min: "0",
+    axis_max: "180",
+    addition_min: "0",
+    addition_max: "4.0",
+    base_price: "",
     cost: "",
     is_active: true,
   });
@@ -1708,16 +2245,33 @@ function LensMatricesTabContent() {
     { value: "glass", label: "Vidrio" },
   ];
 
+  // Constants for contact lenses
+  const USE_TYPES = [
+    { value: "daily", label: "Diario" },
+    { value: "bi_weekly", label: "Quincenal" },
+    { value: "monthly", label: "Mensual" },
+    { value: "extended_wear", label: "Uso Prolongado" },
+  ];
+
+  const MODALITIES = [
+    { value: "spherical", label: "Esférico" },
+    { value: "toric", label: "Tórico" },
+    { value: "multifocal", label: "Multifocal" },
+    { value: "cosmetic", label: "Cosmético" },
+  ];
+
   useEffect(() => {
     fetchFamilies();
     fetchMatrices();
-  }, [includeInactive, selectedFamilyId]);
+  }, [includeInactive, selectedFamilyId, matrixType]);
 
   const fetchFamilies = async () => {
     try {
-      const response = await fetch(
-        "/api/admin/lens-families?include_inactive=true",
-      );
+      const apiEndpoint =
+        matrixType === "optical"
+          ? "/api/admin/lens-families?include_inactive=true"
+          : "/api/admin/contact-lens-families?include_inactive=true";
+      const response = await fetch(apiEndpoint);
       if (response.ok) {
         const data = await response.json();
         setFamilies(data.families || []);
@@ -1731,15 +2285,19 @@ function LensMatricesTabContent() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      const familyParamName =
+        matrixType === "optical" ? "family_id" : "family_id";
       if (selectedFamilyId !== "all") {
-        params.append("family_id", selectedFamilyId);
+        params.append(familyParamName, selectedFamilyId);
       }
       if (includeInactive) {
         params.append("include_inactive", "true");
       }
-      const response = await fetch(
-        `/api/admin/lens-matrices?${params.toString()}`,
-      );
+      const apiEndpoint =
+        matrixType === "optical"
+          ? "/api/admin/lens-matrices"
+          : "/api/admin/contact-lens-matrices";
+      const response = await fetch(`${apiEndpoint}?${params.toString()}`);
       if (!response.ok) {
         throw new Error("Error al cargar matrices");
       }
@@ -1747,7 +2305,9 @@ function LensMatricesTabContent() {
       setMatrices(data.matrices || []);
     } catch (error) {
       console.error("Error fetching matrices:", error);
-      toast.error("Error al cargar matrices de precios");
+      toast.error(
+        `Error al cargar matrices de precios ${matrixType === "optical" ? "ópticos" : "de contacto"}`,
+      );
     } finally {
       setLoading(false);
     }
@@ -1756,34 +2316,69 @@ function LensMatricesTabContent() {
   const handleOpenDialog = (matrix?: any) => {
     if (matrix) {
       setEditingMatrix(matrix);
-      setFormData({
-        lens_family_id: matrix.lens_family_id,
-        sphere_min: matrix.sphere_min.toString(),
-        sphere_max: matrix.sphere_max.toString(),
-        cylinder_min: matrix.cylinder_min.toString(),
-        cylinder_max: matrix.cylinder_max.toString(),
-        addition_min: (matrix as any).addition_min?.toString() || "0",
-        addition_max: (matrix as any).addition_max?.toString() || "4.0",
-        base_price: matrix.base_price.toString(),
-        sourcing_type: matrix.sourcing_type as "stock" | "surfaced",
-        cost: matrix.cost.toString(),
-        is_active: matrix.is_active,
-      });
+      if (matrixType === "optical") {
+        setOpticalFormData({
+          lens_family_id: matrix.lens_family_id,
+          sphere_min: matrix.sphere_min.toString(),
+          sphere_max: matrix.sphere_max.toString(),
+          cylinder_min: matrix.cylinder_min.toString(),
+          cylinder_max: matrix.cylinder_max.toString(),
+          addition_min: (matrix as any).addition_min?.toString() || "0",
+          addition_max: (matrix as any).addition_max?.toString() || "4.0",
+          base_price: matrix.base_price.toString(),
+          sourcing_type: matrix.sourcing_type as "stock" | "surfaced",
+          cost: matrix.cost.toString(),
+          is_active: matrix.is_active,
+        });
+      } else {
+        setContactFormData({
+          contact_lens_family_id: matrix.contact_lens_family_id,
+          sphere_min: matrix.sphere_min.toString(),
+          sphere_max: matrix.sphere_max.toString(),
+          cylinder_min: matrix.cylinder_min.toString(),
+          cylinder_max: matrix.cylinder_max.toString(),
+          axis_min: matrix.axis_min.toString(),
+          axis_max: matrix.axis_max.toString(),
+          addition_min: matrix.addition_min.toString(),
+          addition_max: matrix.addition_max.toString(),
+          base_price: matrix.base_price.toString(),
+          cost: matrix.cost.toString(),
+          is_active: matrix.is_active,
+        });
+      }
     } else {
       setEditingMatrix(null);
-      setFormData({
-        lens_family_id: selectedFamilyId !== "all" ? selectedFamilyId : "",
-        sphere_min: "",
-        sphere_max: "",
-        cylinder_min: "",
-        cylinder_max: "",
-        addition_min: "0",
-        addition_max: "4.0",
-        base_price: "",
-        sourcing_type: "surfaced",
-        cost: "",
-        is_active: true,
-      });
+      if (matrixType === "optical") {
+        setOpticalFormData({
+          lens_family_id: selectedFamilyId !== "all" ? selectedFamilyId : "",
+          sphere_min: "",
+          sphere_max: "",
+          cylinder_min: "",
+          cylinder_max: "",
+          addition_min: "0",
+          addition_max: "4.0",
+          base_price: "",
+          sourcing_type: "surfaced",
+          cost: "",
+          is_active: true,
+        });
+      } else {
+        setContactFormData({
+          contact_lens_family_id:
+            selectedFamilyId !== "all" ? selectedFamilyId : "",
+          sphere_min: "",
+          sphere_max: "",
+          cylinder_min: "0",
+          cylinder_max: "0",
+          axis_min: "0",
+          axis_max: "180",
+          addition_min: "0",
+          addition_max: "4.0",
+          base_price: "",
+          cost: "",
+          is_active: true,
+        });
+      }
     }
     setShowDialog(true);
   };
@@ -1796,24 +2391,44 @@ function LensMatricesTabContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingMatrix
-        ? `/api/admin/lens-matrices/${editingMatrix.id}`
-        : "/api/admin/lens-matrices";
+      const baseUrl =
+        matrixType === "optical"
+          ? "/api/admin/lens-matrices"
+          : "/api/admin/contact-lens-matrices";
+      const url = editingMatrix ? `${baseUrl}/${editingMatrix.id}` : baseUrl;
       const method = editingMatrix ? "PUT" : "POST";
 
-      const body: any = {
-        lens_family_id: formData.lens_family_id,
-        sphere_min: parseFloat(formData.sphere_min),
-        sphere_max: parseFloat(formData.sphere_max),
-        cylinder_min: parseFloat(formData.cylinder_min),
-        cylinder_max: parseFloat(formData.cylinder_max),
-        addition_min: parseFloat(formData.addition_min),
-        addition_max: parseFloat(formData.addition_max),
-        base_price: parseFloat(formData.base_price),
-        cost: parseFloat(formData.cost),
-        sourcing_type: formData.sourcing_type,
-        is_active: formData.is_active,
-      };
+      let body: any;
+      if (matrixType === "optical") {
+        body = {
+          lens_family_id: opticalFormData.lens_family_id,
+          sphere_min: parseFloat(opticalFormData.sphere_min),
+          sphere_max: parseFloat(opticalFormData.sphere_max),
+          cylinder_min: parseFloat(opticalFormData.cylinder_min),
+          cylinder_max: parseFloat(opticalFormData.cylinder_max),
+          addition_min: parseFloat(opticalFormData.addition_min),
+          addition_max: parseFloat(opticalFormData.addition_max),
+          base_price: parseFloat(opticalFormData.base_price),
+          cost: parseFloat(opticalFormData.cost),
+          sourcing_type: opticalFormData.sourcing_type,
+          is_active: opticalFormData.is_active,
+        };
+      } else {
+        body = {
+          contact_lens_family_id: contactFormData.contact_lens_family_id,
+          sphere_min: parseFloat(contactFormData.sphere_min),
+          sphere_max: parseFloat(contactFormData.sphere_max),
+          cylinder_min: parseFloat(contactFormData.cylinder_min),
+          cylinder_max: parseFloat(contactFormData.cylinder_max),
+          axis_min: parseInt(contactFormData.axis_min),
+          axis_max: parseInt(contactFormData.axis_max),
+          addition_min: parseFloat(contactFormData.addition_min),
+          addition_max: parseFloat(contactFormData.addition_max),
+          base_price: parseFloat(contactFormData.base_price),
+          cost: parseFloat(contactFormData.cost),
+          is_active: contactFormData.is_active,
+        };
+      }
 
       const response = await fetch(url, {
         method,
@@ -1844,7 +2459,11 @@ function LensMatricesTabContent() {
     }
 
     try {
-      const response = await fetch(`/api/admin/lens-matrices/${id}`, {
+      const baseUrl =
+        matrixType === "optical"
+          ? "/api/admin/lens-matrices"
+          : "/api/admin/contact-lens-matrices";
+      const response = await fetch(`${baseUrl}/${id}`, {
         method: "DELETE",
       });
 
@@ -1861,12 +2480,41 @@ function LensMatricesTabContent() {
 
   const filteredMatrices = matrices.filter((matrix) => {
     const searchLower = searchTerm.toLowerCase();
-    return (
-      matrix.lens_families.name.toLowerCase().includes(searchLower) ||
-      (matrix.lens_families.brand || "").toLowerCase().includes(searchLower) ||
-      matrix.sourcing_type.toLowerCase().includes(searchLower)
-    );
+    if (matrixType === "optical") {
+      return (
+        matrix.lens_families?.name.toLowerCase().includes(searchLower) ||
+        (matrix.lens_families?.brand || "")
+          .toLowerCase()
+          .includes(searchLower) ||
+        matrix.sourcing_type?.toLowerCase().includes(searchLower)
+      );
+    } else {
+      return (
+        matrix.contact_lens_families?.name
+          .toLowerCase()
+          .includes(searchLower) ||
+        (matrix.contact_lens_families?.brand || "")
+          .toLowerCase()
+          .includes(searchLower)
+      );
+    }
   });
+
+  // Pagination for contact lens matrices
+  const totalPages = Math.ceil(filteredMatrices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedMatrices =
+    matrixType === "contact"
+      ? filteredMatrices.slice(startIndex, endIndex)
+      : filteredMatrices;
+
+  // Reset page when switching matrix types
+  useEffect(() => {
+    setCurrentPage(1);
+    setSearchTerm("");
+    setSelectedFamilyId("all");
+  }, [matrixType]);
 
   return (
     <div className="space-y-6">
@@ -1878,13 +2526,38 @@ function LensMatricesTabContent() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowImportDialog(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Importar CSV
-          </Button>
+          {matrixType === "optical" && (
+            <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Importar CSV
+            </Button>
+          )}
           <Button onClick={() => handleOpenDialog()}>
             <Plus className="h-4 w-4 mr-2" />
             Nueva Matriz
+          </Button>
+        </div>
+      </div>
+
+      {/* Toggle between Optical and Contact Lens Matrices */}
+      <div className="flex items-center gap-4 p-3 border rounded-lg bg-gray-50">
+        <Label className="font-medium text-sm">Tipo de Matriz:</Label>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={matrixType === "optical" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setMatrixType("optical")}
+          >
+            Matrices Ópticas
+          </Button>
+          <Button
+            type="button"
+            variant={matrixType === "contact" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setMatrixType("contact")}
+          >
+            Matrices de Contacto
           </Button>
         </div>
       </div>
@@ -1923,7 +2596,11 @@ function LensMatricesTabContent() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por familia, tipo o material..."
+                  placeholder={
+                    matrixType === "optical"
+                      ? "Buscar por familia, tipo o material..."
+                      : "Buscar por familia de contacto..."
+                  }
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -1952,93 +2629,177 @@ function LensMatricesTabContent() {
 
           {loading ? (
             <div className="text-center py-8">Cargando...</div>
-          ) : filteredMatrices.length === 0 ? (
+          ) : paginatedMatrices.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No se encontraron matrices de precios
+              No se encontraron matrices de precios{" "}
+              {matrixType === "optical" ? "ópticos" : "de contacto"}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Familia</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Rango Esfera</TableHead>
-                    <TableHead>Rango Cilindro</TableHead>
-                    <TableHead>Precio Venta</TableHead>
-                    <TableHead>Costo Compra</TableHead>
-                    <TableHead>Sourcing</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMatrices.map((matrix) => (
-                    <TableRow key={matrix.id}>
-                      <TableCell className="font-medium">
-                        {matrix.lens_families.name}
-                      </TableCell>
-                      <TableCell>
-                        {
-                          LENS_TYPES.find(
-                            (t) => t.value === matrix.lens_families.lens_type,
-                          )?.label
-                        }
-                      </TableCell>
-                      <TableCell>
-                        {
-                          LENS_MATERIALS.find(
-                            (m) =>
-                              m.value === matrix.lens_families.lens_material,
-                          )?.label
-                        }
-                      </TableCell>
-                      <TableCell>
-                        {matrix.sphere_min} a {matrix.sphere_max}
-                      </TableCell>
-                      <TableCell>
-                        {matrix.cylinder_min} a {matrix.cylinder_max}
-                      </TableCell>
-                      <TableCell>{formatCurrency(matrix.base_price)}</TableCell>
-                      <TableCell>{formatCurrency(matrix.cost)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {matrix.sourcing_type === "stock"
-                            ? "Stock"
-                            : "Surfaced"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={matrix.is_active ? "default" : "secondary"}
-                        >
-                          {matrix.is_active ? "Activa" : "Inactiva"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenDialog(matrix)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(matrix.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Familia</TableHead>
+                      {matrixType === "optical" ? (
+                        <>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Material</TableHead>
+                          <TableHead>Rango Esfera</TableHead>
+                          <TableHead>Rango Cilindro</TableHead>
+                          <TableHead>Rango Adición</TableHead>
+                          <TableHead>Precio Venta</TableHead>
+                          <TableHead>Costo Compra</TableHead>
+                          <TableHead>Sourcing</TableHead>
+                        </>
+                      ) : (
+                        <>
+                          <TableHead>Uso</TableHead>
+                          <TableHead>Modalidad</TableHead>
+                          <TableHead>Rango Esfera</TableHead>
+                          <TableHead>Rango Cilindro</TableHead>
+                          <TableHead>Rango Eje</TableHead>
+                          <TableHead>Rango Adición</TableHead>
+                          <TableHead>Precio Base</TableHead>
+                          <TableHead>Costo</TableHead>
+                        </>
+                      )}
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedMatrices.map((matrix) => (
+                      <TableRow key={matrix.id}>
+                        <TableCell className="font-medium">
+                          {matrixType === "optical"
+                            ? matrix.lens_families?.name
+                            : matrix.contact_lens_families?.name}
+                        </TableCell>
+                        {matrixType === "optical" ? (
+                          <>
+                            <TableCell>
+                              {LENS_TYPES.find(
+                                (t) =>
+                                  t.value === matrix.lens_families?.lens_type,
+                              )?.label || "-"}
+                            </TableCell>
+                            <TableCell>
+                              {LENS_MATERIALS.find(
+                                (m) =>
+                                  m.value ===
+                                  matrix.lens_families?.lens_material,
+                              )?.label || "-"}
+                            </TableCell>
+                            <TableCell>
+                              {matrix.sphere_min} a {matrix.sphere_max}
+                            </TableCell>
+                            <TableCell>
+                              {matrix.cylinder_min} a {matrix.cylinder_max}
+                            </TableCell>
+                            <TableCell>
+                              {matrix.addition_min || "0"} a{" "}
+                              {matrix.addition_max || "4.0"}
+                            </TableCell>
+                            <TableCell>
+                              {formatCurrency(matrix.base_price)}
+                            </TableCell>
+                            <TableCell>{formatCurrency(matrix.cost)}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {matrix.sourcing_type === "stock"
+                                  ? "Stock"
+                                  : "Surfaced"}
+                              </Badge>
+                            </TableCell>
+                          </>
+                        ) : (
+                          <>
+                            <TableCell>
+                              {USE_TYPES.find(
+                                (t) =>
+                                  t.value ===
+                                  matrix.contact_lens_families?.use_type,
+                              )?.label || "-"}
+                            </TableCell>
+                            <TableCell>
+                              {MODALITIES.find(
+                                (m) =>
+                                  m.value ===
+                                  matrix.contact_lens_families?.modality,
+                              )?.label || "-"}
+                            </TableCell>
+                            <TableCell>
+                              {matrix.sphere_min} a {matrix.sphere_max}
+                            </TableCell>
+                            <TableCell>
+                              {matrix.cylinder_min} a {matrix.cylinder_max}
+                            </TableCell>
+                            <TableCell>
+                              {matrix.axis_min}° a {matrix.axis_max}°
+                            </TableCell>
+                            <TableCell>
+                              {matrix.addition_min || "0"} a{" "}
+                              {matrix.addition_max || "4.0"}
+                            </TableCell>
+                            <TableCell>
+                              {formatCurrency(matrix.base_price)}
+                            </TableCell>
+                            <TableCell>{formatCurrency(matrix.cost)}</TableCell>
+                          </>
+                        )}
+                        <TableCell>
+                          <Badge
+                            variant={matrix.is_active ? "default" : "secondary"}
+                          >
+                            {matrix.is_active ? (
+                              <>
+                                <Eye className="h-3 w-3 mr-1" />
+                                Activa
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="h-3 w-3 mr-1" />
+                                Inactiva
+                              </>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenDialog(matrix)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(matrix.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {matrixType === "contact" && totalPages > 1 && (
+                <div className="mt-4">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={filteredMatrices.length}
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -2052,18 +2813,33 @@ function LensMatricesTabContent() {
             </DialogTitle>
             <DialogDescription>
               {editingMatrix
-                ? "Modifica los datos de la matriz de precios"
-                : "Crea una nueva matriz de precios para lentes"}
+                ? `Modifica los datos de la matriz de precios ${matrixType === "optical" ? "ópticos" : "de contacto"}`
+                : `Crea una nueva matriz de precios para lentes ${matrixType === "optical" ? "ópticos" : "de contacto"}`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4 py-4">
               <div>
-                <Label htmlFor="lens_family_id">Familia de Lente *</Label>
+                <Label htmlFor="family_id">
+                  Familia de{" "}
+                  {matrixType === "optical" ? "Lente" : "Lente de Contacto"} *
+                </Label>
                 <Select
-                  value={formData.lens_family_id}
+                  value={
+                    matrixType === "optical"
+                      ? opticalFormData.lens_family_id
+                      : contactFormData.contact_lens_family_id
+                  }
                   onValueChange={(value) =>
-                    setFormData({ ...formData, lens_family_id: value })
+                    matrixType === "optical"
+                      ? setOpticalFormData({
+                          ...opticalFormData,
+                          lens_family_id: value,
+                        })
+                      : setContactFormData({
+                          ...contactFormData,
+                          contact_lens_family_id: value,
+                        })
                   }
                   required
                 >
@@ -2082,11 +2858,11 @@ function LensMatricesTabContent() {
                 </Select>
               </div>
 
-              {formData.lens_family_id && (
+              {matrixType === "optical" && opticalFormData.lens_family_id && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   {(() => {
                     const fam = families.find(
-                      (f) => f.id === formData.lens_family_id,
+                      (f) => f.id === opticalFormData.lens_family_id,
                     );
                     const typeLabel = fam
                       ? LENS_TYPES.find((t) => t.value === fam.lens_type)?.label
@@ -2106,6 +2882,31 @@ function LensMatricesTabContent() {
                 </div>
               )}
 
+              {matrixType === "contact" &&
+                contactFormData.contact_lens_family_id && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    {(() => {
+                      const fam = families.find(
+                        (f) => f.id === contactFormData.contact_lens_family_id,
+                      );
+                      const useTypeLabel = fam
+                        ? USE_TYPES.find((t) => t.value === fam.use_type)?.label
+                        : undefined;
+                      const modalityLabel = fam
+                        ? MODALITIES.find((m) => m.value === fam.modality)
+                            ?.label
+                        : undefined;
+                      return (
+                        <p className="text-sm text-blue-800">
+                          Esta familia ya define <b>Uso</b>:{" "}
+                          {useTypeLabel || "—"} y <b>Modalidad</b>:{" "}
+                          {modalityLabel || "—"}.
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="sphere_min">Esfera Mínima *</Label>
@@ -2113,9 +2914,21 @@ function LensMatricesTabContent() {
                     id="sphere_min"
                     type="number"
                     step="0.25"
-                    value={formData.sphere_min}
+                    value={
+                      matrixType === "optical"
+                        ? opticalFormData.sphere_min
+                        : contactFormData.sphere_min
+                    }
                     onChange={(e) =>
-                      setFormData({ ...formData, sphere_min: e.target.value })
+                      matrixType === "optical"
+                        ? setOpticalFormData({
+                            ...opticalFormData,
+                            sphere_min: e.target.value,
+                          })
+                        : setContactFormData({
+                            ...contactFormData,
+                            sphere_min: e.target.value,
+                          })
                     }
                     placeholder="-10.00"
                     required
@@ -2127,9 +2940,21 @@ function LensMatricesTabContent() {
                     id="sphere_max"
                     type="number"
                     step="0.25"
-                    value={formData.sphere_max}
+                    value={
+                      matrixType === "optical"
+                        ? opticalFormData.sphere_max
+                        : contactFormData.sphere_max
+                    }
                     onChange={(e) =>
-                      setFormData({ ...formData, sphere_max: e.target.value })
+                      matrixType === "optical"
+                        ? setOpticalFormData({
+                            ...opticalFormData,
+                            sphere_max: e.target.value,
+                          })
+                        : setContactFormData({
+                            ...contactFormData,
+                            sphere_max: e.target.value,
+                          })
                     }
                     placeholder="+6.00"
                     required
@@ -2144,12 +2969,21 @@ function LensMatricesTabContent() {
                     id="cylinder_min"
                     type="number"
                     step="0.25"
-                    value={formData.cylinder_min}
+                    value={
+                      matrixType === "optical"
+                        ? opticalFormData.cylinder_min
+                        : contactFormData.cylinder_min
+                    }
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        cylinder_min: e.target.value,
-                      })
+                      matrixType === "optical"
+                        ? setOpticalFormData({
+                            ...opticalFormData,
+                            cylinder_min: e.target.value,
+                          })
+                        : setContactFormData({
+                            ...contactFormData,
+                            cylinder_min: e.target.value,
+                          })
                     }
                     placeholder="-2.00"
                     required
@@ -2161,18 +2995,69 @@ function LensMatricesTabContent() {
                     id="cylinder_max"
                     type="number"
                     step="0.25"
-                    value={formData.cylinder_max}
+                    value={
+                      matrixType === "optical"
+                        ? opticalFormData.cylinder_max
+                        : contactFormData.cylinder_max
+                    }
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        cylinder_max: e.target.value,
-                      })
+                      matrixType === "optical"
+                        ? setOpticalFormData({
+                            ...opticalFormData,
+                            cylinder_max: e.target.value,
+                          })
+                        : setContactFormData({
+                            ...contactFormData,
+                            cylinder_max: e.target.value,
+                          })
                     }
                     placeholder="0.00"
                     required
                   />
                 </div>
               </div>
+
+              {/* Axis fields for contact lenses */}
+              {matrixType === "contact" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="axis_min">Eje Mínimo *</Label>
+                    <Input
+                      id="axis_min"
+                      type="number"
+                      min="0"
+                      max="180"
+                      value={contactFormData.axis_min}
+                      onChange={(e) =>
+                        setContactFormData({
+                          ...contactFormData,
+                          axis_min: e.target.value,
+                        })
+                      }
+                      placeholder="0"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="axis_max">Eje Máximo *</Label>
+                    <Input
+                      id="axis_max"
+                      type="number"
+                      min="0"
+                      max="180"
+                      value={contactFormData.axis_max}
+                      onChange={(e) =>
+                        setContactFormData({
+                          ...contactFormData,
+                          axis_max: e.target.value,
+                        })
+                      }
+                      placeholder="180"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Campos de Adición para Presbicia */}
               <div
@@ -2207,12 +3092,21 @@ function LensMatricesTabContent() {
                       step="0.25"
                       min="0"
                       max="4"
-                      value={formData.addition_min}
+                      value={
+                        matrixType === "optical"
+                          ? opticalFormData.addition_min
+                          : contactFormData.addition_min
+                      }
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          addition_min: e.target.value,
-                        })
+                        matrixType === "optical"
+                          ? setOpticalFormData({
+                              ...opticalFormData,
+                              addition_min: e.target.value,
+                            })
+                          : setContactFormData({
+                              ...contactFormData,
+                              addition_min: e.target.value,
+                            })
                       }
                       placeholder="0.00"
                       required
@@ -2239,12 +3133,21 @@ function LensMatricesTabContent() {
                       step="0.25"
                       min="0"
                       max="4"
-                      value={formData.addition_max}
+                      value={
+                        matrixType === "optical"
+                          ? opticalFormData.addition_max
+                          : contactFormData.addition_max
+                      }
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          addition_max: e.target.value,
-                        })
+                        matrixType === "optical"
+                          ? setOpticalFormData({
+                              ...opticalFormData,
+                              addition_max: e.target.value,
+                            })
+                          : setContactFormData({
+                              ...contactFormData,
+                              addition_max: e.target.value,
+                            })
                       }
                       placeholder="4.00"
                       required
@@ -2264,9 +3167,21 @@ function LensMatricesTabContent() {
                   id="base_price"
                   type="number"
                   step="0.01"
-                  value={formData.base_price}
+                  value={
+                    matrixType === "optical"
+                      ? opticalFormData.base_price
+                      : contactFormData.base_price
+                  }
                   onChange={(e) =>
-                    setFormData({ ...formData, base_price: e.target.value })
+                    matrixType === "optical"
+                      ? setOpticalFormData({
+                          ...opticalFormData,
+                          base_price: e.target.value,
+                        })
+                      : setContactFormData({
+                          ...contactFormData,
+                          base_price: e.target.value,
+                        })
                   }
                   placeholder="0.00"
                   required
@@ -2279,43 +3194,72 @@ function LensMatricesTabContent() {
                   id="cost"
                   type="number"
                   step="0.01"
-                  value={formData.cost}
+                  value={
+                    matrixType === "optical"
+                      ? opticalFormData.cost
+                      : contactFormData.cost
+                  }
                   onChange={(e) =>
-                    setFormData({ ...formData, cost: e.target.value })
+                    matrixType === "optical"
+                      ? setOpticalFormData({
+                          ...opticalFormData,
+                          cost: e.target.value,
+                        })
+                      : setContactFormData({
+                          ...contactFormData,
+                          cost: e.target.value,
+                        })
                   }
                   placeholder="0.00"
                   required
                 />
               </div>
 
-              <div>
-                <Label htmlFor="sourcing_type">Tipo de Sourcing *</Label>
-                <Select
-                  value={formData.sourcing_type}
-                  onValueChange={(value: "stock" | "surfaced") =>
-                    setFormData({ ...formData, sourcing_type: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="stock">Stock (en bodega)</SelectItem>
-                    <SelectItem value="surfaced">
-                      Surfaced (fabricar)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {matrixType === "optical" && (
+                <div>
+                  <Label htmlFor="sourcing_type">Tipo de Sourcing *</Label>
+                  <Select
+                    value={opticalFormData.sourcing_type}
+                    onValueChange={(value: "stock" | "surfaced") =>
+                      setOpticalFormData({
+                        ...opticalFormData,
+                        sourcing_type: value,
+                      })
+                    }
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="stock">Stock (en bodega)</SelectItem>
+                      <SelectItem value="surfaced">
+                        Surfaced (fabricar)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="is_active"
-                  checked={formData.is_active}
+                  checked={
+                    matrixType === "optical"
+                      ? opticalFormData.is_active
+                      : contactFormData.is_active
+                  }
                   onChange={(e) =>
-                    setFormData({ ...formData, is_active: e.target.checked })
+                    matrixType === "optical"
+                      ? setOpticalFormData({
+                          ...opticalFormData,
+                          is_active: e.target.checked,
+                        })
+                      : setContactFormData({
+                          ...contactFormData,
+                          is_active: e.target.checked,
+                        })
                   }
                   className="h-4 w-4 rounded border-gray-300"
                 />

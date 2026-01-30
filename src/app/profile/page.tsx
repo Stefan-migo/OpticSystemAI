@@ -43,6 +43,10 @@ import {
   Award,
   Loader2,
   Sparkles,
+  Building2,
+  Settings,
+  CreditCard,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
@@ -116,6 +120,15 @@ function ProfilePageContent() {
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [onboardingStatus, setOnboardingStatus] = useState<{
+    needsOnboarding: boolean;
+    hasOrganization: boolean;
+    isLoading: boolean;
+  }>({
+    needsOnboarding: false,
+    hasOrganization: false,
+    isLoading: true,
+  });
 
   // Password visibility states
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -185,6 +198,40 @@ function ProfilePageContent() {
       router.push("/login");
     }
   }, [authLoading, user, router]);
+
+  // Check onboarding status
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      if (!user || authLoading) return;
+
+      try {
+        const response = await fetch("/api/admin/check-status");
+        if (!response.ok) {
+          throw new Error("Failed to check status");
+        }
+        const data = await response.json();
+
+        const hasOrganization = data.organization?.hasOrganization || false;
+        const isAdmin = data.adminCheck?.isAdmin || false;
+        const needsOnboarding = isAdmin && !hasOrganization;
+
+        setOnboardingStatus({
+          needsOnboarding,
+          hasOrganization,
+          isLoading: false,
+        });
+      } catch (error) {
+        console.error("Error checking onboarding status:", error);
+        setOnboardingStatus({
+          needsOnboarding: false,
+          hasOrganization: false,
+          isLoading: false,
+        });
+      }
+    };
+
+    checkOnboardingStatus();
+  }, [user, authLoading]);
 
   const handleAvatarUpload = async (avatarUrl: string) => {
     try {
@@ -367,6 +414,85 @@ function ProfilePageContent() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Onboarding Status Card */}
+            {!onboardingStatus.isLoading &&
+              onboardingStatus.needsOnboarding && (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                          <Building2 className="h-6 w-6 text-blue-600" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                          Configura tu Óptica
+                        </h3>
+                        <p className="text-gray-600 mb-4">
+                          Para comenzar a usar la plataforma, necesitas
+                          configurar tu organización y crear tu primera
+                          sucursal.
+                        </p>
+                        <Button
+                          onClick={() => router.push("/onboarding/choice")}
+                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                        >
+                          Comenzar Onboarding
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+            {/* Organization & Subscription Card */}
+            {!onboardingStatus.isLoading &&
+              onboardingStatus.hasOrganization && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5" />
+                      Mi Organización
+                    </CardTitle>
+                    <CardDescription>
+                      Gestiona tu organización y suscripción
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Estado</p>
+                        <p className="font-medium">Activa</p>
+                      </div>
+                      <Button
+                        onClick={() => router.push("/admin")}
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                      >
+                        Ir al Dashboard
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          Suscripción
+                        </p>
+                        <p className="font-medium">Plan Básico</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push("/admin")}
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Configuración
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
             <div className="grid gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>

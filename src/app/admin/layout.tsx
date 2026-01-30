@@ -29,12 +29,17 @@ import {
   Calendar,
   Building2,
   DollarSign,
+  Settings,
 } from "lucide-react";
 import AdminNotificationDropdown from "@/components/admin/AdminNotificationDropdown";
 import Chatbot from "@/components/admin/Chatbot";
 import { BranchSelector } from "@/components/admin/BranchSelector";
 import { ThemeSelector } from "@/components/theme-selector";
+import { DemoModeBanner } from "@/components/onboarding/DemoModeBanner";
+import { TourProvider } from "@/components/onboarding/TourProvider";
+import { TourButton } from "@/components/onboarding/TourButton";
 import { useBranch } from "@/hooks/useBranch";
+import { useRoot } from "@/hooks/useRoot";
 import { getBranchHeader } from "@/lib/utils/branch";
 import businessConfig from "@/config/business";
 
@@ -43,13 +48,11 @@ interface AdminLayoutProps {
 }
 
 // Admin navigation items - will be populated dynamically
-const createNavigationItems = (newWorkOrdersCount?: number) => [
-  {
-    href: "/admin/chat",
-    label: "Chatbot IA",
-    icon: MessageSquare,
-    description: "Asistente inteligente",
-  },
+const createNavigationItems = (
+  newWorkOrdersCount?: number,
+  openTicketsCount?: number,
+  isRoot?: boolean,
+) => [
   {
     href: "/admin",
     label: "Dashboard",
@@ -103,10 +106,21 @@ const createNavigationItems = (newWorkOrdersCount?: number) => [
     description: "Reportes y estadísticas",
   },
   {
+    href: "/admin/checkout",
+    label: "Checkout",
+    icon: DollarSign,
+    description: "Pagos con Flow / pasarelas",
+    onboardingOnly: true, // Solo visible durante onboarding/suscripción
+  },
+  {
     href: "/admin/support",
     label: "Soporte",
     icon: MessageSquare,
     description: "Tickets y atención al cliente",
+    badge:
+      openTicketsCount !== undefined && openTicketsCount > 0
+        ? openTicketsCount.toString()
+        : undefined,
   },
   {
     href: "/admin/admin-users",
@@ -127,11 +141,24 @@ const createNavigationItems = (newWorkOrdersCount?: number) => [
     icon: Server,
     description: "Administración del sistema",
   },
+  // Gestión SaaS - Solo visible para root/dev
+  ...(isRoot
+    ? [
+        {
+          href: "/admin/saas-management",
+          label: "Gestión SaaS Opttius",
+          icon: Settings,
+          description: "Administración completa del SaaS",
+          rootOnly: true,
+        },
+      ]
+    : []),
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, profile, loading, signOut } = useAuthContext();
   const { isSuperAdmin, currentBranchId } = useBranch();
+  const { isRoot, isLoading: isRootLoading } = useRoot();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -150,6 +177,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     checkedUserId: null,
   });
 
+  // Organization state
+  const [organizationState, setOrganizationState] = useState<{
+    hasOrganization: boolean | null;
+    isDemoMode: boolean;
+    onboardingRequired: boolean;
+    isChecking: boolean;
+  }>({
+    hasOrganization: null,
+    isDemoMode: false,
+    onboardingRequired: false,
+    isChecking: true,
+  });
+
   // Dynamic stats state - Updated for Optical Shop
   const [stats, setStats] = useState<{
     todayOrders: number;
@@ -161,6 +201,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     inProgressWorkOrders: number; // Trabajos en progreso
     pendingQuotes: number; // Presupuestos pendientes
     todayAppointments: number; // Citas de hoy
+    openTickets: number; // Tickets de soporte abiertos
   }>({
     todayOrders: 0,
     totalOrders: 0,
@@ -170,6 +211,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     inProgressWorkOrders: 0,
     pendingQuotes: 0,
     todayAppointments: 0,
+    openTickets: 0,
   });
 
   // Add state to prevent multiple simultaneous admin checks
@@ -186,6 +228,157 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const debugMode =
     typeof window !== "undefined" &&
     localStorage.getItem("admin-debug") === "true";
+
+  // Check organization status
+  useEffect(() => {
+    const checkOrganization = async () => {
+      // Solo verificar organización si el usuario es admin y está completamente autenticado
+      // También esperar a que el check de root esté completo
+      if (
+        !adminState.isAdmin ||
+        !adminState.hasChecked ||
+        !user ||
+        loading ||
+        isRootLoading
+      ) {
+        if (!adminState.isAdmin && adminState.hasChecked) {
+          // Si ya verificamos y no es admin, no necesitamos verificar organización
+          setOrganizationState({
+            hasOrganization: false,
+            isDemoMode: false,
+            onboardingRequired: false,
+            isChecking: false,
+          });
+        }
+        return;
+      }
+
+      // Si es root/dev, no necesita verificación de organización
+      if (isRoot) {
+        console.log("✅ Root/dev user detected - skipping organization check");
+        setOrganizationState({
+          hasOrganization: true, // Root users no necesitan organización pero marcamos como true para evitar redirección
+          isDemoMode: false,
+          onboardingRequired: false,
+          isChecking: false,
+        });
+        return;
+      }
+
+      setOrganizationState((prev) => ({ ...prev, isChecking: true }));
+
+      try {
+        const response = await fetch("/api/admin/check-status");
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.organization) {
+          const isRootUser = data.organization.isRootUser || false;
+          const orgState = {
+            hasOrganization: data.organization.hasOrganization || isRootUser, // Root users no necesitan organización
+            isDemoMode: data.organization.isDemoMode || false,
+            onboardingRequired:
+              data.organization.onboardingRequired && !isRootUser, // Root users nunca necesitan onboarding
+            isChecking: false,
+          };
+
+          setOrganizationState(orgState);
+
+          // Solo redirigir a onboarding si realmente es necesario
+          // No redirigir si tiene organización (incluso si es demo), es super_admin, o es root/dev
+          if (
+            orgState.onboardingRequired &&
+            !orgState.hasOrganization &&
+            !data.organization.isSuperAdmin &&
+            !isRootUser
+          ) {
+            console.log(
+              "🔄 Redirecting to onboarding - no organization assigned",
+            );
+            router.push("/onboarding/choice");
+            return;
+          }
+
+          // Si es root/dev, permitir acceso directo sin verificación de organización
+          if (isRootUser) {
+            console.log(
+              "✅ Root/dev user detected - skipping organization check",
+            );
+          }
+        } else {
+          // Si no hay datos de organización pero el usuario es admin
+          // Verificar si es root/dev usando el hook del componente
+          console.warn(
+            "⚠️ No organization data in check-status response, but user is admin",
+          );
+
+          // Si es root/dev, no necesita onboarding
+          if (isRoot) {
+            console.log("✅ Root/dev user - skipping onboarding requirement");
+            setOrganizationState({
+              hasOrganization: true, // Root/dev no necesita organización pero marcamos como true
+              isDemoMode: false,
+              onboardingRequired: false,
+              isChecking: false,
+            });
+            return;
+          }
+
+          // Si no es root/dev y no hay organización, requerir onboarding
+          setOrganizationState({
+            hasOrganization: false,
+            isDemoMode: false,
+            onboardingRequired: true,
+            isChecking: false,
+          });
+
+          console.log("🔄 Redirecting to onboarding - no organization data");
+          router.push("/onboarding/choice");
+          return;
+        }
+      } catch (error) {
+        console.error("❌ Error checking organization status:", error);
+        // En caso de error, verificar si es root/dev para no bloquear acceso
+        if (isRoot) {
+          console.log(
+            "✅ Root/dev user - skipping onboarding requirement despite error",
+          );
+          setOrganizationState({
+            hasOrganization: true, // Root/dev no necesita organización
+            isDemoMode: false,
+            onboardingRequired: false,
+            isChecking: false,
+          });
+        } else {
+          // Si no es root/dev y hay error, requerir onboarding por seguridad
+          setOrganizationState({
+            hasOrganization: false,
+            isDemoMode: false,
+            onboardingRequired: true,
+            isChecking: false,
+          });
+          console.log(
+            "🔄 Redirecting to onboarding - error checking organization",
+          );
+          router.push("/onboarding/choice");
+        }
+      }
+    };
+
+    checkOrganization();
+  }, [
+    adminState.isAdmin,
+    adminState.hasChecked,
+    user,
+    loading,
+    router,
+    isRoot,
+    isRootLoading,
+  ]);
 
   // Fetch dashboard stats
   useEffect(() => {
@@ -205,6 +398,28 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           const quotes = data.kpis?.quotes || {};
           const appointments = data.kpis?.appointments || {};
 
+          // Fetch open tickets count (only for non-root users)
+          let openTicketsCount = 0;
+          if (!isRoot) {
+            try {
+              // Fetch tickets without status filter to count open ones
+              const ticketsResponse = await fetch(
+                "/api/admin/saas-management/support/tickets?limit=100",
+              );
+              if (ticketsResponse.ok) {
+                const ticketsData = await ticketsResponse.json();
+                const allTickets = ticketsData.tickets || [];
+                // Count tickets that are not resolved or closed
+                openTicketsCount = allTickets.filter(
+                  (t: any) => t.status !== "resolved" && t.status !== "closed",
+                ).length;
+              }
+            } catch (error) {
+              // Silently handle errors - tickets count is not critical
+              console.error("Error fetching open tickets count:", error);
+            }
+          }
+
           setStats({
             todayOrders: data.kpis?.orders?.pending || 0,
             totalOrders: workOrders.pending || 0, // Trabajos pendientes para el badge
@@ -215,6 +430,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             inProgressWorkOrders: workOrders.inProgress || 0, // Trabajos en progreso
             pendingQuotes: quotes.pending || 0, // Presupuestos pendientes
             todayAppointments: appointments.today || 0, // Citas de hoy
+            openTickets: openTicketsCount, // Tickets de soporte abiertos
           });
         }
       } catch (error) {
@@ -233,14 +449,26 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   useEffect(() => {
     const checkAdminStatus = async () => {
+      console.log("🔍 Admin layout: Starting admin check", {
+        loading,
+        hasUser: !!user,
+        userEmail: user?.email,
+        userId: user?.id,
+        alreadyChecked: adminState.hasChecked,
+        checkedUserId: adminState.checkedUserId,
+        isAdminCheckInProgress,
+      });
+
       // Don't check admin status if auth is still loading
       if (loading) {
+        console.log("⏳ Auth still loading, waiting...");
         // Don't set state here to avoid unnecessary re-renders
         return;
       }
 
       // Wait a bit longer after auth loads to ensure auth state is stable
       if (!user) {
+        console.log("❌ No user found");
         setAdminState({
           isChecking: false,
           isAdmin: false,
@@ -252,6 +480,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       // Additional check: ensure we have a valid user with email
       if (!user.email) {
+        console.log("⚠️ User found but no email");
         setAdminState({
           isChecking: false,
           isAdmin: false,
@@ -268,15 +497,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         adminState.checkedUserId === user.id &&
         adminState.isAdmin
       ) {
+        console.log("✅ Already checked this user and is admin, skipping");
         return;
       }
 
       // Prevent multiple simultaneous admin checks
       if (isAdminCheckInProgress) {
+        console.log("⏳ Admin check already in progress, skipping");
         return;
       }
 
       // Start admin check
+      console.log("🚀 Starting admin check for user:", user.email);
       setIsAdminCheckInProgress(true);
       setAdminState((prev) => ({
         ...prev,
@@ -335,7 +567,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         });
         setIsAdminCheckInProgress(false);
 
-        console.log("🏁 Admin check completed, isAdmin:", isAdminResult);
+        console.log("🏁 Admin check completed:", {
+          isAdmin: isAdminResult,
+          userId: user.id,
+          userEmail: user.email,
+        });
+
+        // Si es admin, iniciar verificación de organización inmediatamente
+        if (isAdminResult && user.id) {
+          console.log("✅ User is admin, organization check will run next");
+        } else {
+          console.warn("⚠️ User is NOT admin, will redirect to login");
+        }
       } catch (error: any) {
         if (error.message === "Admin check timeout") {
           console.error("⏱️ Admin check timed out - assuming not admin");
@@ -358,49 +601,73 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }, [user?.id, loading]); // 🚀 KEY FIX: Only depend on user.id instead of entire user object
 
   useEffect(() => {
+    console.log("🔄 Admin redirect check effect triggered:", {
+      redirectInProgress: redirectInProgress.current,
+      loading,
+      adminStateHasChecked: adminState.hasChecked,
+      adminStateIsChecking: adminState.isChecking,
+      adminStateIsAdmin: adminState.isAdmin,
+      hasUser: !!user,
+      userEmail: user?.email,
+    });
+
     // Skip if redirect is already in progress
     if (redirectInProgress.current) {
+      console.log("⏭️ Redirect already in progress, skipping");
       return;
     }
 
     // Only redirect after both auth and admin checks are COMPLETELY finished
     if (!loading && adminState.hasChecked && !adminState.isChecking) {
-      if (process.env.NODE_ENV === "development" && debugMode) {
-        console.log("🔄 Admin redirect check:", {
-          user: !!user,
-          userEmail: user?.email,
-          isAdmin: adminState.isAdmin,
-          loading,
-          isChecking: adminState.isChecking,
-          hasChecked: adminState.hasChecked,
-        });
-      }
+      console.log("✅ All checks complete, evaluating redirect:", {
+        user: !!user,
+        userEmail: user?.email,
+        isAdmin: adminState.isAdmin,
+      });
 
       // If user is admin, just mark as done and return early
       if (user && user.email && adminState.isAdmin) {
+        console.log("✅ User is admin, allowing access");
         return;
       }
 
       // Add a small delay to let auth fully stabilize before redirecting
       const delayRedirect = () => {
+        console.log("⏳ Delaying redirect to let auth stabilize...");
         redirectInProgress.current = true;
         setTimeout(() => {
+          console.log("🚪 Executing redirect check:", {
+            hasUser: !!user,
+            userEmail: user?.email,
+            isAdmin: adminState.isAdmin,
+          });
+
           if (!user || !user.email) {
+            console.log("❌ No user, redirecting to login");
             router.push("/login");
             return;
           }
 
           // Check admin access - only redirect if we've definitely checked and user is not admin
           if (!adminState.isAdmin) {
+            console.log("❌ User is not admin, redirecting to login");
             router.push("/login");
             return;
           }
+
+          console.log("✅ User is admin, allowing access");
         }, 500); // 500ms delay to let auth stabilize
       };
 
       if (!user || !user.email || !adminState.isAdmin) {
         delayRedirect();
       }
+    } else {
+      console.log("⏳ Still checking, waiting...", {
+        loading,
+        adminStateHasChecked: adminState.hasChecked,
+        adminStateIsChecking: adminState.isChecking,
+      });
     }
   }, [
     user?.id,
@@ -422,7 +689,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   };
 
   // Show loading while auth or admin check is in progress
-  if (loading || adminState.isChecking || !adminState.hasChecked) {
+  // NO bloquear por verificación de organización si el usuario ya es admin
+  const isStillChecking =
+    loading || adminState.isChecking || !adminState.hasChecked;
+
+  if (isStillChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -431,7 +702,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <p className="text-azul-profundo font-semibold">
               {loading
                 ? "Cargando autenticación..."
-                : "Verificando permisos de admin..."}
+                : adminState.isChecking
+                  ? "Verificando permisos de admin..."
+                  : organizationState.isChecking
+                    ? "Verificando organización..."
+                    : "Cargando..."}
             </p>
             <p className="text-tierra-media text-sm">
               {loading
@@ -446,12 +721,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 ? "Auth loading"
                 : adminState.isChecking
                   ? "Admin checking"
-                  : adminState.hasChecked
-                    ? "Check complete"
-                    : "Not checked"}{" "}
+                  : organizationState.isChecking
+                    ? "Org checking"
+                    : adminState.hasChecked
+                      ? "Check complete"
+                      : "Not checked"}{" "}
               | User: {user ? "✓" : "✗"} | Admin:{" "}
-              {adminState.isAdmin ? "✓" : "✗"} | Checked:{" "}
-              {adminState.hasChecked ? "✓" : "✗"}
+              {adminState.isAdmin ? "✓" : "✗"} | HasOrg:{" "}
+              {organizationState.hasOrganization ? "✓" : "✗"}
             </div>
           </div>
         </div>
@@ -461,16 +738,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   // If auth is loaded but user is not found or not admin, let the redirect useEffect handle it
   // Don't render the admin interface until we confirm admin access
-  if (!user || !adminState.isAdmin) {
-    console.log("🚨 Access denied - showing redirect screen:", {
-      user: !!user,
-      isAdmin: adminState.isAdmin,
-      loading,
-      isChecking: adminState.isChecking,
-      hasChecked: adminState.hasChecked,
-      userEmail: user?.email,
-    });
-
+  // IMPORTANT: Solo verificar esto después de que la verificación de admin haya terminado
+  // NO bloquear por verificación de organización - eso es opcional
+  if (
+    !loading &&
+    adminState.hasChecked &&
+    !adminState.isChecking &&
+    (!user || !adminState.isAdmin)
+  ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -500,120 +775,130 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       lastLoggedUserId.current = user.id;
     }
 
-    // Log only once per user
+    // Log only once per user (removed for cleaner console)
     if (!hasLoggedRender.current) {
-      console.log("🎉 Admin dashboard rendering for:", user.email);
       hasLoggedRender.current = true;
     }
   }
 
   return (
-    <div className="admin-layout">
-      {/* Mobile Header */}
-      <div className="lg:hidden admin-header">
-        <div className="admin-header-content">
-          <div className="flex items-center space-x-3">
-            <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-5 w-5 text-admin-text-primary" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0">
-                <AdminSidebar
-                  pathname={pathname}
-                  onNavigate={() => setSidebarOpen(false)}
-                  stats={stats}
-                />
-              </SheetContent>
-            </Sheet>
+    <TourProvider>
+      <div className="admin-layout">
+        {/* Mobile Header */}
+        <div className="lg:hidden admin-header">
+          <div className="admin-header-content">
+            <div className="flex items-center space-x-3">
+              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-5 w-5 text-admin-text-primary" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-80 p-0">
+                  <AdminSidebar
+                    pathname={pathname}
+                    onNavigate={() => setSidebarOpen(false)}
+                    stats={stats}
+                    organizationState={organizationState}
+                  />
+                </SheetContent>
+              </Sheet>
 
-            <h1 className="admin-header-title">Admin</h1>
-          </div>
+              <h1 className="admin-header-title">Admin</h1>
+            </div>
 
-          <div className="admin-header-actions">
-            <BranchSelector />
-            <ThemeSelector />
-            <AdminNotificationDropdown />
-            <Button variant="ghost" size="icon" onClick={handleSignOut}>
-              <LogOut className="h-5 w-5 text-admin-text-primary" />
-            </Button>
+            <div className="admin-header-actions">
+              <BranchSelector />
+              <ThemeSelector />
+              <AdminNotificationDropdown />
+              <Button variant="ghost" size="icon" onClick={handleSignOut}>
+                <LogOut className="h-5 w-5 text-admin-text-primary" />
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="lg:flex">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0">
-          <AdminSidebar
-            pathname={pathname}
-            stats={stats}
-            onChatbotClick={() => setChatbotOpen(true)}
-          />
-        </div>
+        <div className="lg:flex">
+          {/* Desktop Sidebar */}
+          <div className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0">
+            <AdminSidebar
+              pathname={pathname}
+              stats={stats}
+              onChatbotClick={() => setChatbotOpen(true)}
+              organizationState={organizationState}
+            />
+          </div>
 
-        {/* Main Content */}
-        <div className="lg:pl-72" style={{ width: "-webkit-fill-available" }}>
-          {/* Desktop Header */}
-          <div className="hidden lg:block admin-header">
-            <div className="admin-header-content">
-              <div>
-                <h1 className="admin-header-title font-malisha text-admin-text-primary">
-                  {businessConfig.displayName || businessConfig.name}
-                </h1>
-                <p className="admin-header-subtitle font-caption text-admin-text-primary">
-                  {businessConfig.admin.subtitle}
-                </p>
-              </div>
+          {/* Main Content */}
+          <div className="lg:pl-72" style={{ width: "-webkit-fill-available" }}>
+            {/* Desktop Header */}
+            <div className="hidden lg:block admin-header">
+              <div className="admin-header-content">
+                <div>
+                  <h1 className="admin-header-title font-malisha text-admin-text-primary">
+                    {businessConfig.displayName || businessConfig.name}
+                  </h1>
+                  <p className="admin-header-subtitle font-caption text-admin-text-primary">
+                    {businessConfig.admin.subtitle}
+                  </p>
+                </div>
 
-              <div className="admin-header-actions">
-                <BranchSelector />
-                <ThemeSelector />
-                <AdminNotificationDropdown />
+                <div className="admin-header-actions">
+                  <BranchSelector />
+                  <ThemeSelector />
+                  <AdminNotificationDropdown />
 
-                <div className="admin-header-user">
-                  <div className="admin-header-user-info">
-                    <p className="admin-header-user-name font-caption text-admin-text-primary">
-                      {profile?.first_name
-                        ? `${profile.first_name} ${profile.last_name || ""}`.trim()
-                        : user.email}
-                    </p>
-                    <p className="admin-header-user-role font-caption text-admin-text-secondary">
-                      Administrador
-                    </p>
-                  </div>
-                  <Link href="/admin/profile">
+                  <div className="admin-header-user">
+                    <div className="admin-header-user-info">
+                      <p className="admin-header-user-name font-caption text-admin-text-primary">
+                        {profile?.first_name
+                          ? `${profile.first_name} ${profile.last_name || ""}`.trim()
+                          : user?.email || "Usuario"}
+                      </p>
+                      <p className="admin-header-user-role font-caption text-admin-text-secondary">
+                        Administrador
+                      </p>
+                    </div>
+                    <Link href="/admin/profile">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hover:bg-admin-bg-tertiary transition-colors"
+                        title="Ver perfil"
+                      >
+                        <User className="h-5 w-5 text-admin-text-primary" />
+                      </Button>
+                    </Link>
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={handleSignOut}
                       className="hover:bg-admin-bg-tertiary transition-colors"
-                      title="Ver perfil"
+                      title="Cerrar sesión"
                     >
-                      <User className="h-5 w-5 text-admin-text-primary" />
+                      <LogOut className="h-5 w-5 text-admin-text-primary" />
                     </Button>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleSignOut}
-                    className="hover:bg-admin-bg-tertiary transition-colors"
-                    title="Cerrar sesión"
-                  >
-                    <LogOut className="h-5 w-5 text-admin-text-primary" />
-                  </Button>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Page Content */}
+            <main className="admin-content">
+              {/* Demo Mode Banner */}
+              {organizationState.isDemoMode && <DemoModeBanner />}
+              {children}
+            </main>
           </div>
-
-          {/* Page Content */}
-          <main className="admin-content">{children}</main>
         </div>
-      </div>
 
-      {/* Chatbot - Floating Button */}
-      <Chatbot />
-    </div>
+        {/* Chatbot - Floating Button */}
+        <Chatbot />
+
+        {/* Tour Help Button - Floating */}
+        <TourButton />
+      </div>
+    </TourProvider>
   );
 }
 
@@ -623,6 +908,7 @@ function AdminSidebar({
   onNavigate,
   stats,
   onChatbotClick,
+  organizationState,
 }: {
   pathname: string;
   onNavigate?: () => void;
@@ -637,8 +923,15 @@ function AdminSidebar({
     todayAppointments: number;
   };
   onChatbotClick?: () => void;
+  organizationState?: {
+    hasOrganization: boolean | null;
+    isDemoMode: boolean;
+    onboardingRequired: boolean;
+    isChecking: boolean;
+  };
 }) {
   const { isSuperAdmin } = useBranch();
+  const { isRoot } = useRoot();
   return (
     <div
       className="admin-sidebar flex grow flex-col gap-y-5 overflow-y-auto"
@@ -704,11 +997,25 @@ function AdminSidebar({
       {/* Navigation */}
       <nav className="admin-sidebar-nav bg-admin-bg-primary">
         <ul role="list" className="flex flex-1 flex-col gap-y-1">
-          {createNavigationItems(stats.newWorkOrders)
+          {createNavigationItems(stats.newWorkOrders, stats.openTickets, isRoot)
             .filter((item: any) => {
               // Filter out super admin only items if user is not super admin
               if (item.superAdminOnly && !isSuperAdmin) {
                 return false;
+              }
+              // Filter out root-only items if user is not root/dev
+              if (item.rootOnly && !isRoot) {
+                return false;
+              }
+              // Filter out onboarding-only items if user has an active organization
+              // Show checkout only during onboarding (when onboardingRequired is true or hasOrganization is false/null)
+              if (item.onboardingOnly) {
+                if (
+                  organizationState?.hasOrganization &&
+                  !organizationState?.onboardingRequired
+                ) {
+                  return false; // Hide checkout if user has active organization
+                }
               }
               return true;
             })

@@ -138,8 +138,14 @@ function ProductTableComponent({
 
                 <TableCell>
                   <div className="flex items-center space-x-2">
-                    <span>{product.inventory_quantity}</span>
-                    {product.inventory_quantity <= 5 && (
+                    <span>
+                      {product.total_inventory_quantity !== undefined
+                        ? product.total_inventory_quantity
+                        : product.inventory_quantity || 0}
+                    </span>
+                    {(product.total_inventory_quantity !== undefined
+                      ? product.total_inventory_quantity
+                      : product.inventory_quantity || 0) <= 5 && (
                       <AlertTriangle className="h-4 w-4 text-red-500" />
                     )}
                   </div>

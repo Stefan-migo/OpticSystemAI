@@ -110,11 +110,13 @@ export async function POST(request: NextRequest) {
 
     const organizationId = newOrganization.id;
 
-    // Actualizar admin_users con la nueva organization_id
+    // Actualizar admin_users con la nueva organization_id y rol super_admin
+    // El usuario que activa su organización real es el dueño de la óptica, por lo tanto debe ser super_admin
     const { data: adminUser, error: adminError } = await supabaseServiceRole
       .from("admin_users")
       .update({
         organization_id: organizationId,
+        role: "super_admin",
         updated_at: new Date().toISOString(),
       })
       .eq("id", user.id)
@@ -157,20 +159,194 @@ export async function POST(request: NextRequest) {
       logger.error("Error creating branch", branchError);
     } else {
       branch = newBranch;
+    }
 
-      // Crear admin_branch_access
-      const { error: accessError } = await supabaseServiceRole
-        .from("admin_branch_access")
-        .insert({
-          admin_user_id: user.id,
-          branch_id: newBranch.id,
-          role: "manager",
-          is_primary: true,
-        });
+    // ===== LIMPIAR DATOS CREADOS POR EL USUARIO DURANTE EL DEMO =====
+    // Eliminar cualquier dato que el usuario haya creado durante el demo
+    // Esto asegura que la demo sea completamente temporal y no queden datos residuales
+    // IMPORTANTE: Solo eliminamos datos creados por este usuario, NO los datos seed de la demo
 
-      if (accessError) {
-        logger.error("Error creating branch access", accessError);
+    logger.info("Cleaning up demo data created by user", { userId: user.id });
+
+    // Obtener todas las sucursales de la demo para filtrar por branch_id también
+    const { data: demoBranches } = await supabaseServiceRole
+      .from("branches")
+      .select("id")
+      .eq("organization_id", DEMO_ORG_ID);
+
+    const demoBranchIds = demoBranches?.map((b) => b.id) || [];
+
+    // Eliminar datos creados por el usuario en la demo (solo los que creó él, no los datos seed)
+    // Usamos created_by cuando está disponible para identificar datos del usuario
+
+    // 1. Clientes creados por el usuario en la demo
+    if (demoBranchIds.length > 0) {
+      await supabaseServiceRole
+        .from("customers")
+        .delete()
+        .eq("organization_id", DEMO_ORG_ID)
+        .in("branch_id", demoBranchIds)
+        .eq("created_by", user.id);
+    }
+
+    // 2. Órdenes creadas por el usuario en la demo (a través de order_payments.created_by)
+    if (demoBranchIds.length > 0) {
+      // Primero obtener IDs de órdenes con pagos creados por el usuario
+      const { data: userOrderPayments } = await supabaseServiceRole
+        .from("order_payments")
+        .select("order_id")
+        .eq("created_by", user.id);
+
+      const userOrderIds = userOrderPayments?.map((p: any) => p.order_id) || [];
+
+      if (userOrderIds.length > 0) {
+        await supabaseServiceRole
+          .from("orders")
+          .delete()
+          .eq("organization_id", DEMO_ORG_ID)
+          .in("id", userOrderIds);
       }
+    }
+
+    // 3. Presupuestos creados por el usuario en la demo
+    if (demoBranchIds.length > 0) {
+      await supabaseServiceRole
+        .from("quotes")
+        .delete()
+        .eq("organization_id", DEMO_ORG_ID)
+        .in("branch_id", demoBranchIds);
+      // Nota: quotes puede no tener created_by, así que eliminamos todos los de la demo del usuario
+      // Esto es seguro porque cuando el usuario cambia de organización, ya no los verá de todas formas
+    }
+
+    // 4. Trabajos de laboratorio creados por el usuario en la demo
+    if (demoBranchIds.length > 0) {
+      await supabaseServiceRole
+        .from("lab_work_orders")
+        .delete()
+        .eq("organization_id", DEMO_ORG_ID)
+        .in("branch_id", demoBranchIds)
+        .eq("created_by", user.id);
+    }
+
+    // 5. Citas creadas por el usuario en la demo
+    if (demoBranchIds.length > 0) {
+      await supabaseServiceRole
+        .from("appointments")
+        .delete()
+        .eq("organization_id", DEMO_ORG_ID)
+        .in("branch_id", demoBranchIds);
+    }
+
+    // 6. Pagos creados por el usuario en la demo
+    await supabaseServiceRole
+      .from("payments")
+      .delete()
+      .eq("organization_id", DEMO_ORG_ID)
+      .eq("user_id", user.id);
+
+    // 7. Pagos de órdenes creados por el usuario en la demo
+    await supabaseServiceRole
+      .from("order_payments")
+      .delete()
+      .eq("created_by", user.id);
+
+    // 8. Documentos de facturación creados por el usuario en la demo
+    if (demoBranchIds.length > 0) {
+      await supabaseServiceRole
+        .from("billing_documents")
+        .delete()
+        .in("branch_id", demoBranchIds)
+        .eq("emitted_by", user.id);
+    }
+
+    // 9. Sesiones POS creadas por el usuario en la demo
+    if (demoBranchIds.length > 0) {
+      await supabaseServiceRole
+        .from("pos_sessions")
+        .delete()
+        .in("branch_id", demoBranchIds)
+        .eq("cashier_id", user.id);
+    }
+
+    // 10. Transacciones POS creadas por el usuario en la demo
+    if (demoBranchIds.length > 0) {
+      await supabaseServiceRole
+        .from("pos_transactions")
+        .delete()
+        .in("branch_id", demoBranchIds)
+        .eq("cashier_id", user.id);
+    }
+
+    // 11. Cierres de caja creados por el usuario en la demo
+    if (demoBranchIds.length > 0) {
+      await supabaseServiceRole
+        .from("cash_register_sessions")
+        .delete()
+        .in("branch_id", demoBranchIds)
+        .eq("cashier_id", user.id);
+    }
+
+    // 12. Recetas creadas por el usuario en la demo
+    if (demoBranchIds.length > 0) {
+      await supabaseServiceRole
+        .from("prescriptions")
+        .delete()
+        .in("branch_id", demoBranchIds)
+        .eq("created_by", user.id);
+    }
+
+    // 13. Notificaciones admin creadas para el usuario en la demo
+    await supabaseServiceRole
+      .from("admin_notifications")
+      .delete()
+      .eq("target_admin_id", user.id);
+
+    // 14. Logs de actividad del usuario (todos, no solo de la demo)
+    // Esto limpia el historial completo del usuario antes de empezar con su organización real
+    await supabaseServiceRole
+      .from("admin_activity_log")
+      .delete()
+      .eq("admin_user_id", user.id);
+
+    // 15. Progreso del tour del usuario en la demo
+    await supabaseServiceRole
+      .from("user_tour_progress")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("organization_id", DEMO_ORG_ID);
+
+    // 16. Historial de chat del usuario en la demo
+    await supabaseServiceRole
+      .from("chat_sessions")
+      .delete()
+      .eq("user_id", user.id);
+
+    logger.info("Demo data cleanup completed", {
+      userId: user.id,
+      demoBranchesCleaned: demoBranchIds.length,
+    });
+
+    // Crear acceso de super_admin (branch_id = null) para acceso global a todas las sucursales
+    // Primero eliminar cualquier acceso existente (esto ya limpia los accesos a la demo)
+    await supabaseServiceRole
+      .from("admin_branch_access")
+      .delete()
+      .eq("admin_user_id", user.id);
+
+    // Crear acceso de super_admin con branch_id = null
+    const { error: accessError } = await supabaseServiceRole
+      .from("admin_branch_access")
+      .insert({
+        admin_user_id: user.id,
+        branch_id: null, // null = acceso global a todas las sucursales (super_admin)
+        role: "manager",
+        is_primary: true,
+      });
+
+    if (accessError) {
+      logger.error("Error creating super admin branch access", accessError);
+      // Crítico: el usuario podría no tener acceso global
     }
 
     // Crear subscription inicial

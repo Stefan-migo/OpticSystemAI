@@ -32,6 +32,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Tier feature: advanced_analytics must be enabled for the organization
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+    if (adminUser?.organization_id) {
+      const { validateFeature } = await import("@/lib/saas/tier-validator");
+      const hasAdvancedAnalytics = await validateFeature(
+        adminUser.organization_id,
+        "advanced_analytics",
+      );
+      if (!hasAdvancedAnalytics) {
+        return NextResponse.json(
+          {
+            error:
+              "Analíticas avanzadas no están incluidas en tu plan. Actualiza a Pro o Premium.",
+            code: "FEATURE_NOT_AVAILABLE",
+          },
+          { status: 403 },
+        );
+      }
+    }
+
     // Get branch context
     const branchContext = await getBranchContext(request, user.id);
 

@@ -442,11 +442,15 @@ export default function CreateQuoteForm({
         },
       );
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Error calculating contact lens price");
+        const message =
+          data?.error || "No se pudo calcular el precio del lente de contacto";
+        toast.error(message);
+        return;
       }
 
-      const data = await response.json();
       if (data.calculation && data.calculation.price) {
         // Calculate total price: price per box * quantity
         const quantity = formData.contact_lens_quantity || 1;
@@ -988,7 +992,11 @@ export default function CreateQuoteForm({
       quoteSettings?.default_tax_percentage || taxPercentage;
 
     // Get tax inclusion settings from quote settings (default to true - IVA incluido)
-    const lensIncludesTax = quoteSettings?.lens_cost_includes_tax ?? true;
+    // For contact lenses, price already includes tax
+    const lensIncludesTax =
+      lensType === "contact"
+        ? true
+        : (quoteSettings?.lens_cost_includes_tax ?? true);
     const treatmentsIncludeTax =
       quoteSettings?.treatments_cost_includes_tax ?? true;
     const laborIncludesTax = quoteSettings?.labor_cost_includes_tax ?? true;
@@ -1020,10 +1028,10 @@ export default function CreateQuoteForm({
     // Calculate lens, treatments, and labor with tax consideration
     // Use costos internos (lens_cost, treatments_cost, labor_cost) for calculation
     // For two_separate solution, lens_cost should be the sum of far_lens_cost and near_lens_cost
-    // For contact lenses, use contact_lens_cost instead of lens_cost
+    // For contact lenses, use contact_lens_price (precio venta con IVA) instead of lens_cost
     const effectiveLensCost =
       lensType === "contact"
-        ? formData.contact_lens_cost || 0
+        ? formData.contact_lens_price || formData.contact_lens_cost || 0
         : presbyopiaSolution === "two_separate"
           ? (formData.far_lens_cost || 0) + (formData.near_lens_cost || 0)
           : formData.lens_cost || 0;
@@ -1358,13 +1366,17 @@ export default function CreateQuoteForm({
             presbyopiaSolution === "two_separate"
               ? null
               : formData.lens_family_id || null,
-          lens_type: formData.lens_type || null,
+          lens_type:
+            lensType === "contact"
+              ? "Lentes de contacto"
+              : formData.lens_type || null,
           lens_material: formData.lens_material || null,
           lens_index:
             formData.lens_index !== null && formData.lens_index !== undefined
               ? formData.lens_index
               : null,
-          lens_treatments: formData.lens_treatments,
+          lens_treatments:
+            lensType === "contact" ? [] : formData.lens_treatments,
           lens_tint_color: formData.lens_tint_color || null,
           lens_tint_percentage: formData.lens_tint_percentage || null,
           presbyopia_solution: formData.presbyopia_solution || "none",
@@ -1389,16 +1401,23 @@ export default function CreateQuoteForm({
             lensType === "contact"
               ? formData.contact_lens_family_id || null
               : null,
+          // Usar receta seleccionada del cliente para lentes de contacto (no inputs manuales)
           contact_lens_rx_sphere_od:
-            lensType === "contact" ? formData.contact_lens_rx_sphere_od : null,
+            lensType === "contact" && selectedPrescription
+              ? (selectedPrescription.od_sphere ?? null)
+              : null,
           contact_lens_rx_cylinder_od:
-            lensType === "contact"
-              ? formData.contact_lens_rx_cylinder_od
+            lensType === "contact" && selectedPrescription
+              ? (selectedPrescription.od_cylinder ?? null)
               : null,
           contact_lens_rx_axis_od:
-            lensType === "contact" ? formData.contact_lens_rx_axis_od : null,
+            lensType === "contact" && selectedPrescription
+              ? (selectedPrescription.od_axis ?? null)
+              : null,
           contact_lens_rx_add_od:
-            lensType === "contact" ? formData.contact_lens_rx_add_od : null,
+            lensType === "contact" && selectedPrescription
+              ? (selectedPrescription.od_add ?? null)
+              : null,
           contact_lens_rx_base_curve_od:
             lensType === "contact"
               ? formData.contact_lens_rx_base_curve_od
@@ -1408,15 +1427,21 @@ export default function CreateQuoteForm({
               ? formData.contact_lens_rx_diameter_od
               : null,
           contact_lens_rx_sphere_os:
-            lensType === "contact" ? formData.contact_lens_rx_sphere_os : null,
+            lensType === "contact" && selectedPrescription
+              ? (selectedPrescription.os_sphere ?? null)
+              : null,
           contact_lens_rx_cylinder_os:
-            lensType === "contact"
-              ? formData.contact_lens_rx_cylinder_os
+            lensType === "contact" && selectedPrescription
+              ? (selectedPrescription.os_cylinder ?? null)
               : null,
           contact_lens_rx_axis_os:
-            lensType === "contact" ? formData.contact_lens_rx_axis_os : null,
+            lensType === "contact" && selectedPrescription
+              ? (selectedPrescription.os_axis ?? null)
+              : null,
           contact_lens_rx_add_os:
-            lensType === "contact" ? formData.contact_lens_rx_add_os : null,
+            lensType === "contact" && selectedPrescription
+              ? (selectedPrescription.os_add ?? null)
+              : null,
           contact_lens_rx_base_curve_os:
             lensType === "contact"
               ? formData.contact_lens_rx_base_curve_os
@@ -1426,14 +1451,15 @@ export default function CreateQuoteForm({
               ? formData.contact_lens_rx_diameter_os
               : null,
           contact_lens_quantity:
-            lensType === "contact" ? formData.contact_lens_quantity || 1 : null,
+            lensType === "contact" ? formData.contact_lens_quantity || 1 : 1,
           contact_lens_cost:
-            lensType === "contact" ? formData.contact_lens_cost || 0 : null,
+            lensType === "contact" ? formData.contact_lens_cost || 0 : 0,
           contact_lens_price:
-            lensType === "contact" ? formData.contact_lens_price || 0 : null,
+            lensType === "contact" ? formData.contact_lens_price || 0 : 0,
           frame_cost: formData.frame_cost,
           lens_cost: lensType === "contact" ? 0 : formData.lens_cost,
-          treatments_cost: formData.treatments_cost,
+          treatments_cost:
+            lensType === "contact" ? 0 : formData.treatments_cost,
           labor_cost: formData.labor_cost,
           subtotal: formData.subtotal,
           tax_amount: formData.tax_amount,
@@ -2258,137 +2284,7 @@ export default function CreateQuoteForm({
                   </>
                 )}
 
-                {/* Contact Lens RX Fields */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                  <div>
-                    <Label className="font-medium mb-2">
-                      Receta Ojo Derecho (OD)
-                    </Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        placeholder="Esfera"
-                        type="number"
-                        step="0.25"
-                        value={formData.contact_lens_rx_sphere_od || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            contact_lens_rx_sphere_od: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder="Cilindro"
-                        type="number"
-                        step="0.25"
-                        value={formData.contact_lens_rx_cylinder_od || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            contact_lens_rx_cylinder_od: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder="Eje (0-180)"
-                        type="number"
-                        min="0"
-                        max="180"
-                        value={formData.contact_lens_rx_axis_od || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            contact_lens_rx_axis_od: e.target.value
-                              ? parseInt(e.target.value)
-                              : null,
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder="Adición"
-                        type="number"
-                        step="0.25"
-                        value={formData.contact_lens_rx_add_od || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            contact_lens_rx_add_od: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="font-medium mb-2">
-                      Receta Ojo Izquierdo (OS)
-                    </Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        placeholder="Esfera"
-                        type="number"
-                        step="0.25"
-                        value={formData.contact_lens_rx_sphere_os || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            contact_lens_rx_sphere_os: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder="Cilindro"
-                        type="number"
-                        step="0.25"
-                        value={formData.contact_lens_rx_cylinder_os || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            contact_lens_rx_cylinder_os: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder="Eje (0-180)"
-                        type="number"
-                        min="0"
-                        max="180"
-                        value={formData.contact_lens_rx_axis_os || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            contact_lens_rx_axis_os: e.target.value
-                              ? parseInt(e.target.value)
-                              : null,
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder="Adición"
-                        type="number"
-                        step="0.25"
-                        value={formData.contact_lens_rx_add_os || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            contact_lens_rx_add_os: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
+                {/* Las mediciones de receta para lentes de contacto se toman de la receta seleccionada (Resumen de Receta arriba). */}
               </div>
             ) : (
               /* Optical Lens Configuration (existing code) */
@@ -2690,107 +2586,111 @@ export default function CreateQuoteForm({
               </div>
             )}
 
-            {/* Hide treatments when two_separate */}
-            {presbyopiaSolution !== "two_separate" && (
-              <div>
-                <Label>Tratamientos y Recubrimientos</Label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Con familia: ocultamos estándar (AR, Blue, UV, Anti-rayas,
-                  Foto, Polarizado). Extras permitidos: Tinte, Prisma.
-                </p>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {availableTreatments
-                    .filter((t) => {
-                      if (!formData.lens_family_id) return true;
-                      return t.value === "tint" || t.value === "prism_extra";
-                    })
-                    .map((treatment) => {
-                      const isSelected = formData.lens_treatments.includes(
-                        treatment.value,
-                      );
-                      const disabled =
-                        !!formData.lens_family_id &&
-                        [
-                          "anti_reflective",
-                          "blue_light_filter",
-                          "uv_protection",
-                          "scratch_resistant",
-                          "anti_fog",
-                          "photochromic",
-                          "polarized",
-                        ].includes(treatment.value);
-                      return (
-                        <div
-                          key={treatment.value}
-                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                            isSelected
-                              ? "border-verde-suave bg-verde-suave/10"
-                              : "border-gray-200 hover:border-azul-profundo"
-                          } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
-                          onClick={() =>
-                            !disabled && handleTreatmentToggle(treatment)
-                          }
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              {isSelected && (
-                                <CheckCircle className="h-4 w-4 text-verde-suave mr-2" />
-                              )}
-                              <span className={isSelected ? "font-medium" : ""}>
-                                {treatment.label}
-                              </span>
-                            </div>
-                            <Badge variant="outline">
-                              {formatPrice(treatment.cost)}
-                            </Badge>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-                {!formData.lens_family_id && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Sin familia: puedes agregar cualquier tratamiento
-                    manualmente.
+            {/* Tratamientos solo para lentes ópticos; no aplican a lentes de contacto */}
+            {presbyopiaSolution !== "two_separate" &&
+              lensType === "optical" && (
+                <div>
+                  <Label>Tratamientos y Recubrimientos</Label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Con familia: ocultamos estándar (AR, Blue, UV, Anti-rayas,
+                    Foto, Polarizado). Extras permitidos: Tinte, Prisma.
                   </p>
-                )}
-
-                {/* Tint options */}
-                {formData.lens_treatments.includes("tint") && (
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <Label>Color del Tinte</Label>
-                      <Input
-                        value={formData.lens_tint_color}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            lens_tint_color: e.target.value,
-                          }))
-                        }
-                        placeholder="Ej: Gris, Marrón, Verde"
-                      />
-                    </div>
-                    <div>
-                      <Label>Porcentaje de Tinte (%)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={formData.lens_tint_percentage || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            lens_tint_percentage: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                        placeholder="0-100"
-                      />
-                    </div>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {availableTreatments
+                      .filter((t) => {
+                        if (!formData.lens_family_id) return true;
+                        return t.value === "tint" || t.value === "prism_extra";
+                      })
+                      .map((treatment) => {
+                        const isSelected = formData.lens_treatments.includes(
+                          treatment.value,
+                        );
+                        const disabled =
+                          !!formData.lens_family_id &&
+                          [
+                            "anti_reflective",
+                            "blue_light_filter",
+                            "uv_protection",
+                            "scratch_resistant",
+                            "anti_fog",
+                            "photochromic",
+                            "polarized",
+                          ].includes(treatment.value);
+                        return (
+                          <div
+                            key={treatment.value}
+                            className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                              isSelected
+                                ? "border-verde-suave bg-verde-suave/10"
+                                : "border-gray-200 hover:border-azul-profundo"
+                            } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                            onClick={() =>
+                              !disabled && handleTreatmentToggle(treatment)
+                            }
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                {isSelected && (
+                                  <CheckCircle className="h-4 w-4 text-verde-suave mr-2" />
+                                )}
+                                <span
+                                  className={isSelected ? "font-medium" : ""}
+                                >
+                                  {treatment.label}
+                                </span>
+                              </div>
+                              <Badge variant="outline">
+                                {formatPrice(treatment.cost)}
+                              </Badge>
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
-                )}
-              </div>
-            )}
+                  {!formData.lens_family_id && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Sin familia: puedes agregar cualquier tratamiento
+                      manualmente.
+                    </p>
+                  )}
+
+                  {/* Tint options */}
+                  {formData.lens_treatments.includes("tint") && (
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <Label>Color del Tinte</Label>
+                        <Input
+                          value={formData.lens_tint_color}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              lens_tint_color: e.target.value,
+                            }))
+                          }
+                          placeholder="Ej: Gris, Marrón, Verde"
+                        />
+                      </div>
+                      <div>
+                        <Label>Porcentaje de Tinte (%)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={formData.lens_tint_percentage || ""}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              lens_tint_percentage:
+                                parseInt(e.target.value) || 0,
+                            }))
+                          }
+                          placeholder="0-100"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
           </CardContent>
         </Card>
       )}

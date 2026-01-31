@@ -4,6 +4,7 @@ import {
   getBranchContext,
   validateBranchAccess,
 } from "@/lib/api/branch-middleware";
+import { validateTierLimit } from "@/lib/saas/tier-validator";
 import { appLogger as logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
@@ -165,12 +166,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if code already exists
-    const { data: existingBranch } = await supabase
-      .from("branches")
-      .select("id")
-      .eq("code", code)
+    // Resolve organization_id for the new branch (required for tier validation and insert)
+    const { data: adminUserForOrg } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
       .single();
+    const organizationId =
+      body.organization_id ?? adminUserForOrg?.organization_id;
+
+    if (organizationId) {
+      const branchLimit = await validateTierLimit(organizationId, "branches");
+      if (!branchLimit.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              branchLimit.reason ??
+              "Límite de sucursales alcanzado para tu plan",
+            code: "TIER_LIMIT",
+            currentCount: branchLimit.currentCount,
+            maxAllowed: branchLimit.maxAllowed,
+          },
+          { status: 403 },
+        );
+      }
+    }
+
+    // Check if code already exists (scoped by organization if applicable)
+    let codeQuery = supabase.from("branches").select("id").eq("code", code);
+    if (organizationId) {
+      codeQuery = codeQuery.eq("organization_id", organizationId);
+    }
+    const { data: existingBranch } = await codeQuery.single();
 
     if (existingBranch) {
       return NextResponse.json(
@@ -179,23 +206,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create branch
+    // Create branch (with organization_id when available)
+    const insertPayload: Record<string, unknown> = {
+      name,
+      code,
+      address_line_1,
+      address_line_2,
+      city,
+      state,
+      postal_code,
+      country,
+      phone,
+      email,
+      settings: settings || {},
+      is_active: true,
+    };
+    if (organizationId) {
+      insertPayload.organization_id = organizationId;
+    }
+
     const { data: newBranch, error } = await supabase
       .from("branches")
-      .insert({
-        name,
-        code,
-        address_line_1,
-        address_line_2,
-        city,
-        state,
-        postal_code,
-        country,
-        phone,
-        email,
-        settings: settings || {},
-        is_active: true,
-      })
+      .insert(insertPayload)
       .select()
       .single();
 

@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, UserPlus, ArrowLeft } from "lucide-react";
+import { Loader2, UserPlus, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useBranch } from "@/hooks/useBranch";
@@ -38,6 +38,8 @@ export default function RegisterUserPage() {
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -90,7 +92,9 @@ export default function RegisterUserPage() {
 
     // Validar que si el rol requiere sucursal, se haya seleccionado una
     if (
-      (formData.role === "admin" || formData.role === "employee") &&
+      (formData.role === "admin" ||
+        formData.role === "employee" ||
+        formData.role === "vendedor") &&
       !formData.branch_id &&
       branches.length > 0
     ) {
@@ -140,18 +144,22 @@ export default function RegisterUserPage() {
     if (isSuperAdmin) {
       return [
         { value: "admin", label: "Administrador" },
-        { value: "employee", label: "Empleado/Vendedor" },
+        { value: "vendedor", label: "Vendedor" },
+        { value: "employee", label: "Empleado" },
         { value: "super_admin", label: "Super Administrador" },
       ];
     }
     return [
       { value: "admin", label: "Administrador" },
-      { value: "employee", label: "Empleado/Vendedor" },
+      { value: "vendedor", label: "Vendedor" },
+      { value: "employee", label: "Empleado" },
     ];
   };
 
   const requiresBranch =
-    formData.role === "admin" || formData.role === "employee";
+    formData.role === "admin" ||
+    formData.role === "employee" ||
+    formData.role === "vendedor";
 
   return (
     <div className="space-y-6">
@@ -246,11 +254,13 @@ export default function RegisterUserPage() {
               <p className="text-sm text-tierra-media mt-1">
                 {formData.role === "employee"
                   ? "Acceso operativo sin permisos de administración"
-                  : formData.role === "admin"
-                    ? "Acceso completo a una sucursal"
-                    : formData.role === "super_admin"
-                      ? "Acceso completo a todas las sucursales de la organización"
-                      : ""}
+                  : formData.role === "vendedor"
+                    ? "Acceso a ventas y citas en la sucursal asignada"
+                    : formData.role === "admin"
+                      ? "Acceso completo a una sucursal"
+                      : formData.role === "super_admin"
+                        ? "Acceso completo a todas las sucursales de la organización"
+                        : ""}
               </p>
             </div>
 
@@ -297,16 +307,32 @@ export default function RegisterUserPage() {
 
             <div>
               <Label htmlFor="password">Contraseña *</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                minLength={8}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  minLength={8}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-500" />
+                  )}
+                </Button>
+              </div>
               <p className="text-sm text-tierra-media mt-1">
                 Mínimo 8 caracteres
               </p>
@@ -314,16 +340,35 @@ export default function RegisterUserPage() {
 
             <div>
               <Label htmlFor="confirmPassword">Confirmar Contraseña *</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  setFormData({ ...formData, confirmPassword: e.target.value })
-                }
-                minLength={8}
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  value={formData.confirmPassword}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                  minLength={8}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-500" />
+                  )}
+                </Button>
+              </div>
             </div>
 
             <div className="flex gap-4">

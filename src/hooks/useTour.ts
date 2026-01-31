@@ -269,6 +269,28 @@ export function useTour() {
     });
   }, [skipTour, queryClient]);
 
+  // Función para navegar a un paso específico (para navegación hacia atrás)
+  const goToStep = useCallback(
+    (stepIndex: number) => {
+      if (stepIndex < 0 || stepIndex >= TOUR_STEPS.length) {
+        return;
+      }
+
+      // Actualizar estado local inmediatamente
+      const currentProgress = queryClient.getQueryData<TourProgress>([
+        "tour-progress",
+      ]);
+      if (currentProgress && currentProgress.status === "in_progress") {
+        const newProgress: TourProgress = {
+          ...currentProgress,
+          current_step: stepIndex,
+        };
+        queryClient.setQueryData(["tour-progress"], newProgress);
+      }
+    },
+    [queryClient],
+  );
+
   const currentStep = progress?.current_step ?? 0;
   const totalSteps = TOUR_STEPS.length;
   const isActive = progress?.status === "in_progress";
@@ -290,6 +312,7 @@ export function useTour() {
     completeTour: completeTour.mutate,
     skipTour: skipTourImmediate,
     restartTour: restartTour.mutate,
+    goToStep,
     isStarting: startTour.isPending,
     isCompleting: completeTour.isPending,
     isSkipping: skipTour.isPending,

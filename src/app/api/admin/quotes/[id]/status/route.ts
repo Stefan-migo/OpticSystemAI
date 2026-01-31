@@ -130,6 +130,7 @@ export async function PUT(
         updatedQuote.quote_number,
         oldStatus,
         body.status,
+        updatedQuote.branch_id ?? undefined,
       ).catch((err) => logger.warn("Error creating notification", err));
     }
 

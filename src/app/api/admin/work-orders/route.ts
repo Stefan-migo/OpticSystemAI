@@ -418,6 +418,7 @@ export async function POST(request: NextRequest) {
         newWorkOrder.work_order_number,
         customerName,
         newWorkOrder.total_amount,
+        newWorkOrder.branch_id ?? undefined,
       ).catch((err) => logger.error("Error creating notification", err));
     }
 

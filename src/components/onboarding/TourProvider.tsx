@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTour } from "@/hooks/useTour";
 import { useRoot } from "@/hooks/useRoot";
@@ -26,6 +26,7 @@ export function TourProvider({ children }: TourProviderProps) {
     completeTour,
     skipTour,
     isStarting,
+    goToStep,
   } = useTour();
 
   const { isRoot } = useRoot();
@@ -42,6 +43,13 @@ export function TourProvider({ children }: TourProviderProps) {
     setMounted(true);
   }, []);
 
+  // Deshabilitar tour cuando está desactivado por configuración (feature flag)
+  useEffect(() => {
+    if (!TOUR_CONFIG.enabled) {
+      setForceDisabled(true);
+    }
+  }, []);
+
   // Deshabilitar tour para usuarios root/dev
   useEffect(() => {
     if (isRoot) {
@@ -49,10 +57,11 @@ export function TourProvider({ children }: TourProviderProps) {
     }
   }, [isRoot]);
 
-  // Auto-iniciar tour en primera visita - esperar a que la página esté completamente cargada
+  // Auto-iniciar tour en primera visita - optimizado para evitar múltiples renders
+  const hasAutoStartedRef = useRef(false);
   useEffect(() => {
-    // No iniciar tour si es usuario root/dev
-    if (isRoot || forceDisabled) {
+    // No iniciar tour si es usuario root/dev o ya se inició
+    if (isRoot || forceDisabled || hasAutoStartedRef.current) {
       return;
     }
 
@@ -62,15 +71,19 @@ export function TourProvider({ children }: TourProviderProps) {
       TOUR_CONFIG.autoStart &&
       !isStarting &&
       mounted &&
-      !forceDisabled
+      !forceDisabled &&
+      pathname.startsWith("/admin")
     ) {
-      // Esperar a que el DOM esté completamente cargado
-      const timer = setTimeout(() => {
-        // Verificar que estamos en una página admin antes de iniciar
-        if (pathname.startsWith("/admin")) {
+      // Marcar como iniciado inmediatamente para evitar múltiples llamadas
+      hasAutoStartedRef.current = true;
+
+      // Esperar un tiempo reducido ya que usamos páginas mockup (más rápidas)
+      const timer = setTimeout(
+        () => {
           startTour();
-        }
-      }, 1500); // Aumentado a 1.5 segundos para asegurar que la página está completamente cargada
+        },
+        TOUR_CONFIG.useMockupPages ? 500 : 1500,
+      );
       return () => clearTimeout(timer);
     }
   }, [
@@ -91,27 +104,67 @@ export function TourProvider({ children }: TourProviderProps) {
     const currentStepData = TOUR_STEPS[currentStep];
     if (!currentStepData) return;
 
+    // Usar páginas mockup si está habilitado para mejor performance
+    const useMockup = TOUR_CONFIG.useMockupPages;
+    const basePath = useMockup ? TOUR_CONFIG.mockupBasePath : "/admin";
+
     // Mapear secciones a rutas
     const sectionToRoute: Record<string, string> = {
-      dashboard: "/admin",
-      customers: "/admin/customers",
-      products: "/admin/products",
-      quotes: "/admin/quotes",
-      "work-orders": "/admin/work-orders",
-      appointments: "/admin/appointments",
-      pos: "/admin/pos",
-      analytics: "/admin/analytics",
-      system: "/admin/system",
+      dashboard: useMockup ? `${basePath}?section=dashboard` : "/admin",
+      customers: useMockup
+        ? `${basePath}?section=customers`
+        : "/admin/customers",
+      products: useMockup ? `${basePath}?section=products` : "/admin/products",
+      quotes: useMockup ? `${basePath}?section=quotes` : "/admin/quotes",
+      "work-orders": useMockup
+        ? `${basePath}?section=work-orders`
+        : "/admin/work-orders",
+      appointments: useMockup
+        ? `${basePath}?section=appointments`
+        : "/admin/appointments",
+      pos: useMockup ? `${basePath}?section=pos` : "/admin/pos",
+      analytics: useMockup
+        ? `${basePath}?section=analytics`
+        : "/admin/analytics",
+      system: useMockup ? `${basePath}?section=system` : "/admin/system",
     };
 
     const requiredRoute = sectionToRoute[currentStepData.section];
-    if (requiredRoute && pathname !== requiredRoute) {
-      // Usar router.push en lugar de window.location.href para evitar recargas completas
-      setIsNavigating(true);
-      router.push(requiredRoute);
-      // Resetear el flag después de un breve delay
-      setTimeout(() => setIsNavigating(false), 100);
-      return;
+    if (!requiredRoute) return;
+
+    // Para páginas mockup, comparar también los query params
+    if (useMockup) {
+      // Leer query params del URL actual
+      const currentSection =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("section")
+          : null;
+      const requiredSection = currentStepData.section;
+
+      // Si estamos en la ruta base pero con una sección diferente, navegar
+      if (pathname === basePath) {
+        if (currentSection !== requiredSection) {
+          setIsNavigating(true);
+          router.push(requiredRoute);
+          setTimeout(() => setIsNavigating(false), 50);
+          return;
+        }
+      } else {
+        // Si no estamos en la ruta base, navegar a ella
+        setIsNavigating(true);
+        router.push(requiredRoute);
+        setTimeout(() => setIsNavigating(false), 50);
+        return;
+      }
+    } else {
+      // Para páginas reales, comparar solo el pathname
+      const requiredPath = requiredRoute.split("?")[0];
+      if (pathname !== requiredPath) {
+        setIsNavigating(true);
+        router.push(requiredRoute);
+        setTimeout(() => setIsNavigating(false), 100);
+        return;
+      }
     }
   }, [currentStep, isActive, pathname, mounted, router, isNavigating]);
 
@@ -166,12 +219,21 @@ export function TourProvider({ children }: TourProviderProps) {
       return;
     }
 
-    // Buscar el elemento con múltiples intentos para manejar carga lenta
+    // Buscar el elemento con múltiples intentos - optimizado para páginas mockup
     const findElementAsync = async () => {
-      // Esperar a que la página se renderice después de navegación
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Reducir delay para páginas mockup (carga más rápida)
+      const delay = TOUR_CONFIG.useMockupPages ? 100 : 300;
+      await new Promise((resolve) => setTimeout(resolve, delay));
 
-      const bounds = await findElement(currentStepData.selector, 8, 200);
+      // Reducir intentos para páginas mockup (elementos siempre presentes)
+      const maxAttempts = TOUR_CONFIG.useMockupPages ? 3 : 8;
+      const attemptDelay = TOUR_CONFIG.useMockupPages ? 50 : 200;
+
+      const bounds = await findElement(
+        currentStepData.selector,
+        maxAttempts,
+        attemptDelay,
+      );
       setElementBounds(bounds);
     };
 
@@ -205,15 +267,20 @@ export function TourProvider({ children }: TourProviderProps) {
   }, [currentStep, totalSteps, completeStep, completeTour]);
 
   const handlePrevious = useCallback(() => {
-    if (currentStep > 0) {
-      // Para ir hacia atrás, necesitamos actualizar el progreso manualmente
-      // Por ahora, solo permitimos avanzar
-      // TODO: Implementar navegación hacia atrás si es necesario
+    if (currentStep > 0 && goToStep) {
+      // Retroceder al paso anterior usando goToStep
+      goToStep(currentStep - 1);
     }
-  }, [currentStep]);
+  }, [currentStep, goToStep]);
 
-  // Si el tour no está activo, fue forzado a deshabilitarse, o es usuario root/dev, solo renderizar children
-  if (!isActive || !mounted || forceDisabled || isRoot) {
+  // Si el tour está desactivado por config, no está activo, fue forzado a deshabilitarse, o es usuario root/dev, solo renderizar children
+  if (
+    !TOUR_CONFIG.enabled ||
+    !isActive ||
+    !mounted ||
+    forceDisabled ||
+    isRoot
+  ) {
     return <>{children}</>;
   }
 

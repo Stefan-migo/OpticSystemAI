@@ -1064,6 +1064,7 @@ export async function POST(request: NextRequest) {
               newOrder.order_number,
               newOrder.email || "venta@pos.local",
               newOrder.total_amount,
+              newOrder.branch_id ?? undefined,
             ).catch((err) =>
               logger.error("Error creating sale notification", err),
             );
@@ -1202,7 +1203,9 @@ export async function POST(request: NextRequest) {
             contact_lens_rx_base_curve_os:
               contact_lens_rx_base_curve_os || null,
             contact_lens_rx_diameter_os: contact_lens_rx_diameter_os || null,
-            contact_lens_quantity: contact_lens_quantity || 1,
+            contact_lens_quantity: contact_lens_family_id
+              ? contact_lens_quantity || 1
+              : null,
             contact_lens_cost: contact_lens_cost || null,
             prescription_snapshot: null,
             lab_name: null,
@@ -1315,6 +1318,7 @@ export async function POST(request: NextRequest) {
             newOrder.order_number,
             newOrder.email || "venta@pos.local",
             newOrder.total_amount,
+            newOrder.branch_id ?? undefined,
           ).catch((err) =>
             logger.error("Error creating sale notification", err),
           );
@@ -1332,6 +1336,7 @@ export async function POST(request: NextRequest) {
               newWorkOrder.work_order_number,
               customerName,
               newWorkOrder.total_amount,
+              newWorkOrder.branch_id ?? undefined,
             ).catch((err) =>
               logger.error("Error creating work order notification", err),
             );

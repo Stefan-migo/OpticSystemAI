@@ -168,6 +168,7 @@ export async function PUT(
         updatedWorkOrder.work_order_number,
         oldStatus,
         status,
+        updatedWorkOrder.branch_id ?? undefined,
       ).catch((err) => logger.warn("Error creating notification", err));
 
       // If status is delivered, also create completion notification
@@ -182,6 +183,7 @@ export async function PUT(
           id,
           updatedWorkOrder.work_order_number,
           customerName,
+          updatedWorkOrder.branch_id ?? undefined,
         ).catch((err) => logger.warn("Error creating notification", err));
       }
     }

@@ -70,17 +70,14 @@ Tienes dos opciones para crear el usuario SuperAdmin:
 Este script crea el usuario en `auth.users` y lo configura como SuperAdmin:
 
 ```bash
-# Con credenciales por defecto
+# Configura en .env.local: DEMO_ADMIN_EMAIL y DEMO_ADMIN_PASSWORD (ver env.example)
 node scripts/create-demo-super-admin.js
 
-# Con credenciales personalizadas
+# O pasa las variables al ejecutar
 DEMO_ADMIN_EMAIL=tu-email@ejemplo.com DEMO_ADMIN_PASSWORD=TuPassword123! node scripts/create-demo-super-admin.js
 ```
 
-**Credenciales por defecto:**
-
-- Email: `demo-admin@optica-demo.cl`
-- Password: `DemoAdmin123!`
+**Credenciales:** Usa las variables de entorno `DEMO_ADMIN_EMAIL` y `DEMO_ADMIN_PASSWORD` en `.env.local`. No se documentan valores por defecto por seguridad.
 
 ### Opción B: Script SQL (Más Control)
 
@@ -92,15 +89,14 @@ Si prefieres usar SQL directamente:
    - Ve a http://127.0.0.1:54323
    - Ve a Authentication > Users
    - Click "Add user"
-   - Email: `demo-admin@optica-demo.cl`
-   - Password: `DemoAdmin123!`
+   - Email y contraseña: los mismos que uses en `DEMO_ADMIN_EMAIL` y `DEMO_ADMIN_PASSWORD`
    - Auto-confirm: Yes
    - Click "Create user"
 
    **Opción B2: Usando Script Node.js (solo para crear auth user)**
 
    ```bash
-   node scripts/create-admin-via-api.js demo-admin@optica-demo.cl DemoAdmin123!
+   node scripts/create-admin-via-api.js "$DEMO_ADMIN_EMAIL" "$DEMO_ADMIN_PASSWORD"
    ```
 
 2. **Luego, ejecuta el script SQL para asignar permisos:**
@@ -116,13 +112,10 @@ Si prefieres usar SQL directamente:
 ### Verificar que el Usuario se Creó Correctamente
 
 ```bash
-# Verificar admin_users
-docker exec -i supabase_db_web psql -U postgres -d postgres -c "SELECT au.email, au.role, o.name as organization FROM public.admin_users au LEFT JOIN public.organizations o ON au.organization_id = o.id WHERE au.email = 'demo-admin@optica-demo.cl';"
+# Verificar admin_users (reemplaza TU_EMAIL_DEMO por tu DEMO_ADMIN_EMAIL)
+docker exec -i supabase_db_web psql -U postgres -d postgres -c "SELECT au.email, au.role, o.name as organization FROM public.admin_users au LEFT JOIN public.organizations o ON au.organization_id = o.id WHERE au.email = 'TU_EMAIL_DEMO';"
 
-# Deberías ver:
-# email                    | role         | organization
-# -------------------------+--------------+--------------------------
-# demo-admin@optica-demo.cl | super_admin | Óptica Demo Global
+# Deberías ver tu email con role super_admin y organization Óptica Demo Global
 ```
 
 ## 🔧 Paso 3: Configurar Variable de Entorno
@@ -144,8 +137,7 @@ NEXT_PUBLIC_DEMO_ORG_ID=00000000-0000-0000-0000-000000000001
 
 2. **Inicia sesión:**
    - Ve a http://localhost:3000/login
-   - Email: `demo-admin@optica-demo.cl`
-   - Password: `DemoAdmin123!`
+   - Email y contraseña: los valores de `DEMO_ADMIN_EMAIL` y `DEMO_ADMIN_PASSWORD` de tu `.env.local`
 
 3. **Verifica el dashboard:**
    - Deberías ver datos en el dashboard
@@ -220,9 +212,9 @@ npm run supabase:reset
 ### No veo datos en el dashboard
 
 1. Verifica que estés logueado con el usuario demo
-2. Verifica que `organization_id` esté correctamente asignado:
+2. Verifica que `organization_id` esté correctamente asignado (reemplaza TU_EMAIL_DEMO):
    ```bash
-   docker exec -i supabase_db_web psql -U postgres -d postgres -c "SELECT email, organization_id FROM public.admin_users WHERE email = 'demo-admin@optica-demo.cl';"
+   docker exec -i supabase_db_web psql -U postgres -d postgres -c "SELECT email, organization_id FROM public.admin_users WHERE email = 'TU_EMAIL_DEMO';"
    ```
 3. Verifica que la variable `NEXT_PUBLIC_DEMO_ORG_ID` esté en `.env.local`
 4. Reinicia el servidor de desarrollo

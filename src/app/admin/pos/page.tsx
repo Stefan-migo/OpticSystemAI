@@ -343,6 +343,9 @@ export default function POSPage() {
     discount_amount: 0,
   });
 
+  // Tab activo del formulario "Crear orden completa" (para abrir Lentes al cargar presupuesto de lentes de contacto)
+  const [orderFormTab, setOrderFormTab] = useState("customer");
+
   // Tax percentage state
   const [taxPercentage, setTaxPercentage] = useState<number>(19.0);
 
@@ -367,8 +370,13 @@ export default function POSPage() {
       // This allows editing before adding to cart
       const loadQuoteFromUrl = async () => {
         try {
-          // Fetch full quote details
-          const response = await fetch(`/api/admin/quotes/${quoteId}`);
+          // Fetch full quote details (incl. branch header para acceso correcto)
+          const headers: HeadersInit = {
+            ...getBranchHeader(currentBranchId),
+          };
+          const response = await fetch(`/api/admin/quotes/${quoteId}`, {
+            headers,
+          });
           if (!response.ok) {
             throw new Error("Error al cargar el presupuesto");
           }
@@ -396,7 +404,7 @@ export default function POSPage() {
       loadQuoteFromUrl();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, currentBranchId]);
 
   // Calculate totals with tax consideration
   const itemsForTaxCalculation = cart.map((item) => ({
@@ -598,7 +606,17 @@ export default function POSPage() {
         }
       }
 
-      // Load form data from quote - ensure all values are loaded
+      // Detectar si es presupuesto de lentes de contacto para setear lensType
+      const isContactLensQuote =
+        fullQuote.lens_type === "Lentes de contacto" ||
+        !!fullQuote.contact_lens_family_id;
+
+      if (isContactLensQuote) {
+        setLensType("contact");
+        setOrderFormTab("lenses"); // Abrir tab Lentes para que se vean los datos de lentes de contacto
+      }
+
+      // Load form data from quote - ensure all values are loaded (incl. contact lens)
       const formData = {
         frame_name: fullQuote.frame_name || "",
         frame_brand: fullQuote.frame_brand || "",
@@ -622,6 +640,29 @@ export default function POSPage() {
         near_lens_family_id: fullQuote.near_lens_family_id || "",
         far_lens_cost: fullQuote.far_lens_cost || 0,
         near_lens_cost: fullQuote.near_lens_cost || 0,
+        // Contact lens fields (from quote)
+        contact_lens_family_id: fullQuote.contact_lens_family_id || "",
+        contact_lens_rx_sphere_od: fullQuote.contact_lens_rx_sphere_od ?? null,
+        contact_lens_rx_cylinder_od:
+          fullQuote.contact_lens_rx_cylinder_od ?? null,
+        contact_lens_rx_axis_od: fullQuote.contact_lens_rx_axis_od ?? null,
+        contact_lens_rx_add_od: fullQuote.contact_lens_rx_add_od ?? null,
+        contact_lens_rx_base_curve_od:
+          fullQuote.contact_lens_rx_base_curve_od ?? null,
+        contact_lens_rx_diameter_od:
+          fullQuote.contact_lens_rx_diameter_od ?? null,
+        contact_lens_rx_sphere_os: fullQuote.contact_lens_rx_sphere_os ?? null,
+        contact_lens_rx_cylinder_os:
+          fullQuote.contact_lens_rx_cylinder_os ?? null,
+        contact_lens_rx_axis_os: fullQuote.contact_lens_rx_axis_os ?? null,
+        contact_lens_rx_add_os: fullQuote.contact_lens_rx_add_os ?? null,
+        contact_lens_rx_base_curve_os:
+          fullQuote.contact_lens_rx_base_curve_os ?? null,
+        contact_lens_rx_diameter_os:
+          fullQuote.contact_lens_rx_diameter_os ?? null,
+        contact_lens_quantity: fullQuote.contact_lens_quantity ?? 1,
+        contact_lens_cost: fullQuote.contact_lens_cost ?? 0,
+        contact_lens_price: fullQuote.contact_lens_price ?? 0,
         // Second frame for two separate lenses
         near_frame_product_id: fullQuote.near_frame_product_id || "",
         near_frame_name: fullQuote.near_frame_name || "",
@@ -704,10 +745,10 @@ export default function POSPage() {
         console.log("📦 Manual frame detected (no product_id)");
       }
 
-      // Load prescription if exists
-      if (fullQuote.prescription_id) {
-        // Prescriptions should already be loaded above when setting customer
-        // Wait a bit for prescriptions to load, then set
+      // Load prescription: usar la receta embebida del presupuesto si existe; si no, buscar en prescriptions tras cargar
+      if (fullQuote.prescription) {
+        setSelectedPrescription(fullQuote.prescription);
+      } else if (fullQuote.prescription_id) {
         setTimeout(() => {
           const prescription = prescriptions.find(
             (p) => p.id === fullQuote.prescription_id,
@@ -1350,11 +1391,15 @@ export default function POSPage() {
         },
       );
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Error calculating contact lens price");
+        const message =
+          data?.error || "No se pudo calcular el precio del lente de contacto";
+        toast.error(message);
+        return;
       }
 
-      const data = await response.json();
       if (data.calculation && data.calculation.price) {
         // Calculate total price: price per box * quantity
         const quantity = orderFormData.contact_lens_quantity || 1;
@@ -2193,8 +2238,19 @@ export default function POSPage() {
               product_type: item.product_type || "frame", // Preserve product_type from quote item
             };
             addToCart(product);
+          } else if (item.type === "contact_lens") {
+            // Contact lens item
+            const contactLensProduct: Product = {
+              id: item.id,
+              name: item.name,
+              price: item.price || 0,
+              price_includes_tax: true,
+              inventory_quantity: 999,
+              sku: "CONTACT-LENS",
+            };
+            addToCart(contactLensProduct);
           } else if (item.type === "lens_complete") {
-            // Lens as custom item
+            // Optical lens as custom item
             const lensProduct: Product = {
               id: item.id,
               name: item.name,
@@ -2536,18 +2592,23 @@ export default function POSPage() {
           lensType === "contact"
             ? orderFormData.contact_lens_family_id || null
             : null,
+        // Usar receta seleccionada del cliente para lentes de contacto (no inputs manuales)
         contact_lens_rx_sphere_od:
-          lensType === "contact"
-            ? orderFormData.contact_lens_rx_sphere_od
+          lensType === "contact" && selectedPrescription
+            ? (selectedPrescription.od_sphere ?? null)
             : null,
         contact_lens_rx_cylinder_od:
-          lensType === "contact"
-            ? orderFormData.contact_lens_rx_cylinder_od
+          lensType === "contact" && selectedPrescription
+            ? (selectedPrescription.od_cylinder ?? null)
             : null,
         contact_lens_rx_axis_od:
-          lensType === "contact" ? orderFormData.contact_lens_rx_axis_od : null,
+          lensType === "contact" && selectedPrescription
+            ? (selectedPrescription.od_axis ?? null)
+            : null,
         contact_lens_rx_add_od:
-          lensType === "contact" ? orderFormData.contact_lens_rx_add_od : null,
+          lensType === "contact" && selectedPrescription
+            ? (selectedPrescription.od_add ?? null)
+            : null,
         contact_lens_rx_base_curve_od:
           lensType === "contact"
             ? orderFormData.contact_lens_rx_base_curve_od
@@ -2557,17 +2618,21 @@ export default function POSPage() {
             ? orderFormData.contact_lens_rx_diameter_od
             : null,
         contact_lens_rx_sphere_os:
-          lensType === "contact"
-            ? orderFormData.contact_lens_rx_sphere_os
+          lensType === "contact" && selectedPrescription
+            ? (selectedPrescription.os_sphere ?? null)
             : null,
         contact_lens_rx_cylinder_os:
-          lensType === "contact"
-            ? orderFormData.contact_lens_rx_cylinder_os
+          lensType === "contact" && selectedPrescription
+            ? (selectedPrescription.os_cylinder ?? null)
             : null,
         contact_lens_rx_axis_os:
-          lensType === "contact" ? orderFormData.contact_lens_rx_axis_os : null,
+          lensType === "contact" && selectedPrescription
+            ? (selectedPrescription.os_axis ?? null)
+            : null,
         contact_lens_rx_add_os:
-          lensType === "contact" ? orderFormData.contact_lens_rx_add_os : null,
+          lensType === "contact" && selectedPrescription
+            ? (selectedPrescription.os_add ?? null)
+            : null,
         contact_lens_rx_base_curve_os:
           lensType === "contact"
             ? orderFormData.contact_lens_rx_base_curve_os
@@ -3212,7 +3277,11 @@ export default function POSPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="customer" className="w-full">
+                <Tabs
+                  value={orderFormTab}
+                  onValueChange={setOrderFormTab}
+                  className="w-full"
+                >
                   <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="customer">Cliente</TabsTrigger>
                     <TabsTrigger value="frame">Marco</TabsTrigger>
@@ -3296,6 +3365,51 @@ export default function POSPage() {
                                 </SelectContent>
                               </Select>
                             )}
+                          </div>
+                        )}
+
+                        {/* Resumen de receta (mediciones) cuando hay receta seleccionada */}
+                        {selectedPrescription && (
+                          <div className="p-4 border rounded-lg bg-blue-50 text-blue-900">
+                            <p className="font-medium mb-2 text-sm">
+                              Resumen de Receta
+                            </p>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="font-semibold">OD:</span> Esf{" "}
+                                {selectedPrescription.od_sphere ?? "—"} / Cil{" "}
+                                {selectedPrescription.od_cylinder ?? "—"}
+                                {selectedPrescription.od_axis != null && (
+                                  <span>
+                                    {" "}
+                                    Eje {selectedPrescription.od_axis}°
+                                  </span>
+                                )}
+                                {selectedPrescription.od_add != null &&
+                                  selectedPrescription.od_add > 0 && (
+                                    <span className="ml-2 text-orange-600">
+                                      Add: +{selectedPrescription.od_add}
+                                    </span>
+                                  )}
+                              </div>
+                              <div>
+                                <span className="font-semibold">OS:</span> Esf{" "}
+                                {selectedPrescription.os_sphere ?? "—"} / Cil{" "}
+                                {selectedPrescription.os_cylinder ?? "—"}
+                                {selectedPrescription.os_axis != null && (
+                                  <span>
+                                    {" "}
+                                    Eje {selectedPrescription.os_axis}°
+                                  </span>
+                                )}
+                                {selectedPrescription.os_add != null &&
+                                  selectedPrescription.os_add > 0 && (
+                                    <span className="ml-2 text-orange-600">
+                                      Add: +{selectedPrescription.os_add}
+                                    </span>
+                                  )}
+                              </div>
+                            </div>
                           </div>
                         )}
 
@@ -4472,163 +4586,7 @@ export default function POSPage() {
                           </div>
                         )}
 
-                        {/* Contact Lens RX Fields */}
-                        <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                          <div>
-                            <Label className="font-medium mb-2 text-sm">
-                              Receta Ojo Derecho (OD)
-                            </Label>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                placeholder="Esfera"
-                                type="number"
-                                step="0.25"
-                                value={
-                                  orderFormData.contact_lens_rx_sphere_od || ""
-                                }
-                                onChange={(e) =>
-                                  setOrderFormData((prev) => ({
-                                    ...prev,
-                                    contact_lens_rx_sphere_od: e.target.value
-                                      ? parseFloat(e.target.value)
-                                      : null,
-                                  }))
-                                }
-                                className="h-9 text-sm"
-                              />
-                              <Input
-                                placeholder="Cilindro"
-                                type="number"
-                                step="0.25"
-                                value={
-                                  orderFormData.contact_lens_rx_cylinder_od ||
-                                  ""
-                                }
-                                onChange={(e) =>
-                                  setOrderFormData((prev) => ({
-                                    ...prev,
-                                    contact_lens_rx_cylinder_od: e.target.value
-                                      ? parseFloat(e.target.value)
-                                      : null,
-                                  }))
-                                }
-                                className="h-9 text-sm"
-                              />
-                              <Input
-                                placeholder="Eje (0-180)"
-                                type="number"
-                                min="0"
-                                max="180"
-                                value={
-                                  orderFormData.contact_lens_rx_axis_od || ""
-                                }
-                                onChange={(e) =>
-                                  setOrderFormData((prev) => ({
-                                    ...prev,
-                                    contact_lens_rx_axis_od: e.target.value
-                                      ? parseInt(e.target.value)
-                                      : null,
-                                  }))
-                                }
-                                className="h-9 text-sm"
-                              />
-                              <Input
-                                placeholder="Adición"
-                                type="number"
-                                step="0.25"
-                                value={
-                                  orderFormData.contact_lens_rx_add_od || ""
-                                }
-                                onChange={(e) =>
-                                  setOrderFormData((prev) => ({
-                                    ...prev,
-                                    contact_lens_rx_add_od: e.target.value
-                                      ? parseFloat(e.target.value)
-                                      : null,
-                                  }))
-                                }
-                                className="h-9 text-sm"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <Label className="font-medium mb-2 text-sm">
-                              Receta Ojo Izquierdo (OS)
-                            </Label>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                placeholder="Esfera"
-                                type="number"
-                                step="0.25"
-                                value={
-                                  orderFormData.contact_lens_rx_sphere_os || ""
-                                }
-                                onChange={(e) =>
-                                  setOrderFormData((prev) => ({
-                                    ...prev,
-                                    contact_lens_rx_sphere_os: e.target.value
-                                      ? parseFloat(e.target.value)
-                                      : null,
-                                  }))
-                                }
-                                className="h-9 text-sm"
-                              />
-                              <Input
-                                placeholder="Cilindro"
-                                type="number"
-                                step="0.25"
-                                value={
-                                  orderFormData.contact_lens_rx_cylinder_os ||
-                                  ""
-                                }
-                                onChange={(e) =>
-                                  setOrderFormData((prev) => ({
-                                    ...prev,
-                                    contact_lens_rx_cylinder_os: e.target.value
-                                      ? parseFloat(e.target.value)
-                                      : null,
-                                  }))
-                                }
-                                className="h-9 text-sm"
-                              />
-                              <Input
-                                placeholder="Eje (0-180)"
-                                type="number"
-                                min="0"
-                                max="180"
-                                value={
-                                  orderFormData.contact_lens_rx_axis_os || ""
-                                }
-                                onChange={(e) =>
-                                  setOrderFormData((prev) => ({
-                                    ...prev,
-                                    contact_lens_rx_axis_os: e.target.value
-                                      ? parseInt(e.target.value)
-                                      : null,
-                                  }))
-                                }
-                                className="h-9 text-sm"
-                              />
-                              <Input
-                                placeholder="Adición"
-                                type="number"
-                                step="0.25"
-                                value={
-                                  orderFormData.contact_lens_rx_add_os || ""
-                                }
-                                onChange={(e) =>
-                                  setOrderFormData((prev) => ({
-                                    ...prev,
-                                    contact_lens_rx_add_os: e.target.value
-                                      ? parseFloat(e.target.value)
-                                      : null,
-                                  }))
-                                }
-                                className="h-9 text-sm"
-                              />
-                            </div>
-                          </div>
-                        </div>
+                        {/* Las mediciones de receta para lentes de contacto se toman de la receta seleccionada del cliente (Resumen de Receta arriba). */}
                       </div>
                     ) : presbyopiaSolution !== "two_separate" &&
                       lensType === "optical" ? (
@@ -5084,16 +5042,33 @@ export default function POSPage() {
                                   </span>
                                 </div>
                               )}
-                              {orderFormData.lens_cost > 0 && (
-                                <div className="flex justify-between">
-                                  <span className="text-xs text-gray-600">
-                                    Lente:
-                                  </span>
-                                  <span className="text-xs font-medium">
-                                    {formatCurrency(orderFormData.lens_cost)}
-                                  </span>
-                                </div>
-                              )}
+                              {lensType === "contact" &&
+                                (orderFormData.contact_lens_price > 0 ||
+                                  orderFormData.contact_lens_cost > 0) && (
+                                  <div className="flex justify-between">
+                                    <span className="text-xs text-gray-600">
+                                      Lentes de Contacto:
+                                    </span>
+                                    <span className="text-xs font-medium">
+                                      {formatCurrency(
+                                        orderFormData.contact_lens_price ||
+                                          orderFormData.contact_lens_cost ||
+                                          0,
+                                      )}
+                                    </span>
+                                  </div>
+                                )}
+                              {orderFormData.lens_cost > 0 &&
+                                lensType !== "contact" && (
+                                  <div className="flex justify-between">
+                                    <span className="text-xs text-gray-600">
+                                      Lente:
+                                    </span>
+                                    <span className="text-xs font-medium">
+                                      {formatCurrency(orderFormData.lens_cost)}
+                                    </span>
+                                  </div>
+                                )}
                               {orderFormData.treatments_cost > 0 && (
                                 <div className="flex justify-between">
                                   <span className="text-xs text-gray-600">
@@ -5224,10 +5199,14 @@ export default function POSPage() {
                       type="button"
                       onClick={handleAddCompleteOrderToCart}
                       disabled={
-                        !orderFormData.lens_family_id &&
-                        orderFormData.lens_cost === 0 &&
-                        farLensCost === 0 &&
-                        nearLensCost === 0
+                        lensType === "contact"
+                          ? !orderFormData.contact_lens_family_id &&
+                            orderFormData.contact_lens_cost === 0 &&
+                            orderFormData.contact_lens_price === 0
+                          : !orderFormData.lens_family_id &&
+                            orderFormData.lens_cost === 0 &&
+                            farLensCost === 0 &&
+                            nearLensCost === 0
                       }
                       className="w-full"
                       size="sm"

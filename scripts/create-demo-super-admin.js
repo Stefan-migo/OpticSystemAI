@@ -31,8 +31,17 @@ const DEMO_ORG_ID = '00000000-0000-0000-0000-000000000001';
 const DEMO_BRANCH_ID = '00000000-0000-0000-0000-000000000002';
 
 async function createDemoSuperAdmin() {
-  const email = process.env.DEMO_ADMIN_EMAIL || 'demo-admin@optica-demo.cl';
-  const password = process.env.DEMO_ADMIN_PASSWORD || 'DemoAdmin123!';
+  const email = process.env.DEMO_ADMIN_EMAIL;
+  const password = process.env.DEMO_ADMIN_PASSWORD;
+
+  if (!email || !password) {
+    console.error('❌ Missing demo credentials. Set in .env.local or when running:');
+    console.error('   DEMO_ADMIN_EMAIL=your-demo@example.com');
+    console.error('   DEMO_ADMIN_PASSWORD=your-secure-password');
+    console.error('');
+    console.error('   Example: DEMO_ADMIN_EMAIL=demo@test.local DEMO_ADMIN_PASSWORD=DemoPass123! node scripts/create-demo-super-admin.js');
+    process.exit(1);
+  }
 
   console.log('');
   console.log('========================================');
@@ -40,7 +49,7 @@ async function createDemoSuperAdmin() {
   console.log('========================================');
   console.log('');
   console.log('Email:', email);
-  console.log('Password:', password);
+  console.log('Password:', '[configurada]');
   console.log('');
 
   try {

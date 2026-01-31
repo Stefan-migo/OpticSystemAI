@@ -532,7 +532,7 @@ export default function CashRegisterPage() {
       };
 
       // Validar que se haya ingresado el efectivo físico contado
-      if (actualCash === null || actualCash === undefined || actualCash <= 0) {
+      if (actualCash === null || actualCash === undefined || actualCash < 0) {
         toast.error("Debe ingresar el monto de efectivo físico contado");
         setClosing(false);
         return;
@@ -543,8 +543,8 @@ export default function CashRegisterPage() {
       // Validar que actual_cash sea un número válido
       const actualCashValue = Number(actualCash);
 
-      if (isNaN(actualCashValue) || actualCashValue <= 0) {
-        toast.error("El monto de efectivo físico contado debe ser mayor a 0");
+      if (isNaN(actualCashValue) || actualCashValue < 0) {
+        toast.error("El monto de efectivo físico contado debe ser 0 o mayor");
         setClosing(false);
         return;
       }

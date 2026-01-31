@@ -444,6 +444,28 @@ export async function POST(request: NextRequest) {
               );
             }
 
+            // Validar límite de clientes del tier
+            const { validateTierLimit } = await import(
+              "@/lib/saas/tier-validator"
+            );
+            const customerLimit = await validateTierLimit(
+              userOrganizationId,
+              "customers",
+            );
+            if (!customerLimit.allowed) {
+              return NextResponse.json(
+                {
+                  error:
+                    customerLimit.reason ??
+                    "Límite de clientes alcanzado para tu plan. Considera actualizar tu suscripción.",
+                  code: "TIER_LIMIT",
+                  currentCount: customerLimit.currentCount,
+                  maxAllowed: customerLimit.maxAllowed,
+                },
+                { status: 403 },
+              );
+            }
+
             // Check if customer already exists in this branch (by email, phone, or RUT)
             const existingCustomerQuery = supabase
               .from("customers")
@@ -560,6 +582,7 @@ export async function POST(request: NextRequest) {
               newCustomer.id,
               customerName,
               validatedBody.email || undefined,
+              newCustomer.branch_id ?? undefined,
             ).catch((err) => logger.error("Error creating notification", err));
 
             return NextResponse.json(

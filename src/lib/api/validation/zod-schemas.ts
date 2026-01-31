@@ -817,7 +817,7 @@ export const processSaleSchema = z
     contact_lens_rx_add_os: z.number().optional().nullable(),
     contact_lens_rx_base_curve_os: z.number().optional().nullable(),
     contact_lens_rx_diameter_os: z.number().optional().nullable(),
-    contact_lens_quantity: z.number().int().positive().default(1).optional(),
+    contact_lens_quantity: z.number().int().positive().optional().nullable(),
     contact_lens_cost: priceOptionalSchema,
     contact_lens_price: priceOptionalSchema,
     quote_id: uuidOptionalSchema, // Quote ID if sale comes from a quote
@@ -1332,9 +1332,15 @@ export const createQuoteSchema = z.object({
   contact_lens_rx_add_os: z.number().optional().nullable(),
   contact_lens_rx_base_curve_os: z.number().optional().nullable(),
   contact_lens_rx_diameter_os: z.number().optional().nullable(),
-  contact_lens_quantity: z.number().int().positive().default(1).optional(),
-  contact_lens_cost: priceNonNegativeSchema.default(0).optional(),
-  contact_lens_price: priceNonNegativeSchema.default(0).optional(),
+  contact_lens_quantity: z
+    .preprocess((v) => (v == null ? 1 : v), z.number().int().positive())
+    .optional(),
+  contact_lens_cost: z
+    .preprocess((v) => (v == null ? 0 : v), priceNonNegativeSchema)
+    .optional(),
+  contact_lens_price: z
+    .preprocess((v) => (v == null ? 0 : v), priceNonNegativeSchema)
+    .optional(),
   frame_cost: priceNonNegativeSchema.default(0).optional(),
   lens_cost: priceNonNegativeSchema.default(0).optional(),
   treatments_cost: priceNonNegativeSchema.default(0).optional(),

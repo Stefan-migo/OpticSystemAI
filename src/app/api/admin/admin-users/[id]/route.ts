@@ -31,7 +31,13 @@ export async function GET(
       data: GetAdminRoleResult | null;
       error: Error | null;
     };
-    if (adminRole !== "admin") {
+    // Verificar que el usuario tiene algún rol administrativo
+    if (
+      !adminRole ||
+      !["admin", "super_admin", "root", "dev", "employee", "vendedor"].includes(
+        adminRole,
+      )
+    ) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },
@@ -206,7 +212,13 @@ export async function PUT(
       data: GetAdminRoleResult | null;
       error: Error | null;
     };
-    if (adminRole !== "admin") {
+    // Verificar que el usuario tiene algún rol administrativo
+    if (
+      !adminRole ||
+      !["admin", "super_admin", "root", "dev", "employee", "vendedor"].includes(
+        adminRole,
+      )
+    ) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },
@@ -353,7 +365,14 @@ export async function DELETE(
       data: GetAdminRoleResult | null;
       error: Error | null;
     };
-    if (adminRole !== "admin") {
+
+    // Verificar que el usuario tiene algún rol administrativo
+    if (
+      !adminRole ||
+      !["admin", "super_admin", "root", "dev", "employee", "vendedor"].includes(
+        adminRole,
+      )
+    ) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },

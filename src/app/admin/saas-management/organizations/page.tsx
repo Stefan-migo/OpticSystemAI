@@ -54,6 +54,8 @@ import {
   MapPin,
   Loader2,
   ArrowLeft,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -115,6 +117,11 @@ export default function OrganizationsPage() {
 
   // Bulk actions
   const [selectedOrgs, setSelectedOrgs] = useState<Set<string>>(new Set());
+
+  // Delete confirmation
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [orgToDelete, setOrgToDelete] = useState<Organization | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchOrganizations();
@@ -254,6 +261,44 @@ export default function OrganizationsPage() {
       fetchOrganizations();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  const handleDeleteClick = (org: Organization) => {
+    setOrgToDelete(org);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!orgToDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgToDelete.id}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Error al eliminar organización");
+      }
+
+      toast.success(
+        `Organización "${orgToDelete.name}" eliminada completamente junto con todos sus datos relacionados`,
+      );
+      setDeleteDialogOpen(false);
+      setOrgToDelete(null);
+      fetchOrganizations();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -666,6 +711,14 @@ export default function OrganizationsPage() {
                             >
                               Cambiar a Premium
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteClick(org)}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Eliminar Organización
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -706,6 +759,96 @@ export default function OrganizationsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Confirmar Eliminación de Organización
+            </DialogTitle>
+            <DialogDescription>
+              <div className="space-y-4 mt-4">
+                <p className="font-semibold text-lg">
+                  ¿Estás seguro de que deseas eliminar la organización{" "}
+                  <span className="text-red-600">
+                    &quot;{orgToDelete?.name}&quot;
+                  </span>
+                  ?
+                </p>
+
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-red-800 dark:text-red-300 mb-2">
+                        ⚠️ Esta acción es IRREVERSIBLE
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-400 mb-3">
+                        Se eliminará <strong>PERMANENTEMENTE</strong>:
+                      </p>
+                      <ul className="text-sm text-red-700 dark:text-red-400 list-disc list-inside space-y-1">
+                        <li>La organización y todos sus datos</li>
+                        <li>
+                          Todas las sucursales (
+                          {orgToDelete?.stats?.branches || 0})
+                        </li>
+                        <li>
+                          Todos los usuarios asociados (
+                          {orgToDelete?.stats?.activeUsers || 0})
+                        </li>
+                        <li>Todas las suscripciones</li>
+                        <li>Todos los productos</li>
+                        <li>Todos los clientes</li>
+                        <li>Todas las órdenes</li>
+                        <li>Todos los presupuestos</li>
+                        <li>Todos los trabajos de laboratorio</li>
+                        <li>Todos los pagos</li>
+                        <li>Y cualquier otro dato relacionado</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Esta acción no se puede deshacer. Por favor, confirma que
+                  realmente deseas eliminar esta organización.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setOrgToDelete(null);
+              }}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Sí, Eliminar Permanentemente
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,6 +21,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   ArrowLeft,
   Building2,
@@ -34,6 +44,9 @@ import {
   Pause,
   Play,
   Crown,
+  Trash2,
+  AlertTriangle,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -109,9 +122,56 @@ export default function OrganizationDetailsPage() {
     subscription_tier: "basic",
     status: "active",
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  // Branches CRUD
+  const [branches, setBranches] = useState<Array<any>>([]);
+  const [showBranchDialog, setShowBranchDialog] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<any>(null);
+  const [branchFormData, setBranchFormData] = useState({
+    name: "",
+    code: "",
+    address_line_1: "",
+    city: "",
+    phone: "",
+    email: "",
+    is_active: true,
+  });
+
+  // Users CRUD
+  const [users, setUsers] = useState<Array<any>>([]);
+  const [showUserDialog, setShowUserDialog] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [userFormData, setUserFormData] = useState({
+    email: "",
+    password: "",
+    first_name: "",
+    last_name: "",
+    role: "admin",
+    branch_id: "",
+  });
+
+  // Subscriptions CRUD
+  const [subscriptions, setSubscriptions] = useState<Array<any>>([]);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<any>(null);
+  const [subscriptionFormData, setSubscriptionFormData] = useState({
+    status: "trialing",
+    current_period_start: "",
+    current_period_end: "",
+    stripe_subscription_id: "",
+    stripe_customer_id: "",
+  });
 
   useEffect(() => {
     fetchOrganizationDetails();
+    if (orgId) {
+      fetchBranches();
+      fetchUsers();
+      fetchSubscriptions();
+    }
   }, [orgId]);
 
   const fetchOrganizationDetails = async () => {
@@ -191,6 +251,361 @@ export default function OrganizationDetailsPage() {
       }
 
       toast.success("Acción realizada exitosamente");
+      fetchOrganizationDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    setDeleting(true);
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Error al eliminar organización");
+      }
+
+      toast.success(
+        `Organización "${organization?.name}" eliminada completamente junto con todos sus datos relacionados`,
+      );
+      router.push("/admin/saas-management/organizations");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+      setDeleting(false);
+    }
+  };
+
+  // Branches functions
+  const fetchBranches = async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}/branches`,
+      );
+      if (!response.ok) throw new Error("Error al cargar sucursales");
+      const data = await response.json();
+      setBranches(data.branches || []);
+    } catch (err) {
+      toast.error("Error al cargar sucursales");
+    }
+  };
+
+  const handleCreateBranch = async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}/branches`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(branchFormData),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Error al crear sucursal");
+
+      toast.success("Sucursal creada exitosamente");
+      setShowBranchDialog(false);
+      setBranchFormData({
+        name: "",
+        code: "",
+        address_line_1: "",
+        city: "",
+        phone: "",
+        email: "",
+        is_active: true,
+      });
+      fetchBranches();
+      fetchOrganizationDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  const handleUpdateBranch = async () => {
+    if (!editingBranch) return;
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}/branches/${editingBranch.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(branchFormData),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Error al actualizar sucursal");
+
+      toast.success("Sucursal actualizada exitosamente");
+      setShowBranchDialog(false);
+      setEditingBranch(null);
+      setBranchFormData({
+        name: "",
+        code: "",
+        address_line_1: "",
+        city: "",
+        phone: "",
+        email: "",
+        is_active: true,
+      });
+      fetchBranches();
+      fetchOrganizationDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  const handleDeleteBranch = async (branchId: string) => {
+    if (
+      !confirm(
+        "¿Estás seguro de eliminar esta sucursal? Esta acción eliminará todos los datos relacionados.",
+      )
+    )
+      return;
+
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}/branches/${branchId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Error al eliminar sucursal");
+
+      toast.success("Sucursal eliminada exitosamente");
+      fetchBranches();
+      fetchOrganizationDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  // Users functions
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}/users`,
+      );
+      if (!response.ok) throw new Error("Error al cargar usuarios");
+      const data = await response.json();
+      setUsers(data.users || []);
+    } catch (err) {
+      toast.error("Error al cargar usuarios");
+    }
+  };
+
+  const handleCreateUser = async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}/users`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(userFormData),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Error al crear usuario");
+
+      toast.success("Usuario creado exitosamente");
+      setShowUserDialog(false);
+      setUserFormData({
+        email: "",
+        password: "",
+        first_name: "",
+        last_name: "",
+        role: "admin",
+        branch_id: "",
+      });
+      fetchUsers();
+      fetchOrganizationDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/users/${editingUser.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: userFormData.role,
+            is_active: editingUser.is_active,
+          }),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Error al actualizar usuario");
+
+      toast.success("Usuario actualizado exitosamente");
+      setShowUserDialog(false);
+      setEditingUser(null);
+      setUserFormData({
+        email: "",
+        password: "",
+        first_name: "",
+        last_name: "",
+        role: "admin",
+        branch_id: "",
+      });
+      fetchUsers();
+      fetchOrganizationDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (
+      !confirm(
+        "¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.",
+      )
+    )
+      return;
+
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/users/${userId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Error al eliminar usuario");
+
+      toast.success("Usuario eliminado exitosamente");
+      fetchUsers();
+      fetchOrganizationDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  // Subscriptions functions
+  const fetchSubscriptions = async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}/subscriptions`,
+      );
+      if (!response.ok) throw new Error("Error al cargar suscripciones");
+      const data = await response.json();
+      setSubscriptions(data.subscriptions || []);
+    } catch (err) {
+      toast.error("Error al cargar suscripciones");
+    }
+  };
+
+  const handleCreateSubscription = async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}/subscriptions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(subscriptionFormData),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Error al crear suscripción");
+
+      toast.success("Suscripción creada exitosamente");
+      setShowSubscriptionDialog(false);
+      setSubscriptionFormData({
+        status: "trialing",
+        current_period_start: "",
+        current_period_end: "",
+        stripe_subscription_id: "",
+        stripe_customer_id: "",
+      });
+      fetchSubscriptions();
+      fetchOrganizationDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  const handleUpdateSubscription = async () => {
+    if (!editingSubscription) return;
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/subscriptions/${editingSubscription.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(subscriptionFormData),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Error al actualizar suscripción");
+
+      toast.success("Suscripción actualizada exitosamente");
+      setShowSubscriptionDialog(false);
+      setEditingSubscription(null);
+      setSubscriptionFormData({
+        status: "trialing",
+        current_period_start: "",
+        current_period_end: "",
+        stripe_subscription_id: "",
+        stripe_customer_id: "",
+      });
+      fetchSubscriptions();
+      fetchOrganizationDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  const handleDeleteSubscription = async (subscriptionId: string) => {
+    if (!confirm("¿Estás seguro de eliminar esta suscripción?")) return;
+
+    try {
+      const response = await fetch(
+        `/api/admin/saas-management/subscriptions/${subscriptionId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Error al eliminar suscripción");
+
+      toast.success("Suscripción eliminada exitosamente");
+      fetchSubscriptions();
       fetchOrganizationDetails();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error desconocido");
@@ -310,6 +725,13 @@ export default function OrganizationDetailsPage() {
             <Edit className="h-4 w-4 mr-2" />
             Editar
           </Button>
+          <Button
+            variant="destructive"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Eliminar
+          </Button>
         </div>
       </div>
 
@@ -387,138 +809,830 @@ export default function OrganizationDetailsPage() {
         </Card>
       </div>
 
-      {/* Información detallada */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Información general */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Información General</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-gray-500">
-                Nombre
-              </label>
-              <p className="text-base">{organization.name}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Slug</label>
-              <p className="text-base">{organization.slug}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Owner</label>
-              {organization.owner ? (
-                <div>
-                  <p className="text-base">
-                    {organization.owner.first_name}{" "}
-                    {organization.owner.last_name}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {organization.owner.email}
-                  </p>
-                  {organization.owner.phone && (
-                    <p className="text-sm text-gray-500">
-                      {organization.owner.phone}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-base text-gray-400">Sin owner asignado</p>
-              )}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">
-                Creada
-              </label>
-              <p className="text-base">{formatDate(organization.created_at)}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">
-                Última actualización
-              </label>
-              <p className="text-base">{formatDate(organization.updated_at)}</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Tabs para gestión detallada */}
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">
+            <Building2 className="h-4 w-4 mr-2" />
+            Resumen
+          </TabsTrigger>
+          <TabsTrigger value="branches">
+            <MapPin className="h-4 w-4 mr-2" />
+            Sucursales ({branches.length})
+          </TabsTrigger>
+          <TabsTrigger value="users">
+            <Users className="h-4 w-4 mr-2" />
+            Usuarios ({users.length})
+          </TabsTrigger>
+          <TabsTrigger value="subscriptions">
+            <Crown className="h-4 w-4 mr-2" />
+            Suscripciones ({subscriptions.length})
+          </TabsTrigger>
+        </TabsList>
 
-        {/* Sucursales */}
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Sucursales ({organization.branches?.length || 0})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {organization.branches && organization.branches.length > 0 ? (
-              <div className="space-y-2">
-                {organization.branches.map((branch) => (
-                  <div
-                    key={branch.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
+        {/* Tab: Resumen */}
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Información general */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Información General</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">
+                    Nombre
+                  </label>
+                  <p className="text-base">{organization.name}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">
+                    Slug
+                  </label>
+                  <p className="text-base">{organization.slug}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">
+                    Owner
+                  </label>
+                  {organization.owner ? (
                     <div>
-                      <p className="font-medium">{branch.name}</p>
-                      <p className="text-sm text-gray-500">{branch.code}</p>
-                      {branch.address_line_1 && (
+                      <p className="text-base">
+                        {organization.owner.first_name}{" "}
+                        {organization.owner.last_name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {organization.owner.email}
+                      </p>
+                      {organization.owner.phone && (
                         <p className="text-sm text-gray-500">
-                          {branch.address_line_1}, {branch.city}
+                          {organization.owner.phone}
                         </p>
                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-center py-4">
-                No hay sucursales registradas
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Usuarios recientes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Usuarios Recientes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {organization.recentUsers && organization.recentUsers.length > 0 ? (
-            <div className="space-y-2">
-              {organization.recentUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {user.profiles?.first_name} {user.profiles?.last_name}
+                  ) : (
+                    <p className="text-base text-gray-400">
+                      Sin owner asignado
                     </p>
-                    <p className="text-sm text-gray-500">{user.email}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline">{user.role}</Badge>
-                      {user.is_active ? (
-                        <Badge variant="default">Activo</Badge>
-                      ) : (
-                        <Badge variant="secondary">Inactivo</Badge>
-                      )}
-                    </div>
-                  </div>
-                  {user.last_login && (
-                    <div className="text-sm text-gray-500">
-                      Último acceso: {formatDate(user.last_login)}
-                    </div>
                   )}
                 </div>
-              ))}
+                <div>
+                  <label className="text-sm font-medium text-gray-500">
+                    Creada
+                  </label>
+                  <p className="text-base">
+                    {formatDate(organization.created_at)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">
+                    Última actualización
+                  </label>
+                  <p className="text-base">
+                    {formatDate(organization.updated_at)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Usuarios recientes */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Usuarios Recientes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {organization.recentUsers &&
+                organization.recentUsers.length > 0 ? (
+                  <div className="space-y-2">
+                    {organization.recentUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {user.profiles?.first_name}{" "}
+                            {user.profiles?.last_name}
+                          </p>
+                          <p className="text-sm text-gray-500">{user.email}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline">{user.role}</Badge>
+                            {user.is_active ? (
+                              <Badge variant="default">Activo</Badge>
+                            ) : (
+                              <Badge variant="secondary">Inactivo</Badge>
+                            )}
+                          </div>
+                        </div>
+                        {user.last_login && (
+                          <div className="text-sm text-gray-500">
+                            Último acceso: {formatDate(user.last_login)}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">
+                    No hay usuarios registrados
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Tab: Sucursales */}
+        <TabsContent value="branches" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Sucursales</CardTitle>
+              <Button
+                onClick={() => {
+                  setEditingBranch(null);
+                  setBranchFormData({
+                    name: "",
+                    code: "",
+                    address_line_1: "",
+                    city: "",
+                    phone: "",
+                    email: "",
+                    is_active: true,
+                  });
+                  setShowBranchDialog(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Sucursal
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {branches.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">
+                  No hay sucursales registradas
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Dirección</TableHead>
+                      <TableHead>Teléfono</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {branches.map((branch) => (
+                      <TableRow key={branch.id}>
+                        <TableCell className="font-medium">
+                          {branch.name}
+                        </TableCell>
+                        <TableCell>{branch.code}</TableCell>
+                        <TableCell>
+                          {branch.address_line_1 && branch.city
+                            ? `${branch.address_line_1}, ${branch.city}`
+                            : "-"}
+                        </TableCell>
+                        <TableCell>{branch.phone || "-"}</TableCell>
+                        <TableCell>
+                          {branch.is_active ? (
+                            <Badge variant="default">Activa</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactiva</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingBranch(branch);
+                                setBranchFormData({
+                                  name: branch.name,
+                                  code: branch.code,
+                                  address_line_1: branch.address_line_1 || "",
+                                  city: branch.city || "",
+                                  phone: branch.phone || "",
+                                  email: branch.email || "",
+                                  is_active: branch.is_active,
+                                });
+                                setShowBranchDialog(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteBranch(branch.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Usuarios */}
+        <TabsContent value="users" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Usuarios</CardTitle>
+              <Button
+                onClick={() => {
+                  setEditingUser(null);
+                  setUserFormData({
+                    email: "",
+                    password: "",
+                    first_name: "",
+                    last_name: "",
+                    role: "admin",
+                    branch_id: "",
+                  });
+                  setShowUserDialog(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Usuario
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {users.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">
+                  No hay usuarios registrados
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          {user.profiles?.first_name} {user.profiles?.last_name}
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{user.role}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.is_active ? (
+                            <Badge variant="default">Activo</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactivo</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingUser(user);
+                                setUserFormData({
+                                  email: user.email,
+                                  password: "",
+                                  first_name: user.profiles?.first_name || "",
+                                  last_name: user.profiles?.last_name || "",
+                                  role: user.role,
+                                  branch_id: "",
+                                });
+                                setShowUserDialog(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteUser(user.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Suscripciones */}
+        <TabsContent value="subscriptions" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Suscripciones</CardTitle>
+              <Button
+                onClick={() => {
+                  setEditingSubscription(null);
+                  setSubscriptionFormData({
+                    status: "trialing",
+                    current_period_start: "",
+                    current_period_end: "",
+                    stripe_subscription_id: "",
+                    stripe_customer_id: "",
+                  });
+                  setShowSubscriptionDialog(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Suscripción
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {subscriptions.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">
+                  No hay suscripciones registradas
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Período Inicio</TableHead>
+                      <TableHead>Período Fin</TableHead>
+                      <TableHead>Stripe Subscription ID</TableHead>
+                      <TableHead>Creada</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {subscriptions.map((sub) => (
+                      <TableRow key={sub.id}>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              sub.status === "active"
+                                ? "default"
+                                : sub.status === "cancelled"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                          >
+                            {sub.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {sub.current_period_start
+                            ? formatDate(sub.current_period_start)
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {sub.current_period_end
+                            ? formatDate(sub.current_period_end)
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {sub.stripe_subscription_id || "-"}
+                        </TableCell>
+                        <TableCell>{formatDate(sub.created_at)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingSubscription(sub);
+                                setSubscriptionFormData({
+                                  status: sub.status,
+                                  current_period_start:
+                                    sub.current_period_start || "",
+                                  current_period_end:
+                                    sub.current_period_end || "",
+                                  stripe_subscription_id:
+                                    sub.stripe_subscription_id || "",
+                                  stripe_customer_id:
+                                    sub.stripe_customer_id || "",
+                                });
+                                setShowSubscriptionDialog(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteSubscription(sub.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialog de creación/edición de sucursal */}
+      <Dialog open={showBranchDialog} onOpenChange={setShowBranchDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingBranch ? "Editar Sucursal" : "Nueva Sucursal"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingBranch
+                ? "Modifica los datos de la sucursal"
+                : "Completa los datos para crear una nueva sucursal"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Nombre *</label>
+                <Input
+                  value={branchFormData.name}
+                  onChange={(e) =>
+                    setBranchFormData({
+                      ...branchFormData,
+                      name: e.target.value,
+                    })
+                  }
+                  placeholder="Ej: Sucursal Centro"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Código</label>
+                <Input
+                  value={branchFormData.code}
+                  onChange={(e) =>
+                    setBranchFormData({
+                      ...branchFormData,
+                      code: e.target.value,
+                    })
+                  }
+                  placeholder="Se genera automáticamente si se deja vacío"
+                />
+              </div>
             </div>
-          ) : (
-            <p className="text-gray-500 text-center py-4">
-              No hay usuarios registrados
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            <div>
+              <label className="text-sm font-medium">Dirección</label>
+              <Input
+                value={branchFormData.address_line_1}
+                onChange={(e) =>
+                  setBranchFormData({
+                    ...branchFormData,
+                    address_line_1: e.target.value,
+                  })
+                }
+                placeholder="Dirección línea 1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Ciudad</label>
+              <Input
+                value={branchFormData.city}
+                onChange={(e) =>
+                  setBranchFormData({ ...branchFormData, city: e.target.value })
+                }
+                placeholder="Ciudad"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Teléfono</label>
+                <Input
+                  value={branchFormData.phone}
+                  onChange={(e) =>
+                    setBranchFormData({
+                      ...branchFormData,
+                      phone: e.target.value,
+                    })
+                  }
+                  placeholder="Teléfono"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Email</label>
+                <Input
+                  type="email"
+                  value={branchFormData.email}
+                  onChange={(e) =>
+                    setBranchFormData({
+                      ...branchFormData,
+                      email: e.target.value,
+                    })
+                  }
+                  placeholder="Email"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="branch-active"
+                checked={branchFormData.is_active}
+                onChange={(e) =>
+                  setBranchFormData({
+                    ...branchFormData,
+                    is_active: e.target.checked,
+                  })
+                }
+                className="rounded"
+              />
+              <label htmlFor="branch-active" className="text-sm font-medium">
+                Sucursal activa
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBranchDialog(false);
+                setEditingBranch(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={editingBranch ? handleUpdateBranch : handleCreateBranch}
+            >
+              {editingBranch ? "Guardar Cambios" : "Crear Sucursal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de creación/edición de usuario */}
+      <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingUser ? "Editar Usuario" : "Nuevo Usuario"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingUser
+                ? "Modifica los datos del usuario"
+                : "Completa los datos para crear un nuevo usuario"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Nombre</label>
+                <Input
+                  value={userFormData.first_name}
+                  onChange={(e) =>
+                    setUserFormData({
+                      ...userFormData,
+                      first_name: e.target.value,
+                    })
+                  }
+                  placeholder="Nombre"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Apellido</label>
+                <Input
+                  value={userFormData.last_name}
+                  onChange={(e) =>
+                    setUserFormData({
+                      ...userFormData,
+                      last_name: e.target.value,
+                    })
+                  }
+                  placeholder="Apellido"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Email *</label>
+              <Input
+                type="email"
+                value={userFormData.email}
+                onChange={(e) =>
+                  setUserFormData({ ...userFormData, email: e.target.value })
+                }
+                placeholder="email@ejemplo.com"
+                disabled={!!editingUser}
+              />
+            </div>
+            {!editingUser && (
+              <div>
+                <label className="text-sm font-medium">Contraseña *</label>
+                <Input
+                  type="password"
+                  value={userFormData.password}
+                  onChange={(e) =>
+                    setUserFormData({
+                      ...userFormData,
+                      password: e.target.value,
+                    })
+                  }
+                  placeholder="Mínimo 8 caracteres"
+                />
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium">Rol</label>
+              <Select
+                value={userFormData.role}
+                onValueChange={(value) =>
+                  setUserFormData({ ...userFormData, role: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="employee">Empleado</SelectItem>
+                  <SelectItem value="vendedor">Vendedor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {!editingUser && (
+              <div>
+                <label className="text-sm font-medium">
+                  Sucursal (Opcional)
+                </label>
+                <Select
+                  value={userFormData.branch_id}
+                  onValueChange={(value) =>
+                    setUserFormData({ ...userFormData, branch_id: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar sucursal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin sucursal específica</SelectItem>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name} ({branch.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUserDialog(false);
+                setEditingUser(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={editingUser ? handleUpdateUser : handleCreateUser}>
+              {editingUser ? "Guardar Cambios" : "Crear Usuario"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de creación/edición de suscripción */}
+      <Dialog
+        open={showSubscriptionDialog}
+        onOpenChange={setShowSubscriptionDialog}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingSubscription ? "Editar Suscripción" : "Nueva Suscripción"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingSubscription
+                ? "Modifica los datos de la suscripción"
+                : "Completa los datos para crear una nueva suscripción"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Estado</label>
+              <Select
+                value={subscriptionFormData.status}
+                onValueChange={(value) =>
+                  setSubscriptionFormData({
+                    ...subscriptionFormData,
+                    status: value,
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Activa</SelectItem>
+                  <SelectItem value="trialing">En Prueba</SelectItem>
+                  <SelectItem value="past_due">Vencida</SelectItem>
+                  <SelectItem value="cancelled">Cancelada</SelectItem>
+                  <SelectItem value="incomplete">Incompleta</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Período Inicio</label>
+                <Input
+                  type="date"
+                  value={subscriptionFormData.current_period_start}
+                  onChange={(e) =>
+                    setSubscriptionFormData({
+                      ...subscriptionFormData,
+                      current_period_start: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Período Fin</label>
+                <Input
+                  type="date"
+                  value={subscriptionFormData.current_period_end}
+                  onChange={(e) =>
+                    setSubscriptionFormData({
+                      ...subscriptionFormData,
+                      current_period_end: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">
+                Stripe Subscription ID
+              </label>
+              <Input
+                value={subscriptionFormData.stripe_subscription_id}
+                onChange={(e) =>
+                  setSubscriptionFormData({
+                    ...subscriptionFormData,
+                    stripe_subscription_id: e.target.value,
+                  })
+                }
+                placeholder="sub_xxxxx"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Stripe Customer ID</label>
+              <Input
+                value={subscriptionFormData.stripe_customer_id}
+                onChange={(e) =>
+                  setSubscriptionFormData({
+                    ...subscriptionFormData,
+                    stripe_customer_id: e.target.value,
+                  })
+                }
+                placeholder="cus_xxxxx"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSubscriptionDialog(false);
+                setEditingSubscription(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={
+                editingSubscription
+                  ? handleUpdateSubscription
+                  : handleCreateSubscription
+              }
+            >
+              {editingSubscription ? "Guardar Cambios" : "Crear Suscripción"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de edición */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
@@ -604,6 +1718,98 @@ export default function OrganizationDetailsPage() {
                 </>
               ) : (
                 "Guardar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Confirmar Eliminación de Organización
+            </DialogTitle>
+            <DialogDescription>
+              <div className="space-y-4 mt-4">
+                <p className="font-semibold text-lg">
+                  ¿Estás seguro de que deseas eliminar la organización{" "}
+                  <span className="text-red-600">
+                    &quot;{organization?.name}&quot;
+                  </span>
+                  ?
+                </p>
+
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-red-800 dark:text-red-300 mb-2">
+                        ⚠️ Esta acción es IRREVERSIBLE
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-400 mb-3">
+                        Se eliminará <strong>PERMANENTEMENTE</strong>:
+                      </p>
+                      <ul className="text-sm text-red-700 dark:text-red-400 list-disc list-inside space-y-1">
+                        <li>La organización y todos sus datos</li>
+                        <li>
+                          Todas las sucursales (
+                          {organization?.stats?.branches || 0})
+                        </li>
+                        <li>
+                          Todos los usuarios asociados (
+                          {organization?.stats?.activeUsers || 0})
+                        </li>
+                        <li>Todas las suscripciones</li>
+                        <li>
+                          Todos los productos (
+                          {organization?.stats?.products || 0})
+                        </li>
+                        <li>Todos los clientes</li>
+                        <li>
+                          Todas las órdenes ({organization?.stats?.orders || 0})
+                        </li>
+                        <li>Todos los presupuestos</li>
+                        <li>Todos los trabajos de laboratorio</li>
+                        <li>Todos los pagos</li>
+                        <li>Y cualquier otro dato relacionado</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Esta acción no se puede deshacer. Por favor, confirma que
+                  realmente deseas eliminar esta organización.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Sí, Eliminar Permanentemente
+                </>
               )}
             </Button>
           </DialogFooter>

@@ -12,6 +12,11 @@ import {
 } from "lucide-react";
 import { InsightCard } from "./InsightCard";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type {
@@ -24,8 +29,7 @@ interface SmartContextWidgetProps {
 }
 
 export function SmartContextWidget({ section }: SmartContextWidgetProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const queryClient = useQueryClient();
 
@@ -138,189 +142,171 @@ export function SmartContextWidget({ section }: SmartContextWidgetProps) {
     }
   };
 
-  // Loading state - compact
-  if (isLoading) {
-    return (
-      <div className="fixed top-4 right-4 z-40 w-80 max-w-[calc(100vw-2rem)]">
-        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-3 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-blue-600 animate-pulse" />
-          <span className="text-xs text-gray-600">Cargando insights...</span>
-        </div>
-      </div>
-    );
-  }
+  // Sort insights by priority (highest first)
+  const sortedInsights = [...insights].sort((a, b) => b.priority - a.priority);
 
-  // Error state - silently fail, don't show error UI
+  // Don't show anything if there's an error
   if (error) {
     return null;
   }
 
-  // Show generate button if no insights
-  if (!insights || insights.length === 0) {
-    return (
-      <div className="fixed top-4 right-4 z-40 w-80 max-w-[calc(100vw-2rem)]">
-        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <span className="text-xs text-gray-600">No hay insights aún</span>
-            </div>
-            <Button
-              onClick={regenerateInsights}
-              disabled={isRegenerating}
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-            >
-              {isRegenerating ? (
-                <>
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3 h-3 mr-1" />
-                  Generar
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Button with badge showing insight count
+  const hasInsights = insights && insights.length > 0;
+  const badgeCount = insights.length;
 
-  // Sort insights by priority (highest first)
-  const sortedInsights = [...insights].sort((a, b) => b.priority - a.priority);
-  const topInsight = sortedInsights[0];
-  const remainingInsights = sortedInsights.slice(1);
-
-  // If minimized, show only a small badge
-  if (isMinimized && topInsight) {
-    return (
-      <div className="fixed top-4 right-4 z-40">
-        <Button
-          onClick={() => setIsMinimized(false)}
-          variant="outline"
-          size="sm"
-          className="shadow-lg bg-white hover:bg-gray-50 border-2 border-blue-200"
-        >
-          <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
-          <span className="text-xs font-medium text-gray-700">
-            {insights.length} insight{insights.length !== 1 ? "s" : ""}
-          </span>
-        </Button>
-      </div>
-    );
-  }
-
-  // Render floating widget with insights
   return (
-    <div className="fixed top-4 right-4 z-40 w-80 max-w-[calc(100vw-2rem)]">
-      <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            <span className="text-sm font-semibold text-gray-800">
-              Insights Inteligentes
+    <div className="fixed top-20 right-4 z-40">
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "shadow-lg bg-white hover:bg-gray-50 border-2 transition-all",
+              hasInsights
+                ? "border-blue-300 hover:border-blue-400"
+                : "border-gray-200 hover:border-gray-300",
+              isLoading && "opacity-50 cursor-not-allowed",
+            )}
+            disabled={isLoading}
+          >
+            <Sparkles
+              className={cn(
+                "w-4 h-4 mr-2",
+                hasInsights ? "text-blue-600" : "text-gray-500",
+                isLoading && "animate-pulse",
+              )}
+            />
+            <span className="text-xs font-medium text-gray-700">
+              {isLoading
+                ? "Cargando..."
+                : hasInsights
+                  ? `Insights (${badgeCount})`
+                  : "Insights"}
             </span>
-            {insights.length > 0 && (
-              <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">
-                {insights.length}
+            {hasInsights && (
+              <span className="ml-2 text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">
+                {badgeCount}
               </span>
             )}
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0"
-              onClick={regenerateInsights}
-              disabled={isRegenerating}
-              title="Regenerar insights"
-            >
-              <RefreshCw
-                className={cn(
-                  "w-3.5 h-3.5 text-gray-600",
-                  isRegenerating && "animate-spin",
-                )}
-              />
-            </Button>
-            {isExpanded && remainingInsights.length > 0 && (
+            {isOpen ? (
+              <ChevronUp className="w-4 h-4 ml-2 text-gray-500" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-2 text-gray-500" />
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="w-96 max-w-[calc(100vw-2rem)] p-0"
+          align="end"
+          side="bottom"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-semibold text-gray-800">
+                Insights Inteligentes
+              </span>
+              {hasInsights && (
+                <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">
+                  {badgeCount}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0"
-                onClick={() => setIsExpanded(!isExpanded)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  regenerateInsights();
+                }}
+                disabled={isRegenerating}
+                title="Regenerar insights"
               >
-                {isExpanded ? (
-                  <ChevronUp className="w-4 h-4 text-gray-600" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                )}
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0"
-              onClick={() => setIsMinimized(true)}
-            >
-              <X className="w-4 h-4 text-gray-600" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="max-h-[600px] overflow-y-auto">
-          {topInsight && (
-            <div className="p-3 border-b border-gray-100 last:border-b-0">
-              <InsightCard
-                insight={topInsight}
-                onDismiss={() => dismissInsight.mutate(topInsight.id)}
-                onFeedback={(score) =>
-                  sendFeedback.mutate({ insightId: topInsight.id, score })
-                }
-                compact={true}
-              />
-            </div>
-          )}
-
-          {/* Remaining insights (collapsible) */}
-          {isExpanded &&
-            remainingInsights.map((insight) => (
-              <div
-                key={insight.id}
-                className="p-3 border-b border-gray-100 last:border-b-0"
-              >
-                <InsightCard
-                  insight={insight}
-                  onDismiss={() => dismissInsight.mutate(insight.id)}
-                  onFeedback={(score) =>
-                    sendFeedback.mutate({ insightId: insight.id, score })
-                  }
-                  compact={true}
+                <RefreshCw
+                  className={cn(
+                    "w-3.5 h-3.5 text-gray-600",
+                    isRegenerating && "animate-spin",
+                  )}
                 />
-              </div>
-            ))}
-        </div>
-
-        {/* Footer hint */}
-        {remainingInsights.length > 0 && !isExpanded && (
-          <div className="p-2 bg-gray-50 border-t border-gray-200 text-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs text-gray-600 h-6"
-              onClick={() => setIsExpanded(true)}
-            >
-              Ver {remainingInsights.length} más
-              <ChevronDown className="w-3 h-3 ml-1" />
-            </Button>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }}
+              >
+                <X className="w-4 h-4 text-gray-600" />
+              </Button>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Content */}
+          <div className="max-h-[600px] overflow-y-auto">
+            {isLoading ? (
+              <div className="p-6 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                <span className="text-sm text-gray-600">
+                  Cargando insights...
+                </span>
+              </div>
+            ) : !hasInsights ? (
+              <div className="p-6 flex flex-col items-center justify-center gap-3">
+                <Sparkles className="w-8 h-8 text-gray-400" />
+                <p className="text-sm text-gray-600 text-center">
+                  No hay insights disponibles aún
+                </p>
+                <Button
+                  onClick={regenerateInsights}
+                  disabled={isRegenerating}
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                >
+                  {isRegenerating ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                      Generando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3 mr-2" />
+                      Generar Insights
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <>
+                {sortedInsights.map((insight, index) => (
+                  <div
+                    key={insight.id}
+                    className={cn(
+                      "p-3 border-b border-gray-100 last:border-b-0",
+                      index === 0 && "bg-blue-50/50",
+                    )}
+                  >
+                    <InsightCard
+                      insight={insight}
+                      onDismiss={() => dismissInsight.mutate(insight.id)}
+                      onFeedback={(score) =>
+                        sendFeedback.mutate({ insightId: insight.id, score })
+                      }
+                      compact={true}
+                    />
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

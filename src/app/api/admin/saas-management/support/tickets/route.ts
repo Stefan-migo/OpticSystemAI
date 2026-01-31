@@ -12,12 +12,38 @@ import { parseAndValidateBody } from "@/lib/api/validation/zod-helpers";
 
 /**
  * GET /api/admin/saas-management/support/tickets
- * Listar tickets de soporte SaaS con filtros (solo root/dev)
+ * Listar tickets de soporte SaaS con filtros
+ * - Root/dev: puede ver todos los tickets
+ * - Organizaciones: solo pueden ver sus propios tickets
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireRoot(request);
+    const supabase = await createClient();
     const supabaseServiceRole = createServiceRoleClient();
+
+    // Obtener usuario autenticado
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Verificar si es root/dev o pertenece a una organización
+    const { data: adminUser, error: adminError } = await supabaseServiceRole
+      .from("admin_users")
+      .select("id, role, organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (adminError || !adminUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const isRoot = adminUser.role === "root" || adminUser.role === "dev";
+    const userOrganizationId = adminUser.organization_id;
 
     const { searchParams } = new URL(request.url);
 
@@ -44,7 +70,17 @@ export async function GET(request: NextRequest) {
       .order(filters.sort_by, { ascending: filters.sort_order === "asc" });
 
     // Aplicar filtros
-    if (filters.organization_id) {
+    // Si no es root, solo puede ver tickets de su organización
+    if (!isRoot) {
+      if (!userOrganizationId) {
+        return NextResponse.json(
+          { error: "No organization assigned" },
+          { status: 403 },
+        );
+      }
+      query = query.eq("organization_id", userOrganizationId);
+    } else if (filters.organization_id) {
+      // Root puede filtrar por organización específica
       query = query.eq("organization_id", filters.organization_id);
     }
 

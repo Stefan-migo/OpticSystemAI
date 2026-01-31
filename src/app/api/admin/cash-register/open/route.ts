@@ -58,18 +58,15 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const validatedData = openCashRegisterSchema.parse(body);
 
-        // Check if there's already an open session for today and this branch
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayStart = today.toISOString();
-
+        // Check if there's already an open session for this branch
         const { data: existingSession, error: checkError } =
           await supabaseServiceRole
             .from("pos_sessions")
             .select("id, status, opening_time")
             .eq("branch_id", branchContext.branchId!)
             .eq("status", "open")
-            .gte("opening_time", todayStart)
+            .order("opening_time", { ascending: false })
+            .limit(1)
             .maybeSingle();
 
         if (checkError && checkError.code !== "PGRST116") {
@@ -83,8 +80,35 @@ export async function POST(request: NextRequest) {
         if (existingSession) {
           return NextResponse.json(
             {
-              error: "Ya existe una caja abierta para hoy en esta sucursal",
+              error: "Ya existe una caja abierta para esta sucursal",
               session: existingSession,
+            },
+            { status: 400 },
+          );
+        }
+
+        const todayStr = new Date().toISOString().split("T")[0];
+        const { data: existingClosure, error: closureError } =
+          await supabaseServiceRole
+            .from("cash_register_closures")
+            .select("id, status")
+            .eq("branch_id", branchContext.branchId!)
+            .eq("closure_date", todayStr)
+            .maybeSingle();
+
+        if (closureError && closureError.code !== "PGRST116") {
+          logger.error("Error checking existing closure", closureError);
+          return NextResponse.json(
+            { error: "Error al verificar cierres existentes" },
+            { status: 500 },
+          );
+        }
+
+        if (existingClosure?.status === "closed") {
+          return NextResponse.json(
+            {
+              error:
+                "La caja ya fue cerrada hoy. Debe reabrirla para continuar.",
             },
             { status: 400 },
           );
@@ -188,18 +212,15 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        // Check if there's an open session for today
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayStart = today.toISOString();
-
+        // Check if there's an open session for this branch
         const { data: openSession, error: sessionError } =
           await supabaseServiceRole
             .from("pos_sessions")
             .select("id, status, opening_time, opening_cash_amount, branch_id")
             .eq("branch_id", branchContext.branchId!)
             .eq("status", "open")
-            .gte("opening_time", todayStart)
+            .order("opening_time", { ascending: false })
+            .limit(1)
             .maybeSingle();
 
         if (sessionError && sessionError.code !== "PGRST116") {

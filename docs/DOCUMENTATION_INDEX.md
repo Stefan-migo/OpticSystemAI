@@ -228,6 +228,19 @@ Resumen completo de la implementación del sistema de soporte SaaS
 
 ---
 
+### 6j. **Gestión SaaS Opttius** ✅ ACTUALIZADO (2026-01-30)
+
+Documentos del plan e implementación del panel root/dev:
+
+- **PLAN_GESTION_SAAS_OPTTIUS.md** – Plan completo, roles, fases y **sección 10: Implementación completada y correcciones post-implementación** (estado de rutas, APIs simplificadas, páginas de detalle, UI).
+- **RESUMEN_EJECUTIVO_CORRECCIONES.md** – Resumen de problemas/soluciones y **Implementación completada y correcciones (30-Ene-2026)**.
+- **ESTADO_ACTUAL_PROYECTO.md** – Estado general del proyecto; incluye **Gestión SaaS (root/dev)** como completada y notas de correcciones.
+- **IMPLEMENTACION_DETALLES_TECNICOS.md** – Detalles técnicos de implementación y **sección 9: Notas post-implementación** (APIs sin relaciones complejas, páginas de detalle, UI, referencias).
+
+👉 **Usar cuando:** Necesitas el estado actual de la Gestión SaaS, qué se corrigió tras la implementación o referencias técnicas para mantener/ampliar el panel root/dev
+
+---
+
 ### 7. **Cómo ejecutar tests**
 
 **Estructura:** `src/__tests__/unit/` (unitarios), `src/__tests__/integration/api/` (integración).
@@ -269,7 +282,7 @@ npm run test:run -- src/__tests__/integration/api/orders.test.ts
 
 ---
 
-## 📊 Estado Actual (2026-01-29)
+## 📊 Estado Actual (2026-01-30)
 
 ```
 ✅ Completadas (Fases 0-5 + SaaS 0):  20 de 29 tareas

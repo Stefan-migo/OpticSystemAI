@@ -3,11 +3,12 @@
 import { HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTour } from "@/hooks/useTour";
+import { TOUR_CONFIG } from "@/lib/onboarding/tour-config";
 
 export function TourButton() {
   const { restartTour, isCompleted, isNotStarted, isLoading } = useTour();
 
-  if (isLoading) return null;
+  if (!TOUR_CONFIG.enabled || isLoading) return null;
 
   return (
     <Button

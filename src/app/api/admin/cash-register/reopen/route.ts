@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     // Get the session to check its branch
     const { data: session, error: sessionError } = await supabaseServiceRole
       .from("pos_sessions")
-      .select("id, branch_id, status, reopen_count")
+      .select("id, branch_id, status, reopen_count, opening_time")
       .eq("id", session_id)
       .single();
 
@@ -77,17 +77,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if there's already an open session for this branch
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStart = today.toISOString();
-
     const { data: openSessions, error: openSessionsError } =
       await supabaseServiceRole
         .from("pos_sessions")
         .select("id, opening_time")
         .eq("branch_id", session.branch_id)
-        .eq("status", "open")
-        .gte("opening_time", todayStart);
+        .eq("status", "open");
 
     if (openSessionsError) {
       logger.error("Error checking open sessions", openSessionsError);
@@ -115,12 +110,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the closure associated with this session
-    const { data: closure, error: closureError } = await supabaseServiceRole
-      .from("cash_register_closures")
-      .select("id, status, reopen_count")
-      .eq("pos_session_id", session_id)
-      .maybeSingle();
+    // Get the closure associated with this session (fallback by branch/date)
+    let closure = null;
+    const { data: closureBySession, error: closureError } =
+      await supabaseServiceRole
+        .from("cash_register_closures")
+        .select("id, status, reopen_count, pos_session_id")
+        .eq("pos_session_id", session_id)
+        .maybeSingle();
+
+    if (closureBySession) {
+      closure = closureBySession;
+    } else if (session.opening_time) {
+      const sessionDateStr = session.opening_time.split("T")[0];
+      const { data: closureByDate } = await supabaseServiceRole
+        .from("cash_register_closures")
+        .select("id, status, reopen_count, pos_session_id")
+        .eq("branch_id", session.branch_id)
+        .eq("closure_date", sessionDateStr)
+        .maybeSingle();
+      closure = closureByDate || null;
+    }
 
     if (closureError && closureError.code !== "PGRST116") {
       logger.error("Error fetching closure for reopen", closureError);
@@ -165,6 +175,7 @@ export async function POST(request: NextRequest) {
           reopened_by: user.id,
           reopen_count: closureReopenCount,
           reopen_notes: `Reabierta por ${user.email} el ${new Date().toLocaleString("es-CL")}`,
+          pos_session_id: session_id,
           updated_at: new Date().toISOString(),
         })
         .eq("id", closure.id);

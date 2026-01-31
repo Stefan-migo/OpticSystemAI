@@ -162,12 +162,16 @@ export const TOUR_STEPS: TourStep[] = [
 ];
 
 export const TOUR_CONFIG = {
+  /** Desactivar todo el tour (auto-inicio, overlay, botón flotante). Poner en true cuando esté listo. */
+  enabled: false,
   autoStart: true, // Iniciar automáticamente en primera visita
   showProgress: true, // Mostrar barra de progreso
   allowSkip: true, // Permitir saltar el tour
   allowRestart: true, // Permitir reiniciar el tour
   highlightDelay: 100, // Delay antes de destacar elemento (ms) - reducido para mejor rendimiento
   animationDuration: 200, // Duración de animaciones (ms) - reducido para mejor rendimiento
+  useMockupPages: true, // Usar páginas mockup para mejor performance
+  mockupBasePath: "/admin/tour", // Ruta base para páginas mockup
 };
 
 /**

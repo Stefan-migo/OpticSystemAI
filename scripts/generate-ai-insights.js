@@ -155,7 +155,7 @@ async function generateInsightsForSection(section, userEmail) {
 
 // Main
 const sectionArg = process.argv[2];
-const userEmail = process.argv[3] || 'demo-admin@optica-demo.cl';
+const userEmail = process.argv[3] || process.env.DEMO_ADMIN_EMAIL || '';
 
 const sectionsToProcess = sectionArg
   ? [sectionArg]

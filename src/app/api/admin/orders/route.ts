@@ -588,6 +588,7 @@ export async function POST(request: NextRequest) {
             newOrder.order_number,
             newOrder.email,
             newOrder.total_amount,
+            newOrder.branch_id ?? undefined,
           ).catch((err) => logger.error("Error creating notification", err));
 
           return NextResponse.json({

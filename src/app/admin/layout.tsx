@@ -30,6 +30,8 @@ import {
   Building2,
   DollarSign,
   Settings,
+  ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import AdminNotificationDropdown from "@/components/admin/AdminNotificationDropdown";
 import Chatbot from "@/components/admin/Chatbot";
@@ -220,6 +222,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   // Add ref to prevent multiple redirects
   const redirectInProgress = useRef(false);
 
+  // When user is signing out, skip any redirect to onboarding (avoids race with check-status response)
+  const signOutInProgress = useRef(false);
+
   // Add ref to track if we've already logged the render message
   const hasLoggedRender = useRef(false);
   const lastLoggedUserId = useRef<string | null>(null);
@@ -288,9 +293,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
           setOrganizationState(orgState);
 
-          // Solo redirigir a onboarding si realmente es necesario
+          // Solo redirigir a onboarding si realmente es necesario (y no estamos cerrando sesión)
           // No redirigir si tiene organización (incluso si es demo), es super_admin, o es root/dev
           if (
+            !signOutInProgress.current &&
             orgState.onboardingRequired &&
             !orgState.hasOrganization &&
             !data.organization.isSuperAdmin &&
@@ -328,7 +334,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             return;
           }
 
-          // Si no es root/dev y no hay organización, requerir onboarding
+          // Si no es root/dev y no hay organización, requerir onboarding (salvo si está cerrando sesión)
           setOrganizationState({
             hasOrganization: false,
             isDemoMode: false,
@@ -336,8 +342,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             isChecking: false,
           });
 
-          console.log("🔄 Redirecting to onboarding - no organization data");
-          router.push("/onboarding/choice");
+          if (!signOutInProgress.current) {
+            console.log("🔄 Redirecting to onboarding - no organization data");
+            router.push("/onboarding/choice");
+          }
           return;
         }
       } catch (error) {
@@ -354,17 +362,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             isChecking: false,
           });
         } else {
-          // Si no es root/dev y hay error, requerir onboarding por seguridad
+          // Si no es root/dev y hay error, requerir onboarding por seguridad (salvo si está cerrando sesión)
           setOrganizationState({
             hasOrganization: false,
             isDemoMode: false,
             onboardingRequired: true,
             isChecking: false,
           });
-          console.log(
-            "🔄 Redirecting to onboarding - error checking organization",
-          );
-          router.push("/onboarding/choice");
+          if (!signOutInProgress.current) {
+            console.log(
+              "🔄 Redirecting to onboarding - error checking organization",
+            );
+            router.push("/onboarding/choice");
+          }
         }
       }
     };
@@ -403,6 +413,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           if (!isRoot) {
             try {
               // Fetch tickets without status filter to count open ones
+              // This endpoint now supports organization access
               const ticketsResponse = await fetch(
                 "/api/admin/saas-management/support/tickets?limit=100",
               );
@@ -413,10 +424,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 openTicketsCount = allTickets.filter(
                   (t: any) => t.status !== "resolved" && t.status !== "closed",
                 ).length;
+              } else if (ticketsResponse.status === 403) {
+                // User doesn't have access to tickets, silently ignore
+                console.debug("User doesn't have access to tickets");
               }
             } catch (error) {
               // Silently handle errors - tickets count is not critical
-              console.error("Error fetching open tickets count:", error);
+              console.debug("Error fetching open tickets count:", error);
             }
           }
 
@@ -643,6 +657,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           });
 
           if (!user || !user.email) {
+            // Si el usuario acaba de cerrar sesión, ya estamos yendo a "/"; no redirigir a login
+            if (signOutInProgress.current) return;
             console.log("❌ No user, redirecting to login");
             router.push("/login");
             return;
@@ -678,12 +694,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     router,
   ]);
 
-  // Reset redirect flag when user changes
+  // Reset redirect/signOut flags when user changes
   useEffect(() => {
     redirectInProgress.current = false;
+    // Solo resetear signOutInProgress cuando hay usuario de nuevo (nuevo login).
+    // No resetear al cerrar sesión, así el setTimeout de redirección no nos manda a /login.
+    if (user?.id) signOutInProgress.current = false;
   }, [user?.id]);
 
   const handleSignOut = async () => {
+    signOutInProgress.current = true;
     await signOut();
     router.push("/");
   };
@@ -847,6 +867,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   <BranchSelector />
                   <ThemeSelector />
                   <AdminNotificationDropdown />
+
+                  {/* Botón "Activar tu óptica" - Solo visible en modo demo */}
+                  {organizationState.isDemoMode && (
+                    <Button
+                      onClick={() => router.push("/onboarding/create")}
+                      className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2"
+                      size="sm"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Activar tu Óptica
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  )}
 
                   <div className="admin-header-user">
                     <div className="admin-header-user-info">

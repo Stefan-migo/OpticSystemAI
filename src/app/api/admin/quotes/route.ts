@@ -297,6 +297,31 @@ export async function POST(request: NextRequest) {
         lens_treatments: validatedBody.lens_treatments || [],
         lens_tint_color: validatedBody.lens_tint_color || null,
         lens_tint_percentage: validatedBody.lens_tint_percentage || null,
+        // Contact lens fields
+        contact_lens_family_id: validatedBody.contact_lens_family_id || null,
+        contact_lens_rx_sphere_od:
+          validatedBody.contact_lens_rx_sphere_od || null,
+        contact_lens_rx_cylinder_od:
+          validatedBody.contact_lens_rx_cylinder_od || null,
+        contact_lens_rx_axis_od: validatedBody.contact_lens_rx_axis_od || null,
+        contact_lens_rx_add_od: validatedBody.contact_lens_rx_add_od || null,
+        contact_lens_rx_base_curve_od:
+          validatedBody.contact_lens_rx_base_curve_od || null,
+        contact_lens_rx_diameter_od:
+          validatedBody.contact_lens_rx_diameter_od || null,
+        contact_lens_rx_sphere_os:
+          validatedBody.contact_lens_rx_sphere_os || null,
+        contact_lens_rx_cylinder_os:
+          validatedBody.contact_lens_rx_cylinder_os || null,
+        contact_lens_rx_axis_os: validatedBody.contact_lens_rx_axis_os || null,
+        contact_lens_rx_add_os: validatedBody.contact_lens_rx_add_os || null,
+        contact_lens_rx_base_curve_os:
+          validatedBody.contact_lens_rx_base_curve_os || null,
+        contact_lens_rx_diameter_os:
+          validatedBody.contact_lens_rx_diameter_os || null,
+        contact_lens_quantity: validatedBody.contact_lens_quantity || 1,
+        contact_lens_cost: validatedBody.contact_lens_cost || 0,
+        contact_lens_price: validatedBody.contact_lens_price || 0,
         frame_cost:
           typeof validatedBody.frame_cost === "number"
             ? validatedBody.frame_cost
@@ -371,6 +396,7 @@ export async function POST(request: NextRequest) {
         newQuote.quote_number,
         customerName,
         newQuote.total_amount,
+        newQuote.branch_id ?? undefined,
       ).catch((err) => logger.error("Error creating notification", err));
     }
 

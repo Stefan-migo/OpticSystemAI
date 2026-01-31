@@ -1,14 +1,26 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Crown, Mail, Phone, Calendar, Activity, Clock, Shield, Globe, Building2 } from 'lucide-react';
-import Link from 'next/link';
-import { toast } from 'sonner';
-import { useBranch } from '@/hooks/useBranch';
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  ArrowLeft,
+  Crown,
+  Mail,
+  Phone,
+  Calendar,
+  Activity,
+  Clock,
+  Shield,
+  Globe,
+  Building2,
+} from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { useBranch } from "@/hooks/useBranch";
+import BranchAccessManager from "@/components/admin/BranchAccessManager";
 
 interface AdminUser {
   id: string;
@@ -59,21 +71,23 @@ export default function AdminUserDetailPage() {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/admin-users/${adminId}`);
-      
+
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error('Administrador no encontrado');
+          throw new Error("Administrador no encontrado");
         }
-        throw new Error('Error al cargar el administrador');
+        throw new Error("Error al cargar el administrador");
       }
 
       const data = await response.json();
       setAdminUser(data.adminUser);
       setError(null);
     } catch (err) {
-      console.error('Error fetching admin user:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido');
-      toast.error(err instanceof Error ? err.message : 'Error al cargar el administrador');
+      console.error("Error fetching admin user:", err);
+      setError(err instanceof Error ? err.message : "Error desconocido");
+      toast.error(
+        err instanceof Error ? err.message : "Error al cargar el administrador",
+      );
     } finally {
       setLoading(false);
     }
@@ -96,9 +110,16 @@ export default function AdminUserDetailPage() {
         <Card className="bg-admin-bg-tertiary">
           <CardContent className="p-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-azul-profundo mb-4">Error</h2>
-              <p className="text-tierra-media mb-6">{error || 'Administrador no encontrado'}</p>
-              <Button onClick={() => router.push('/admin/admin-users')} variant="outline">
+              <h2 className="text-2xl font-bold text-azul-profundo mb-4">
+                Error
+              </h2>
+              <p className="text-tierra-media mb-6">
+                {error || "Administrador no encontrado"}
+              </p>
+              <Button
+                onClick={() => router.push("/admin/admin-users")}
+                variant="outline"
+              >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Volver a Administradores
               </Button>
@@ -111,45 +132,59 @@ export default function AdminUserDetailPage() {
 
   const handleToggleStatus = async () => {
     if (!isSuperAdmin) {
-      toast.error('Solo los super administradores pueden activar o desactivar otros administradores');
+      toast.error(
+        "Solo los super administradores pueden activar o desactivar otros administradores",
+      );
       return;
     }
 
-    if (!confirm(`¿Estás seguro de que quieres ${adminUser.is_active ? 'desactivar' : 'activar'} a este administrador?`)) {
+    if (
+      !confirm(
+        `¿Estás seguro de que quieres ${adminUser.is_active ? "desactivar" : "activar"} a este administrador?`,
+      )
+    ) {
       return;
     }
 
     try {
       setTogglingStatus(true);
       const response = await fetch(`/api/admin/admin-users/${adminId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ is_active: !adminUser.is_active }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al actualizar estado');
+        throw new Error(errorData.error || "Error al actualizar estado");
       }
 
-      toast.success(`Administrador ${!adminUser.is_active ? 'activado' : 'desactivado'} exitosamente`);
+      toast.success(
+        `Administrador ${!adminUser.is_active ? "activado" : "desactivado"} exitosamente`,
+      );
       fetchAdminUser();
     } catch (error) {
-      console.error('Error toggling admin status:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al actualizar estado');
+      console.error("Error toggling admin status:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Error al actualizar estado",
+      );
     } finally {
       setTogglingStatus(false);
     }
   };
 
-  const fullName = adminUser.profiles 
-    ? `${adminUser.profiles.first_name || ''} ${adminUser.profiles.last_name || ''}`.trim() || adminUser.email
+  const fullName = adminUser.profiles
+    ? `${adminUser.profiles.first_name || ""} ${adminUser.profiles.last_name || ""}`.trim() ||
+      adminUser.email
     : adminUser.email;
 
   return (
-    <div className="container mx-auto py-8 space-y-6" style={{ paddingTop: '1rem' }}>
+    <div
+      className="container mx-auto py-8 space-y-6"
+      style={{ paddingTop: "1rem" }}
+    >
       {/* Header */}
       <div className="space-y-4">
         {/* First Row: Back Button */}
@@ -161,17 +196,22 @@ export default function AdminUserDetailPage() {
             </Button>
           </Link>
         </div>
-        
+
         {/* Second Row: Title and Edit Button */}
-        <div className="flex items-center justify-between" style={{ marginTop: '2rem' }}>
+        <div
+          className="flex items-center justify-between"
+          style={{ marginTop: "2rem" }}
+        >
           <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">Detalles del Administrador</h1>
-            <p className="text-tierra-media">Información completa del usuario administrador</p>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Detalles del Administrador
+            </h1>
+            <p className="text-tierra-media">
+              Información completa del usuario administrador
+            </p>
           </div>
           <Link href={`/admin/admin-users/${adminId}/edit`}>
-            <Button>
-              Editar Administrador
-            </Button>
+            <Button>Editar Administrador</Button>
           </Link>
         </div>
       </div>
@@ -185,7 +225,9 @@ export default function AdminUserDetailPage() {
             </div>
             <div>
               <div className="text-2xl">{fullName}</div>
-              <div className="text-sm font-normal text-tierra-media">{adminUser.email}</div>
+              <div className="text-sm font-normal text-tierra-media">
+                {adminUser.email}
+              </div>
             </div>
           </CardTitle>
         </CardHeader>
@@ -196,9 +238,12 @@ export default function AdminUserDetailPage() {
               <label className="text-sm text-tierra-media">Estado</label>
               <div className="mt-1 flex items-center gap-2">
                 {adminUser.is_active ? (
-                  <Badge 
-                    className="bg-verde-suave text-primary" 
-                    style={{ backgroundColor: 'var(--accent)', color: 'var(--admin-bg-primary)' }}
+                  <Badge
+                    className="bg-verde-suave text-primary"
+                    style={{
+                      backgroundColor: "var(--accent)",
+                      color: "var(--admin-bg-primary)",
+                    }}
                   >
                     Activo
                   </Badge>
@@ -212,7 +257,11 @@ export default function AdminUserDetailPage() {
                     onClick={handleToggleStatus}
                     disabled={togglingStatus}
                   >
-                    {togglingStatus ? 'Actualizando...' : adminUser.is_active ? 'Desactivar' : 'Activar'}
+                    {togglingStatus
+                      ? "Actualizando..."
+                      : adminUser.is_active
+                        ? "Desactivar"
+                        : "Activar"}
                   </Button>
                 )}
               </div>
@@ -225,13 +274,34 @@ export default function AdminUserDetailPage() {
             <div>
               <label className="text-sm text-tierra-media">Rol</label>
               <div className="mt-1">
-                {adminUser.is_super_admin ? (
-                  <Badge variant="default" className="flex items-center gap-1 w-fit bg-dorado text-primary">
+                {adminUser.is_super_admin ||
+                adminUser.role === "super_admin" ? (
+                  <Badge
+                    variant="default"
+                    className="flex items-center gap-1 w-fit bg-dorado text-primary"
+                  >
                     <Globe className="h-3 w-3" />
                     Super Administrador
                   </Badge>
+                ) : adminUser.role === "vendedor" ? (
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-1 w-fit"
+                  >
+                    Vendedor
+                  </Badge>
+                ) : adminUser.role === "employee" ? (
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-1 w-fit"
+                  >
+                    Empleado
+                  </Badge>
                 ) : (
-                  <Badge variant="default" className="flex items-center gap-1 w-fit">
+                  <Badge
+                    variant="default"
+                    className="flex items-center gap-1 w-fit"
+                  >
                     <Crown className="h-3 w-3" />
                     Administrador
                   </Badge>
@@ -240,59 +310,7 @@ export default function AdminUserDetailPage() {
             </div>
           </div>
 
-          {/* Branch Access Information */}
-          <div>
-            <label className="text-sm text-tierra-media">Acceso a Sucursales</label>
-            <div className="mt-2">
-              {adminUser.is_super_admin ? (
-                <div className="p-4 bg-dorado/10 border border-dorado/30 rounded-md">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-5 w-5 text-dorado" />
-                    <div>
-                      <div className="font-medium text-dorado">Super Administrador</div>
-                      <div className="text-sm text-tierra-media">
-                        Puede administrar todas las sucursales disponibles
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : adminUser.branches && adminUser.branches.length > 0 ? (
-                <div className="space-y-2">
-                  {adminUser.branches.map((branch) => (
-                    <div
-                      key={branch.id}
-                      className="p-3 border rounded-md bg-admin-bg-secondary flex items-center justify-between"
-                      style={{ backgroundColor: 'var(--admin-border-secondary)' }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-admin-accent-tertiary" />
-                        <div>
-                          <div className="font-medium">
-                            {branch.name} ({branch.code})
-                          </div>
-                          {branch.is_primary && (
-                            <Badge variant="outline" className="text-xs mt-1">
-                              Sucursal Principal
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div 
-                  className="p-4 text-center text-tierra-media border rounded-md bg-admin-bg-secondary"
-                  style={{ 
-                    color: 'var(--admin-accent-secondary)', 
-                    backgroundColor: 'var(--admin-border-primary)' 
-                  }}
-                >
-                  No tiene sucursales asignadas
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Branch Access Information - Replaced with BranchAccessManager */}
 
           {/* Contact Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -319,12 +337,14 @@ export default function AdminUserDetailPage() {
             <div className="flex items-center gap-3">
               <Calendar className="h-5 w-5 text-tierra-media" />
               <div>
-                <label className="text-sm text-tierra-media">Fecha de Registro</label>
+                <label className="text-sm text-tierra-media">
+                  Fecha de Registro
+                </label>
                 <div className="font-medium">
-                  {new Date(adminUser.created_at).toLocaleDateString('es-AR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
+                  {new Date(adminUser.created_at).toLocaleDateString("es-AR", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
                   })}
                 </div>
               </div>
@@ -333,15 +353,20 @@ export default function AdminUserDetailPage() {
               <div className="flex items-center gap-3">
                 <Clock className="h-5 w-5 text-tierra-media" />
                 <div>
-                  <label className="text-sm text-tierra-media">Último Acceso</label>
+                  <label className="text-sm text-tierra-media">
+                    Último Acceso
+                  </label>
                   <div className="font-medium">
-                    {new Date(adminUser.last_login).toLocaleDateString('es-AR', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    {new Date(adminUser.last_login).toLocaleDateString(
+                      "es-AR",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    )}
                   </div>
                 </div>
               </div>
@@ -352,7 +377,9 @@ export default function AdminUserDetailPage() {
           <div className="flex items-center gap-3">
             <Activity className="h-5 w-5 text-tierra-media" />
             <div>
-              <label className="text-sm text-tierra-media">Actividad (últimos 30 días)</label>
+              <label className="text-sm text-tierra-media">
+                Actividad (últimos 30 días)
+              </label>
               <div className="font-medium">
                 {adminUser.analytics?.activityCount30Days || 0} acciones
               </div>
@@ -360,6 +387,28 @@ export default function AdminUserDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Branch Access Manager - Only for super admin and admin */}
+      {(isSuperAdmin || adminUser.role === "admin") && (
+        <BranchAccessManager
+          adminUserId={adminId}
+          isSuperAdmin={
+            adminUser.is_super_admin || adminUser.role === "super_admin"
+          }
+          canEdit={isSuperAdmin || adminUser.role === "admin"}
+        />
+      )}
+
+      {/* Branch Access Manager - Only for super admin and admin */}
+      {(isSuperAdmin || adminUser.role === "admin") && (
+        <BranchAccessManager
+          adminUserId={adminId}
+          isSuperAdmin={
+            adminUser.is_super_admin || adminUser.role === "super_admin"
+          }
+          canEdit={isSuperAdmin || adminUser.role === "admin"}
+        />
+      )}
 
       {/* Permissions Card */}
       <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
@@ -371,22 +420,28 @@ export default function AdminUserDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(adminUser.permissions || {}).map(([resource, actions]) => (
-              <div key={resource} className="p-3 bg-admin-bg-tertiary rounded-md">
-                <div className="font-medium capitalize mb-2">{resource.replace('_', ' ')}</div>
-                <div className="flex flex-wrap gap-1">
-                  {actions.map((action) => (
-                    <Badge key={action} variant="outline" className="text-xs">
-                      {action}
-                    </Badge>
-                  ))}
+            {Object.entries(adminUser.permissions || {}).map(
+              ([resource, actions]) => (
+                <div
+                  key={resource}
+                  className="p-3 bg-admin-bg-tertiary rounded-md"
+                >
+                  <div className="font-medium capitalize mb-2">
+                    {resource.replace("_", " ")}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {actions.map((action) => (
+                      <Badge key={action} variant="outline" className="text-xs">
+                        {action}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ),
+            )}
           </div>
         </CardContent>
       </Card>
     </div>
   );
 }
-

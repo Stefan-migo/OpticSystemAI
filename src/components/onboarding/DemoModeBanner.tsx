@@ -6,6 +6,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { X, Sparkles, ArrowRight } from "lucide-react";
 
+// Tiempo en milisegundos antes de volver a mostrar el banner (24 horas)
+const BANNER_REAPPEAR_DELAY = 24 * 60 * 60 * 1000; // 24 horas
+
 export function DemoModeBanner() {
   const router = useRouter();
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -20,9 +23,22 @@ export function DemoModeBanner() {
         if (data.organization?.isDemoMode) {
           setIsDemoMode(true);
           // Verificar si el banner fue descartado previamente
-          const dismissed = localStorage.getItem("demo-banner-dismissed");
-          if (dismissed) {
-            setIsDismissed(true);
+          const dismissedTimestamp = localStorage.getItem(
+            "demo-banner-dismissed-timestamp",
+          );
+          if (dismissedTimestamp) {
+            const dismissedTime = parseInt(dismissedTimestamp, 10);
+            const now = Date.now();
+            const timeSinceDismissed = now - dismissedTime;
+
+            // Si ha pasado el tiempo determinado, volver a mostrar el banner
+            if (timeSinceDismissed >= BANNER_REAPPEAR_DELAY) {
+              // Limpiar el timestamp para volver a mostrar el banner
+              localStorage.removeItem("demo-banner-dismissed-timestamp");
+              setIsDismissed(false);
+            } else {
+              setIsDismissed(true);
+            }
           }
         }
       } catch (err) {
@@ -39,7 +55,11 @@ export function DemoModeBanner() {
 
   const handleDismiss = () => {
     setIsDismissed(true);
-    localStorage.setItem("demo-banner-dismissed", "true");
+    // Guardar timestamp en lugar de solo "true"
+    localStorage.setItem(
+      "demo-banner-dismissed-timestamp",
+      Date.now().toString(),
+    );
   };
 
   if (!isDemoMode || isDismissed) {

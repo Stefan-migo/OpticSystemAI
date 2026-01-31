@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,7 @@ import {
   Loader2,
   MapPin,
   ArrowLeft,
+  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -99,8 +101,22 @@ export default function UsersManagementPage() {
 
   // Dialogs
   const [showChangeOrgDialog, setShowChangeOrgDialog] = useState(false);
+  const [showCreateUserDialog, setShowCreateUserDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newOrganizationId, setNewOrganizationId] = useState("");
+  const [createUserForm, setCreateUserForm] = useState({
+    email: "",
+    password: "",
+    first_name: "",
+    last_name: "",
+    role: "admin",
+    organization_id: "",
+    branch_id: "",
+  });
+  const [branchesForOrg, setBranchesForOrg] = useState<
+    Array<{ id: string; name: string; code: string }>
+  >([]);
+  const [creatingUser, setCreatingUser] = useState(false);
 
   useEffect(() => {
     fetchOrganizations();
@@ -206,6 +222,76 @@ export default function UsersManagementPage() {
     handleAction(selectedUser.id, "change_organization", newOrganizationId);
   };
 
+  const loadBranchesForOrg = async (orgId: string) => {
+    if (!orgId) {
+      setBranchesForOrg([]);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/admin/saas-management/organizations/${orgId}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setBranchesForOrg(data.organization?.branches || []);
+      } else {
+        setBranchesForOrg([]);
+      }
+    } catch {
+      setBranchesForOrg([]);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!createUserForm.email || !createUserForm.password) {
+      toast.error("Email y contraseña son requeridos");
+      return;
+    }
+    if (createUserForm.password.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      const res = await fetch("/api/admin/saas-management/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: createUserForm.email,
+          password: createUserForm.password,
+          first_name: createUserForm.first_name || undefined,
+          last_name: createUserForm.last_name || undefined,
+          role: createUserForm.role,
+          organization_id: createUserForm.organization_id || undefined,
+          branch_id: createUserForm.branch_id || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Error al crear usuario");
+      }
+      toast.success("Usuario creado correctamente");
+      setShowCreateUserDialog(false);
+      setCreateUserForm({
+        email: "",
+        password: "",
+        first_name: "",
+        last_name: "",
+        role: "admin",
+        organization_id: "",
+        branch_id: "",
+      });
+      setBranchesForOrg([]);
+      fetchUsers();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Error al crear usuario",
+      );
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
   const getRoleBadge = (role: string) => {
     const colors: Record<string, string> = {
       root: "bg-red-100 text-red-800",
@@ -213,6 +299,7 @@ export default function UsersManagementPage() {
       super_admin: "bg-purple-100 text-purple-800",
       admin: "bg-blue-100 text-blue-800",
       employee: "bg-gray-100 text-gray-800",
+      vendedor: "bg-green-100 text-green-800",
     };
 
     const icons: Record<string, typeof Shield> = {
@@ -221,6 +308,7 @@ export default function UsersManagementPage() {
       super_admin: Crown,
       admin: User,
       employee: User,
+      vendedor: User,
     };
 
     const Icon = icons[role] || User;
@@ -236,9 +324,11 @@ export default function UsersManagementPage() {
               ? "Super Admin"
               : role === "admin"
                 ? "Admin"
-                : role === "employee"
-                  ? "Empleado"
-                  : role}
+                : role === "vendedor"
+                  ? "Vendedor"
+                  : role === "employee"
+                    ? "Empleado"
+                    : role}
       </Badge>
     );
   };
@@ -254,7 +344,7 @@ export default function UsersManagementPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold text-azul-profundo">
             Gestión de Usuarios
           </h1>
@@ -262,6 +352,10 @@ export default function UsersManagementPage() {
             Administra todos los usuarios del sistema
           </p>
         </div>
+        <Button onClick={() => setShowCreateUserDialog(true)}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Nuevo usuario
+        </Button>
       </div>
 
       {/* Filtros */}
@@ -308,6 +402,7 @@ export default function UsersManagementPage() {
                 <SelectItem value="dev">Dev</SelectItem>
                 <SelectItem value="super_admin">Super Admin</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="vendedor">Vendedor</SelectItem>
                 <SelectItem value="employee">Empleado</SelectItem>
               </SelectContent>
             </Select>
@@ -513,6 +608,183 @@ export default function UsersManagementPage() {
         </CardContent>
       </Card>
 
+      {/* Dialog para crear usuario */}
+      <Dialog
+        open={showCreateUserDialog}
+        onOpenChange={(open) => {
+          setShowCreateUserDialog(open);
+          if (!open) {
+            setCreateUserForm({
+              email: "",
+              password: "",
+              first_name: "",
+              last_name: "",
+              role: "admin",
+              organization_id: "",
+              branch_id: "",
+            });
+            setBranchesForOrg([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Crear usuario</DialogTitle>
+            <DialogDescription>
+              Crea un nuevo usuario y asígnale organización y rol (solo
+              root/dev).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                value={createUserForm.email}
+                onChange={(e) =>
+                  setCreateUserForm((f) => ({ ...f, email: e.target.value }))
+                }
+                placeholder="usuario@ejemplo.com"
+              />
+            </div>
+            <div>
+              <Label>Contraseña * (mín. 8 caracteres)</Label>
+              <Input
+                type="password"
+                value={createUserForm.password}
+                onChange={(e) =>
+                  setCreateUserForm((f) => ({ ...f, password: e.target.value }))
+                }
+                placeholder="••••••••"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Nombre</Label>
+                <Input
+                  value={createUserForm.first_name}
+                  onChange={(e) =>
+                    setCreateUserForm((f) => ({
+                      ...f,
+                      first_name: e.target.value,
+                    }))
+                  }
+                  placeholder="Nombre"
+                />
+              </div>
+              <div>
+                <Label>Apellido</Label>
+                <Input
+                  value={createUserForm.last_name}
+                  onChange={(e) =>
+                    setCreateUserForm((f) => ({
+                      ...f,
+                      last_name: e.target.value,
+                    }))
+                  }
+                  placeholder="Apellido"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Rol</Label>
+              <Select
+                value={createUserForm.role}
+                onValueChange={(v) =>
+                  setCreateUserForm((f) => ({ ...f, role: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="root">Root</SelectItem>
+                  <SelectItem value="dev">Dev</SelectItem>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="vendedor">Vendedor</SelectItem>
+                  <SelectItem value="employee">Empleado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Organización</Label>
+              <Select
+                value={
+                  createUserForm.organization_id
+                    ? createUserForm.organization_id
+                    : "__none__"
+                }
+                onValueChange={(v) => {
+                  const orgId = v === "__none__" ? "" : v;
+                  setCreateUserForm((f) => ({
+                    ...f,
+                    organization_id: orgId,
+                    branch_id: "",
+                  }));
+                  loadBranchesForOrg(orgId);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin organización" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin organización</SelectItem>
+                  {organizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {(createUserForm.role === "admin" ||
+              createUserForm.role === "vendedor" ||
+              createUserForm.role === "employee") &&
+              branchesForOrg.length > 0 && (
+                <div>
+                  <Label>Sucursal (opcional)</Label>
+                  <Select
+                    value={createUserForm.branch_id}
+                    onValueChange={(v) =>
+                      setCreateUserForm((f) => ({ ...f, branch_id: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar sucursal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branchesForOrg.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name} ({b.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateUserDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateUser} disabled={creatingUser}>
+              {creatingUser ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creando...
+                </>
+              ) : (
+                "Crear usuario"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog para cambiar organización */}
       <Dialog open={showChangeOrgDialog} onOpenChange={setShowChangeOrgDialog}>
         <DialogContent>
@@ -526,14 +798,16 @@ export default function UsersManagementPage() {
             <div>
               <label className="text-sm font-medium">Organización</label>
               <Select
-                value={newOrganizationId}
-                onValueChange={setNewOrganizationId}
+                value={newOrganizationId ? newOrganizationId : "__none__"}
+                onValueChange={(v) =>
+                  setNewOrganizationId(v === "__none__" ? "" : v)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar organización" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin organización</SelectItem>
+                  <SelectItem value="__none__">Sin organización</SelectItem>
                   {organizations.map((org) => (
                     <SelectItem key={org.id} value={org.id}>
                       {org.name}
@@ -553,7 +827,19 @@ export default function UsersManagementPage() {
             >
               Cancelar
             </Button>
-            <Button onClick={handleChangeOrganization}>Guardar</Button>
+            <Button
+              onClick={() => {
+                const orgId =
+                  newOrganizationId === "__none__" ? "" : newOrganizationId;
+                if (!orgId) {
+                  toast.error("Selecciona una organización");
+                  return;
+                }
+                handleAction(selectedUser!.id, "change_organization", orgId);
+              }}
+            >
+              Guardar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

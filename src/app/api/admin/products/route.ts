@@ -704,6 +704,28 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          // Validar límite de productos del tier
+          const { validateTierLimit } = await import(
+            "@/lib/saas/tier-validator"
+          );
+          const productLimit = await validateTierLimit(
+            userOrganizationId,
+            "products",
+          );
+          if (!productLimit.allowed) {
+            return NextResponse.json(
+              {
+                error:
+                  productLimit.reason ??
+                  "Límite de productos alcanzado para tu plan. Considera actualizar tu suscripción.",
+                code: "TIER_LIMIT",
+                currentCount: productLimit.currentCount,
+                maxAllowed: productLimit.maxAllowed,
+              },
+              { status: 403 },
+            );
+          }
+
           logger.debug("Creating product with data", {
             name: validatedBody.name,
             product_type: validatedBody.product_type,

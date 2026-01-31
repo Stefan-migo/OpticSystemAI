@@ -28,6 +28,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Tier feature: chat_ia must be enabled for the organization
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+    if (adminUser?.organization_id) {
+      const { validateFeature } = await import("@/lib/saas/tier-validator");
+      const hasChatIa = await validateFeature(
+        adminUser.organization_id,
+        "chat_ia",
+      );
+      if (!hasChatIa) {
+        return NextResponse.json(
+          {
+            error:
+              "Chat IA no está incluido en tu plan. Actualiza a Pro o Premium para usar esta función.",
+            code: "FEATURE_NOT_AVAILABLE",
+          },
+          { status: 403 },
+        );
+      }
+    }
+
     const body = await request.json();
     const { message, provider, model, sessionId, config, section } = body;
 

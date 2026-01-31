@@ -40,6 +40,8 @@ export interface CreateNotificationParams {
   metadata?: Record<string, any>;
   targetAdminId?: string;
   targetAdminRole?: string;
+  /** Branch ID for óptica-scoped notifications; null for SaaS/broadcast. */
+  branchId?: string | null;
 }
 
 export class NotificationService {
@@ -76,7 +78,7 @@ export class NotificationService {
       // Get priority (with override support)
       const priority = settingsData?.priority || params.priority || "medium";
 
-      // Create notification
+      // Create notification (branch_id scopes to óptica; SaaS uses target_admin_role=root, no branch_id)
       const { error: insertError } = await supabase
         .from("admin_notifications")
         .insert({
@@ -91,6 +93,7 @@ export class NotificationService {
           metadata: params.metadata || {},
           target_admin_id: params.targetAdminId || null,
           target_admin_role: params.targetAdminRole || null,
+          branch_id: params.branchId ?? null,
           created_by_system: true,
         });
 
@@ -110,13 +113,14 @@ export class NotificationService {
   }
 
   /**
-   * Create notification for new quote
+   * Create notification for new quote (branchId scopes to óptica)
    */
   static async notifyNewQuote(
     quoteId: string,
     quoteNumber: string,
     customerName: string,
     totalAmount: number,
+    branchId?: string | null,
   ): Promise<void> {
     await this.createNotification({
       type: "quote_new",
@@ -132,17 +136,19 @@ export class NotificationService {
         customer_name: customerName,
         total_amount: totalAmount,
       },
+      branchId: branchId ?? null,
     });
   }
 
   /**
-   * Create notification for quote status change
+   * Create notification for quote status change (branchId scopes to óptica)
    */
   static async notifyQuoteStatusChange(
     quoteId: string,
     quoteNumber: string,
     oldStatus: string,
     newStatus: string,
+    branchId?: string | null,
   ): Promise<void> {
     const statusLabels: Record<string, string> = {
       draft: "Borrador",
@@ -166,17 +172,19 @@ export class NotificationService {
         old_status: oldStatus,
         new_status: newStatus,
       },
+      branchId: branchId ?? null,
     });
   }
 
   /**
-   * Create notification for quote converted to work order
+   * Create notification for quote converted to work order (branchId scopes to óptica)
    */
   static async notifyQuoteConverted(
     quoteId: string,
     quoteNumber: string,
     workOrderId: string,
     workOrderNumber: string,
+    branchId?: string | null,
   ): Promise<void> {
     await this.createNotification({
       type: "quote_converted",
@@ -193,17 +201,19 @@ export class NotificationService {
         work_order_id: workOrderId,
         work_order_number: workOrderNumber,
       },
+      branchId: branchId ?? null,
     });
   }
 
   /**
-   * Create notification for new work order
+   * Create notification for new work order (branchId scopes to óptica)
    */
   static async notifyNewWorkOrder(
     workOrderId: string,
     workOrderNumber: string,
     customerName: string,
     totalAmount: number,
+    branchId?: string | null,
   ): Promise<void> {
     await this.createNotification({
       type: "work_order_new",
@@ -219,17 +229,19 @@ export class NotificationService {
         customer_name: customerName,
         total_amount: totalAmount,
       },
+      branchId: branchId ?? null,
     });
   }
 
   /**
-   * Create notification for work order status change
+   * Create notification for work order status change (branchId scopes to óptica)
    */
   static async notifyWorkOrderStatusChange(
     workOrderId: string,
     workOrderNumber: string,
     oldStatus: string,
     newStatus: string,
+    branchId?: string | null,
   ): Promise<void> {
     const statusLabels: Record<string, string> = {
       quote: "Presupuesto",
@@ -260,16 +272,18 @@ export class NotificationService {
         old_status: oldStatus,
         new_status: newStatus,
       },
+      branchId: branchId ?? null,
     });
   }
 
   /**
-   * Create notification for work order completed
+   * Create notification for work order completed (branchId scopes to óptica)
    */
   static async notifyWorkOrderCompleted(
     workOrderId: string,
     workOrderNumber: string,
     customerName: string,
+    branchId?: string | null,
   ): Promise<void> {
     await this.createNotification({
       type: "work_order_completed",
@@ -284,16 +298,18 @@ export class NotificationService {
         work_order_number: workOrderNumber,
         customer_name: customerName,
       },
+      branchId: branchId ?? null,
     });
   }
 
   /**
-   * Create notification for new customer
+   * Create notification for new customer (branchId scopes to óptica)
    */
   static async notifyNewCustomer(
     customerId: string,
     customerName: string,
     email?: string,
+    branchId?: string | null,
   ): Promise<void> {
     await this.createNotification({
       type: "new_customer",
@@ -308,17 +324,19 @@ export class NotificationService {
         customer_name: customerName,
         email: email,
       },
+      branchId: branchId ?? null,
     });
   }
 
   /**
-   * Create notification for new sale
+   * Create notification for new sale (branchId scopes to óptica)
    */
   static async notifyNewSale(
     orderId: string,
     orderNumber: string,
     customerEmail: string,
     totalAmount: number,
+    branchId?: string | null,
   ): Promise<void> {
     await this.createNotification({
       type: "sale_new",
@@ -334,17 +352,19 @@ export class NotificationService {
         customer_email: customerEmail,
         total_amount: totalAmount,
       },
+      branchId: branchId ?? null,
     });
   }
 
   /**
-   * Create notification for new appointment
+   * Create notification for new appointment (branchId scopes to óptica)
    */
   static async notifyNewAppointment(
     appointmentId: string,
     customerName: string,
     appointmentDate: string,
     appointmentTime: string,
+    branchId?: string | null,
   ): Promise<void> {
     await this.createNotification({
       type: "appointment_new",
@@ -360,6 +380,7 @@ export class NotificationService {
         appointment_date: appointmentDate,
         appointment_time: appointmentTime,
       },
+      branchId: branchId ?? null,
     });
   }
 

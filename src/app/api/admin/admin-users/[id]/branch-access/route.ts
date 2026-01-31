@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import type {
+  GetAdminRoleParams,
+  GetAdminRoleResult,
+} from "@/types/supabase-rpc";
 
 // GET: Get branch access for an admin user
 export async function GET(
@@ -20,11 +24,19 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if requester is super admin
+    // Check if requester is super admin or admin
     const branchContext = await getBranchContext(request, user.id);
-    if (!branchContext.isSuperAdmin) {
+    const { data: adminRole } = (await supabase.rpc("get_admin_role", {
+      user_id: user.id,
+    } as GetAdminRoleParams)) as {
+      data: GetAdminRoleResult | null;
+      error: Error | null;
+    };
+
+    const isAdmin = adminRole === "admin" || adminRole === "super_admin";
+    if (!branchContext.isSuperAdmin && !isAdmin) {
       return NextResponse.json(
-        { error: "Only super admins can view branch access" },
+        { error: "Only super admins and admins can view branch access" },
         { status: 403 },
       );
     }
@@ -86,11 +98,27 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if requester is super admin
+    // Check if requester is super admin or admin
     const branchContext = await getBranchContext(request, user.id);
-    if (!branchContext.isSuperAdmin) {
+    const { data: adminRole } = (await supabase.rpc("get_admin_role", {
+      user_id: user.id,
+    } as GetAdminRoleParams)) as {
+      data: GetAdminRoleResult | null;
+      error: Error | null;
+    };
+
+    const isAdmin = adminRole === "admin" || adminRole === "super_admin";
+    if (!branchContext.isSuperAdmin && !isAdmin) {
       return NextResponse.json(
-        { error: "Only super admins can assign branch access" },
+        { error: "Only super admins and admins can assign branch access" },
+        { status: 403 },
+      );
+    }
+
+    // Only super admins can assign super admin access (branch_id = null)
+    if (branch_id === null && !branchContext.isSuperAdmin) {
+      return NextResponse.json(
+        { error: "Only super admins can assign super admin access" },
         { status: 403 },
       );
     }
@@ -229,11 +257,27 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if requester is super admin
+    // Check if requester is super admin or admin
     const branchContext = await getBranchContext(request, user.id);
-    if (!branchContext.isSuperAdmin) {
+    const { data: adminRole } = (await supabase.rpc("get_admin_role", {
+      user_id: user.id,
+    } as GetAdminRoleParams)) as {
+      data: GetAdminRoleResult | null;
+      error: Error | null;
+    };
+
+    const isAdmin = adminRole === "admin" || adminRole === "super_admin";
+    if (!branchContext.isSuperAdmin && !isAdmin) {
       return NextResponse.json(
-        { error: "Only super admins can remove branch access" },
+        { error: "Only super admins and admins can remove branch access" },
+        { status: 403 },
+      );
+    }
+
+    // Only super admins can remove super admin access (branch_id = null)
+    if (branch_id === "null" && !branchContext.isSuperAdmin) {
+      return NextResponse.json(
+        { error: "Only super admins can remove super admin access" },
         { status: 403 },
       );
     }

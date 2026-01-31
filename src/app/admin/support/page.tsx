@@ -112,9 +112,9 @@ export default function OrganizationSupportPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creatingTicket, setCreatingTicket] = useState(false);
   const [filters, setFilters] = useState({
-    status: "",
-    priority: "",
-    category: "",
+    status: "all",
+    priority: "all",
+    category: "all",
     search: "",
   });
   const [pagination, setPagination] = useState({
@@ -149,9 +149,12 @@ export default function OrganizationSupportPage() {
         limit: pagination.limit.toString(),
       });
 
-      if (filters.status) params.append("status", filters.status);
-      if (filters.priority) params.append("priority", filters.priority);
-      if (filters.category) params.append("category", filters.category);
+      if (filters.status && filters.status !== "all")
+        params.append("status", filters.status);
+      if (filters.priority && filters.priority !== "all")
+        params.append("priority", filters.priority);
+      if (filters.category && filters.category !== "all")
+        params.append("category", filters.category);
       if (filters.search) params.append("search", filters.search);
 
       const response = await fetch(
@@ -306,7 +309,7 @@ export default function OrganizationSupportPage() {
                   <SelectValue placeholder="Todos los estados" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los estados</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
                   {Object.entries(statusLabels).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
@@ -328,7 +331,7 @@ export default function OrganizationSupportPage() {
                   <SelectValue placeholder="Todas las prioridades" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas las prioridades</SelectItem>
+                  <SelectItem value="all">Todas las prioridades</SelectItem>
                   <SelectItem value="low">Baja</SelectItem>
                   <SelectItem value="medium">Media</SelectItem>
                   <SelectItem value="high">Alta</SelectItem>
@@ -349,7 +352,7 @@ export default function OrganizationSupportPage() {
                   <SelectValue placeholder="Todas las categorías" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas las categorías</SelectItem>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
                   {Object.entries(categoryLabels).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
@@ -402,16 +405,16 @@ export default function OrganizationSupportPage() {
               <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
               <p className="text-lg font-medium mb-2">No hay tickets</p>
               <p className="text-sm mb-4">
-                {filters.status ||
-                filters.priority ||
-                filters.category ||
+                {(filters.status && filters.status !== "all") ||
+                (filters.priority && filters.priority !== "all") ||
+                (filters.category && filters.category !== "all") ||
                 filters.search
                   ? "No hay tickets que coincidan con los filtros"
                   : "Crea tu primer ticket de soporte"}
               </p>
-              {!filters.status &&
-                !filters.priority &&
-                !filters.category &&
+              {(!filters.status || filters.status === "all") &&
+                (!filters.priority || filters.priority === "all") &&
+                (!filters.category || filters.category === "all") &&
                 !filters.search && (
                   <Button onClick={() => setShowCreateDialog(true)}>
                     <Plus className="h-4 w-4 mr-2" />

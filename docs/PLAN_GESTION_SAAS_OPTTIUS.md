@@ -837,3 +837,68 @@ USING (
 - Considerar agregar búsqueda global en el futuro
 - Implementar notificaciones para acciones críticas
 - Employee role agregará valor significativo al producto (separación de responsabilidades, escalabilidad)
+
+---
+
+## 10. Implementación Completada y Correcciones Post-Implementación
+
+**Fecha**: 30 de Enero, 2026
+
+### 10.1 Estado de la Implementación
+
+La Gestión SaaS Opttius está **implementada y operativa** con las siguientes secciones:
+
+| Sección              | Ruta                                        | Estado | Notas                             |
+| -------------------- | ------------------------------------------- | ------ | --------------------------------- |
+| Dashboard            | `/admin/saas-management/dashboard`          | ✅     | Métricas y enlaces a subsecciones |
+| Organizaciones       | `/admin/saas-management/organizations`      | ✅     | Listado, filtros, crear, acciones |
+| Detalle Organización | `/admin/saas-management/organizations/[id]` | ✅     | Detalle, edición, stats           |
+| Usuarios             | `/admin/saas-management/users`              | ✅     | Listado global, filtros, acciones |
+| Detalle Usuario      | `/admin/saas-management/users/[id]`         | ✅     | Detalle completo del usuario      |
+| Suscripciones        | `/admin/saas-management/subscriptions`      | ✅     | Listado, filtros, acciones        |
+| Detalle Suscripción  | `/admin/saas-management/subscriptions/[id]` | ✅     | Detalle y organización            |
+| Tiers                | `/admin/saas-management/tiers`              | ✅     | Edición de planes                 |
+| Soporte              | `/admin/saas-management/support`            | ✅     | Búsqueda rápida + pestaña Tickets |
+
+### 10.2 Correcciones Técnicas Aplicadas
+
+#### APIs – Evitar relaciones complejas en Supabase
+
+Las APIs que devolvían 500 al usar `select()` con relaciones anidadas (ej. `owner:profiles!organizations_owner_id_fkey`, `organization:organizations(...)`) se ajustaron para:
+
+1. **Query principal**: Solo `select("*")` o campos directos de la tabla.
+2. **Datos relacionados**: Obtener en consultas separadas (organización, owner, perfiles, sucursales, etc.) y enriquecer la respuesta en el handler.
+
+**Archivos modificados**:
+
+- `src/app/api/admin/saas-management/organizations/route.ts` – Listado sin join a `profiles`; owner y suscripción por consultas adicionales.
+- `src/app/api/admin/saas-management/organizations/[id]/route.ts` – Detalle sin relaciones anidadas; organización, owner, usuarios recientes y sucursales por separado.
+- `src/app/api/admin/saas-management/users/route.ts` – Listado simplificado; perfiles, organización y `admin_branch_access` enriquecidos después.
+- `src/app/api/admin/saas-management/users/[id]/route.ts` – Detalle con datos relacionados obtenidos por separado.
+- `src/app/api/admin/saas-management/subscriptions/route.ts` – Filtro por tier vía IDs de organizaciones; sin filtro por relación anidada.
+- `src/app/api/admin/saas-management/subscriptions/[id]/route.ts` – Detalle sin join; organización en consulta aparte.
+- `src/app/api/admin/saas-management/support/tickets/route.ts` – Listado de tickets sin relaciones anidadas; organización y usuarios enriquecidos después.
+
+#### Páginas de detalle creadas
+
+- `src/app/admin/saas-management/users/[id]/page.tsx` – Detalle de usuario (perfil, organización, sucursales, actividad).
+- `src/app/admin/saas-management/subscriptions/[id]/page.tsx` – Detalle de suscripción (período, Stripe, organización).
+
+#### UI y navegación
+
+- **Botón "Volver"**: Añadido en organizaciones, usuarios, suscripciones, tiers y soporte (vuelta al dashboard de SaaS).
+- **Import**: Corregido import de `ArrowLeft` en `src/app/admin/saas-management/organizations/page.tsx`.
+- **Panel de Soporte**:
+  - Filtros con valor por defecto `"all"` en lugar de `""` para cumplir con Radix Select (`SelectItem` no puede tener `value=""`).
+  - Al llamar a la API de tickets no se envían los parámetros `status`, `priority` ni `category` cuando su valor es `"all"`.
+
+### 10.3 Flujo de Usuario Root/Dev
+
+- Login con usuario root → redirección a `/admin/saas-management/dashboard`.
+- Tour de onboarding deshabilitado para usuarios root/dev.
+- Root/dev no requiere organización ni onboarding; el layout de admin omite la verificación de organización para estos roles.
+
+### 10.4 Documentación Relacionada
+
+- **Soporte SaaS**: `docs/SAAS_SUPPORT_SYSTEM_PLAN.md` – Plan del sistema de tickets y soporte.
+- **Testing SaaS**: `docs/SAAS_TESTING_PLAN.md` – Plan de pruebas para la gestión SaaS.

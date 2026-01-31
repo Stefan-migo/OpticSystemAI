@@ -117,31 +117,32 @@ export function BranchProvider({ children }: BranchProviderProps) {
         // Regular admin: use server values (they have assigned branches)
         setIsGlobalView(data.isGlobalView || false);
 
-        if (data.currentBranch) {
-          const branch = data.branches?.find(
-            (b: Branch) => b.id === data.currentBranch,
+        // Check localStorage first, but validate it exists in available branches
+        const savedBranchId = localStorage.getItem(STORAGE_KEY);
+        let branchToUse: Branch | undefined;
+
+        if (savedBranchId && savedBranchId !== "global") {
+          // Validate saved branch still exists and user has access
+          branchToUse = data.branches?.find(
+            (b: Branch) => b.id === savedBranchId,
           );
-          if (branch) {
-            setCurrentBranchState(branch);
-            localStorage.setItem(STORAGE_KEY, branch.id);
-          } else {
-            // Use first available branch
-            const firstBranch = data.branches?.[0];
-            if (firstBranch) {
-              setCurrentBranchState(firstBranch);
-              localStorage.setItem(STORAGE_KEY, firstBranch.id);
-            }
-          }
-        } else {
-          // Use primary branch or first available
-          const primaryBranch = data.branches?.find(
-            (b: Branch) => b.is_primary,
-          );
-          const branch = primaryBranch || data.branches?.[0];
-          if (branch) {
-            setCurrentBranchState(branch);
-            localStorage.setItem(STORAGE_KEY, branch.id);
-          }
+        }
+
+        // If no valid saved branch, use primary branch or first available
+        if (!branchToUse) {
+          branchToUse =
+            data.branches?.find((b: Branch) => b.is_primary) ||
+            data.branches?.[0];
+        }
+
+        if (branchToUse) {
+          setCurrentBranchState(branchToUse);
+          localStorage.setItem(STORAGE_KEY, branchToUse.id);
+        } else if (data.branches && data.branches.length > 0) {
+          // Fallback: use first branch if no primary found
+          const firstBranch = data.branches[0];
+          setCurrentBranchState(firstBranch);
+          localStorage.setItem(STORAGE_KEY, firstBranch.id);
         }
       }
 

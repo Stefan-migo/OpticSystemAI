@@ -199,3 +199,104 @@ export async function PATCH(
     );
   }
 }
+
+/**
+ * DELETE /api/admin/saas-management/users/[id]
+ * Eliminar usuario completamente (elimina auth.users, admin_users, profiles, etc.)
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    await requireRoot(request);
+    const supabaseServiceRole = createServiceRoleClient();
+
+    const { id } = params;
+
+    // Verificar que el usuario existe
+    const { data: existingUser } = await supabaseServiceRole
+      .from("admin_users")
+      .select("id, email, role, organization_id")
+      .eq("id", id)
+      .single();
+
+    if (!existingUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Prevenir eliminación de usuarios root/dev
+    if (existingUser.role === "root" || existingUser.role === "dev") {
+      return NextResponse.json(
+        {
+          error: "Cannot delete root or dev users",
+          details: "Root and dev users are protected and cannot be deleted",
+        },
+        { status: 403 },
+      );
+    }
+
+    // Verificar confirmación en el body (opcional pero recomendado)
+    let body: { confirm?: boolean } = {};
+    try {
+      const bodyText = await request.text();
+      if (bodyText) {
+        body = JSON.parse(bodyText);
+      }
+    } catch {
+      // Si no hay body o no es JSON válido, continuar sin confirmación
+    }
+
+    logger.info(`Deleting user ${id} (${existingUser.email})`);
+
+    // Eliminar admin_branch_access primero
+    await supabaseServiceRole
+      .from("admin_branch_access")
+      .delete()
+      .eq("admin_user_id", id);
+
+    // Eliminar admin_users (esto activará CASCADE en admin_activity_log)
+    await supabaseServiceRole.from("admin_users").delete().eq("id", id);
+
+    // Eliminar el usuario de auth.users (esto activará CASCADE en profiles)
+    const { error: deleteAuthError } =
+      await supabaseServiceRole.auth.admin.deleteUser(id);
+
+    if (deleteAuthError) {
+      logger.error("Error deleting auth user", deleteAuthError);
+      // No hacer rollback porque admin_users ya fue eliminado
+      return NextResponse.json(
+        {
+          error: "Failed to delete auth user",
+          details: deleteAuthError.message,
+          warning:
+            "User admin record was deleted but auth user deletion failed",
+        },
+        { status: 500 },
+      );
+    }
+
+    logger.info(`User deleted successfully: ${id} (${existingUser.email})`);
+
+    return NextResponse.json({
+      success: true,
+      message: "Usuario eliminado completamente",
+      deleted: {
+        userId: id,
+        email: existingUser.email,
+      },
+    });
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    logger.error("Error deleting user", error);
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
+}

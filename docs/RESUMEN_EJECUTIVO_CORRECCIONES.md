@@ -161,6 +161,33 @@ El sistema implementará la siguiente jerarquía de roles:
 3. ✅ Implementar correcciones críticas (Sprint 1)
 4. ✅ Testing de correcciones
 5. ✅ Continuar con implementación completa
+6. ✅ Gestión SaaS completa implementada (organizaciones, usuarios, suscripciones, tiers, soporte)
+7. ✅ Correcciones post-implementación aplicadas (APIs 500, páginas de detalle, UI)
+
+---
+
+## Implementación Completada y Correcciones (30-Ene-2026)
+
+### Estado actual
+
+- **Gestión SaaS**: Implementada y operativa. Rutas: dashboard, organizaciones (listado + detalle), usuarios (listado + detalle), suscripciones (listado + detalle), tiers, soporte (búsqueda + tickets).
+- **Usuario root/dev**: Redirección a `/admin/saas-management/dashboard` tras login; tour deshabilitado; sin requisito de organización.
+
+### Correcciones técnicas aplicadas
+
+1. **APIs 500**: Se eliminaron relaciones complejas en Supabase (`select` con joins a `profiles`, `organizations`, etc.). Las APIs ahora hacen `select("*")` y enriquecen con consultas separadas (owner, organización, perfiles, sucursales). Afecta: organizations (listado y detalle), users (listado y detalle), subscriptions (listado, detalle, filtro por tier), support/tickets.
+2. **Páginas de detalle**: Creadas `users/[id]/page.tsx` y `subscriptions/[id]/page.tsx`; existía `organizations/[id]/page.tsx`. Todas usan APIs simplificadas.
+3. **Botón "Volver"**: Añadido en organizaciones, usuarios, suscripciones, tiers y soporte (vuelta al dashboard SaaS).
+4. **Organizations page**: Corregido import de `ArrowLeft` (lucide-react).
+5. **Support page**: `SelectItem` con `value=""` sustituido por `value="all"`; estado inicial de filtros en `"all"`; al cargar tickets no se envían `status`, `priority` ni `category` cuando son `"all"`.
+6. **Support tickets API**: Query simplificada; tickets enriquecidos con organización y usuarios por consultas separadas.
+
+### Documentación de referencia
+
+- Plan completo: `docs/PLAN_GESTION_SAAS_OPTTIUS.md` (sección 10: Implementación completada).
+- Detalles técnicos: `docs/IMPLEMENTACION_DETALLES_TECNICOS.md`.
+- Soporte SaaS: `docs/SAAS_SUPPORT_SYSTEM_PLAN.md`.
+- Testing SaaS: `docs/SAAS_TESTING_PLAN.md`.
 
 ---
 

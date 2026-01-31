@@ -149,6 +149,7 @@ export async function POST(
         customerName,
         appointment.appointment_date,
         appointment.appointment_time,
+        appointment.branch_id ?? undefined,
       ).catch((err) => logger.warn("Error creating notification", err));
     }
 

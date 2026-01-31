@@ -7,7 +7,7 @@
  * 
  * Ejemplos:
  *   node scripts/generate-ai-insights-direct.js dashboard
- *   node scripts/generate-ai-insights-direct.js inventory demo-admin@optica-demo.cl
+ *   node scripts/generate-ai-insights-direct.js inventory $DEMO_ADMIN_EMAIL
  */
 
 require('dotenv').config({ path: '.env.local' });
@@ -187,7 +187,7 @@ async function generateInsightsForSection(section, userEmail) {
 
 // Main
 const sectionArg = process.argv[2];
-const userEmail = process.argv[3] || 'demo-admin@optica-demo.cl';
+const userEmail = process.argv[3] || process.env.DEMO_ADMIN_EMAIL || '';
 
 const sectionsToProcess = sectionArg ? [sectionArg] : sections;
 

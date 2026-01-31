@@ -151,15 +151,18 @@ export async function POST(
       }
     }
 
-    // Add lens as custom item (lens_complete type)
-    if (quote.lens_type && quote.lens_material) {
+    // Add optical lens as custom item (lens_complete type)
+    if (
+      quote.lens_type &&
+      quote.lens_type !== "Lentes de contacto" &&
+      quote.lens_material
+    ) {
       items.push({
         type: "lens_complete",
-        id: `lens-${quote.id}`, // Temporary ID for cart
+        id: `lens-${quote.id}`,
         name: `Lente ${quote.lens_type} ${quote.lens_material}`,
         price: quote.lens_cost || 0,
         quantity: 1,
-        // Lens metadata
         lens_family_id: quote.lens_family_id,
         lens_type: quote.lens_type,
         lens_material: quote.lens_material,
@@ -169,6 +172,25 @@ export async function POST(
         lens_tint_percentage: quote.lens_tint_percentage,
         treatments_cost: quote.treatments_cost || 0,
         labor_cost: quote.labor_cost || 0,
+        prescription_id: quote.prescription_id,
+      });
+    }
+
+    // Add contact lens as item when quote is for contact lenses
+    if (
+      quote.lens_type === "Lentes de contacto" ||
+      quote.contact_lens_family_id
+    ) {
+      const contactLensPrice =
+        quote.contact_lens_price ?? quote.contact_lens_cost ?? 0;
+      items.push({
+        type: "contact_lens",
+        id: `contact-lens-${quote.id}`,
+        name: `Lentes de Contacto${quote.contact_lens_quantity > 1 ? ` - ${quote.contact_lens_quantity} caja(s)` : ""}`,
+        price: contactLensPrice,
+        quantity: 1,
+        contact_lens_family_id: quote.contact_lens_family_id,
+        contact_lens_quantity: quote.contact_lens_quantity || 1,
         prescription_id: quote.prescription_id,
       });
     }
@@ -192,12 +214,16 @@ export async function POST(
       },
       notes: quote.customer_notes || null,
       internalNotes: quote.notes || null,
-      // Include original quote data for reference
+      // Include original quote data for reference (form pre-fill)
       originalQuote: {
         frame_cost: quote.frame_cost || 0,
         lens_cost: quote.lens_cost || 0,
         treatments_cost: quote.treatments_cost || 0,
         labor_cost: quote.labor_cost || 0,
+        contact_lens_family_id: quote.contact_lens_family_id || null,
+        contact_lens_quantity: quote.contact_lens_quantity || 1,
+        contact_lens_cost: quote.contact_lens_cost || 0,
+        contact_lens_price: quote.contact_lens_price || 0,
       },
     });
   } catch (error) {

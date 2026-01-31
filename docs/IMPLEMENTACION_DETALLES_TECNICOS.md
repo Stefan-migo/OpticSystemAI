@@ -1167,10 +1167,50 @@ node scripts/create-root-user.js root@opttius.com SecurePassword123 Root Admin
 
 ## 8. Próximos Pasos
 
-1. Implementar correcciones críticas (Fase 1)
-2. Crear migración de base de datos para rol root
-3. Crear middleware de protección
-4. Implementar registro de usuarios con organización
-5. Corregir gráficos y mensajes
-6. Testing completo
-7. Continuar con Fase 2 (Gestión SaaS completa)
+1. ✅ Implementar correcciones críticas (Fase 1)
+2. ✅ Crear migración de base de datos para rol root
+3. ✅ Crear middleware de protección
+4. ✅ Implementar registro de usuarios con organización
+5. ✅ Corregir gráficos y mensajes
+6. Testing completo (E2E pendiente)
+7. ✅ Continuar con Fase 2 (Gestión SaaS completa)
+8. Phase SaaS 1: Billing (Stripe, Tier Enforcement)
+
+---
+
+## 9. Notas Post-Implementación (30-Ene-2026)
+
+### 9.1 APIs de Gestión SaaS – Relaciones en Supabase
+
+Las APIs que usaban `select()` con relaciones anidadas (ej. `owner:profiles!organizations_owner_id_fkey`, `organization:organizations(...)`) generaban errores 500. **Solución aplicada**:
+
+- **Query principal**: Usar solo `select("*")` o campos directos de la tabla.
+- **Datos relacionados**: Obtener en consultas separadas (organización, owner, perfiles, sucursales, etc.) y enriquecer la respuesta en el handler.
+
+**Archivos afectados**:
+
+- `src/app/api/admin/saas-management/organizations/route.ts` y `[id]/route.ts`
+- `src/app/api/admin/saas-management/users/route.ts` y `[id]/route.ts`
+- `src/app/api/admin/saas-management/subscriptions/route.ts` y `[id]/route.ts`
+- `src/app/api/admin/saas-management/support/tickets/route.ts`
+
+### 9.2 Páginas de Detalle Creadas
+
+- **Usuarios**: `src/app/admin/saas-management/users/[id]/page.tsx` – Detalle de usuario (perfil, organización, sucursales, actividad).
+- **Suscripciones**: `src/app/admin/saas-management/subscriptions/[id]/page.tsx` – Detalle de suscripción (período, Stripe, organización).
+
+La página `organizations/[id]/page.tsx` ya existía; su API se simplificó de la misma forma.
+
+### 9.3 UI y Navegación
+
+- **Botón "Volver"**: Añadido en organizaciones, usuarios, suscripciones, tiers y soporte (vuelta a `/admin/saas-management/dashboard`).
+- **Organizations page**: Import de `ArrowLeft` desde `lucide-react` (evitar `ReferenceError`).
+- **Support page**: `SelectItem` no puede tener `value=""` (Radix Select). Usar `value="all"` y estado inicial de filtros en `"all"`. Al llamar a la API de tickets, no enviar `status`, `priority` ni `category` cuando su valor es `"all"`.
+
+### 9.4 Referencia de Documentación
+
+- Plan completo y estado: `docs/PLAN_GESTION_SAAS_OPTTIUS.md` (sección 10).
+- Resumen ejecutivo: `docs/RESUMEN_EJECUTIVO_CORRECCIONES.md`.
+- Estado del proyecto: `docs/ESTADO_ACTUAL_PROYECTO.md`.
+- Soporte SaaS: `docs/SAAS_SUPPORT_SYSTEM_PLAN.md`.
+- Testing SaaS: `docs/SAAS_TESTING_PLAN.md`.

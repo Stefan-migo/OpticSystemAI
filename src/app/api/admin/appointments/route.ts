@@ -233,9 +233,20 @@ export async function POST(request: NextRequest) {
       isGlobalView: branchContext.isGlobalView,
     });
 
-    // Validate branch access for non-super admins
-    if (!branchContext.isSuperAdmin && !branchContext.branchId) {
-      logger.warn("No branch selected for non-super admin");
+    // For non-super admins with assigned branches: use default branch when none selected
+    // (users who cannot select branch manually should still create appointments in their branch)
+    const defaultBranchForNonSuperAdmin =
+      !branchContext.isSuperAdmin && branchContext.accessibleBranches.length > 0
+        ? branchContext.accessibleBranches.find((b) => b.isPrimary)?.id ||
+          branchContext.accessibleBranches[0]?.id
+        : null;
+    const effectiveBranchId =
+      branchContext.branchId || defaultBranchForNonSuperAdmin;
+
+    if (!branchContext.isSuperAdmin && !effectiveBranchId) {
+      logger.warn(
+        "No branch selected and no default branch for non-super admin",
+      );
       return NextResponse.json(
         {
           error: "Debe seleccionar una sucursal para crear citas",
@@ -267,7 +278,10 @@ export async function POST(request: NextRequest) {
     }
 
     // If branch_id is provided in validatedBody, use it (for super admins)
-    const finalBranchId = validatedBody.branch_id || branchContext.branchId;
+    const finalBranchId =
+      validatedBody.branch_id ||
+      branchContext.branchId ||
+      defaultBranchForNonSuperAdmin;
 
     // Final validation: ensure we have a branch_id (required by database)
     if (!finalBranchId) {
@@ -550,6 +564,7 @@ export async function POST(request: NextRequest) {
         customerName,
         appointmentWithCustomer.appointment_date,
         appointmentWithCustomer.appointment_time,
+        appointmentWithCustomer.branch_id ?? undefined,
       ).catch((err) => logger.error("Error creating notification", err));
     }
 

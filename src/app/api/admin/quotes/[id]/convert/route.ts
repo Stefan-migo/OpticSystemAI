@@ -166,6 +166,7 @@ export async function POST(
       quote.quote_number,
       newWorkOrder.id,
       newWorkOrder.work_order_number,
+      quote.branch_id ?? newWorkOrder.branch_id ?? undefined,
     ).catch((err) => logger.warn("Error creating notification", err));
 
     // Also notify about new work order
@@ -180,6 +181,7 @@ export async function POST(
       newWorkOrder.work_order_number,
       customerName,
       newWorkOrder.total_amount,
+      newWorkOrder.branch_id ?? undefined,
     ).catch((err) => logger.warn("Error creating notification", err));
 
     return NextResponse.json({

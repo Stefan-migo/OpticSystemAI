@@ -159,3 +159,86 @@ export async function PATCH(
     );
   }
 }
+
+/**
+ * DELETE /api/admin/saas-management/subscriptions/[id]
+ * Eliminar suscripción completamente
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    await requireRoot(request);
+    const supabaseServiceRole = createServiceRoleClient();
+
+    const { id } = params;
+
+    // Verificar que la suscripción existe
+    const { data: existingSub } = await supabaseServiceRole
+      .from("subscriptions")
+      .select("id, organization_id, stripe_subscription_id")
+      .eq("id", id)
+      .single();
+
+    if (!existingSub) {
+      return NextResponse.json(
+        { error: "Subscription not found" },
+        { status: 404 },
+      );
+    }
+
+    // Verificar confirmación en el body (opcional pero recomendado)
+    let body: { confirm?: boolean } = {};
+    try {
+      const bodyText = await request.text();
+      if (bodyText) {
+        body = JSON.parse(bodyText);
+      }
+    } catch {
+      // Si no hay body o no es JSON válido, continuar sin confirmación
+    }
+
+    logger.info(`Deleting subscription ${id}`);
+
+    // Eliminar la suscripción
+    const { error: deleteError } = await supabaseServiceRole
+      .from("subscriptions")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      logger.error("Error deleting subscription", deleteError);
+      return NextResponse.json(
+        {
+          error: "Failed to delete subscription",
+          details: deleteError.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    logger.info(`Subscription deleted successfully: ${id}`);
+
+    return NextResponse.json({
+      success: true,
+      message: "Suscripción eliminada completamente",
+      deleted: {
+        subscriptionId: id,
+        organizationId: existingSub.organization_id,
+      },
+    });
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    logger.error("Error deleting subscription", error);
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
+}

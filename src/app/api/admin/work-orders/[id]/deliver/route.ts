@@ -179,6 +179,7 @@ export async function POST(
         id,
         updatedWorkOrder.work_order_number,
         customerName,
+        updatedWorkOrder.branch_id ?? undefined,
       ).catch((err) => logger.warn("Error creating notification", err));
     }
 

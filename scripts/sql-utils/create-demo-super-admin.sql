@@ -1,23 +1,28 @@
 -- Create SuperAdmin User for Demo Organization
 -- This script creates a super admin user and assigns them to the demo organization
--- 
--- IMPORTANT: Change the email and password before running this script
--- The password will be hashed using Supabase's auth system
+--
+-- IMPORTANT: Replace DEMO_EMAIL and DEMO_PASSWORD below with your demo credentials
+-- (use the same values as DEMO_ADMIN_EMAIL and DEMO_ADMIN_PASSWORD from .env.local)
+-- Do NOT commit real credentials to the repo.
 --
 -- Usage:
---   1. Edit this file and change DEMO_ADMIN_EMAIL and DEMO_ADMIN_PASSWORD
+--   1. Replace the placeholder values in the DECLARE block below
 --   2. Run: docker exec -i supabase_db_web psql -U postgres -d postgres < scripts/sql-utils/create-demo-super-admin.sql
---   OR use Supabase Studio SQL Editor
+--   OR use the Node script (recommended): node scripts/create-demo-super-admin.js
 
 DO $$
 DECLARE
   demo_org_id UUID := '00000000-0000-0000-0000-000000000001'::uuid;
   demo_branch_id UUID := '00000000-0000-0000-0000-000000000002'::uuid;
-  demo_admin_email TEXT := 'demo-admin@optica-demo.cl';
-  demo_admin_password TEXT := 'DemoAdmin123!';
+  demo_admin_email TEXT := 'REPLACE_WITH_DEMO_ADMIN_EMAIL';
+  demo_admin_password TEXT := 'REPLACE_WITH_DEMO_ADMIN_PASSWORD';
   user_id UUID;
   user_exists BOOLEAN := false;
 BEGIN
+  IF demo_admin_email = 'REPLACE_WITH_DEMO_ADMIN_EMAIL' OR demo_admin_password = 'REPLACE_WITH_DEMO_ADMIN_PASSWORD' THEN
+    RAISE EXCEPTION 'Edit this script and replace demo_admin_email and demo_admin_password with your demo credentials, or use: node scripts/create-demo-super-admin.js';
+  END IF;
+
   RAISE NOTICE '========================================';
   RAISE NOTICE 'Creating SuperAdmin for Demo Organization';
   RAISE NOTICE '========================================';
@@ -44,8 +49,8 @@ BEGIN
     RAISE NOTICE 'Method 1: Using Supabase Studio';
     RAISE NOTICE '   1. Go to Authentication > Users';
     RAISE NOTICE '   2. Click "Add user"';
-    RAISE NOTICE '   3. Email: %', demo_admin_email;
-    RAISE NOTICE '   4. Password: %', demo_admin_password;
+    RAISE NOTICE '   3. Email: (your DEMO_ADMIN_EMAIL)';
+    RAISE NOTICE '   4. Password: (your DEMO_ADMIN_PASSWORD)';
     RAISE NOTICE '   5. Auto-confirm: Yes';
     RAISE NOTICE '';
     RAISE NOTICE 'Method 2: Using Node.js script';
@@ -151,9 +156,8 @@ BEGIN
   RAISE NOTICE '✅ SuperAdmin created successfully!';
   RAISE NOTICE '========================================';
   RAISE NOTICE '';
-  RAISE NOTICE 'Credentials:';
+  RAISE NOTICE 'Credentials: (las que configuraste en el script)';
   RAISE NOTICE '  Email: %', demo_admin_email;
-  RAISE NOTICE '  Password: %', demo_admin_password;
   RAISE NOTICE '  Role: super_admin';
   RAISE NOTICE '  Organization: Óptica Demo Global';
   RAISE NOTICE '';
@@ -178,4 +182,5 @@ FROM public.admin_users au
 LEFT JOIN public.organizations o ON au.organization_id = o.id
 LEFT JOIN public.admin_branch_access aba ON au.id = aba.admin_user_id
 LEFT JOIN public.branches b ON aba.branch_id = b.id
-WHERE au.email = 'demo-admin@optica-demo.cl';
+-- Reemplaza con tu DEMO_ADMIN_EMAIL para verificar
+WHERE au.email = 'REPLACE_WITH_DEMO_ADMIN_EMAIL';

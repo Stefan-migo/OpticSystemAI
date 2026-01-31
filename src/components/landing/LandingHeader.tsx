@@ -4,31 +4,60 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Building2, LayoutDashboard } from "lucide-react";
+import { Menu, X, Building2, LayoutDashboard, Eye } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+
+type OrgStatus = {
+  hasOrganization: boolean;
+  isDemoMode: boolean;
+} | null;
 
 export function LandingHeader() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [orgStatus, setOrgStatus] = useState<OrgStatus>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function checkAuth() {
+    async function checkAuthAndOrg() {
       try {
         const supabase = createClient();
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        setIsAuthenticated(!!user);
+        const authenticated = !!user;
+        setIsAuthenticated(authenticated);
+
+        if (authenticated) {
+          try {
+            const res = await fetch("/api/admin/check-status", {
+              credentials: "include",
+            });
+            if (res.ok) {
+              const data = await res.json();
+              setOrgStatus({
+                hasOrganization: data.organization?.hasOrganization ?? false,
+                isDemoMode: data.organization?.isDemoMode ?? false,
+              });
+            } else {
+              setOrgStatus({ hasOrganization: false, isDemoMode: false });
+            }
+          } catch {
+            setOrgStatus({ hasOrganization: false, isDemoMode: false });
+          }
+        } else {
+          setOrgStatus(null);
+        }
       } catch (error) {
         console.error("Error checking auth:", error);
         setIsAuthenticated(false);
+        setOrgStatus(null);
       } finally {
         setIsLoading(false);
       }
     }
-    checkAuth();
+    checkAuthAndOrg();
   }, []);
 
   const navigation = [
@@ -79,13 +108,34 @@ export function LandingHeader() {
             {isLoading ? (
               <div className="h-10 w-32 bg-gray-100 animate-pulse rounded-md" />
             ) : isAuthenticated ? (
-              <Button
-                onClick={() => router.push("/admin")}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
-              >
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                Ir al Dashboard
-              </Button>
+              // Only show "Ir al Dashboard" when user has a real organization (not demo-only, not pending onboarding)
+              orgStatus?.hasOrganization && !orgStatus?.isDemoMode ? (
+                <Button
+                  onClick={() => router.push("/admin")}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                >
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  Ir al Dashboard
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => router.push("/onboarding/create")}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  >
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Activar tu Óptica
+                  </Button>
+                  <Button
+                    onClick={() => router.push("/onboarding/choice")}
+                    variant="outline"
+                    className="border-2 border-gray-300 hover:border-blue-600 hover:bg-blue-50"
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    Continúa con Óptica Demo
+                  </Button>
+                </>
+              )
             ) : (
               <>
                 <Button
@@ -137,16 +187,42 @@ export function LandingHeader() {
               {isLoading ? (
                 <div className="h-10 w-full bg-gray-100 animate-pulse rounded-md" />
               ) : isAuthenticated ? (
-                <Button
-                  onClick={() => {
-                    router.push("/admin");
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
-                >
-                  <LayoutDashboard className="mr-2 h-4 w-4" />
-                  Ir al Dashboard
-                </Button>
+                orgStatus?.hasOrganization && !orgStatus?.isDemoMode ? (
+                  <Button
+                    onClick={() => {
+                      router.push("/admin");
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  >
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Ir al Dashboard
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={() => {
+                        router.push("/onboarding/create");
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                    >
+                      <Building2 className="mr-2 h-4 w-4" />
+                      Activar tu Óptica
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        router.push("/onboarding/choice");
+                        setMobileMenuOpen(false);
+                      }}
+                      variant="outline"
+                      className="w-full border-2 border-gray-300 hover:border-blue-600 hover:bg-blue-50"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Continúa con Óptica Demo
+                    </Button>
+                  </>
+                )
               ) : (
                 <>
                   <Button

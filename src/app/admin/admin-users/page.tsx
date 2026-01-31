@@ -424,7 +424,7 @@ export default function AdminUsersPage() {
   };
 
   const getRoleBadge = (admin: AdminUser) => {
-    if (admin.is_super_admin) {
+    if (admin.is_super_admin || admin.role === "super_admin") {
       return (
         <Badge
           variant="default"
@@ -432,6 +432,22 @@ export default function AdminUsersPage() {
         >
           <Globe className="h-3 w-3" />
           Super Administrador
+        </Badge>
+      );
+    }
+    if (admin.role === "vendedor") {
+      return (
+        <Badge variant="secondary" className="flex items-center gap-1">
+          <User className="h-3 w-3" />
+          Vendedor
+        </Badge>
+      );
+    }
+    if (admin.role === "employee") {
+      return (
+        <Badge variant="secondary" className="flex items-center gap-1">
+          <User className="h-3 w-3" />
+          Empleado
         </Badge>
       );
     }

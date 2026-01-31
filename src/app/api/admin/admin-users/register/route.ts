@@ -73,6 +73,21 @@ function getDefaultPermissions(role: string) {
       work_orders: ["read", "update"], // Puede actualizar estado, no crear/eliminar
       pos: ["read", "create"], // Acceso completo a POS para ventas
     },
+    vendedor: {
+      // Acceso a ventas y citas en sucursal asignada (igual que employee)
+      orders: ["read", "create", "update"],
+      products: ["read"],
+      customers: ["read", "create", "update"],
+      analytics: [],
+      settings: [],
+      admin_users: [],
+      support: ["read", "create"],
+      bulk_operations: [],
+      appointments: ["read", "create", "update"],
+      quotes: ["read", "create", "update"],
+      work_orders: ["read", "update"],
+      pos: ["read", "create"],
+    },
   };
 
   return rolePermissions[role] || rolePermissions.admin;
@@ -132,12 +147,12 @@ export async function POST(request: NextRequest) {
 
     // Validar que el rol a crear es permitido
     // Root/dev puede crear cualquier rol
-    // Super admin puede crear: admin, employee, super_admin (de su org)
-    // Admin puede crear: admin, employee
+    // Super admin puede crear: admin, employee, vendedor, super_admin (de su org)
+    // Admin puede crear: admin, employee, vendedor
     if (!isRoot) {
       const allowedRoles = isSuperAdmin
-        ? ["admin", "employee", "super_admin"]
-        : ["admin", "employee"];
+        ? ["admin", "employee", "vendedor", "super_admin"]
+        : ["admin", "employee", "vendedor"];
 
       if (!allowedRoles.includes(role)) {
         return NextResponse.json(
@@ -159,6 +174,25 @@ export async function POST(request: NextRequest) {
       organizationId = currentAdminUser.organization_id;
     }
     // Root/dev puede crear usuarios sin organization_id (para otros root/dev)
+
+    // Validar límite de usuarios del tier cuando se crea usuario en una organización
+    if (organizationId) {
+      const { validateTierLimit } = await import("@/lib/saas/tier-validator");
+      const userLimit = await validateTierLimit(organizationId, "users");
+      if (!userLimit.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              userLimit.reason ??
+              "Límite de usuarios alcanzado para tu plan. Considera actualizar tu suscripción.",
+            code: "TIER_LIMIT",
+            currentCount: userLimit.currentCount,
+            maxAllowed: userLimit.maxAllowed,
+          },
+          { status: 403 },
+        );
+      }
+    }
 
     // Validar inputs
     if (!email || !password) {
@@ -205,29 +239,87 @@ export async function POST(request: NextRequest) {
       });
 
     if (createAuthError || !newAuthUser.user) {
-      logger.error("Error creating auth user", createAuthError);
+      logger.error("Error creating auth user", {
+        error: createAuthError,
+        email,
+        userId: currentUser.id,
+      });
       return NextResponse.json(
-        { error: "Error al crear usuario", details: createAuthError?.message },
+        {
+          error: "Error al crear usuario en el sistema de autenticación",
+          details:
+            createAuthError?.message || "Error desconocido al crear usuario",
+        },
         { status: 500 },
       );
     }
 
-    // Crear perfil
-    const { error: profileError } = await supabaseServiceRole
+    // Verificar si el perfil ya existe (puede ser creado por trigger on_auth_user_created)
+    // Esperar un momento para que el trigger se ejecute si existe
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const { data: existingProfile } = await supabaseServiceRole
       .from("profiles")
-      .insert({
-        id: newAuthUser.user.id,
-        email,
-        first_name: firstName,
-        last_name: lastName,
-      });
+      .select("id")
+      .eq("id", newAuthUser.user.id)
+      .maybeSingle();
+
+    // Crear o actualizar perfil
+    let profileError;
+    if (existingProfile) {
+      // El perfil ya existe (creado por trigger), actualizarlo
+      const { error: updateError } = await supabaseServiceRole
+        .from("profiles")
+        .update({
+          email,
+          first_name: firstName,
+          last_name: lastName,
+        })
+        .eq("id", newAuthUser.user.id);
+
+      profileError = updateError;
+    } else {
+      // El perfil no existe, crearlo
+      const { error: insertError } = await supabaseServiceRole
+        .from("profiles")
+        .insert({
+          id: newAuthUser.user.id,
+          email,
+          first_name: firstName,
+          last_name: lastName,
+        });
+
+      profileError = insertError;
+    }
 
     if (profileError) {
-      logger.error("Error creating profile", profileError);
+      logger.error("Error creating/updating profile", {
+        error: profileError,
+        userId: newAuthUser.user.id,
+        email,
+        code: profileError.code,
+        details: profileError.details,
+        hint: profileError.hint,
+        message: profileError.message,
+      });
       // Intentar eliminar el usuario de auth si falla el perfil
-      await supabaseServiceRole.auth.admin.deleteUser(newAuthUser.user.id);
+      try {
+        await supabaseServiceRole.auth.admin.deleteUser(newAuthUser.user.id);
+      } catch (deleteError) {
+        logger.warn(
+          "Failed to cleanup auth user after profile error",
+          deleteError,
+        );
+      }
       return NextResponse.json(
-        { error: "Error al crear perfil", details: profileError.message },
+        {
+          error: "Error al crear perfil del usuario",
+          details:
+            profileError.message ||
+            profileError.hint ||
+            profileError.details ||
+            "Error desconocido al crear perfil",
+        },
         { status: 500 },
       );
     }
@@ -247,15 +339,29 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (adminError) {
-      logger.error("Error creating admin user", adminError);
+      logger.error("Error creating admin user", {
+        error: adminError,
+        userId: newAuthUser.user.id,
+        email,
+        role,
+        organizationId,
+      });
       // Rollback: eliminar usuario y perfil
-      await supabaseServiceRole.auth.admin.deleteUser(newAuthUser.user.id);
-      await supabaseServiceRole
-        .from("profiles")
-        .delete()
-        .eq("id", newAuthUser.user.id);
+      try {
+        await supabaseServiceRole.auth.admin.deleteUser(newAuthUser.user.id);
+        await supabaseServiceRole
+          .from("profiles")
+          .delete()
+          .eq("id", newAuthUser.user.id);
+      } catch (rollbackError) {
+        logger.warn("Failed to rollback user creation", rollbackError);
+      }
       return NextResponse.json(
-        { error: "Error al crear administrador", details: adminError.message },
+        {
+          error: "Error al crear registro de administrador",
+          details:
+            adminError.message || "Error desconocido al crear administrador",
+        },
         { status: 500 },
       );
     }
@@ -284,7 +390,8 @@ export async function POST(request: NextRequest) {
           .insert({
             admin_user_id: newAdmin.id,
             branch_id: branch_id,
-            role: role === "employee" ? "employee" : "manager",
+            role:
+              role === "employee" || role === "vendedor" ? "staff" : "manager",
             is_primary: true,
           });
 

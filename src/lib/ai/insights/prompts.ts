@@ -74,14 +74,80 @@ function getDashboardPrompt(
   },
   additionalContext?: Record<string, any>,
 ): string {
+  // Detectar estado de la óptica
+  const isNewOrganization = additionalContext?.isNewOrganization || false;
+  const hasData =
+    (data.yesterdaySales !== undefined && data.yesterdaySales !== null) ||
+    (data.monthlyAverage !== undefined && data.monthlyAverage !== null) ||
+    (data.overdueWorkOrders !== undefined && data.overdueWorkOrders > 0) ||
+    (data.pendingQuotes !== undefined && data.pendingQuotes > 0);
+  const organizationAge = additionalContext?.organizationAge || 0; // días desde creación
+  const totalCustomers = additionalContext?.totalCustomers || 0;
+  const totalProducts = additionalContext?.totalProducts || 0;
+  const totalOrders = additionalContext?.totalOrders || 0;
+
+  // Determinar fase de la óptica
+  let organizationPhase = "new";
+  if (organizationAge > 90 && totalOrders > 50) {
+    organizationPhase = "established";
+  } else if (organizationAge > 30 && totalOrders > 10) {
+    organizationPhase = "growing";
+  } else if (organizationAge > 7 || totalOrders > 0) {
+    organizationPhase = "starting";
+  }
+
+  let phaseInstructions = "";
+  if (organizationPhase === "new") {
+    phaseInstructions = `
+ESTADO: Óptica nueva (menos de 7 días o sin órdenes)
+ENFOQUE: Bienvenida y guía de implementación inicial
+- Genera insights de bienvenida y ayuda para configurar el sistema
+- Sugiere pasos iniciales: agregar productos, crear clientes, configurar sucursales
+- Prioridad: 5-7 (importante pero no urgente)
+- Tipo: 'info' o 'opportunity'
+`;
+  } else if (organizationPhase === "starting") {
+    phaseInstructions = `
+ESTADO: Óptica en fase inicial (${organizationAge} días, ${totalOrders} órdenes)
+ENFOQUE: Guía para empezar a usar el sistema efectivamente
+- Sugiere completar configuración básica si falta
+- Recomienda empezar a registrar ventas y clientes
+- Prioridad: 6-8
+- Tipo: 'opportunity' o 'info'
+`;
+  } else if (organizationPhase === "growing") {
+    phaseInstructions = `
+ESTADO: Óptica en crecimiento (${organizationAge} días, ${totalOrders} órdenes)
+ENFOQUE: Optimización y mejores prácticas
+- Analiza métricas reales y sugiere mejoras
+- Identifica oportunidades de crecimiento
+- Prioridad: según métricas reales (5-9)
+- Tipo: 'warning', 'opportunity' o 'info' según contexto
+`;
+  } else {
+    phaseInstructions = `
+ESTADO: Óptica establecida (${organizationAge} días, ${totalOrders} órdenes)
+ENFOQUE: Análisis profundo y optimización continua
+- Analiza tendencias y patrones
+- Identifica problemas y oportunidades específicas
+- Prioridad: según análisis de datos (1-10)
+- Tipo: según análisis ('warning', 'opportunity', 'info', 'neutral')
+`;
+  }
+
   return `
 Eres el Gerente General de la óptica "${organizationName}".
 
+${phaseInstructions}
+
 Analiza las siguientes métricas:
-- Ventas de ayer: ${data.yesterdaySales || "N/A"}
-- Promedio mensual: ${data.monthlyAverage || "N/A"}
+- Ventas de ayer: ${data.yesterdaySales ?? "N/A"} ${data.yesterdaySales === 0 ? "(sin ventas aún)" : ""}
+- Promedio mensual: ${data.monthlyAverage ?? "N/A"} ${data.monthlyAverage === 0 ? "(sin datos históricos)" : ""}
 - Trabajos pendientes: ${data.overdueWorkOrders || 0}
 - Presupuestos pendientes: ${data.pendingQuotes || 0}
+- Total de clientes: ${totalCustomers}
+- Total de productos: ${totalProducts}
+- Total de órdenes: ${totalOrders}
 
 RUTAS DISPONIBLES EN EL SISTEMA (usa SOLO estas rutas):
 - Trabajos de laboratorio: /admin/work-orders (con filtros: ?status=ordered, ?status=sent_to_lab, etc.)
@@ -90,14 +156,33 @@ RUTAS DISPONIBLES EN EL SISTEMA (usa SOLO estas rutas):
 - Productos: /admin/products
 - Clientes: /admin/customers
 - POS: /admin/pos
+- Configuración: /admin/settings
 
-Tareas:
+Tareas según fase:
+${
+  organizationPhase === "new"
+    ? `
+1. Genera un mensaje de bienvenida cálido y profesional
+2. Sugiere los primeros pasos: agregar productos básicos, crear clientes de prueba
+3. Explica cómo usar el sistema para empezar a trabajar
+4. Prioridad: 5-7, Tipo: 'info' o 'opportunity'
+`
+    : organizationPhase === "starting"
+      ? `
+1. Verifica si hay datos básicos (productos, clientes)
+2. Sugiere empezar a registrar ventas si aún no lo han hecho
+3. Recomienda completar configuración faltante
+4. Prioridad: 6-8, Tipo: 'opportunity' o 'info'
+`
+      : `
 1. Compara las ventas de ayer con el promedio mensual
 2. Si hay trabajos pendientes, sugiere revisar /admin/work-orders?status=ordered
 3. Si hay presupuestos pendientes, sugiere revisar /admin/quotes?status=draft
-4. Genera un resumen ejecutivo de máximo 2 líneas
+4. Analiza tendencias y genera insights específicos basados en datos reales
 5. Si no hay problemas, genera un insight de tipo 'neutral' indicando que todo está en orden
-6. Asigna prioridad del 1 al 10 (10 = crítico, 1 = informativo)
+6. Asigna prioridad del 1 al 10 según la importancia real (10 = crítico, 1 = informativo)
+`
+}
 
 IMPORTANTE: Usa SOLO las rutas listadas arriba. NO inventes rutas que no existen.
 Ejemplos de action_url válidos:
@@ -105,12 +190,24 @@ Ejemplos de action_url válidos:
 - "/admin/quotes?status=draft"
 - "/admin/analytics"
 - "/admin/products"
+- "/admin/customers"
+- "/admin/settings"
 
-Ejemplos de insights:
+Ejemplos de insights según fase:
+${
+  organizationPhase === "new"
+    ? `
+- Bienvenida: tipo 'info', prioridad 5, action_url: "/admin/products"
+- Configuración inicial: tipo 'opportunity', prioridad 6, action_url: "/admin/settings"
+- Primeros pasos: tipo 'info', prioridad 5, action_url: "/admin/customers"
+`
+    : `
 - Si ventas < promedio: tipo 'warning', prioridad 7-8, action_url: "/admin/analytics"
 - Si trabajos pendientes > 0: tipo 'warning', prioridad 9-10, action_url: "/admin/work-orders?status=ordered"
 - Si presupuestos pendientes > 0: tipo 'opportunity', prioridad 6-7, action_url: "/admin/quotes?status=draft"
 - Si todo está bien: tipo 'neutral', prioridad 1-2
+`
+}
 `;
 }
 

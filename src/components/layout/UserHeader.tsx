@@ -21,7 +21,7 @@ export default function UserHeader() {
   const handleSignOut = async () => {
     const { error } = await signOut();
     if (!error) {
-      router.push("/login");
+      router.push("/");
     }
   };
 

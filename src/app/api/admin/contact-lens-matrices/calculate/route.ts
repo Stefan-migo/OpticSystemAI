@@ -138,14 +138,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If no result found, return appropriate error
+    // Si no hay resultado: configuración de la familia (matrices) o la receta no cae en ningún rango
     if (!calculation || calculation.length === 0) {
       return NextResponse.json(
         {
           error:
-            "No se encontró una matriz de precios para los parámetros especificados",
+            "No se encontró una matriz de precios para esta familia y receta. Comprueba que existan matrices de precios para esta familia (Productos → Lentes de contacto → Matrices) y que los valores de la receta (esfera, cilindro, eje, adición) entren en algún rango configurado.",
+          code: "NO_PRICE_MATRIX_MATCH",
         },
-        { status: 404 },
+        { status: 422 },
       );
     }
 

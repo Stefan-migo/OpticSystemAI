@@ -52,7 +52,32 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get("date");
     const closureDate = dateParam ? new Date(dateParam) : new Date();
-    const dateStr = closureDate.toISOString().split("T")[0]; // YYYY-MM-DD
+    let dateStr = closureDate.toISOString().split("T")[0]; // YYYY-MM-DD
+
+    // Align summary date with the currently open session if it differs
+    if (branchContext.branchId) {
+      const { data: openSession } = await supabaseServiceRole
+        .from("pos_sessions")
+        .select("id, opening_time")
+        .eq("branch_id", branchContext.branchId)
+        .eq("status", "open")
+        .order("opening_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (openSession?.opening_time) {
+        const sessionDateStr = openSession.opening_time.split("T")[0];
+        if (sessionDateStr !== dateStr) {
+          logger.warn("Summary date does not match open session date", {
+            requestedDate: dateStr,
+            sessionDate: sessionDateStr,
+            sessionId: openSession.id,
+            branchId: branchContext.branchId,
+          });
+          dateStr = sessionDateStr;
+        }
+      }
+    }
 
     // Build query for POS orders of the day
     let ordersQuery = supabaseServiceRole
@@ -398,27 +423,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Get date string early for use in queries
-    const dateStr = closure_date.split("T")[0];
+    let dateStr = closure_date.split("T")[0];
 
-    // Check if there's an open session for today and close it
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStart = today.toISOString();
-
-    // First, check if there's an open session (this is the one we need to close)
+    // Check if there's an open session for this branch and close it
+    // (Do not filter by date to avoid mismatches)
     const { data: openSession, error: openSessionError } =
       await supabaseServiceRole
         .from("pos_sessions")
-        .select("id, status, reopen_count")
+        .select("id, status, reopen_count, opening_time")
         .eq("branch_id", branchContext.branchId!)
         .eq("status", "open")
-        .gte("opening_time", todayStart)
         .order("opening_time", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
     if (openSessionError && openSessionError.code !== "PGRST116") {
       logger.error("Error checking open session", openSessionError);
       // Continue anyway, but log the error
+    }
+
+    // Align closure date with the session opening date if available
+    if (openSession?.opening_time) {
+      const sessionDateStr = openSession.opening_time.split("T")[0];
+      if (sessionDateStr !== dateStr) {
+        logger.warn("Closure date does not match session date", {
+          requestedDate: dateStr,
+          sessionDate: sessionDateStr,
+          sessionId: openSession.id,
+          branchId: branchContext.branchId,
+        });
+        dateStr = sessionDateStr;
+      }
     }
 
     // Get the session ID for the closure
@@ -685,14 +720,16 @@ export async function POST(request: NextRequest) {
     const cardMachineDifference =
       cardMachineDebitDifference + cardMachineCreditDifference;
 
-    // Get opening time (start of day)
-    const openedAt = new Date(`${dateStr}T00:00:00`);
+    // Get opening time (start of day or session opening time if available)
+    const openedAt = openSession?.opening_time
+      ? new Date(openSession.opening_time)
+      : new Date(`${dateStr}T00:00:00`);
 
     // Check if closure already exists for this branch and date
     const { data: existingClosure, error: existingClosureError } =
       await supabaseServiceRole
         .from("cash_register_closures")
-        .select("id, status")
+        .select("id, status, pos_session_id")
         .eq("branch_id", branchContext.branchId)
         .eq("closure_date", dateStr)
         .maybeSingle();
@@ -714,14 +751,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If a closure exists and is "closed", reject (can't close twice)
+    // If a closure exists and is "closed", only allow update if it matches the open session
+    const canUpdateClosedClosure =
+      existingClosure &&
+      existingClosure.status === "closed" &&
+      openSession &&
+      (!existingClosure.pos_session_id ||
+        existingClosure.pos_session_id === openSession.id);
+
     if (existingClosure && existingClosure.status === "closed") {
-      return NextResponse.json(
-        {
-          error: "Ya existe un cierre de caja para esta fecha y sucursal",
-        },
-        { status: 400 },
-      );
+      if (!canUpdateClosedClosure) {
+        return NextResponse.json(
+          {
+            error: "Ya existe un cierre de caja para esta fecha y sucursal",
+          },
+          { status: 400 },
+        );
+      }
+
+      logger.warn("Updating a closed closure due to open session", {
+        closureId: existingClosure.id,
+        sessionId: openSession?.id,
+        branchId: branchContext.branchId,
+        dateStr,
+      });
     }
 
     // Validate branch_id is not null before inserting
@@ -817,6 +870,14 @@ export async function POST(request: NextRequest) {
         currentStatus: existingClosure.status,
         newStatus: "closed",
       });
+      closureResponse = await supabaseServiceRole
+        .from("cash_register_closures")
+        .update(closureData)
+        .eq("id", existingClosure.id)
+        .select()
+        .single();
+    } else if (canUpdateClosedClosure && existingClosure) {
+      // Update closed closure only if it matches the open session (consistency repair)
       closureResponse = await supabaseServiceRole
         .from("cash_register_closures")
         .update(closureData)

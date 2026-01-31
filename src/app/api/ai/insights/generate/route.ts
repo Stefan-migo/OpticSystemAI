@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Get organization name
+      // Get organization name and metadata
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
-        .select("name")
+        .select("name, created_at")
         .eq("id", adminUser.organization_id)
         .single();
 
@@ -77,17 +77,58 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Calculate organization age
+      const orgCreatedAt = new Date(organization.created_at);
+      const now = new Date();
+      const organizationAge = Math.floor(
+        (now.getTime() - orgCreatedAt.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      // Get basic stats to determine organization state
+      const { count: totalCustomers } = await supabase
+        .from("customers")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", adminUser.organization_id);
+
+      const { count: totalProducts } = await supabase
+        .from("products")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", adminUser.organization_id);
+
+      const { count: totalOrders } = await supabase
+        .from("orders")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", adminUser.organization_id);
+
+      // Determine if organization is new
+      const isNewOrganization =
+        organizationAge < 7 ||
+        (totalOrders || 0) === 0 ||
+        (totalCustomers || 0) < 5;
+
+      // Enhance additional context with organization state
+      const enhancedContext = {
+        ...additionalContext,
+        organizationAge,
+        isNewOrganization,
+        totalCustomers: totalCustomers || 0,
+        totalProducts: totalProducts || 0,
+        totalOrders: totalOrders || 0,
+      };
+
       // Generate insights using LLM
       logger.info("Generating insights", {
         section,
         organizationId: adminUser.organization_id,
+        organizationAge,
+        isNewOrganization,
       });
 
       const insights = await generateInsights({
         section,
         data,
         organizationName: organization.name,
-        additionalContext,
+        additionalContext: enhancedContext,
         temperature: 0.7,
       });
 

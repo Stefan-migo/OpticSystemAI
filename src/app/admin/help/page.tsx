@@ -41,24 +41,20 @@ import {
   AlertCircle,
   XCircle,
   Send,
-  User,
-  Package,
-  Calendar,
-  Receipt,
+  HelpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  createOpticalInternalSupportTicketSchema,
-  createOpticalInternalSupportMessageSchema,
+  createSaasSupportTicketSchema,
+  createSaasSupportMessageSchema,
 } from "@/lib/api/validation/zod-schemas";
 import type { z } from "zod";
-import { useBranch } from "@/hooks/useBranch";
 
-type TicketForm = z.infer<typeof createOpticalInternalSupportTicketSchema>;
-type MessageForm = z.infer<typeof createOpticalInternalSupportMessageSchema>;
+type TicketForm = z.infer<typeof createSaasSupportTicketSchema>;
+type MessageForm = z.infer<typeof createSaasSupportMessageSchema>;
 
 interface Ticket {
   id: string;
@@ -69,21 +65,10 @@ interface Ticket {
   status: string;
   created_at: string;
   last_response_at: string | null;
-  customer?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-  } | null;
   assigned_to_user?: {
     id: string;
     email: string;
     role: string;
-  } | null;
-  branch?: {
-    id: string;
-    name: string;
-    code: string;
   } | null;
 }
 
@@ -91,7 +76,7 @@ const statusLabels: Record<string, string> = {
   open: "Abierto",
   assigned: "Asignado",
   in_progress: "En Progreso",
-  waiting_customer: "Esperando Cliente",
+  waiting_customer: "Esperando Tu Respuesta",
   resolved: "Resuelto",
   closed: "Cerrado",
 };
@@ -120,34 +105,24 @@ const priorityLabels: Record<string, string> = {
 };
 
 const categoryLabels: Record<string, string> = {
-  lens_issue: "Problema con Lente",
-  frame_issue: "Problema con Marco",
-  prescription_issue: "Problema con Receta",
-  delivery_issue: "Problema con Entrega",
-  payment_issue: "Problema con Pago",
-  appointment_issue: "Problema con Cita",
-  customer_complaint: "Queja del Cliente",
-  quality_issue: "Problema de Calidad",
+  technical: "Técnico",
+  billing: "Facturación",
+  feature_request: "Funcionalidad",
+  bug_report: "Bug",
+  account: "Cuenta",
   other: "Otro",
 };
 
-export default function OpticalInternalSupportPage() {
+export default function HelpPage() {
   const router = useRouter();
-  const { currentBranchId } = useBranch();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creatingTicket, setCreatingTicket] = useState(false);
-  const [customers, setCustomers] = useState<
-    Array<{ id: string; first_name: string; last_name: string; email: string }>
-  >([]);
-  const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [filters, setFilters] = useState({
     status: "all",
     priority: "all",
     category: "all",
-    branch_id: "all",
-    customer_id: "all",
     search: "",
   });
   const [pagination, setPagination] = useState({
@@ -162,49 +137,17 @@ export default function OpticalInternalSupportPage() {
     handleSubmit: handleSubmitTicket,
     formState: { errors: ticketErrors },
     reset: resetTicket,
-    watch: watchTicket,
-    setValue: setTicketValue,
   } = useForm<TicketForm>({
-    resolver: zodResolver(createOpticalInternalSupportTicketSchema),
+    resolver: zodResolver(createSaasSupportTicketSchema),
     defaultValues: {
       priority: "medium",
-      category: "other",
-      branch_id: currentBranchId || undefined,
+      category: "technical",
     },
   });
 
-  // Cargar clientes cuando se abre el diálogo
-  useEffect(() => {
-    if (showCreateDialog) {
-      loadCustomers();
-    }
-  }, [showCreateDialog]);
-
-  // Actualizar branch_id cuando cambia currentBranchId
-  useEffect(() => {
-    if (currentBranchId && !watchTicket("branch_id")) {
-      setTicketValue("branch_id", currentBranchId);
-    }
-  }, [currentBranchId, setTicketValue, watchTicket]);
-
   useEffect(() => {
     loadTickets();
-  }, [filters, pagination.page, currentBranchId]);
-
-  const loadCustomers = async () => {
-    setLoadingCustomers(true);
-    try {
-      const response = await fetch("/api/admin/customers?limit=100");
-      if (response.ok) {
-        const data = await response.json();
-        setCustomers(data.customers || []);
-      }
-    } catch (err) {
-      console.error("Error loading customers:", err);
-    } finally {
-      setLoadingCustomers(false);
-    }
-  };
+  }, [filters, pagination.page]);
 
   const loadTickets = async () => {
     setLoadingTickets(true);
@@ -220,17 +163,19 @@ export default function OpticalInternalSupportPage() {
         params.append("priority", filters.priority);
       if (filters.category && filters.category !== "all")
         params.append("category", filters.category);
-      if (filters.branch_id && filters.branch_id !== "all")
-        params.append("branch_id", filters.branch_id);
-      if (filters.customer_id && filters.customer_id !== "all")
-        params.append("customer_id", filters.customer_id);
       if (filters.search) params.append("search", filters.search);
 
       const response = await fetch(
-        `/api/admin/optical-support/tickets?${params.toString()}`,
+        `/api/admin/saas-management/support/tickets?${params.toString()}`,
       );
 
       if (!response.ok) {
+        if (response.status === 403) {
+          // Usuario no tiene acceso, mostrar mensaje amigable
+          setTickets([]);
+          setPagination((prev) => ({ ...prev, total: 0, totalPages: 0 }));
+          return;
+        }
         throw new Error("Error al cargar tickets");
       }
 
@@ -251,11 +196,14 @@ export default function OpticalInternalSupportPage() {
   const onSubmitTicket = async (data: TicketForm) => {
     setCreatingTicket(true);
     try {
-      const response = await fetch("/api/admin/optical-support/tickets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const response = await fetch(
+        "/api/admin/saas-management/support/tickets",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        },
+      );
 
       if (!response.ok) {
         const result = await response.json();
@@ -269,7 +217,7 @@ export default function OpticalInternalSupportPage() {
       loadTickets();
       // Redirigir al ticket creado
       if (result.ticket?.id) {
-        router.push(`/admin/support/tickets/${result.ticket.id}`);
+        router.push(`/admin/help/tickets/${result.ticket.id}`);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al crear ticket");
@@ -287,10 +235,13 @@ export default function OpticalInternalSupportPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Soporte Interno</h1>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <HelpCircle className="h-8 w-8" />
+            Centro de Ayuda
+          </h1>
           <p className="text-gray-600 mt-2">
-            Gestiona problemas internos con clientes (lentes, entregas, pagos,
-            etc.)
+            Contacta al equipo de soporte técnico de Opttius para resolver
+            dudas, reportar problemas o solicitar funcionalidades
           </p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
@@ -298,6 +249,25 @@ export default function OpticalInternalSupportPage() {
           Crear Ticket
         </Button>
       </div>
+
+      {/* Info Card */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-3">
+            <HelpCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-blue-900 mb-1">
+                ¿Necesitas ayuda?
+              </p>
+              <p className="text-sm text-blue-700">
+                Si tienes problemas con el sistema, errores técnicos, dudas
+                sobre funcionalidades o necesitas ayuda con tu cuenta, crea un
+                ticket de soporte y nuestro equipo te ayudará lo antes posible.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -366,7 +336,7 @@ export default function OpticalInternalSupportPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Estado</label>
               <Select
@@ -434,33 +404,6 @@ export default function OpticalInternalSupportPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Cliente</label>
-              <Select
-                value={filters.customer_id}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    customer_id: value,
-                    page: 1,
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos los clientes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los clientes</SelectItem>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.first_name} {customer.last_name} (
-                      {customer.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <label className="text-sm font-medium">Buscar</label>
               <div className="flex gap-2">
                 <Input
@@ -491,7 +434,7 @@ export default function OpticalInternalSupportPage() {
       {/* Tickets List */}
       <Card>
         <CardHeader>
-          <CardTitle>Tickets ({pagination.total})</CardTitle>
+          <CardTitle>Mis Tickets ({pagination.total})</CardTitle>
         </CardHeader>
         <CardContent>
           {loadingTickets ? (
@@ -508,7 +451,7 @@ export default function OpticalInternalSupportPage() {
                 (filters.category && filters.category !== "all") ||
                 filters.search
                   ? "No hay tickets que coincidan con los filtros"
-                  : "Crea tu primer ticket de soporte interno"}
+                  : "Crea tu primer ticket de soporte"}
               </p>
               {(!filters.status || filters.status === "all") &&
                 (!filters.priority || filters.priority === "all") &&
@@ -523,13 +466,10 @@ export default function OpticalInternalSupportPage() {
           ) : (
             <div className="space-y-2">
               {tickets.map((ticket) => (
-                <Link
-                  key={ticket.id}
-                  href={`/admin/support/tickets/${ticket.id}`}
-                >
+                <Link key={ticket.id} href={`/admin/help/tickets/${ticket.id}`}>
                   <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <div className="flex items-center gap-2 mb-1">
                         <span className="font-mono font-semibold text-sm">
                           {ticket.ticket_number}
                         </span>
@@ -542,23 +482,11 @@ export default function OpticalInternalSupportPage() {
                         <Badge variant="outline">
                           {categoryLabels[ticket.category]}
                         </Badge>
-                        {ticket.branch && (
-                          <Badge variant="outline" className="text-xs">
-                            {ticket.branch.name}
-                          </Badge>
-                        )}
                       </div>
                       <h3 className="font-medium text-gray-900">
                         {ticket.subject}
                       </h3>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 flex-wrap">
-                        {ticket.customer && (
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {ticket.customer.first_name}{" "}
-                            {ticket.customer.last_name}
-                          </span>
-                        )}
+                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                         {ticket.assigned_to_user && (
                           <span>
                             Asignado a: {ticket.assigned_to_user.email}
@@ -627,12 +555,11 @@ export default function OpticalInternalSupportPage() {
 
       {/* Create Ticket Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Crear Ticket de Soporte Interno</DialogTitle>
+            <DialogTitle>Crear Ticket de Soporte</DialogTitle>
             <DialogDescription>
-              Registra un problema interno relacionado con un cliente (lente,
-              entrega, pago, etc.)
+              Describe tu problema o solicitud y nuestro equipo te ayudará
             </DialogDescription>
           </DialogHeader>
           <form
@@ -645,8 +572,10 @@ export default function OpticalInternalSupportPage() {
                   Categoría <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={watchTicket("category")}
-                  onValueChange={(value) => setTicketValue("category", value)}
+                  {...registerTicket("category")}
+                  onValueChange={(value) =>
+                    registerTicket("category").onChange({ target: { value } })
+                  }
                 >
                   <SelectTrigger
                     id="category"
@@ -674,8 +603,10 @@ export default function OpticalInternalSupportPage() {
                   Prioridad <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={watchTicket("priority")}
-                  onValueChange={(value) => setTicketValue("priority", value)}
+                  {...registerTicket("priority")}
+                  onValueChange={(value) =>
+                    registerTicket("priority").onChange({ target: { value } })
+                  }
                 >
                   <SelectTrigger
                     id="priority"
@@ -697,41 +628,6 @@ export default function OpticalInternalSupportPage() {
                   </p>
                 )}
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="customer_id">Cliente (opcional)</Label>
-              <Select
-                value={watchTicket("customer_id") || "__none__"}
-                onValueChange={(value) =>
-                  setTicketValue(
-                    "customer_id",
-                    value === "__none__" ? undefined : value,
-                  )
-                }
-              >
-                <SelectTrigger id="customer_id">
-                  <SelectValue placeholder="Selecciona un cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Sin cliente</SelectItem>
-                  {loadingCustomers ? (
-                    <SelectItem value="__loading__" disabled>
-                      Cargando clientes...
-                    </SelectItem>
-                  ) : (
-                    customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.first_name} {customer.last_name} (
-                        {customer.email})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">
-                Si el problema está relacionado con un cliente específico
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -758,7 +654,7 @@ export default function OpticalInternalSupportPage() {
               <Textarea
                 id="description"
                 {...registerTicket("description")}
-                placeholder="Describe el problema en detalle..."
+                placeholder="Describe tu problema o solicitud en detalle..."
                 rows={6}
                 className={ticketErrors.description ? "border-red-500" : ""}
               />
@@ -768,8 +664,8 @@ export default function OpticalInternalSupportPage() {
                 </p>
               )}
               <p className="text-xs text-gray-500">
-                Mínimo 10 caracteres. Describe el problema y cómo se resolvió o
-                se está resolviendo.
+                Mínimo 10 caracteres. Sé lo más específico posible para
+                ayudarnos a resolver tu problema más rápido.
               </p>
             </div>
 

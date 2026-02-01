@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Root/super admin only sees SaaS-related notifications (Gestión SaaS Opttius)
-    const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
+    // Check if user is root/dev
+    const { data: isRootUser } = await supabase.rpc("is_root_user", {
       user_id: user.id,
     });
 
@@ -46,42 +46,16 @@ export async function GET(request: NextRequest) {
     const unreadOnly = url.searchParams.get("unread_only") === "true";
     const type = url.searchParams.get("type");
 
-    const isRoot = !!isSuperAdmin;
+    const isRoot = !!isRootUser;
 
-    // Root: only SaaS (target_admin_role=root or assigned SaaS ticket). No óptica notifications.
-    // Non-root: only own + broadcast-to-all (exclude root-only). Then filter by branch when possible.
+    // RLS policies handle filtering by organization_id and branch_id automatically
+    // We just need to apply additional filters (unread, type) and pagination
     let query = supabase
       .from("admin_notifications")
       .select("*", { count: "exact" })
       .eq("is_archived", false)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
-
-    if (isRoot) {
-      const baseFilter = `target_admin_role.eq.root,and(target_admin_id.eq.${user.id},related_entity_type.eq.saas_support_ticket)`;
-      query = query.or(baseFilter);
-    } else {
-      // Exclude root-only: (target_admin_id = me) OR (target_admin_id null AND target_admin_role null)
-      const visibilityFilter = `target_admin_id.eq.${user.id},and(target_admin_id.is.null,target_admin_role.is.null)`;
-      query = query.or(visibilityFilter);
-
-      // Each óptica only sees notifications for their org: branch_id null (legacy) or branch_id in user's branches
-      const { data: userBranches } = await supabase.rpc("get_user_branches", {
-        user_id: user.id,
-      });
-      const branchIds = (userBranches || [])
-        .map((r: { branch_id: string }) => r.branch_id)
-        .filter(Boolean);
-      if (branchIds.length > 0) {
-        query = query.or(
-          `branch_id.is.null,branch_id.in.(${branchIds.join(",")})`,
-        );
-      }
-      // If user has no branches (edge case), only show branch_id null
-      else {
-        query = query.is("branch_id", null);
-      }
-    }
 
     // Apply filters
     if (unreadOnly) {
@@ -102,41 +76,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Unread count with same filters
-    let unreadCount: number;
-    if (isRoot) {
-      const baseFilter = `target_admin_role.eq.root,and(target_admin_id.eq.${user.id},related_entity_type.eq.saas_support_ticket)`;
-      const { count: rootUnread } = await supabase
-        .from("admin_notifications")
-        .select("id", { count: "exact", head: true })
-        .or(baseFilter)
-        .eq("is_archived", false)
-        .eq("is_read", false);
-      unreadCount = rootUnread ?? 0;
-    } else {
-      const visibilityFilter = `target_admin_id.eq.${user.id},and(target_admin_id.is.null,target_admin_role.is.null)`;
-      let countQuery = supabase
-        .from("admin_notifications")
-        .select("id", { count: "exact", head: true })
-        .or(visibilityFilter)
-        .eq("is_archived", false)
-        .eq("is_read", false);
-      const { data: userBranches } = await supabase.rpc("get_user_branches", {
-        user_id: user.id,
-      });
-      const branchIds = (userBranches || [])
-        .map((r: { branch_id: string }) => r.branch_id)
-        .filter(Boolean);
-      if (branchIds.length > 0) {
-        countQuery = countQuery.or(
-          `branch_id.is.null,branch_id.in.(${branchIds.join(",")})`,
-        );
-      } else {
-        countQuery = countQuery.is("branch_id", null);
-      }
-      const { count: nonRootUnread } = await countQuery;
-      unreadCount = nonRootUnread ?? 0;
-    }
+    // Unread count - RLS policies handle filtering automatically
+    const { count: unreadCount } = await supabase
+      .from("admin_notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("is_archived", false)
+      .eq("is_read", false);
 
     return NextResponse.json({
       notifications: notifications || [],

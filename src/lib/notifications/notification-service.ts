@@ -42,6 +42,8 @@ export interface CreateNotificationParams {
   targetAdminRole?: string;
   /** Branch ID for óptica-scoped notifications; null for SaaS/broadcast. */
   branchId?: string | null;
+  /** Organization ID for óptica-scoped notifications; null for SaaS (target_admin_role=root). Will be auto-detected from branchId if not provided. */
+  organizationId?: string | null;
 }
 
 export class NotificationService {
@@ -78,6 +80,50 @@ export class NotificationService {
       // Get priority (with override support)
       const priority = settingsData?.priority || params.priority || "medium";
 
+      // Determine organization_id
+      let organizationId: string | null = params.organizationId ?? null;
+
+      // If organization_id not provided but branch_id is, get it from branch
+      if (!organizationId && params.branchId) {
+        const { data: branch } = await supabase
+          .from("branches")
+          .select("organization_id")
+          .eq("id", params.branchId)
+          .single();
+        organizationId = branch?.organization_id || null;
+      }
+
+      // If organization_id still not set but related entity exists, try to get it from entity
+      if (
+        !organizationId &&
+        params.relatedEntityId &&
+        params.relatedEntityType
+      ) {
+        const entityTableMap: Record<string, string> = {
+          order: "orders",
+          quote: "quotes",
+          work_order: "lab_work_orders",
+          appointment: "appointments",
+          customer: "customers",
+          product: "products",
+        };
+
+        const tableName = entityTableMap[params.relatedEntityType];
+        if (tableName) {
+          const { data: entity } = await supabase
+            .from(tableName)
+            .select("organization_id")
+            .eq("id", params.relatedEntityId)
+            .single();
+          organizationId = entity?.organization_id || null;
+        }
+      }
+
+      // For SaaS notifications (target_admin_role=root), organization_id should be NULL
+      if (params.targetAdminRole === "root") {
+        organizationId = null;
+      }
+
       // Create notification (branch_id scopes to óptica; SaaS uses target_admin_role=root, no branch_id)
       const { error: insertError } = await supabase
         .from("admin_notifications")
@@ -94,6 +140,7 @@ export class NotificationService {
           target_admin_id: params.targetAdminId || null,
           target_admin_role: params.targetAdminRole || null,
           branch_id: params.branchId ?? null,
+          organization_id: organizationId,
           created_by_system: true,
         });
 

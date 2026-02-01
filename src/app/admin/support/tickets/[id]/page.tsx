@@ -13,11 +13,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Loader2,
   ArrowLeft,
-  Mail,
   Calendar,
   MessageSquare,
   CheckCircle2,
@@ -27,24 +33,42 @@ import {
   Send,
   User,
   Building2,
+  Edit,
+  UserPlus,
+  Package,
+  Receipt,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createSaasSupportMessageSchema } from "@/lib/api/validation/zod-schemas";
+import {
+  createOpticalInternalSupportMessageSchema,
+  updateOpticalInternalSupportTicketSchema,
+} from "@/lib/api/validation/zod-schemas";
 import type { z } from "zod";
+import { useBranch } from "@/hooks/useBranch";
 
-type MessageForm = z.infer<typeof createSaasSupportMessageSchema>;
+type MessageForm = z.infer<typeof createOpticalInternalSupportMessageSchema>;
+type UpdateTicketForm = z.infer<
+  typeof updateOpticalInternalSupportTicketSchema
+>;
 
 interface TicketMessage {
   id: string;
   message: string;
   sender_name: string;
   sender_email: string;
-  is_from_customer: boolean;
+  sender_role: string | null;
+  is_internal: boolean;
   created_at: string;
   message_type: string;
+  sender?: {
+    id: string;
+    email: string;
+    role: string;
+  } | null;
 }
 
 interface Ticket {
@@ -60,15 +84,53 @@ interface Ticket {
   first_response_at: string | null;
   last_response_at: string | null;
   resolution: string | null;
+  resolution_notes: string | null;
+  resolved_at: string | null;
+  assigned_to: string | null;
+  assigned_at: string | null;
+  customer?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  } | null;
+  branch?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
   assigned_to_user?: {
     id: string;
     email: string;
     role: string;
   } | null;
-  organization?: {
+  created_by_user?: {
     id: string;
-    name: string;
-    slug: string;
+    email: string;
+    role: string;
+  } | null;
+  resolved_by_user?: {
+    id: string;
+    email: string;
+    role: string;
+  } | null;
+  related_order?: {
+    id: string;
+    order_number: string;
+  } | null;
+  related_work_order?: {
+    id: string;
+    work_order_number: string;
+  } | null;
+  related_appointment?: {
+    id: string;
+    appointment_date: string;
+    appointment_time: string;
+  } | null;
+  related_quote?: {
+    id: string;
+    quote_number: string;
   } | null;
 }
 
@@ -76,7 +138,7 @@ const statusLabels: Record<string, string> = {
   open: "Abierto",
   assigned: "Asignado",
   in_progress: "En Progreso",
-  waiting_customer: "Esperando Tu Respuesta",
+  waiting_customer: "Esperando Cliente",
   resolved: "Resuelto",
   closed: "Cerrado",
 };
@@ -97,47 +159,97 @@ const priorityColors: Record<string, string> = {
   urgent: "bg-red-100 text-red-800",
 };
 
+const priorityLabels: Record<string, string> = {
+  low: "Baja",
+  medium: "Media",
+  high: "Alta",
+  urgent: "Urgente",
+};
+
 const categoryLabels: Record<string, string> = {
-  technical: "Técnico",
-  billing: "Facturación",
-  feature_request: "Funcionalidad",
-  bug_report: "Bug",
-  account: "Cuenta",
+  lens_issue: "Problema con Lente",
+  frame_issue: "Problema con Marco",
+  prescription_issue: "Problema con Receta",
+  delivery_issue: "Problema con Entrega",
+  payment_issue: "Problema con Pago",
+  appointment_issue: "Problema con Cita",
+  customer_complaint: "Queja del Cliente",
+  quality_issue: "Problema de Calidad",
   other: "Otro",
 };
 
-export default function OrganizationTicketDetailPage() {
+export default function OpticalInternalSupportTicketDetailPage() {
   const router = useRouter();
   const params = useParams();
   const ticketId = params.id as string;
+  const { currentBranchId } = useBranch();
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [updatingTicket, setUpdatingTicket] = useState(false);
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [adminUsers, setAdminUsers] = useState<
+    Array<{ id: string; email: string; role: string }>
+  >([]);
 
   const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
+    register: registerMessage,
+    handleSubmit: handleSubmitMessage,
+    formState: { errors: messageErrors },
+    reset: resetMessage,
   } = useForm<MessageForm>({
-    resolver: zodResolver(createSaasSupportMessageSchema),
+    resolver: zodResolver(createOpticalInternalSupportMessageSchema),
     defaultValues: {
       is_internal: false,
       message_type: "message",
     },
   });
 
+  const {
+    register: registerUpdate,
+    handleSubmit: handleSubmitUpdate,
+    formState: { errors: updateErrors },
+    reset: resetUpdate,
+    watch: watchUpdate,
+    setValue: setUpdateValue,
+  } = useForm<UpdateTicketForm>({
+    resolver: zodResolver(updateOpticalInternalSupportTicketSchema),
+  });
+
+  useEffect(() => {
+    if (ticket) {
+      setUpdateValue("status", ticket.status as any);
+      setUpdateValue("priority", ticket.priority as any);
+      setUpdateValue("assigned_to", ticket.assigned_to || undefined);
+      setUpdateValue("resolution", ticket.resolution || undefined);
+      setUpdateValue("resolution_notes", ticket.resolution_notes || undefined);
+    }
+  }, [ticket, setUpdateValue]);
+
   useEffect(() => {
     fetchTicket();
     fetchMessages();
+    fetchAdminUsers();
   }, [ticketId]);
+
+  const fetchAdminUsers = async () => {
+    try {
+      const response = await fetch("/api/admin/admin-users");
+      if (response.ok) {
+        const data = await response.json();
+        setAdminUsers(data.users || []);
+      }
+    } catch (err) {
+      console.error("Error loading admin users:", err);
+    }
+  };
 
   const fetchTicket = async () => {
     try {
       const response = await fetch(
-        `/api/admin/saas-management/support/tickets/${ticketId}`,
+        `/api/admin/optical-support/tickets/${ticketId}`,
       );
 
       if (!response.ok) {
@@ -156,17 +268,12 @@ export default function OrganizationTicketDetailPage() {
   const fetchMessages = async () => {
     try {
       const response = await fetch(
-        `/api/admin/saas-management/support/tickets/${ticketId}/messages`,
+        `/api/admin/optical-support/tickets/${ticketId}/messages`,
       );
 
       if (response.ok) {
         const data = await response.json();
-        // Filtrar solo mensajes públicos (sin internos)
-        setMessages(
-          (data.messages || []).filter(
-            (msg: TicketMessage) => !msg.is_internal,
-          ),
-        );
+        setMessages(data.messages || []);
       }
     } catch (err) {
       console.error("Error fetching messages:", err);
@@ -177,14 +284,11 @@ export default function OrganizationTicketDetailPage() {
     setSendingMessage(true);
     try {
       const response = await fetch(
-        `/api/admin/saas-management/support/tickets/${ticketId}/messages`,
+        `/api/admin/optical-support/tickets/${ticketId}/messages`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...data,
-            is_from_customer: true, // Los mensajes de organizaciones son del cliente
-          }),
+          body: JSON.stringify(data),
         },
       );
 
@@ -194,7 +298,7 @@ export default function OrganizationTicketDetailPage() {
       }
 
       toast.success("Mensaje enviado exitosamente");
-      reset();
+      resetMessage();
       fetchMessages();
       fetchTicket();
     } catch (err) {
@@ -203,6 +307,37 @@ export default function OrganizationTicketDetailPage() {
       );
     } finally {
       setSendingMessage(false);
+    }
+  };
+
+  const onSubmitUpdate = async (data: UpdateTicketForm) => {
+    setUpdatingTicket(true);
+    try {
+      const response = await fetch(
+        `/api/admin/optical-support/tickets/${ticketId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        },
+      );
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Error al actualizar ticket");
+      }
+
+      toast.success("Ticket actualizado exitosamente");
+      setShowUpdateDialog(false);
+      resetUpdate();
+      fetchTicket();
+      fetchMessages();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Error al actualizar ticket",
+      );
+    } finally {
+      setUpdatingTicket(false);
     }
   };
 
@@ -261,11 +396,15 @@ export default function OrganizationTicketDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowUpdateDialog(true)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
             <Badge className={statusColors[ticket.status]}>
               {statusLabels[ticket.status]}
             </Badge>
             <Badge className={priorityColors[ticket.priority]}>
-              {ticket.priority}
+              {priorityLabels[ticket.priority]}
             </Badge>
             <Badge variant="outline">{categoryLabels[ticket.category]}</Badge>
           </div>
@@ -298,6 +437,16 @@ export default function OrganizationTicketDetailPage() {
                     </p>
                   </div>
                 )}
+                {ticket.resolution_notes && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">
+                      Notas de Resolución
+                    </Label>
+                    <p className="mt-1 text-gray-900 whitespace-pre-wrap">
+                      {ticket.resolution_notes}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -321,8 +470,8 @@ export default function OrganizationTicketDetailPage() {
                       <div
                         key={msg.id}
                         className={`p-4 rounded-lg border ${
-                          msg.is_from_customer
-                            ? "bg-blue-50 border-blue-200"
+                          msg.is_internal
+                            ? "bg-yellow-50 border-yellow-200"
                             : "bg-gray-50 border-gray-200"
                         }`}
                       >
@@ -332,14 +481,24 @@ export default function OrganizationTicketDetailPage() {
                             <span className="font-medium text-sm">
                               {msg.sender_name}
                             </span>
-                            {msg.is_from_customer && (
+                            {msg.is_internal && (
                               <Badge variant="outline" className="text-xs">
-                                Tú
+                                Nota Interna
                               </Badge>
                             )}
-                            {!msg.is_from_customer && (
+                            {msg.message_type === "status_change" && (
                               <Badge variant="outline" className="text-xs">
-                                Soporte
+                                Cambio de Estado
+                              </Badge>
+                            )}
+                            {msg.message_type === "assignment" && (
+                              <Badge variant="outline" className="text-xs">
+                                Asignación
+                              </Badge>
+                            )}
+                            {msg.message_type === "resolution" && (
+                              <Badge variant="outline" className="text-xs">
+                                Resolución
                               </Badge>
                             )}
                           </div>
@@ -361,15 +520,15 @@ export default function OrganizationTicketDetailPage() {
             {ticket.status !== "resolved" && ticket.status !== "closed" && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Responder</CardTitle>
+                  <CardTitle>Agregar Mensaje</CardTitle>
                   <CardDescription>
-                    Agrega información adicional o responde a las preguntas del
-                    equipo de soporte
+                    Agrega información adicional o notas sobre la resolución del
+                    problema
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form
-                    onSubmit={handleSubmit(onSubmitMessage)}
+                    onSubmit={handleSubmitMessage(onSubmitMessage)}
                     className="space-y-4"
                   >
                     <div className="space-y-2">
@@ -378,16 +537,30 @@ export default function OrganizationTicketDetailPage() {
                       </Label>
                       <Textarea
                         id="message"
-                        {...register("message")}
-                        placeholder="Escribe tu respuesta aquí..."
+                        {...registerMessage("message")}
+                        placeholder="Escribe tu mensaje aquí..."
                         rows={6}
-                        className={errors.message ? "border-red-500" : ""}
+                        className={
+                          messageErrors.message ? "border-red-500" : ""
+                        }
                       />
-                      {errors.message && (
+                      {messageErrors.message && (
                         <p className="text-sm text-red-500">
-                          {errors.message.message}
+                          {messageErrors.message.message}
                         </p>
                       )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_internal"
+                        {...registerMessage("is_internal")}
+                        className="rounded"
+                      />
+                      <Label htmlFor="is_internal" className="text-sm">
+                        Nota interna (solo visible para el equipo)
+                      </Label>
                     </div>
 
                     <Button
@@ -418,20 +591,11 @@ export default function OrganizationTicketDetailPage() {
                 <AlertDescription>
                   Este ticket está{" "}
                   {ticket.status === "resolved" ? "resuelto" : "cerrado"}. Si
-                  necesitas más ayuda, puedes crear un nuevo ticket.
+                  necesitas agregar más información, puedes crear un nuevo
+                  ticket.
                 </AlertDescription>
               </Alert>
-            ) : (
-              ticket.status === "waiting_customer" && (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    El equipo de soporte está esperando tu respuesta. Por favor,
-                    responde lo antes posible.
-                  </AlertDescription>
-                </Alert>
-              )
-            )}
+            ) : null}
           </div>
 
           {/* Sidebar */}
@@ -442,6 +606,115 @@ export default function OrganizationTicketDetailPage() {
                 <CardTitle className="text-lg">Información</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {ticket.customer && (
+                  <div className="flex items-start gap-3">
+                    <User className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <Label className="text-xs text-gray-500">Cliente</Label>
+                      <p className="text-sm font-medium">
+                        {ticket.customer.first_name} {ticket.customer.last_name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {ticket.customer.email}
+                      </p>
+                      {ticket.customer.phone && (
+                        <p className="text-xs text-gray-500">
+                          {ticket.customer.phone}
+                        </p>
+                      )}
+                      <Link
+                        href={`/admin/customers/${ticket.customer.id}`}
+                        className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                      >
+                        Ver cliente →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                {ticket.branch && (
+                  <div className="flex items-start gap-3">
+                    <Building2 className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <Label className="text-xs text-gray-500">Sucursal</Label>
+                      <p className="text-sm font-medium">
+                        {ticket.branch.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {ticket.branch.code}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {ticket.related_order && (
+                  <div className="flex items-start gap-3">
+                    <Receipt className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <Label className="text-xs text-gray-500">
+                        Pedido Relacionado
+                      </Label>
+                      <Link
+                        href={`/admin/orders/${ticket.related_order.id}`}
+                        className="text-sm font-medium text-blue-600 hover:underline"
+                      >
+                        {ticket.related_order.order_number} →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                {ticket.related_work_order && (
+                  <div className="flex items-start gap-3">
+                    <Package className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <Label className="text-xs text-gray-500">
+                        Trabajo Relacionado
+                      </Label>
+                      <Link
+                        href={`/admin/work-orders/${ticket.related_work_order.id}`}
+                        className="text-sm font-medium text-blue-600 hover:underline"
+                      >
+                        {ticket.related_work_order.work_order_number} →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                {ticket.related_quote && (
+                  <div className="flex items-start gap-3">
+                    <FileText className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <Label className="text-xs text-gray-500">
+                        Presupuesto Relacionado
+                      </Label>
+                      <Link
+                        href={`/admin/quotes/${ticket.related_quote.id}`}
+                        className="text-sm font-medium text-blue-600 hover:underline"
+                      >
+                        {ticket.related_quote.quote_number} →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                {ticket.related_appointment && (
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <Label className="text-xs text-gray-500">
+                        Cita Relacionada
+                      </Label>
+                      <p className="text-sm font-medium">
+                        {new Date(
+                          ticket.related_appointment.appointment_date,
+                        ).toLocaleDateString("es-CL")}{" "}
+                        {ticket.related_appointment.appointment_time}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-start gap-3">
                   <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
                   <div>
@@ -449,6 +722,11 @@ export default function OrganizationTicketDetailPage() {
                     <p className="text-sm font-medium">
                       {new Date(ticket.created_at).toLocaleString("es-CL")}
                     </p>
+                    {ticket.created_by_user && (
+                      <p className="text-xs text-gray-500">
+                        Por: {ticket.created_by_user.email}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -470,7 +748,7 @@ export default function OrganizationTicketDetailPage() {
 
                 {ticket.assigned_to_user && (
                   <div className="flex items-start gap-3">
-                    <User className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <UserPlus className="h-5 w-5 text-gray-400 mt-0.5" />
                     <div>
                       <Label className="text-xs text-gray-500">
                         Asignado a
@@ -478,21 +756,163 @@ export default function OrganizationTicketDetailPage() {
                       <p className="text-sm font-medium">
                         {ticket.assigned_to_user.email}
                       </p>
+                      {ticket.assigned_at && (
+                        <p className="text-xs text-gray-500">
+                          {new Date(ticket.assigned_at).toLocaleDateString(
+                            "es-CL",
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {ticket.resolved_at && ticket.resolved_by_user && (
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <div>
+                      <Label className="text-xs text-gray-500">Resuelto</Label>
+                      <p className="text-sm font-medium">
+                        {new Date(ticket.resolved_at).toLocaleString("es-CL")}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Por: {ticket.resolved_by_user.email}
+                      </p>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
-
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                Los mensajes internos del equipo de soporte no son visibles en
-                esta vista.
-              </AlertDescription>
-            </Alert>
           </div>
         </div>
+
+        {/* Update Ticket Dialog */}
+        <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Actualizar Ticket</DialogTitle>
+              <DialogDescription>
+                Cambia el estado, prioridad o asignación del ticket
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              onSubmit={handleSubmitUpdate(onSubmitUpdate)}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="status">Estado</Label>
+                  <Select
+                    value={watchUpdate("status") || ticket.status}
+                    onValueChange={(value) =>
+                      setUpdateValue("status", value as any)
+                    }
+                  >
+                    <SelectTrigger id="status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(statusLabels).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Prioridad</Label>
+                  <Select
+                    value={watchUpdate("priority") || ticket.priority}
+                    onValueChange={(value) =>
+                      setUpdateValue("priority", value as any)
+                    }
+                  >
+                    <SelectTrigger id="priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(priorityLabels).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="assigned_to">Asignar a</Label>
+                <Select
+                  value={watchUpdate("assigned_to") || "__none__"}
+                  onValueChange={(value) =>
+                    setUpdateValue(
+                      "assigned_to",
+                      value === "__none__" ? undefined : value,
+                    )
+                  }
+                >
+                  <SelectTrigger id="assigned_to">
+                    <SelectValue placeholder="Sin asignar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin asignar</SelectItem>
+                    {adminUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.email} ({user.role})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="resolution">Resolución</Label>
+                <Textarea
+                  id="resolution"
+                  {...registerUpdate("resolution")}
+                  placeholder="Describe cómo se resolvió el problema..."
+                  rows={4}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="resolution_notes">Notas de Resolución</Label>
+                <Textarea
+                  id="resolution_notes"
+                  {...registerUpdate("resolution_notes")}
+                  placeholder="Notas adicionales sobre la resolución..."
+                  rows={3}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowUpdateDialog(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={updatingTicket}>
+                  {updatingTicket ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Actualizando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Actualizar
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

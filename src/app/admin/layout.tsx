@@ -32,6 +32,7 @@ import {
   Settings,
   ArrowRight,
   Sparkles,
+  HelpCircle,
 } from "lucide-react";
 import AdminNotificationDropdown from "@/components/admin/AdminNotificationDropdown";
 import Chatbot from "@/components/admin/Chatbot";
@@ -116,9 +117,9 @@ const createNavigationItems = (
   },
   {
     href: "/admin/support",
-    label: "Soporte",
+    label: "Soporte Interno",
     icon: MessageSquare,
-    description: "Tickets y atención al cliente",
+    description: "Gestión de problemas internos con clientes",
     badge:
       openTicketsCount !== undefined && openTicketsCount > 0
         ? openTicketsCount.toString()
@@ -408,14 +409,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           const quotes = data.kpis?.quotes || {};
           const appointments = data.kpis?.appointments || {};
 
-          // Fetch open tickets count (only for non-root users)
+          // Fetch open tickets count for internal support (only for non-root users)
           let openTicketsCount = 0;
           if (!isRoot) {
             try {
-              // Fetch tickets without status filter to count open ones
-              // This endpoint now supports organization access
+              // Fetch internal support tickets to count open ones
               const ticketsResponse = await fetch(
-                "/api/admin/saas-management/support/tickets?limit=100",
+                "/api/admin/optical-support/tickets?limit=100",
               );
               if (ticketsResponse.ok) {
                 const ticketsData = await ticketsResponse.json();
@@ -831,6 +831,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <BranchSelector />
               <ThemeSelector />
               <AdminNotificationDropdown />
+              <Link href="/admin/help">
+                <Button variant="ghost" size="icon" title="Centro de Ayuda">
+                  <HelpCircle className="h-5 w-5 text-admin-text-primary" />
+                </Button>
+              </Link>
               <Button variant="ghost" size="icon" onClick={handleSignOut}>
                 <LogOut className="h-5 w-5 text-admin-text-primary" />
               </Button>
@@ -900,6 +905,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                         title="Ver perfil"
                       >
                         <User className="h-5 w-5 text-admin-text-primary" />
+                      </Button>
+                    </Link>
+                    <Link href="/admin/help">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hover:bg-admin-bg-tertiary transition-colors"
+                        title="Centro de Ayuda"
+                      >
+                        <HelpCircle className="h-5 w-5 text-admin-text-primary" />
                       </Button>
                     </Link>
                     <Button

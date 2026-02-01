@@ -2,62 +2,57 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
+import businessConfig from "@/config/business";
 
 const plans = [
   {
-    name: "Basic",
+    name: "Standard",
     price: "$49",
     period: "mes",
-    description: "Perfecto para ópticas pequeñas",
+    description: "Para ópticas que inician su transformación digital.",
     features: [
       "1 sucursal",
       "Hasta 2 usuarios",
-      "Hasta 500 clientes",
-      "Hasta 100 productos",
+      "Hasta 500 pacientes",
+      "Inventario básico",
       "POS integrado",
-      "Sistema de citas",
-      "Presupuestos y órdenes",
-      "Soporte por email",
+      "Presupuestos & Órdenes",
+      "Soporte vía tickets",
     ],
     popular: false,
-    color: "blue",
   },
   {
-    name: "Pro",
+    name: "Professional",
     price: "$99",
     period: "mes",
-    description: "Ideal para ópticas en crecimiento",
+    description: "La potencia de la IA para ópticas en expansión.",
     features: [
       "3 sucursales",
-      "Hasta 5 usuarios",
-      "Hasta 2,000 clientes",
-      "Hasta 500 productos",
-      "Todo lo de Basic",
-      "Chatbot IA",
-      "Analíticas avanzadas",
+      "Hasta 10 usuarios",
+      "Hasta 5,000 pacientes",
+      "Inventario avanzado",
+      "Asistente IA 24/7",
+      "Reportes ejecutivos",
       "Soporte prioritario",
     ],
     popular: true,
-    color: "indigo",
   },
   {
-    name: "Premium",
+    name: "Enterprise",
     price: "$299",
     period: "mes",
-    description: "Para grandes operaciones",
+    description: "Control total para grandes cadenas y laboratorios.",
     features: [
       "Sucursales ilimitadas",
-      "Hasta 50 usuarios",
-      "Clientes ilimitados",
-      "Productos ilimitados",
-      "Todo lo de Pro",
-      "API personalizada",
-      "Branding personalizado",
-      "Soporte 24/7 dedicado",
+      "Usuarios ilimitados",
+      "Pacientes ilimitados",
+      "API de integración",
+      "Multibodega avanzada",
+      "Personalización de marca",
+      "Account Manager dedicado",
     ],
     popular: false,
-    color: "cyan",
   },
 ];
 
@@ -65,104 +60,104 @@ export function PricingSection() {
   const router = useRouter();
 
   const handleGetStarted = () => {
-    router.push("/onboarding/choice");
+    router.push("/signup");
   };
 
   return (
-    <section id="precios" className="py-24 bg-white">
+    <section id="precios" className="py-32 bg-gray-50/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Planes que se Adaptan a Ti
+        <div className="text-center mb-24 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-primary text-[10px] font-bold uppercase tracking-[0.2em] mb-6">
+            <Sparkles className="h-4 w-4" />
+            <span>Inversión en Crecimiento</span>
+          </div>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-malisha text-gray-900 mb-6">
+            Planes Diseñados para{" "}
+            <span className="text-primary italic">Escalar</span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Elige el plan perfecto para tu óptica. Todos incluyen prueba
-            gratuita de 14 días.
+          <p className="text-lg text-gray-500 font-body">
+            Elige el nivel de potencia que tu óptica necesita. Sin contratos
+            ocultos.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-8 items-stretch">
           {plans.map((plan, index) => (
             <div
               key={index}
-              className={`relative p-8 rounded-2xl border-2 ${
+              className={`relative flex flex-col p-10 rounded-[3rem] transition-all duration-500 ${
                 plan.popular
-                  ? "border-indigo-500 shadow-2xl scale-105 bg-gradient-to-br from-indigo-50 to-white"
-                  : "border-gray-200 hover:border-gray-300 bg-white"
-              } transition-all duration-300`}
+                  ? "bg-white border-primary/20 shadow-premium-lg scale-105 z-10"
+                  : "bg-white border border-gray-100 shadow-premium hover:shadow-premium-lg"
+              }`}
             >
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                  <span className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                    Más Popular
+                <div className="absolute -top-5 left-1/2 -translate-x-1/2">
+                  <span className="bg-primary text-white px-6 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
+                    Más Solicitado
                   </span>
                 </div>
               )}
 
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              <div className="mb-10">
+                <h3 className="text-2xl font-bold text-gray-900 mb-3 tracking-tight">
                   {plan.name}
                 </h3>
-                <p className="text-gray-600 mb-4">{plan.description}</p>
-                <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-5xl font-bold text-gray-900">
+                <p className="text-gray-500 text-sm font-body leading-relaxed min-h-[40px]">
+                  {plan.description}
+                </p>
+              </div>
+
+              <div className="mb-10">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-5xl font-malisha text-gray-900">
                     {plan.price}
                   </span>
-                  <span className="text-gray-600">/{plan.period}</span>
+                  <span className="text-gray-400 font-medium">
+                    /{plan.period}
+                  </span>
                 </div>
               </div>
 
-              <ul className="space-y-4 mb-8">
-                {plan.features.map((feature, featureIndex) => {
-                  const colorClasses = {
-                    blue: "bg-blue-100 text-blue-600",
-                    indigo: "bg-indigo-100 text-indigo-600",
-                    cyan: "bg-cyan-100 text-cyan-600",
-                  };
-                  const colorClass =
-                    colorClasses[plan.color as keyof typeof colorClasses] ||
-                    colorClasses.blue;
-
-                  return (
+              <div className="flex-1 mb-10">
+                <p className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-6">
+                  ¿Qué incluye?
+                </p>
+                <ul className="space-y-4">
+                  {plan.features.map((feature, featureIndex) => (
                     <li key={featureIndex} className="flex items-start gap-3">
-                      <div
-                        className={`p-1 ${colorClass.split(" ")[0]} rounded-full mt-0.5 flex-shrink-0`}
-                      >
-                        <Check
-                          className={`h-4 w-4 ${colorClass.split(" ")[1]}`}
-                        />
+                      <div className="mt-1 h-5 w-5 rounded-full bg-primary/5 flex items-center justify-center text-primary flex-shrink-0">
+                        <Check className="h-3 w-3" strokeWidth={3} />
                       </div>
-                      <span className="text-gray-700">{feature}</span>
+                      <span className="text-gray-600 text-sm font-body leading-tight">
+                        {feature}
+                      </span>
                     </li>
-                  );
-                })}
-              </ul>
+                  ))}
+                </ul>
+              </div>
 
               <Button
                 onClick={handleGetStarted}
-                className={`w-full ${
+                className={`w-full h-14 rounded-2xl font-bold transition-all duration-300 ${
                   plan.popular
-                    ? "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white"
-                    : "bg-gray-900 hover:bg-gray-800 text-white"
+                    ? "bg-primary text-white shadow-premium hover:shadow-premium-lg hover:scale-[1.02]"
+                    : "bg-gray-50 text-gray-900 hover:bg-gray-100"
                 }`}
-                size="lg"
+                variant={plan.popular ? "default" : "ghost"}
               >
-                Comenzar Prueba Gratuita
+                Comenzar ahora
               </Button>
             </div>
           ))}
         </div>
 
-        <div className="mt-12 text-center">
-          <p className="text-gray-600 mb-4">
-            Todos los planes incluyen prueba gratuita de 14 días
+        <div className="mt-20 text-center max-w-2xl mx-auto">
+          <p className="text-gray-500 text-sm font-body leading-relaxed mb-8">
+            Todos los planes incluyen una prueba gratuita de 14 días con acceso
+            total. No se requiere tarjeta de crédito para comenzar.
           </p>
-          <Button
-            onClick={() => router.push("/signup")}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
-          >
-            Comenzar Ahora - Es Gratis
-          </Button>
+          <div className="h-px w-20 bg-gray-200 mx-auto"></div>
         </div>
       </div>
     </section>

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -13,25 +13,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Save, 
-  X, 
-  Eye, 
-  Code,
-  FileText,
-  Sparkles
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { replaceTemplateVariables, getDefaultVariables } from '@/lib/email/template-utils';
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Save, X, Eye, Code, FileText, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+import {
+  replaceTemplateVariables,
+  getDefaultVariables,
+} from "@/lib/email/template-utils";
 
 interface EmailTemplate {
   id: string;
@@ -54,7 +50,7 @@ interface EmailTemplateEditorProps {
 // Predefined email templates
 const emailTemplates = {
   simple: {
-    name: 'Plantilla Simple',
+    name: "Plantilla Simple",
     html: `<!DOCTYPE html>
 <html>
 <head>
@@ -81,10 +77,10 @@ const emailTemplates = {
     </div>
   </div>
 </body>
-</html>`
+</html>`,
   },
   modern: {
-    name: 'Plantilla Moderna',
+    name: "Plantilla Moderna",
     html: `<!DOCTYPE html>
 <html>
 <head>
@@ -114,10 +110,10 @@ const emailTemplates = {
     </div>
   </div>
 </body>
-</html>`
+</html>`,
   },
   minimal: {
-    name: 'Plantilla Minimalista',
+    name: "Plantilla Minimalista",
     html: `<!DOCTYPE html>
 <html>
 <head>
@@ -141,53 +137,52 @@ const emailTemplates = {
     </div>
   </div>
 </body>
-</html>`
-  }
+</html>`,
+  },
 };
 
 export default function EmailTemplateEditor({
   template,
   open,
   onOpenChange,
-  onSave
+  onSave,
 }: EmailTemplateEditorProps) {
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [formData, setFormData] = useState({
-    name: '',
-    type: 'custom',
-    subject: '',
-    content: '',
-    is_active: true
+    name: "",
+    type: "custom",
+    subject: "",
+    content: "",
+    is_active: true,
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
 
   useEffect(() => {
     if (template) {
       setFormData({
-        name: template.name || '',
-        type: template.type || 'custom',
-        subject: template.subject || '',
-        content: template.content || '',
-        is_active: template.is_active ?? true
+        name: template.name || "",
+        type: template.type || "custom",
+        subject: template.subject || "",
+        content: template.content || "",
+        is_active: template.is_active ?? true,
       });
     } else {
       setFormData({
-        name: '',
-        type: 'custom',
-        subject: '',
+        name: "",
+        type: "custom",
+        subject: "",
         content: emailTemplates.modern.html,
-        is_active: true
+        is_active: true,
       });
     }
   }, [template, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.subject || !formData.content) {
-      toast.error('Por favor completa todos los campos requeridos');
+      toast.error("Por favor completa todos los campos requeridos");
       return;
     }
 
@@ -195,75 +190,176 @@ export default function EmailTemplateEditor({
       setLoading(true);
 
       const submitData = {
-        ...formData
+        ...formData,
       };
 
       if (template) {
         // Update existing template
-        const response = await fetch(`/api/admin/system/email-templates/${template.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(submitData)
-        });
+        const response = await fetch(
+          `/api/admin/system/email-templates/${template.id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(submitData),
+          },
+        );
 
         if (!response.ok) {
           const data = await response.json();
-          throw new Error(data.error || 'Error al actualizar plantilla');
+          throw new Error(data.error || "Error al actualizar plantilla");
         }
 
-        toast.success('Plantilla actualizada exitosamente');
+        toast.success("Plantilla actualizada exitosamente");
       } else {
         // Create new template
-        const response = await fetch('/api/admin/system/email-templates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(submitData)
+        const response = await fetch("/api/admin/system/email-templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(submitData),
         });
 
         if (!response.ok) {
           const data = await response.json();
-          throw new Error(data.error || 'Error al crear plantilla');
+          throw new Error(data.error || "Error al crear plantilla");
         }
 
-        toast.success('Plantilla creada exitosamente');
+        toast.success("Plantilla creada exitosamente");
       }
 
       onSave();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error saving template:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al guardar plantilla');
+      console.error("Error saving template:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Error al guardar plantilla",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const availableVariables = [
-    { key: 'customer_name', label: 'Nombre del Cliente', description: 'Nombre completo del cliente' },
-    { key: 'order_number', label: 'Número de Pedido', description: 'Número único del pedido' },
-    { key: 'order_total', label: 'Total del Pedido', description: 'Monto total formateado' },
-    { key: 'order_date', label: 'Fecha del Pedido', description: 'Fecha formateada del pedido' },
-    { key: 'order_items', label: 'Items del Pedido', description: 'Lista HTML de productos' },
-    { key: 'company_name', label: 'Nombre de la Empresa', description: 'DA LUZ CONSCIENTE' },
-    { key: 'support_email', label: 'Email de Soporte', description: 'soporte@daluzconsciente.com' },
-    { key: 'contact_email', label: 'Email de Contacto', description: 'contacto@daluzconsciente.com' },
-    { key: 'website_url', label: 'URL del Sitio', description: 'URL del sitio web' },
-    { key: 'tracking_number', label: 'Número de Seguimiento', description: 'Número de tracking del envío' },
-    { key: 'carrier', label: 'Transportista', description: 'Nombre de la empresa de envío' },
-    { key: 'estimated_delivery', label: 'Entrega Estimada', description: 'Fecha estimada de entrega' },
-    { key: 'delivery_date', label: 'Fecha de Entrega', description: 'Fecha de entrega' },
-    { key: 'payment_method', label: 'Método de Pago', description: 'Método de pago utilizado' },
-    { key: 'transaction_id', label: 'ID de Transacción', description: 'ID de la transacción' },
-    { key: 'amount', label: 'Monto', description: 'Monto del pago' },
-    { key: 'membership_tier', label: 'Tipo de Membresía', description: 'Tipo de membresía' },
-    { key: 'membership_start_date', label: 'Fecha de Inicio', description: 'Fecha de inicio de membresía' },
-    { key: 'access_url', label: 'URL de Acceso', description: 'URL para acceder a la membresía' },
-    { key: 'reset_link', label: 'Enlace de Restablecimiento', description: 'URL para resetear contraseña' },
-    { key: 'reset_url', label: 'URL de Restablecimiento', description: 'URL para resetear contraseña' },
-    { key: 'account_url', label: 'URL de Cuenta', description: 'URL de la cuenta del usuario' },
-    { key: 'renewal_url', label: 'URL de Renovación', description: 'URL para renovar membresía' },
-    { key: 'days_remaining', label: 'Días Restantes', description: 'Días restantes de membresía' },
-    { key: 'low_stock_products', label: 'Productos con Stock Bajo', description: 'Lista de productos con stock bajo' },
+    {
+      key: "customer_name",
+      label: "Nombre del Cliente",
+      description: "Nombre completo del cliente",
+    },
+    {
+      key: "order_number",
+      label: "Número de Pedido",
+      description: "Número único del pedido",
+    },
+    {
+      key: "order_total",
+      label: "Total del Pedido",
+      description: "Monto total formateado",
+    },
+    {
+      key: "order_date",
+      label: "Fecha del Pedido",
+      description: "Fecha formateada del pedido",
+    },
+    {
+      key: "order_items",
+      label: "Items del Pedido",
+      description: "Lista HTML de productos",
+    },
+    {
+      key: "company_name",
+      label: "Nombre de la Empresa",
+      description: "OPTTIUS CONSCIENTE",
+    },
+    {
+      key: "support_email",
+      label: "Email de Soporte",
+      description: "soporte@daluzconsciente.com",
+    },
+    {
+      key: "contact_email",
+      label: "Email de Contacto",
+      description: "contacto@daluzconsciente.com",
+    },
+    {
+      key: "website_url",
+      label: "URL del Sitio",
+      description: "URL del sitio web",
+    },
+    {
+      key: "tracking_number",
+      label: "Número de Seguimiento",
+      description: "Número de tracking del envío",
+    },
+    {
+      key: "carrier",
+      label: "Transportista",
+      description: "Nombre de la empresa de envío",
+    },
+    {
+      key: "estimated_delivery",
+      label: "Entrega Estimada",
+      description: "Fecha estimada de entrega",
+    },
+    {
+      key: "delivery_date",
+      label: "Fecha de Entrega",
+      description: "Fecha de entrega",
+    },
+    {
+      key: "payment_method",
+      label: "Método de Pago",
+      description: "Método de pago utilizado",
+    },
+    {
+      key: "transaction_id",
+      label: "ID de Transacción",
+      description: "ID de la transacción",
+    },
+    { key: "amount", label: "Monto", description: "Monto del pago" },
+    {
+      key: "membership_tier",
+      label: "Tipo de Membresía",
+      description: "Tipo de membresía",
+    },
+    {
+      key: "membership_start_date",
+      label: "Fecha de Inicio",
+      description: "Fecha de inicio de membresía",
+    },
+    {
+      key: "access_url",
+      label: "URL de Acceso",
+      description: "URL para acceder a la membresía",
+    },
+    {
+      key: "reset_link",
+      label: "Enlace de Restablecimiento",
+      description: "URL para resetear contraseña",
+    },
+    {
+      key: "reset_url",
+      label: "URL de Restablecimiento",
+      description: "URL para resetear contraseña",
+    },
+    {
+      key: "account_url",
+      label: "URL de Cuenta",
+      description: "URL de la cuenta del usuario",
+    },
+    {
+      key: "renewal_url",
+      label: "URL de Renovación",
+      description: "URL para renovar membresía",
+    },
+    {
+      key: "days_remaining",
+      label: "Días Restantes",
+      description: "Días restantes de membresía",
+    },
+    {
+      key: "low_stock_products",
+      label: "Productos con Stock Bajo",
+      description: "Lista de productos con stock bajo",
+    },
   ];
 
   const insertVariable = (variable: string) => {
@@ -276,10 +372,13 @@ export default function EmailTemplateEditor({
       const after = text.substring(end);
       const newText = before + `{{${variable}}}` + after;
       setFormData({ ...formData, content: newText });
-      
+
       setTimeout(() => {
         textarea.focus();
-        textarea.setSelectionRange(start + variable.length + 4, start + variable.length + 4);
+        textarea.setSelectionRange(
+          start + variable.length + 4,
+          start + variable.length + 4,
+        );
       }, 0);
     }
   };
@@ -295,27 +394,29 @@ export default function EmailTemplateEditor({
     const defaultVars = getDefaultVariables();
     const previewVars = {
       ...defaultVars,
-      customer_name: 'María González',
-      order_number: 'ORD-12345',
-      order_total: '$15.000,00',
-      order_date: '15 de enero de 2025',
-      order_items: '<div>Producto 1 x 2 - $10.000</div><div>Producto 2 x 1 - $5.000</div>',
-      tracking_number: 'ABC123456789',
-      carrier: 'Correo Argentino',
-      estimated_delivery: '22 de enero de 2025',
-      delivery_date: '20 de enero de 2025',
-      payment_method: 'Tarjeta de Crédito',
-      transaction_id: 'MP-123456789',
-      amount: '$15.000,00',
-      membership_tier: 'Transformación Completa',
-      membership_start_date: '15 de enero de 2025',
-      access_url: 'https://daluzconsciente.com/mi-cuenta',
-      reset_link: 'https://daluzconsciente.com/reset-password?token=xxx',
-      reset_url: 'https://daluzconsciente.com/reset-password?token=xxx',
-      account_url: 'https://daluzconsciente.com/mi-cuenta',
-      renewal_url: 'https://daluzconsciente.com/membresias',
-      days_remaining: '15',
-      low_stock_products: '<div>Producto A - Stock: 3</div><div>Producto B - Stock: 2</div>',
+      customer_name: "María González",
+      order_number: "ORD-12345",
+      order_total: "$15.000,00",
+      order_date: "15 de enero de 2025",
+      order_items:
+        "<div>Producto 1 x 2 - $10.000</div><div>Producto 2 x 1 - $5.000</div>",
+      tracking_number: "ABC123456789",
+      carrier: "Correo Argentino",
+      estimated_delivery: "22 de enero de 2025",
+      delivery_date: "20 de enero de 2025",
+      payment_method: "Tarjeta de Crédito",
+      transaction_id: "MP-123456789",
+      amount: "$15.000,00",
+      membership_tier: "Transformación Completa",
+      membership_start_date: "15 de enero de 2025",
+      access_url: "https://daluzconsciente.com/mi-cuenta",
+      reset_link: "https://daluzconsciente.com/reset-password?token=xxx",
+      reset_url: "https://daluzconsciente.com/reset-password?token=xxx",
+      account_url: "https://daluzconsciente.com/mi-cuenta",
+      renewal_url: "https://daluzconsciente.com/membresias",
+      days_remaining: "15",
+      low_stock_products:
+        "<div>Producto A - Stock: 3</div><div>Producto B - Stock: 2</div>",
     };
 
     return replaceTemplateVariables(formData.content, previewVars);
@@ -324,10 +425,10 @@ export default function EmailTemplateEditor({
   const getPreviewSubject = (): string => {
     const previewVars = {
       ...getDefaultVariables(),
-      customer_name: 'María González',
-      order_number: 'ORD-12345',
-      order_total: '$15.000,00',
-      order_date: '15 de enero de 2025',
+      customer_name: "María González",
+      order_number: "ORD-12345",
+      order_total: "$15.000,00",
+      order_date: "15 de enero de 2025",
     };
     return replaceTemplateVariables(formData.subject, previewVars);
   };
@@ -337,13 +438,12 @@ export default function EmailTemplateEditor({
       <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {template ? 'Editar Plantilla' : 'Nueva Plantilla'}
+            {template ? "Editar Plantilla" : "Nueva Plantilla"}
           </DialogTitle>
           <DialogDescription>
-            {template 
-              ? 'Modifica la plantilla de email. Los cambios se aplicarán automáticamente en los próximos emails.'
-              : 'Crea una nueva plantilla de email para el sistema'
-            }
+            {template
+              ? "Modifica la plantilla de email. Los cambios se aplicarán automáticamente en los próximos emails."
+              : "Crea una nueva plantilla de email para el sistema"}
           </DialogDescription>
         </DialogHeader>
 
@@ -355,7 +455,9 @@ export default function EmailTemplateEditor({
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="Ej: Confirmación de Pedido"
                 required
               />
@@ -365,23 +467,37 @@ export default function EmailTemplateEditor({
               <Label htmlFor="type">Tipo *</Label>
               <Select
                 value={formData.type}
-                onValueChange={(value) => setFormData({ ...formData, type: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, type: value })
+                }
                 disabled={!!template?.is_system}
               >
                 <SelectTrigger id="type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="order_confirmation">Confirmación de Pedido</SelectItem>
+                  <SelectItem value="order_confirmation">
+                    Confirmación de Pedido
+                  </SelectItem>
                   <SelectItem value="order_shipped">Pedido Enviado</SelectItem>
-                  <SelectItem value="order_delivered">Pedido Entregado</SelectItem>
-                  <SelectItem value="password_reset">Restablecer Contraseña</SelectItem>
+                  <SelectItem value="order_delivered">
+                    Pedido Entregado
+                  </SelectItem>
+                  <SelectItem value="password_reset">
+                    Restablecer Contraseña
+                  </SelectItem>
                   <SelectItem value="account_welcome">Bienvenida</SelectItem>
-                  <SelectItem value="membership_welcome">Bienvenida Membresía</SelectItem>
-                  <SelectItem value="membership_reminder">Recordatorio Membresía</SelectItem>
+                  <SelectItem value="membership_welcome">
+                    Bienvenida Membresía
+                  </SelectItem>
+                  <SelectItem value="membership_reminder">
+                    Recordatorio Membresía
+                  </SelectItem>
                   <SelectItem value="payment_success">Pago Exitoso</SelectItem>
                   <SelectItem value="payment_failed">Pago Fallido</SelectItem>
-                  <SelectItem value="low_stock_alert">Alerta de Stock Bajo</SelectItem>
+                  <SelectItem value="low_stock_alert">
+                    Alerta de Stock Bajo
+                  </SelectItem>
                   <SelectItem value="marketing">Marketing</SelectItem>
                   <SelectItem value="custom">Personalizado</SelectItem>
                 </SelectContent>
@@ -395,12 +511,15 @@ export default function EmailTemplateEditor({
             <Input
               id="subject"
               value={formData.subject}
-              onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, subject: e.target.value })
+              }
               placeholder="Ej: Confirmación de tu pedido {{order_number}}"
               required
             />
             <p className="text-xs text-muted-foreground">
-              Puedes usar variables como {'{{customer_name}}'}, {'{{order_number}}'}, etc.
+              Puedes usar variables como {"{{customer_name}}"},{" "}
+              {"{{order_number}}"}, etc.
             </p>
           </div>
 
@@ -416,17 +535,23 @@ export default function EmailTemplateEditor({
                   onClick={() => setShowPreview(!showPreview)}
                 >
                   <Eye className="h-4 w-4 mr-2" />
-                  {showPreview ? 'Ocultar' : 'Mostrar'} Vista Previa
+                  {showPreview ? "Ocultar" : "Mostrar"} Vista Previa
                 </Button>
               </div>
             </div>
 
-            <div className={`grid gap-4 ${showPreview ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <div
+              className={`grid gap-4 ${showPreview ? "grid-cols-2" : "grid-cols-1"}`}
+            >
               {/* Editor Section */}
               <div className="space-y-2">
                 <div className="border rounded-lg p-2 bg-muted/50">
                   <div className="flex gap-2 mb-2 flex-wrap">
-                    <Select onValueChange={(v) => applyTemplate(v as keyof typeof emailTemplates)}>
+                    <Select
+                      onValueChange={(v) =>
+                        applyTemplate(v as keyof typeof emailTemplates)
+                      }
+                    >
                       <SelectTrigger className="w-[200px]">
                         <SelectValue placeholder="Aplicar plantilla" />
                       </SelectTrigger>
@@ -456,7 +581,9 @@ export default function EmailTemplateEditor({
                     ref={textareaRef}
                     id="content"
                     value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, content: e.target.value })
+                    }
                     placeholder="<html><body>...</body></html>"
                     rows={20}
                     className="font-mono text-sm"
@@ -466,28 +593,88 @@ export default function EmailTemplateEditor({
 
                 {/* Variables Panel */}
                 <div className="border rounded-lg p-3 bg-muted/30">
-                  <Label className="text-sm font-semibold mb-2 block">Variables Disponibles</Label>
+                  <Label className="text-sm font-semibold mb-2 block">
+                    Variables Disponibles
+                  </Label>
                   <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                     {availableVariables
-                      .filter(v => {
+                      .filter((v) => {
                         // Filter variables based on template type
-                        if (formData.type === 'order_confirmation' || formData.type === 'order_shipped' || formData.type === 'order_delivered') {
-                          return ['customer_name', 'order_number', 'order_total', 'order_date', 'order_items', 'company_name', 'support_email', 'website_url', 'tracking_number', 'carrier', 'estimated_delivery', 'delivery_date', 'payment_method'].includes(v.key);
+                        if (
+                          formData.type === "order_confirmation" ||
+                          formData.type === "order_shipped" ||
+                          formData.type === "order_delivered"
+                        ) {
+                          return [
+                            "customer_name",
+                            "order_number",
+                            "order_total",
+                            "order_date",
+                            "order_items",
+                            "company_name",
+                            "support_email",
+                            "website_url",
+                            "tracking_number",
+                            "carrier",
+                            "estimated_delivery",
+                            "delivery_date",
+                            "payment_method",
+                          ].includes(v.key);
                         }
-                        if (formData.type === 'password_reset') {
-                          return ['customer_name', 'reset_link', 'reset_url', 'company_name', 'support_email'].includes(v.key);
+                        if (formData.type === "password_reset") {
+                          return [
+                            "customer_name",
+                            "reset_link",
+                            "reset_url",
+                            "company_name",
+                            "support_email",
+                          ].includes(v.key);
                         }
-                        if (formData.type === 'account_welcome') {
-                          return ['customer_name', 'account_url', 'company_name', 'support_email', 'website_url'].includes(v.key);
+                        if (formData.type === "account_welcome") {
+                          return [
+                            "customer_name",
+                            "account_url",
+                            "company_name",
+                            "support_email",
+                            "website_url",
+                          ].includes(v.key);
                         }
-                        if (formData.type === 'membership_welcome' || formData.type === 'membership_reminder') {
-                          return ['customer_name', 'membership_tier', 'membership_start_date', 'access_url', 'renewal_url', 'days_remaining', 'company_name', 'support_email'].includes(v.key);
+                        if (
+                          formData.type === "membership_welcome" ||
+                          formData.type === "membership_reminder"
+                        ) {
+                          return [
+                            "customer_name",
+                            "membership_tier",
+                            "membership_start_date",
+                            "access_url",
+                            "renewal_url",
+                            "days_remaining",
+                            "company_name",
+                            "support_email",
+                          ].includes(v.key);
                         }
-                        if (formData.type === 'payment_success' || formData.type === 'payment_failed') {
-                          return ['customer_name', 'order_number', 'amount', 'payment_method', 'transaction_id', 'company_name', 'support_email'].includes(v.key);
+                        if (
+                          formData.type === "payment_success" ||
+                          formData.type === "payment_failed"
+                        ) {
+                          return [
+                            "customer_name",
+                            "order_number",
+                            "amount",
+                            "payment_method",
+                            "transaction_id",
+                            "company_name",
+                            "support_email",
+                          ].includes(v.key);
                         }
-                        if (formData.type === 'low_stock_alert') {
-                          return ['low_stock_products', 'product_count', 'company_name', 'support_email'].includes(v.key);
+                        if (formData.type === "low_stock_alert") {
+                          return [
+                            "low_stock_products",
+                            "product_count",
+                            "company_name",
+                            "support_email",
+                          ].includes(v.key);
                         }
                         return true; // Show all for custom type
                       })
@@ -504,7 +691,8 @@ export default function EmailTemplateEditor({
                       ))}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Haz clic en una variable para insertarla en el contenido HTML
+                    Haz clic en una variable para insertarla en el contenido
+                    HTML
                   </p>
                 </div>
               </div>
@@ -515,16 +703,20 @@ export default function EmailTemplateEditor({
                   <Label>Vista Previa en Tiempo Real</Label>
                   <div className="border rounded-lg p-4 bg-white max-h-[600px] overflow-y-auto">
                     <div className="mb-4 pb-4 border-b">
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">Asunto:</p>
-                      <p className="text-base font-medium">{getPreviewSubject()}</p>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">
+                        Asunto:
+                      </p>
+                      <p className="text-base font-medium">
+                        {getPreviewSubject()}
+                      </p>
                     </div>
-                    <div 
+                    <div
                       className="email-preview [&_img]:max-w-full [&_img]:h-auto [&_table]:w-full [&_table]:border-collapse [&_a]:text-[#8B4513] [&_a]:underline"
                       dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
-                      style={{ 
-                        fontFamily: 'Arial, sans-serif',
-                        lineHeight: '1.6',
-                        maxWidth: '100%'
+                      style={{
+                        fontFamily: "Arial, sans-serif",
+                        lineHeight: "1.6",
+                        maxWidth: "100%",
                       }}
                     />
                   </div>
@@ -544,7 +736,9 @@ export default function EmailTemplateEditor({
             <Switch
               id="is_active"
               checked={formData.is_active}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, is_active: checked })
+              }
             />
           </div>
 
@@ -560,7 +754,7 @@ export default function EmailTemplateEditor({
             </Button>
             <Button type="submit" disabled={loading}>
               <Save className="h-4 w-4 mr-2" />
-              {loading ? 'Guardando...' : 'Guardar Plantilla'}
+              {loading ? "Guardando..." : "Guardar Plantilla"}
             </Button>
           </DialogFooter>
         </form>

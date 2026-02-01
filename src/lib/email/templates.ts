@@ -1,45 +1,45 @@
-import { emailConfig } from './client'
+import { emailConfig } from "./client";
 
 // Types for template data
 export interface OrderConfirmationData {
-  orderNumber: string
-  customerName: string
-  customerEmail: string
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
   items: Array<{
-    name: string
-    quantity: number
-    price: number
-  }>
-  subtotal: number
-  total: number
-  paymentMethod: string
-  orderDate: string
-  estimatedDelivery?: string
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
+  subtotal: number;
+  total: number;
+  paymentMethod: string;
+  orderDate: string;
+  estimatedDelivery?: string;
 }
 
 export interface PaymentNotificationData {
-  orderNumber: string
-  customerName: string
-  amount: number
-  status: 'success' | 'failed' | 'pending'
-  paymentMethod: string
-  transactionId?: string
+  orderNumber: string;
+  customerName: string;
+  amount: number;
+  status: "success" | "failed" | "pending";
+  paymentMethod: string;
+  transactionId?: string;
 }
 
 export interface MembershipWelcomeData {
-  customerName: string
-  membershipType: string
-  accessUrl: string
-  duration: string
-  startDate: string
+  customerName: string;
+  membershipType: string;
+  accessUrl: string;
+  duration: string;
+  startDate: string;
 }
 
 // Utility function to format currency
 function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-  }).format(amount)
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+  }).format(amount);
 }
 
 // Base email layout
@@ -136,14 +136,14 @@ function createBaseLayout(content: string, title: string): string {
 <body>
   <div class="container">
     <div class="header">
-      <h1>DA LUZ CONSCIENTE</h1>
+      <h1>OPTTIUS CONSCIENTE</h1>
       <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Biocosmética & Bienestar Holístico</p>
     </div>
     <div class="content">
       ${content}
     </div>
     <div class="footer">
-      <p><strong>DA LUZ CONSCIENTE</strong></p>
+      <p><strong>OPTTIUS CONSCIENTE</strong></p>
       <p>Argentina | contacto@daluzconsciente.com</p>
       <p style="margin-top: 15px;">
         <a href="${emailConfig.domain}" style="color: #8B5A2B;">Visitar sitio web</a> |
@@ -153,17 +153,25 @@ function createBaseLayout(content: string, title: string): string {
   </div>
 </body>
 </html>
-  `
+  `;
 }
 
 // Order confirmation email template
-export function createOrderConfirmationEmail(data: OrderConfirmationData): { html: string; text: string; subject: string } {
-  const itemsHtml = data.items.map(item => `
+export function createOrderConfirmationEmail(data: OrderConfirmationData): {
+  html: string;
+  text: string;
+  subject: string;
+} {
+  const itemsHtml = data.items
+    .map(
+      (item) => `
     <div class="item-row">
       <span>${item.name} (x${item.quantity})</span>
       <span>${formatCurrency(item.price * item.quantity)}</span>
     </div>
-  `).join('')
+  `,
+    )
+    .join("");
 
   const content = `
     <h2>¡Gracias por tu pedido, ${data.customerName}!</h2>
@@ -180,7 +188,7 @@ export function createOrderConfirmationEmail(data: OrderConfirmationData): { htm
 
     <p><strong>Método de pago:</strong> ${data.paymentMethod}</p>
     <p><strong>Fecha del pedido:</strong> ${data.orderDate}</p>
-    ${data.estimatedDelivery ? `<p><strong>Entrega estimada:</strong> ${data.estimatedDelivery}</p>` : ''}
+    ${data.estimatedDelivery ? `<p><strong>Entrega estimada:</strong> ${data.estimatedDelivery}</p>` : ""}
 
     <p>Te enviaremos actualizaciones sobre el estado de tu pedido a esta dirección de correo.</p>
     
@@ -191,7 +199,7 @@ export function createOrderConfirmationEmail(data: OrderConfirmationData): { htm
     <p style="color: #666; font-size: 14px;">
       Si tienes alguna pregunta sobre tu pedido, no dudes en contactarnos respondiendo a este correo.
     </p>
-  `
+  `;
 
   const text = `
 ¡Gracias por tu pedido, ${data.customerName}!
@@ -199,28 +207,32 @@ export function createOrderConfirmationEmail(data: OrderConfirmationData): { htm
 Hemos recibido tu pedido #${data.orderNumber} y lo estamos procesando.
 
 Detalles del pedido:
-${data.items.map(item => `${item.name} (x${item.quantity}): ${formatCurrency(item.price * item.quantity)}`).join('\n')}
+${data.items.map((item) => `${item.name} (x${item.quantity}): ${formatCurrency(item.price * item.quantity)}`).join("\n")}
 
 Total: ${formatCurrency(data.total)}
 Método de pago: ${data.paymentMethod}
 Fecha del pedido: ${data.orderDate}
-${data.estimatedDelivery ? `Entrega estimada: ${data.estimatedDelivery}` : ''}
+${data.estimatedDelivery ? `Entrega estimada: ${data.estimatedDelivery}` : ""}
 
 Ver detalles: ${emailConfig.domain}/mi-cuenta/pedidos
 
-DA LUZ CONSCIENTE
+OPTTIUS CONSCIENTE
 Argentina | contacto@daluzconsciente.com
-  `
+  `;
 
   return {
-    html: createBaseLayout(content, 'Confirmación de pedido'),
+    html: createBaseLayout(content, "Confirmación de pedido"),
     text,
-    subject: `Confirmación de pedido #${data.orderNumber} - DA LUZ CONSCIENTE`
-  }
+    subject: `Confirmación de pedido #${data.orderNumber} - OPTTIUS CONSCIENTE`,
+  };
 }
 
 // Payment success email template
-export function createPaymentSuccessEmail(data: PaymentNotificationData): { html: string; text: string; subject: string } {
+export function createPaymentSuccessEmail(data: PaymentNotificationData): {
+  html: string;
+  text: string;
+  subject: string;
+} {
   const content = `
     <h2>¡Pago confirmado, ${data.customerName}!</h2>
     <p>Tu pago ha sido procesado exitosamente.</p>
@@ -239,12 +251,16 @@ export function createPaymentSuccessEmail(data: PaymentNotificationData): { html
         <span>Método de pago</span>
         <span>${data.paymentMethod}</span>
       </div>
-      ${data.transactionId ? `
+      ${
+        data.transactionId
+          ? `
       <div class="item-row">
         <span>ID de transacción</span>
         <span>${data.transactionId}</span>
       </div>
-      ` : ''}
+      `
+          : ""
+      }
     </div>
 
     <p>Tu pedido está siendo preparado y te notificaremos cuando esté listo para el envío.</p>
@@ -252,7 +268,7 @@ export function createPaymentSuccessEmail(data: PaymentNotificationData): { html
     <div style="text-align: center; margin: 30px 0;">
       <a href="${emailConfig.domain}/mi-cuenta/pedidos" class="button">Ver mi pedido</a>
     </div>
-  `
+  `;
 
   const text = `
 ¡Pago confirmado, ${data.customerName}!
@@ -263,25 +279,29 @@ Detalles del pago:
 Pedido: #${data.orderNumber}
 Monto: ${formatCurrency(data.amount)}
 Método de pago: ${data.paymentMethod}
-${data.transactionId ? `ID de transacción: ${data.transactionId}` : ''}
+${data.transactionId ? `ID de transacción: ${data.transactionId}` : ""}
 
 Tu pedido está siendo preparado y te notificaremos cuando esté listo para el envío.
 
 Ver mi pedido: ${emailConfig.domain}/mi-cuenta/pedidos
 
-DA LUZ CONSCIENTE
+OPTTIUS CONSCIENTE
 Argentina | contacto@daluzconsciente.com
-  `
+  `;
 
   return {
-    html: createBaseLayout(content, 'Pago confirmado'),
+    html: createBaseLayout(content, "Pago confirmado"),
     text,
-    subject: `Pago confirmado - Pedido #${data.orderNumber}`
-  }
+    subject: `Pago confirmado - Pedido #${data.orderNumber}`,
+  };
 }
 
 // Payment failed email template
-export function createPaymentFailedEmail(data: PaymentNotificationData): { html: string; text: string; subject: string } {
+export function createPaymentFailedEmail(data: PaymentNotificationData): {
+  html: string;
+  text: string;
+  subject: string;
+} {
   const content = `
     <h2>Problema con el pago, ${data.customerName}</h2>
     <p>No pudimos procesar el pago para tu pedido <strong>#${data.orderNumber}</strong>.</p>
@@ -316,7 +336,7 @@ export function createPaymentFailedEmail(data: PaymentNotificationData): { html:
     <p style="color: #666; font-size: 14px;">
       Tu pedido se mantendrá reservado por 24 horas. Si necesitas ayuda, contáctanos.
     </p>
-  `
+  `;
 
   const text = `
 Problema con el pago, ${data.customerName}
@@ -337,19 +357,23 @@ Intentar nuevamente: ${emailConfig.domain}/checkout?order=${data.orderNumber}
 
 Tu pedido se mantendrá reservado por 24 horas.
 
-DA LUZ CONSCIENTE
+OPTTIUS CONSCIENTE
 Argentina | contacto@daluzconsciente.com
-  `
+  `;
 
   return {
-    html: createBaseLayout(content, 'Problema con el pago'),
+    html: createBaseLayout(content, "Problema con el pago"),
     text,
-    subject: `Problema con el pago - Pedido #${data.orderNumber}`
-  }
+    subject: `Problema con el pago - Pedido #${data.orderNumber}`,
+  };
 }
 
 // Membership welcome email template
-export function createMembershipWelcomeEmail(data: MembershipWelcomeData): { html: string; text: string; subject: string } {
+export function createMembershipWelcomeEmail(data: MembershipWelcomeData): {
+  html: string;
+  text: string;
+  subject: string;
+} {
   const content = `
     <h2>¡Bienvenida a tu transformación, ${data.customerName}!</h2>
     <p>Es un honor acompañarte en este viaje de 7 meses hacia una versión más consciente y radiante de ti misma.</p>
@@ -386,7 +410,7 @@ export function createMembershipWelcomeEmail(data: MembershipWelcomeData): { htm
     <p style="color: #666; font-size: 14px;">
       Guarda este correo para futuras referencias. Tu área privada estará disponible 24/7 durante toda tu membresía.
     </p>
-  `
+  `;
 
   const text = `
 ¡Bienvenida a tu transformación, ${data.customerName}!
@@ -409,13 +433,13 @@ Acceder a mi área privada: ${data.accessUrl}
 
 Guarda este correo para futuras referencias.
 
-DA LUZ CONSCIENTE
+OPTTIUS CONSCIENTE
 Argentina | contacto@daluzconsciente.com
-  `
+  `;
 
   return {
-    html: createBaseLayout(content, 'Bienvenida a tu transformación'),
+    html: createBaseLayout(content, "Bienvenida a tu transformación"),
     text,
-    subject: `¡Bienvenida a tu transformación! - DA LUZ CONSCIENTE`
-  }
-} 
+    subject: `¡Bienvenida a tu transformación! - OPTTIUS CONSCIENTE`,
+  };
+}

@@ -1,36 +1,44 @@
-import React, { useState } from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Mail, Phone, User, MessageSquare, MapPin, Star, Check, AlertCircle } from 'lucide-react';
+import React, { useState } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Mail,
+  Phone,
+  User,
+  MessageSquare,
+  MapPin,
+  Star,
+  Check,
+  AlertCircle,
+} from "lucide-react";
 
-const formContainerVariants = cva(
-  "w-full max-w-2xl mx-auto space-y-6",
-  {
-    variants: {
-      variant: {
-        default: "p-6 bg-white rounded-lg border",
-        elegant: "p-8 bg-gradient-to-br from-white to-line-lightest/30 rounded-xl shadow-lg border border-line-primary/10",
-        minimal: "p-4 bg-transparent",
-        card: "p-6 bg-card rounded-lg shadow-soft border"
-      },
-      spacing: {
-        compact: "space-y-4",
-        normal: "space-y-6", 
-        relaxed: "space-y-8"
-      }
+const formContainerVariants = cva("w-full max-w-2xl mx-auto space-y-6", {
+  variants: {
+    variant: {
+      default: "p-6 bg-white rounded-lg border",
+      elegant:
+        "p-8 bg-gradient-to-br from-white to-line-lightest/30 rounded-xl shadow-lg border border-line-primary/10",
+      minimal: "p-4 bg-transparent",
+      card: "p-6 bg-card rounded-lg shadow-soft border",
     },
-    defaultVariants: {
-      variant: "default",
-      spacing: "normal"
-    }
-  }
-);
+    spacing: {
+      compact: "space-y-4",
+      normal: "space-y-6",
+      relaxed: "space-y-8",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+    spacing: "normal",
+  },
+});
 
-interface FormContainerProps extends VariantProps<typeof formContainerVariants> {
+interface FormContainerProps
+  extends VariantProps<typeof formContainerVariants> {
   children: React.ReactNode;
   className?: string;
   title?: string;
@@ -41,7 +49,7 @@ interface FormContainerProps extends VariantProps<typeof formContainerVariants> 
 interface FormFieldProps {
   label: string;
   name: string;
-  type?: 'text' | 'email' | 'tel' | 'textarea' | 'select';
+  type?: "text" | "email" | "tel" | "textarea" | "select";
   placeholder?: string;
   required?: boolean;
   error?: string;
@@ -62,14 +70,14 @@ interface ContactFormData {
   interests: string[];
 }
 
-export function FormContainer({ 
-  children, 
-  className, 
-  title, 
-  subtitle, 
-  badge, 
-  variant, 
-  spacing 
+export function FormContainer({
+  children,
+  className,
+  title,
+  subtitle,
+  badge,
+  variant,
+  spacing,
 }: FormContainerProps) {
   return (
     <div className={cn(formContainerVariants({ variant, spacing }), className)}>
@@ -85,11 +93,7 @@ export function FormContainer({
               {title}
             </h2>
           )}
-          {subtitle && (
-            <p className="text-muted-foreground">
-              {subtitle}
-            </p>
-          )}
+          {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
         </div>
       )}
       {children}
@@ -97,22 +101,22 @@ export function FormContainer({
   );
 }
 
-export function FormField({ 
-  label, 
-  name, 
-  type = 'text', 
-  placeholder, 
-  required, 
-  error, 
-  success, 
-  helper, 
-  icon, 
-  options, 
+export function FormField({
+  label,
+  name,
+  type = "text",
+  placeholder,
+  required,
+  error,
+  success,
+  helper,
+  icon,
+  options,
   rows = 4,
-  className 
+  className,
 }: FormFieldProps) {
   const [focused, setFocused] = useState(false);
-  
+
   const fieldId = `field-${name}`;
   const hasError = !!error;
   const hasSuccess = !!success;
@@ -128,31 +132,35 @@ export function FormField({
       className: cn(
         "transition-all duration-200",
         hasError && "border-red-500 focus:border-red-500 focus:ring-red-500/20",
-        hasSuccess && "border-green-500 focus:border-green-500 focus:ring-green-500/20",
-        !hasError && !hasSuccess && focused && "border-line-primary focus:ring-line-primary/20"
-      )
+        hasSuccess &&
+          "border-green-500 focus:border-green-500 focus:ring-green-500/20",
+        !hasError &&
+          !hasSuccess &&
+          focused &&
+          "border-line-primary focus:ring-line-primary/20",
+      ),
     };
 
-    if (type === 'textarea') {
+    if (type === "textarea") {
       return (
         <textarea
           {...baseProps}
           rows={rows}
           className={cn(
             "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none",
-            baseProps.className
+            baseProps.className,
           )}
         />
       );
     }
 
-    if (type === 'select' && options) {
+    if (type === "select" && options) {
       return (
         <select
           {...baseProps}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-            baseProps.className
+            baseProps.className,
           )}
         >
           <option value="">{placeholder}</option>
@@ -177,21 +185,25 @@ export function FormField({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <label 
+      <label
         htmlFor={fieldId}
         className={cn(
           "block text-sm font-medium transition-colors duration-200",
-          hasError ? "text-red-600" : hasSuccess ? "text-green-600" : "text-foreground",
-          focused && !hasError && !hasSuccess && "text-line-primary"
+          hasError
+            ? "text-red-600"
+            : hasSuccess
+              ? "text-green-600"
+              : "text-foreground",
+          focused && !hasError && !hasSuccess && "text-line-primary",
         )}
       >
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
-      
+
       <div className="relative">
         {renderInput()}
-        
+
         {/* Status Icons */}
         {(hasError || hasSuccess) && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -200,7 +212,7 @@ export function FormField({
           </div>
         )}
       </div>
-      
+
       {/* Helper/Error/Success Messages */}
       {(error || success || helper) && (
         <div className="text-sm">
@@ -225,88 +237,99 @@ export function FormField({
   );
 }
 
-export function ContactForm({ onSubmit }: { onSubmit?: (data: ContactFormData) => void }) {
+export function ContactForm({
+  onSubmit,
+}: {
+  onSubmit?: (data: ContactFormData) => void;
+}) {
   const [formData, setFormData] = useState<ContactFormData>({
-    name: '',
-    email: '',
-    phone: '',
-    subject: '',
-    message: '',
-    interests: []
+    name: "",
+    email: "",
+    phone: "",
+    subject: "",
+    message: "",
+    interests: [],
   });
-  
-  const [errors, setErrors] = useState<Partial<Record<keyof ContactFormData, string>>>({});
+
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof ContactFormData, string>>
+  >({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof ContactFormData, string>> = {};
-    
+
     if (!formData.name.trim()) {
-      newErrors.name = 'El nombre es requerido';
+      newErrors.name = "El nombre es requerido";
     }
-    
+
     if (!formData.email.trim()) {
-      newErrors.email = 'El email es requerido';
+      newErrors.email = "El email es requerido";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email inválido';
+      newErrors.email = "Email inválido";
     }
-    
+
     if (!formData.message.trim()) {
-      newErrors.message = 'El mensaje es requerido';
+      newErrors.message = "El mensaje es requerido";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setIsSubmitting(true);
-    
+
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     if (onSubmit) {
       onSubmit(formData);
     }
-    
+
     setIsSubmitting(false);
     setIsSubmitted(true);
   };
 
   const updateField = (field: keyof ContactFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
   if (isSubmitted) {
     return (
-      <FormContainer variant="elegant" title="¡Mensaje Enviado!" subtitle="Te contactaremos pronto">
+      <FormContainer
+        variant="elegant"
+        title="¡Mensaje Enviado!"
+        subtitle="Te contactaremos pronto"
+      >
         <div className="text-center py-8">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check className="w-8 h-8 text-green-600" />
           </div>
           <p className="text-muted-foreground mb-6">
-            Gracias por contactarnos. Hemos recibido tu mensaje y te responderemos dentro de las próximas 24 horas.
+            Gracias por contactarnos. Hemos recibido tu mensaje y te
+            responderemos dentro de las próximas 24 horas.
           </p>
-          <Button 
-            variant="line-primary" 
+          <Button
+            variant="line-primary"
             onClick={() => {
               setIsSubmitted(false);
               setFormData({
-                name: '',
-                email: '',
-                phone: '',
-                subject: '',
-                message: '',
-                interests: []
+                name: "",
+                email: "",
+                phone: "",
+                subject: "",
+                message: "",
+                interests: [],
               });
             }}
           >
@@ -318,9 +341,9 @@ export function ContactForm({ onSubmit }: { onSubmit?: (data: ContactFormData) =
   }
 
   return (
-    <FormContainer 
-      variant="elegant" 
-      title="Ponte en Contacto" 
+    <FormContainer
+      variant="elegant"
+      title="Ponte en Contacto"
       subtitle="Estamos aquí para ayudarte en tu camino hacia la belleza consciente"
       badge="Consulta Gratuita"
     >
@@ -336,7 +359,7 @@ export function ContactForm({ onSubmit }: { onSubmit?: (data: ContactFormData) =
             error={errors.name}
             success={formData.name && !errors.name ? "Perfecto" : undefined}
           />
-          
+
           <FormField
             label="Email"
             name="email"
@@ -345,7 +368,9 @@ export function ContactForm({ onSubmit }: { onSubmit?: (data: ContactFormData) =
             required
             icon={<Mail className="w-4 h-4" />}
             error={errors.email}
-            success={formData.email && !errors.email ? "Email válido" : undefined}
+            success={
+              formData.email && !errors.email ? "Email válido" : undefined
+            }
           />
         </div>
 
@@ -358,18 +383,18 @@ export function ContactForm({ onSubmit }: { onSubmit?: (data: ContactFormData) =
             icon={<Phone className="w-4 h-4" />}
             helper="Te llamaremos si prefieres una consulta telefónica"
           />
-          
+
           <FormField
             label="Asunto"
             name="subject"
             type="select"
             placeholder="Selecciona un tema"
             options={[
-              { value: 'products', label: 'Consulta sobre Productos' },
-              { value: 'membership', label: 'Programa de Membresía' },
-              { value: 'custom', label: 'Rutina Personalizada' },
-              { value: 'support', label: 'Soporte Técnico' },
-              { value: 'other', label: 'Otro' }
+              { value: "products", label: "Consulta sobre Productos" },
+              { value: "membership", label: "Programa de Membresía" },
+              { value: "custom", label: "Rutina Personalizada" },
+              { value: "support", label: "Soporte Técnico" },
+              { value: "other", label: "Otro" },
             ]}
           />
         </div>
@@ -393,21 +418,21 @@ export function ContactForm({ onSubmit }: { onSubmit?: (data: ContactFormData) =
             loading={isSubmitting}
             className="flex-1"
           >
-            {isSubmitting ? 'Enviando...' : 'Enviar Mensaje'}
+            {isSubmitting ? "Enviando..." : "Enviar Mensaje"}
           </Button>
-          
+
           <Button
             type="button"
             variant="line-outline"
             size="lg"
             onClick={() => {
               setFormData({
-                name: '',
-                email: '',
-                phone: '',
-                subject: '',
-                message: '',
-                interests: []
+                name: "",
+                email: "",
+                phone: "",
+                subject: "",
+                message: "",
+                interests: [],
               });
               setErrors({});
             }}
@@ -422,17 +447,17 @@ export function ContactForm({ onSubmit }: { onSubmit?: (data: ContactFormData) =
 
 // Newsletter signup component
 export function NewsletterForm() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
     setIsLoading(false);
     setIsSubscribed(true);
   };
@@ -444,9 +469,12 @@ export function NewsletterForm() {
           <div className="w-12 h-12 bg-line-primary/10 rounded-full flex items-center justify-center">
             <Check className="w-6 h-6 text-line-primary" />
           </div>
-          <h3 className="font-semibold text-foreground">¡Bienvenida a la comunidad!</h3>
+          <h3 className="font-semibold text-foreground">
+            ¡Bienvenida a la comunidad!
+          </h3>
           <p className="text-sm text-muted-foreground">
-            Te enviaremos las mejores tips de belleza natural y ofertas exclusivas.
+            Te enviaremos las mejores tips de belleza natural y ofertas
+            exclusivas.
           </p>
         </div>
       </Card>
@@ -456,7 +484,7 @@ export function NewsletterForm() {
   return (
     <Card variant="line-outline" className="p-6">
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg">Newsletter DA LUZ</CardTitle>
+        <CardTitle className="text-lg">Newsletter OPTTIUS</CardTitle>
         <p className="text-sm text-muted-foreground">
           Recibe tips exclusivos de belleza natural y ofertas especiales
         </p>
@@ -472,16 +500,16 @@ export function NewsletterForm() {
             className="flex-1"
             variant="line"
           />
-          <Button 
-            type="submit" 
-            variant="line-primary" 
+          <Button
+            type="submit"
+            variant="line-primary"
             loading={isLoading}
             disabled={!email}
           >
-            {isLoading ? 'Suscribiendo...' : 'Suscribirse'}
+            {isLoading ? "Suscribiendo..." : "Suscribirse"}
           </Button>
         </form>
       </CardContent>
     </Card>
   );
-} 
+}

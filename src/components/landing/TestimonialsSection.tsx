@@ -1,72 +1,85 @@
 "use client";
 
-import { Star, Quote } from "lucide-react";
+import { Star, Quote, Sparkles } from "lucide-react";
+import businessConfig from "@/config/business";
 
 const testimonials = [
   {
-    name: "Dr. María González",
+    name: "Dra. María González",
     role: "Directora, Óptica Visión Clara",
-    image: "👩‍⚕️",
+    image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Maria",
     content:
-      "Opttius ha transformado completamente nuestra operación. El sistema de citas automatizado y el chatbot nos han ahorrado horas cada día.",
+      "Opttius ha transformado completamente nuestra operación. El nivel de precisión en las órdenes de laboratorio es algo que nunca habíamos experimentado.",
     rating: 5,
   },
   {
     name: "Carlos Ramírez",
     role: "Propietario, Óptica Centro",
-    image: "👨‍💼",
+    image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Carlos",
     content:
-      "La gestión multi-sucursal es increíble. Puedo ver todo desde un solo lugar y las analíticas me ayudan a tomar mejores decisiones.",
+      "La gestión multi-sucursal nos permite tener el control total de nuestro inventario en tiempo real. La IA de Opttius es simplemente brillante.",
     rating: 5,
   },
   {
     name: "Ana Martínez",
     role: "Gerente, Laboratorio Óptico Premium",
-    image: "👩‍🔬",
+    image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ana",
     content:
-      "El sistema de presupuestos y órdenes es perfecto. Los cálculos automáticos eliminan errores y aceleran nuestro proceso.",
+      "El flujo de trabajo es impecable. Desde el presupuesto hasta la entrega final, todo está perfectamente sincronizado y libre de errores.",
     rating: 5,
   },
 ];
 
 export function TestimonialsSection() {
   return (
-    <section className="py-24 bg-gradient-to-b from-blue-50 to-indigo-50">
+    <section className="py-32 bg-gray-50/30" id="testimonios">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Lo que dicen nuestros clientes
+        <div className="text-center mb-24 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-primary text-[10px] font-bold uppercase tracking-[0.2em] mb-6">
+            <Sparkles className="h-4 w-4" />
+            <span>Casos de Éxito</span>
+          </div>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-malisha text-gray-900 mb-6 leading-tight">
+            Confianza de{" "}
+            <span className="text-primary italic">Líderes Ópticos</span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Ópticas y laboratorios que confían en Opttius
+          <p className="text-lg text-gray-500 font-body">
+            Descubre por qué las mejores ópticas de la región eligen nuestra
+            tecnología.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-10">
           {testimonials.map((testimonial, index) => (
             <div
               key={index}
-              className="relative p-8 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-shadow"
+              className="relative p-10 bg-white rounded-[3rem] shadow-premium hover:shadow-premium-lg transition-all duration-500 border border-gray-100 group overflow-hidden"
             >
-              <Quote className="absolute top-6 right-6 h-12 w-12 text-blue-100" />
-              <div className="flex items-center gap-1 mb-4">
+              <Quote className="absolute -top-4 -right-4 h-24 w-24 text-gray-50 opacity-50 transition-colors group-hover:text-primary/10" />
+
+              <div className="flex items-center gap-1 mb-8">
                 {[...Array(testimonial.rating)].map((_, i) => (
-                  <Star
-                    key={i}
-                    className="h-5 w-5 fill-yellow-400 text-yellow-400"
-                  />
+                  <Star key={i} className="h-4 w-4 fill-primary text-primary" />
                 ))}
               </div>
-              <p className="text-gray-700 mb-6 leading-relaxed relative z-10">
+
+              <p className="text-gray-600 mb-10 leading-relaxed font-body italic relative z-10 text-lg">
                 "{testimonial.content}"
               </p>
-              <div className="flex items-center gap-4">
-                <div className="text-4xl">{testimonial.image}</div>
+
+              <div className="flex items-center gap-5">
+                <div className="h-16 w-16 rounded-2xl overflow-hidden border-2 border-primary/10">
+                  <img
+                    src={testimonial.image}
+                    alt={testimonial.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
                 <div>
-                  <div className="font-semibold text-gray-900">
+                  <div className="font-bold text-gray-900 group-hover:text-primary transition-colors">
                     {testimonial.name}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">
                     {testimonial.role}
                   </div>
                 </div>

@@ -27,6 +27,7 @@ import type { InsightSection } from "@/lib/ai/insights/schemas";
 interface ChatbotContentProps {
   className?: string;
   currentSection?: InsightSection | null;
+  onClose?: () => void;
 }
 
 // Quick suggestions based on section
@@ -66,6 +67,7 @@ const quickSuggestions: Record<InsightSection, string[]> = {
 export function ChatbotContent({
   className,
   currentSection,
+  onClose,
 }: ChatbotContentProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -572,6 +574,7 @@ export function ChatbotContent({
             onExport={handleExport}
             onClear={handleClear}
             onDelete={handleDelete}
+            onClose={onClose}
           />
         </div>
 
@@ -599,7 +602,7 @@ export function ChatbotContent({
             </div>
           )}
 
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950/20">
             <div className="flex-1 overflow-y-auto min-h-0">
               <MessageList
                 messages={messages}
@@ -622,12 +625,12 @@ export function ChatbotContent({
         </div>
 
         {/* Fixed Input at Bottom */}
-        <div className="flex-shrink-0 z-10 bg-admin-bg-primary border-t border-admin-border-primary">
+        <div className="flex-shrink-0 z-10 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
           {/* Quick Suggestions */}
           {currentSection && messages.length === 0 && (
-            <div className="p-4 border-b border-admin-border-primary">
-              <p className="text-xs text-admin-text-secondary mb-2">
-                Sugerencias rápidas:
+            <div className="p-4 border-b border-slate-50 dark:border-slate-800/50">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 ml-1">
+                Sugerencias rápidas
               </p>
               <div className="flex flex-wrap gap-2">
                 {quickSuggestions[currentSection].map((suggestion, index) => (
@@ -635,7 +638,7 @@ export function ChatbotContent({
                     key={index}
                     onClick={() => sendMessage(suggestion)}
                     disabled={isStreaming}
-                    className="text-xs px-3 py-1.5 rounded-md bg-admin-bg-secondary hover:bg-admin-bg-tertiary border border-admin-border-primary text-admin-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-xs px-4 py-2 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-primary/5 hover:text-primary hover:border-primary/20 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm active:scale-95"
                   >
                     {suggestion}
                   </button>

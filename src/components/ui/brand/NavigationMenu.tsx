@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Home, Leaf, Sparkles, ShoppingBag } from 'lucide-react';
+import React, { useState } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  ChevronDown,
+  ChevronRight,
+  Home,
+  Leaf,
+  Sparkles,
+  ShoppingBag,
+} from "lucide-react";
 
 const navigationVariants = cva(
   "relative bg-white border-b shadow-sm transition-all duration-300",
@@ -13,19 +20,19 @@ const navigationVariants = cva(
         primary: "bg-white border-gray-200",
         line: "border-line-primary/20",
         transparent: "bg-transparent border-transparent",
-        solid: "bg-line-primary text-white border-line-primary"
+        solid: "bg-line-primary text-white border-line-primary",
       },
       size: {
         compact: "py-2",
         normal: "py-4",
-        spacious: "py-6"
-      }
+        spacious: "py-6",
+      },
     },
     defaultVariants: {
       variant: "primary",
-      size: "normal"
-    }
-  }
+      size: "normal",
+    },
+  },
 );
 
 const megaMenuVariants = cva(
@@ -35,16 +42,16 @@ const megaMenuVariants = cva(
       lineTheme: {
         default: "border-t-brand-primary",
         alma: "border-t-[#9B201A]",
-        ecos: "border-t-[#12406F]", 
+        ecos: "border-t-[#12406F]",
         jade: "border-t-[#345511]",
         umbral: "border-t-[#EA4F12]",
-        utopica: "border-t-[#392E13]"
-      }
+        utopica: "border-t-[#392E13]",
+      },
     },
     defaultVariants: {
-      lineTheme: "default"
-    }
-  }
+      lineTheme: "default",
+    },
+  },
 );
 
 interface NavItem {
@@ -54,7 +61,7 @@ interface NavItem {
   badge?: string;
   icon?: React.ReactNode;
   children?: NavItem[];
-  lineTheme?: 'default' | 'alma' | 'ecos' | 'jade' | 'umbral' | 'utopica';
+  lineTheme?: "default" | "alma" | "ecos" | "jade" | "umbral" | "utopica";
   featured?: boolean;
 }
 
@@ -79,14 +86,14 @@ interface BreadcrumbProps {
   separator?: React.ReactNode;
 }
 
-export function NavigationMenu({ 
-  items, 
-  className, 
-  logo, 
-  actions, 
-  variant, 
+export function NavigationMenu({
+  items,
+  className,
+  logo,
+  actions,
+  variant,
   size,
-  onItemClick 
+  onItemClick,
 }: NavigationMenuProps) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
@@ -104,12 +111,8 @@ export function NavigationMenu({
         <div className="flex items-center justify-between">
           {/* Logo Section */}
           <div className="flex items-center space-x-8">
-            {logo && (
-              <div className="flex-shrink-0">
-                {logo}
-              </div>
-            )}
-            
+            {logo && <div className="flex-shrink-0">{logo}</div>}
+
             {/* Main Navigation Items */}
             <div className="hidden md:flex items-center space-x-1">
               {items.map((item, index) => (
@@ -127,9 +130,7 @@ export function NavigationMenu({
 
           {/* Actions Section */}
           {actions && (
-            <div className="flex items-center space-x-4">
-              {actions}
-            </div>
+            <div className="flex items-center space-x-4">{actions}</div>
           )}
         </div>
       </div>
@@ -142,7 +143,7 @@ function NavItemComponent({
   isActive,
   onHover,
   onLeave,
-  onClick
+  onClick,
 }: {
   item: NavItem;
   isActive: boolean;
@@ -162,7 +163,7 @@ function NavItemComponent({
   };
 
   return (
-    <div 
+    <div
       className="relative group"
       onMouseEnter={() => hasChildren && onHover(item.label)}
       onMouseLeave={() => hasChildren && onLeave()}
@@ -171,7 +172,7 @@ function NavItemComponent({
         variant="ghost"
         className={cn(
           "group/button relative px-4 py-2 h-auto font-medium transition-all duration-200 hover:bg-line-lightest/50",
-          isActive && "text-line-primary bg-line-lightest/30"
+          isActive && "text-line-primary bg-line-lightest/30",
         )}
         onClick={handleClick}
         asChild={!!item.href}
@@ -207,8 +208,8 @@ function NavItemComponent({
 
       {/* Mega Menu */}
       {hasChildren && (
-        <MegaMenu 
-          item={item} 
+        <MegaMenu
+          item={item}
           isOpen={isActive}
           onClose={onLeave}
           className={cn(megaMenuVariants({ lineTheme: item.lineTheme }))}
@@ -229,9 +230,7 @@ function MegaMenu({ item, isOpen, onClose, className }: MegaMenuProps) {
             <div key={`${child.label}-${index}`} className="space-y-4">
               <div className="flex items-center space-x-2">
                 {child.icon && (
-                  <div className="w-5 h-5 text-line-primary">
-                    {child.icon}
-                  </div>
+                  <div className="w-5 h-5 text-line-primary">{child.icon}</div>
                 )}
                 <h3 className="font-semibold text-foreground text-lg">
                   {child.label}
@@ -242,7 +241,7 @@ function MegaMenu({ item, isOpen, onClose, className }: MegaMenuProps) {
                   </Badge>
                 )}
               </div>
-              
+
               {child.children && (
                 <ul className="space-y-2">
                   {child.children.map((grandchild, gIndex) => (
@@ -275,35 +274,33 @@ function MegaMenu({ item, isOpen, onClose, className }: MegaMenuProps) {
   );
 }
 
-export function Breadcrumb({ 
-  items, 
-  className, 
-  separator = <ChevronRight className="w-4 h-4 text-muted-foreground" /> 
+export function Breadcrumb({
+  items,
+  className,
+  separator = <ChevronRight className="w-4 h-4 text-muted-foreground" />,
 }: BreadcrumbProps) {
   return (
     <nav className={cn("flex items-center space-x-2 text-sm", className)}>
-      <a 
-        href="/" 
+      <a
+        href="/"
         className="flex items-center text-muted-foreground hover:text-line-primary transition-colors"
       >
         <Home className="w-4 h-4" />
         <span className="sr-only">Home</span>
       </a>
-      
+
       {items.map((item, index) => (
         <React.Fragment key={`${item.label}-${index}`}>
           {separator}
           {item.href ? (
-            <a 
+            <a
               href={item.href}
               className="text-muted-foreground hover:text-line-primary transition-colors"
             >
               {item.label}
             </a>
           ) : (
-            <span className="text-foreground font-medium">
-              {item.label}
-            </span>
+            <span className="text-foreground font-medium">{item.label}</span>
           )}
         </React.Fragment>
       ))}
@@ -311,7 +308,7 @@ export function Breadcrumb({
   );
 }
 
-// Sample navigation configuration for DA LUZ
+// Sample navigation configuration for OPTTIUS
 export const daLuzNavigationItems: NavItem[] = [
   {
     label: "Productos",
@@ -325,9 +322,12 @@ export const daLuzNavigationItems: NavItem[] = [
         featured: true,
         children: [
           { label: "Cremas Faciales", href: "/productos/cremas-faciales" },
-          { label: "Aceites Corporales", href: "/productos/aceites-corporales" },
-          { label: "Hidrolatos", href: "/productos/hidrolatos" }
-        ]
+          {
+            label: "Aceites Corporales",
+            href: "/productos/aceites-corporales",
+          },
+          { label: "Hidrolatos", href: "/productos/hidrolatos" },
+        ],
       },
       {
         label: "Línea Ecos",
@@ -336,8 +336,8 @@ export const daLuzNavigationItems: NavItem[] = [
         children: [
           { label: "Tónicos", href: "/productos/tonicos" },
           { label: "Serums", href: "/productos/serums" },
-          { label: "Mascarillas", href: "/productos/mascarillas" }
-        ]
+          { label: "Mascarillas", href: "/productos/mascarillas" },
+        ],
       },
       {
         label: "Línea Jade Ritual",
@@ -345,10 +345,13 @@ export const daLuzNavigationItems: NavItem[] = [
         lineTheme: "jade",
         children: [
           { label: "Rituales de Belleza", href: "/productos/rituales" },
-          { label: "Aceites Esenciales", href: "/productos/aceites-esenciales" }
-        ]
-      }
-    ]
+          {
+            label: "Aceites Esenciales",
+            href: "/productos/aceites-esenciales",
+          },
+        ],
+      },
+    ],
   },
   {
     label: "Membresía",
@@ -360,10 +363,10 @@ export const daLuzNavigationItems: NavItem[] = [
         children: [
           { label: "Visión General", href: "/membresia" },
           { label: "Módulos", href: "/membresia/modulos" },
-          { label: "Beneficios", href: "/membresia/beneficios" }
-        ]
-      }
-    ]
+          { label: "Beneficios", href: "/membresia/beneficios" },
+        ],
+      },
+    ],
   },
   {
     label: "Servicios",
@@ -373,13 +376,13 @@ export const daLuzNavigationItems: NavItem[] = [
         label: "Consultas Personalizadas",
         children: [
           { label: "Análisis de Piel", href: "/servicios/analisis" },
-          { label: "Rutinas Personalizadas", href: "/servicios/rutinas" }
-        ]
-      }
-    ]
+          { label: "Rutinas Personalizadas", href: "/servicios/rutinas" },
+        ],
+      },
+    ],
   },
   {
     label: "Blog",
-    href: "/blog"
-  }
-]; 
+    href: "/blog",
+  },
+];

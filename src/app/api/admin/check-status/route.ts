@@ -81,6 +81,19 @@ export async function GET(request: NextRequest) {
     const isRootUser = !!isRoot;
     const isDemoMode = organizationId === DEMO_ORG_ID;
 
+    // Get organization details if exists
+    let organizationName = null;
+    let organizationLogo = null;
+    if (organizationId) {
+      const { data: orgData } = await supabase
+        .from("organizations")
+        .select("name, logo_url")
+        .eq("id", organizationId)
+        .single();
+      organizationName = orgData?.name || null;
+      organizationLogo = orgData?.logo_url || null;
+    }
+
     // Determine if onboarding is required
     // Onboarding required if: user is admin but has no organization_id (and not super_admin and not root/dev)
     const onboardingRequired =
@@ -112,6 +125,8 @@ export async function GET(request: NextRequest) {
       },
       organization: {
         organizationId,
+        organizationName,
+        organizationLogo,
         hasOrganization: !!organizationId,
         isDemoMode,
         isSuperAdmin,

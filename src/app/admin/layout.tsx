@@ -183,11 +183,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   // Organization state
   const [organizationState, setOrganizationState] = useState<{
     hasOrganization: boolean | null;
+    organizationName: string | null;
+    organizationLogo: string | null;
     isDemoMode: boolean;
     onboardingRequired: boolean;
     isChecking: boolean;
   }>({
     hasOrganization: null,
+    organizationName: null,
+    organizationLogo: null,
     isDemoMode: false,
     onboardingRequired: false,
     isChecking: true,
@@ -251,6 +255,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           // Si ya verificamos y no es admin, no necesitamos verificar organización
           setOrganizationState({
             hasOrganization: false,
+            organizationName: null,
             isDemoMode: false,
             onboardingRequired: false,
             isChecking: false,
@@ -264,6 +269,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         console.log("✅ Root/dev user detected - skipping organization check");
         setOrganizationState({
           hasOrganization: true, // Root users no necesitan organización pero marcamos como true para evitar redirección
+          organizationName: null,
+          organizationLogo: null,
           isDemoMode: false,
           onboardingRequired: false,
           isChecking: false,
@@ -286,6 +293,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           const isRootUser = data.organization.isRootUser || false;
           const orgState = {
             hasOrganization: data.organization.hasOrganization || isRootUser, // Root users no necesitan organización
+            organizationName: data.organization.organizationName || null,
+            organizationLogo: data.organization.organizationLogo || null,
             isDemoMode: data.organization.isDemoMode || false,
             onboardingRequired:
               data.organization.onboardingRequired && !isRootUser, // Root users nunca necesitan onboarding
@@ -328,6 +337,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             console.log("✅ Root/dev user - skipping onboarding requirement");
             setOrganizationState({
               hasOrganization: true, // Root/dev no necesita organización pero marcamos como true
+              organizationName: null,
+              organizationLogo: null,
               isDemoMode: false,
               onboardingRequired: false,
               isChecking: false,
@@ -338,6 +349,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           // Si no es root/dev y no hay organización, requerir onboarding (salvo si está cerrando sesión)
           setOrganizationState({
             hasOrganization: false,
+            organizationName: null,
+            organizationLogo: null,
             isDemoMode: false,
             onboardingRequired: true,
             isChecking: false,
@@ -358,6 +371,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           );
           setOrganizationState({
             hasOrganization: true, // Root/dev no necesita organización
+            organizationName: null,
+            organizationLogo: null,
             isDemoMode: false,
             onboardingRequired: false,
             isChecking: false,
@@ -366,6 +381,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           // Si no es root/dev y hay error, requerir onboarding por seguridad (salvo si está cerrando sesión)
           setOrganizationState({
             hasOrganization: false,
+            organizationName: null,
+            organizationLogo: null,
             isDemoMode: false,
             onboardingRequired: true,
             isChecking: false,
@@ -824,21 +841,26 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 </SheetContent>
               </Sheet>
 
-              <h1 className="admin-header-title">Admin</h1>
+              <div className="flex items-center gap-2">
+                {organizationState.organizationLogo && (
+                  <Image
+                    src={organizationState.organizationLogo}
+                    alt="Logo"
+                    width={28}
+                    height={28}
+                    className="rounded-lg shadow-sm"
+                  />
+                )}
+                <h1 className="admin-header-title font-malisha">
+                  {organizationState.organizationName || businessConfig.name}
+                </h1>
+              </div>
             </div>
 
             <div className="admin-header-actions">
               <BranchSelector />
               <ThemeSelector />
               <AdminNotificationDropdown />
-              <Link href="/admin/help">
-                <Button variant="ghost" size="icon" title="Centro de Ayuda">
-                  <HelpCircle className="h-5 w-5 text-admin-text-primary" />
-                </Button>
-              </Link>
-              <Button variant="ghost" size="icon" onClick={handleSignOut}>
-                <LogOut className="h-5 w-5 text-admin-text-primary" />
-              </Button>
             </div>
           </div>
         </div>
@@ -855,17 +877,34 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
 
           {/* Main Content */}
-          <div className="lg:pl-72" style={{ width: "-webkit-fill-available" }}>
+          <div className="lg:pl-72 flex-1 min-w-0 w-full">
             {/* Desktop Header */}
             <div className="hidden lg:block admin-header">
               <div className="admin-header-content">
                 <div>
-                  <h1 className="admin-header-title font-malisha text-admin-text-primary">
-                    {businessConfig.displayName || businessConfig.name}
-                  </h1>
-                  <p className="admin-header-subtitle font-caption text-admin-text-primary">
-                    {businessConfig.admin.subtitle}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    {organizationState.organizationLogo && (
+                      <Image
+                        src={organizationState.organizationLogo}
+                        alt="Logo"
+                        width={36}
+                        height={36}
+                        className="rounded-xl shadow-sm border border-admin-border-secondary/30"
+                      />
+                    )}
+                    <div>
+                      <h1 className="admin-header-title font-malisha text-admin-text-primary">
+                        {organizationState.organizationName ||
+                          businessConfig.displayName ||
+                          businessConfig.name}
+                      </h1>
+                      <p className="admin-header-subtitle font-caption text-admin-text-tertiary">
+                        {organizationState.organizationName
+                          ? "Panel de Administración"
+                          : businessConfig.admin.subtitle}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="admin-header-actions">
@@ -885,48 +924,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   )}
-
-                  <div className="admin-header-user">
-                    <div className="admin-header-user-info">
-                      <p className="admin-header-user-name font-caption text-admin-text-primary">
-                        {profile?.first_name
-                          ? `${profile.first_name} ${profile.last_name || ""}`.trim()
-                          : user?.email || "Usuario"}
-                      </p>
-                      <p className="admin-header-user-role font-caption text-admin-text-secondary">
-                        Administrador
-                      </p>
-                    </div>
-                    <Link href="/admin/profile">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="hover:bg-admin-bg-tertiary transition-colors"
-                        title="Ver perfil"
-                      >
-                        <User className="h-5 w-5 text-admin-text-primary" />
-                      </Button>
-                    </Link>
-                    <Link href="/admin/help">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="hover:bg-admin-bg-tertiary transition-colors"
-                        title="Centro de Ayuda"
-                      >
-                        <HelpCircle className="h-5 w-5 text-admin-text-primary" />
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleSignOut}
-                      className="hover:bg-admin-bg-tertiary transition-colors"
-                      title="Cerrar sesión"
-                    >
-                      <LogOut className="h-5 w-5 text-admin-text-primary" />
-                    </Button>
-                  </div>
                 </div>
               </div>
             </div>
@@ -973,6 +970,7 @@ function AdminSidebar({
   onChatbotClick?: () => void;
   organizationState?: {
     hasOrganization: boolean | null;
+    organizationName: string | null;
     isDemoMode: boolean;
     onboardingRequired: boolean;
     isChecking: boolean;
@@ -980,90 +978,52 @@ function AdminSidebar({
 }) {
   const { isSuperAdmin } = useBranch();
   const { isRoot } = useRoot();
+  const { user, profile, signOut } = useAuthContext();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/");
+  };
+
   return (
-    <div
-      className="admin-sidebar flex grow flex-col gap-y-5 overflow-y-auto"
-      style={{ background: "var(--admin-bg-primary)" }}
-    >
+    <div className="admin-sidebar flex grow flex-col h-full overflow-hidden">
       {/* Logo */}
-      <div className="admin-sidebar-header bg-admin-bg-secondary">
+      <div className="admin-sidebar-header">
         <Link href="/" className="admin-sidebar-logo">
-          <div className="admin-sidebar-logo-icon">
-            <Image
-              src={businessConfig.admin.logo}
-              alt={`Logo`}
-              width={60}
-              height={60}
-              className="transition-transform duration-300 hover:scale-105"
-            />
+          <Image
+            src={businessConfig.admin.logo}
+            alt="Logo"
+            width={40}
+            height={40}
+            className="rounded-xl shadow-md"
+          />
+          <div className="flex flex-col">
+            <span className="font-malisha text-lg leading-tight">
+              {businessConfig.name}
+            </span>
+            {organizationState?.organizationName && (
+              <span className="text-[10px] text-admin-text-tertiary font-medium truncate max-w-[150px]">
+                {organizationState.organizationName}
+              </span>
+            )}
           </div>
-          <span className="font-malisha text-admin-text-primary">
-            {businessConfig.name}
-          </span>
         </Link>
       </div>
 
-      {/* Quick Stats - Optical Shop Focused */}
-      <div className="px-6 bg-admin-bg-primary">
-        <div className="admin-card">
-          <div className="admin-card-content">
-            <h3 className="admin-card-title">Resumen Rápido</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">
-                  Trabajos Pendientes
-                </span>
-                <span className="font-medium text-orange-600">
-                  {stats.newWorkOrders}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">En Proceso</span>
-                <span className="font-medium text-blue-600">
-                  {stats.inProgressWorkOrders}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">
-                  Presupuestos Pendientes
-                </span>
-                <span className="font-medium text-purple-600">
-                  {stats.pendingQuotes}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Citas Hoy</span>
-                <span className="font-medium text-green-600">
-                  {stats.todayAppointments}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Navigation */}
-      <nav className="admin-sidebar-nav bg-admin-bg-primary">
-        <ul role="list" className="flex flex-1 flex-col gap-y-1">
+      <nav className="admin-sidebar-nav flex-1">
+        <ul role="list" className="space-y-1">
           {createNavigationItems(stats.newWorkOrders, stats.openTickets, isRoot)
             .filter((item: any) => {
-              // Filter out super admin only items if user is not super admin
-              if (item.superAdminOnly && !isSuperAdmin) {
-                return false;
-              }
-              // Filter out root-only items if user is not root/dev
-              if (item.rootOnly && !isRoot) {
-                return false;
-              }
-              // Filter out onboarding-only items if user has an active organization
-              // Show checkout only during onboarding (when onboardingRequired is true or hasOrganization is false/null)
+              if (item.superAdminOnly && !isSuperAdmin) return false;
+              if (item.rootOnly && !isRoot) return false;
               if (item.onboardingOnly) {
                 if (
                   organizationState?.hasOrganization &&
                   !organizationState?.onboardingRequired
-                ) {
-                  return false; // Hide checkout if user has active organization
-                }
+                )
+                  return false;
               }
               return true;
             })
@@ -1071,7 +1031,6 @@ function AdminSidebar({
               const isActive =
                 pathname === item.href ||
                 (item.href !== "/admin" && pathname.startsWith(item.href));
-
               return (
                 <li key={item.href}>
                   <Link
@@ -1079,10 +1038,10 @@ function AdminSidebar({
                     onClick={onNavigate}
                     className={cn("admin-nav-item", isActive && "active")}
                   >
-                    <item.icon className="h-5 w-5 shrink-0" />
+                    <item.icon className="h-5 w-5" />
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <span>{item.label}</span>
+                        <span className="truncate">{item.label}</span>
                         {item.badge && (
                           <Badge
                             variant="secondary"
@@ -1092,9 +1051,6 @@ function AdminSidebar({
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {item.description}
-                      </p>
                     </div>
                   </Link>
                 </li>
@@ -1103,13 +1059,65 @@ function AdminSidebar({
         </ul>
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-gray-200 p-6">
-        <div className="text-center">
-          <p className="text-xs text-gray-500">
-            {businessConfig.displayName || businessConfig.name} v1.0
+      {/* User & Footer Section */}
+      <div className="mt-auto p-4 space-y-4 bg-admin-bg-tertiary/20">
+        {/* User Profile Hookup */}
+        <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/50 backdrop-blur-sm shadow-sm border border-white/50">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+            {profile?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold truncate text-admin-text-primary">
+              {profile?.first_name
+                ? `${profile.first_name} ${profile.last_name || ""}`.trim()
+                : user?.email?.split("@")[0]}
+            </p>
+            <p className="text-[10px] font-medium text-admin-text-tertiary uppercase tracking-wider">
+              {isRoot
+                ? "Root User"
+                : isSuperAdmin
+                  ? "Super Admin"
+                  : "Administrador"}
+            </p>
+          </div>
+          <Link href="/admin/profile">
+            <Button variant="ghost" size="icon-sm" className="rounded-lg">
+              <User className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-2">
+          <Link href="/admin/help" className="w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-[10px] gap-1.5 h-8"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+              Ayuda
+            </Button>
+          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSignOut}
+            className="w-full text-[10px] gap-1.5 h-8 text-destructive hover:text-destructive"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Salir
+          </Button>
+        </div>
+
+        {/* Opttius Branding */}
+        <div className="text-center pt-2">
+          <p className="text-[10px] text-admin-text-tertiary font-medium">
+            &copy; {new Date().getFullYear()} Opttius
           </p>
-          <p className="text-xs text-gray-500 mt-1">Admin Panel</p>
+          <p className="text-[9px] text-admin-text-tertiary/60">
+            Derechos Reservados
+          </p>
         </div>
       </div>
     </div>

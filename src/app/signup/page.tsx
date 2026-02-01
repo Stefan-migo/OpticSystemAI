@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,7 +30,9 @@ import {
   ArrowRight,
   Shield,
   CheckCircle2,
+  Sparkles,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const signupSchema = z
   .object({
@@ -219,331 +222,454 @@ export default function SignupPage() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
-        <Card className="w-full max-w-md border-0 shadow-2xl">
-          <CardHeader className="space-y-1 pb-6 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
+      <div className="min-h-screen flex flex-col md:flex-row bg-white overflow-hidden">
+        {/* Left Side: Branding & Visuals */}
+        <div className="relative hidden lg:flex lg:w-1/2 xl:w-7/12 bg-admin-bg-primary overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-10000 hover:scale-110"
+            style={{
+              backgroundImage: `url('/luxury_optics_auth_bg_1769965128142.png')`,
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-tr from-admin-bg-primary/95 via-admin-bg-primary/40 to-transparent" />
+
+          <div className="relative z-10 flex flex-col justify-between p-12 w-full">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 bg-white rounded-3xl flex items-center justify-center shadow-premium-lg overflow-hidden p-2">
+                <Image
+                  src="/logo-opttius.png"
+                  alt="Opttius Logo"
+                  width={40}
+                  height={40}
+                  className="object-contain"
+                />
+              </div>
+              <span className="text-3xl font-black text-white tracking-tighter uppercase">
+                Opttius
+              </span>
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">
-              ¡Cuenta Creada!
-            </CardTitle>
-            <CardDescription className="text-gray-600">
-              Tu cuenta ha sido creada exitosamente
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            {requiresEmailConfirmation ? (
-              <>
-                <Alert className="border-blue-200 bg-blue-50">
-                  <AlertDescription className="text-blue-800">
-                    <strong>¡Cuenta creada exitosamente!</strong>
-                    <br />
-                    <br />
-                    Por favor, revisa tu correo electrónico y haz clic en el
-                    enlace de confirmación para activar tu cuenta.
-                    <br />
-                    <br />
-                    Una vez que confirmes tu email, podrás iniciar sesión y
-                    configurar tu óptica.
-                  </AlertDescription>
-                </Alert>
-                <Button
-                  onClick={() => router.push("/login")}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                >
-                  Ir a Iniciar Sesión
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-                <p className="text-xs text-center text-gray-500 mt-4">
-                  Después de confirmar tu email, podrás iniciar sesión y
-                  configurar tu óptica
+
+            <div className="max-w-xl">
+              <h2 className="text-5xl font-black text-white leading-tight tracking-tight mb-6">
+                Tu visión,{" "}
+                <span className="text-admin-accent-primary">nuestra</span>,
+                <br />
+                tecnología.
+              </h2>
+              <div className="h-1 w-24 bg-admin-accent-primary rounded-full mb-8" />
+              <p className="text-xl text-white/80 font-medium leading-relaxed">
+                Únete a la red de ópticas que están transformando la salud
+                visual con gestión inteligente y experiencia de usuario
+                superior.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-6 text-white/50 text-sm font-bold uppercase tracking-widest">
+              <span>Enterprise Edition</span>
+              <div className="h-1 w-1 rounded-full bg-white/30" />
+              <span>v2.5.0</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Success Message */}
+        <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-12 lg:p-20 bg-slate-50/50 relative overflow-y-auto">
+          <div className="absolute top-0 right-0 p-8 flex items-center gap-3 lg:hidden">
+            <Image
+              src="/logo-opttius.png"
+              alt="Opttius Logo"
+              width={32}
+              height={32}
+              className="object-contain"
+            />
+            <span className="text-xl font-black text-admin-text-primary tracking-tighter uppercase">
+              Opttius
+            </span>
+          </div>
+          <div className="w-full max-w-md animate-in zoom-in-95 duration-500">
+            <Card className="border-none bg-white shadow-premium-lg rounded-[2.5rem] overflow-hidden">
+              <CardContent className="p-10 text-center">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-admin-success/10 rounded-3xl mb-8">
+                  <CheckCircle2 className="h-10 w-10 text-admin-success" />
+                </div>
+
+                <h3 className="text-3xl font-black text-admin-text-primary tracking-tight mb-3">
+                  ¡Cuenta Creada!
+                </h3>
+                <p className="text-admin-text-tertiary font-bold uppercase text-[10px] tracking-widest mb-8">
+                  Tu acceso ha sido procesado exitosamente
                 </p>
-              </>
-            ) : (
-              <>
-                <Alert className="border-green-200 bg-green-50">
-                  <AlertDescription className="text-green-800">
-                    <strong>¡Cuenta creada exitosamente!</strong>
-                    <br />
-                    <br />
-                    Serás redirigido al onboarding en breve...
-                  </AlertDescription>
-                </Alert>
-                <Button
-                  onClick={() => router.push("/onboarding/choice")}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                >
-                  Continuar al Onboarding
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
+
+                {requiresEmailConfirmation ? (
+                  <div className="space-y-8">
+                    <div className="p-6 bg-admin-info/5 border border-admin-info/20 rounded-2xl text-left">
+                      <p className="text-xs font-bold text-admin-text-secondary leading-relaxed">
+                        Por favor, revisa tu correo electrónico y haz clic en el
+                        enlace de confirmación para activar tu cuenta.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => router.push("/login")}
+                      className="w-full h-14 bg-admin-accent-primary hover:bg-admin-accent-primary/90 text-white rounded-2xl shadow-premium-md font-black uppercase text-[11px] tracking-widest transition-all"
+                    >
+                      Ir a Iniciar Sesión
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    <div className="p-6 bg-admin-success/5 border border-admin-success/20 rounded-2xl text-left">
+                      <p className="text-xs font-bold text-admin-text-secondary leading-relaxed">
+                        Redirigiendo al configurador de tu óptica...
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => router.push("/onboarding/choice")}
+                      className="w-full h-14 bg-admin-accent-primary hover:bg-admin-accent-primary/90 text-white rounded-2xl shadow-premium-md font-black uppercase text-[11px] tracking-widest transition-all"
+                    >
+                      Continuar al Onboarding
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
-      <div className="w-full max-w-md">
-        {/* Logo/Brand Section */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg mb-4">
-            <Shield className="h-8 w-8 text-white" />
+    <div className="min-h-screen flex flex-col md:flex-row bg-white overflow-hidden">
+      {/* Left Side: Branding & Visuals */}
+      <div className="relative hidden lg:flex lg:w-1/2 xl:w-7/12 bg-admin-bg-primary overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-10000 hover:scale-110"
+          style={{
+            backgroundImage: `url('/luxury_optics_auth_bg_1769965128142.png')`,
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-tr from-admin-bg-primary/95 via-admin-bg-primary/40 to-transparent" />
+
+        <div className="relative z-10 flex flex-col justify-between p-12 w-full">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 bg-white rounded-3xl flex items-center justify-center shadow-premium-lg overflow-hidden p-2">
+              <Image
+                src="/logo-opttius.png"
+                alt="Opttius Logo"
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+            </div>
+            <span className="text-3xl font-black text-white tracking-tighter uppercase">
+              Opttius
+            </span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Crear Cuenta
-          </h1>
-          <p className="text-gray-600">Únete para comenzar</p>
+
+          <div className="max-w-xl">
+            <h2 className="text-5xl font-black text-white leading-tight tracking-tight mb-6">
+              Escala tu óptica al{" "}
+              <span className="text-admin-accent-primary">siguiente</span>
+              <br />
+              nivel hoy.
+            </h2>
+            <div className="h-1 w-24 bg-admin-accent-primary rounded-full mb-8" />
+            <p className="text-xl text-white/80 font-medium leading-relaxed">
+              Únete a cientos de profesionales que ya confían en Opttius para
+              gestionar sus sucursales, inventarios y ventas con una plataforma
+              diseñada para el éxito.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-6 text-white/50 text-sm font-bold uppercase tracking-widest">
+            <span>Enterprise Edition</span>
+            <div className="h-1 w-1 rounded-full bg-white/30" />
+            <span>v2.5.0</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side: Signup Form */}
+      <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-12 lg:p-20 bg-slate-50/50 relative overflow-y-auto">
+        <div className="absolute top-0 right-0 p-8 flex items-center gap-3 lg:hidden">
+          <Image
+            src="/logo-opttius.png"
+            alt="Opttius Logo"
+            width={32}
+            height={32}
+            className="object-contain"
+          />
+          <span className="text-xl font-black text-admin-text-primary tracking-tighter uppercase">
+            Opttius
+          </span>
         </div>
 
-        <Card className="border-0 shadow-2xl">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Comienza Ahora
-            </CardTitle>
-            <CardDescription className="text-center text-gray-600">
-              Completa tu información para crear una cuenta
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {error && (
-                <Alert
-                  variant="destructive"
-                  className="border-red-200 bg-red-50"
-                >
-                  <AlertDescription className="text-red-800">
-                    {error}
-                  </AlertDescription>
-                </Alert>
-              )}
+        <div className="w-full max-w-xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="text-center mb-8 lg:text-left">
+            <h1 className="text-4xl font-black text-admin-text-primary tracking-tight mb-2">
+              Crea tu Cuenta
+            </h1>
+            <p className="text-admin-text-tertiary font-bold uppercase text-[10px] tracking-widest">
+              Estás a pocos pasos de optimizar tu visión de negocio
+            </p>
+          </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="firstName"
-                    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+          <Card className="border-none bg-white shadow-premium-lg rounded-[2.5rem] overflow-hidden">
+            <CardContent className="p-8 sm:p-12">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                {error && (
+                  <Alert
+                    variant="destructive"
+                    className="bg-admin-error/5 border-admin-error/20 rounded-2xl"
                   >
-                    <User className="h-4 w-4" />
-                    Nombre
-                  </Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="Juan"
-                    {...register("firstName")}
-                    className={`h-11 ${errors.firstName ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
-                    disabled={loading}
-                  />
-                  {errors.firstName && (
-                    <p className="text-sm text-red-600">
-                      {errors.firstName.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="lastName"
-                    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                  >
-                    <User className="h-4 w-4" />
-                    Last Name
-                  </Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="Doe"
-                    {...register("lastName")}
-                    className={`h-11 ${errors.lastName ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
-                    disabled={loading}
-                  />
-                  {errors.lastName && (
-                    <p className="text-sm text-red-600">
-                      {errors.lastName.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="email"
-                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                >
-                  <Mail className="h-4 w-4" />
-                  Correo Electrónico
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    {...register("email")}
-                    className={`h-11 pl-10 ${errors.email ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
-                    disabled={loading}
-                  />
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                </div>
-                {errors.email && (
-                  <p className="text-sm text-red-600">{errors.email.message}</p>
+                    <AlertDescription className="text-admin-error font-bold text-xs">
+                      {error}
+                    </AlertDescription>
+                  </Alert>
                 )}
-              </div>
 
-              <div className="space-y-2">
-                <Label
-                  htmlFor="phone"
-                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                >
-                  <Phone className="h-4 w-4" />
-                  Teléfono (Opcional)
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+56 9 1234 5678"
-                    {...register("phone")}
-                    className={`h-11 pl-10 ${errors.phone ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
-                    disabled={loading}
-                  />
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="firstName"
+                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
+                    >
+                      Nombre
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="firstName"
+                        placeholder="Juan"
+                        {...register("firstName")}
+                        className={cn(
+                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 focus:bg-white transition-all font-bold",
+                          errors.firstName ? "border-admin-error" : "",
+                        )}
+                        disabled={loading}
+                      />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                    </div>
+                    {errors.firstName && (
+                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1">
+                        {errors.firstName.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="lastName"
+                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
+                    >
+                      Apellido
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="lastName"
+                        placeholder="Pérez"
+                        {...register("lastName")}
+                        className={cn(
+                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 focus:bg-white transition-all font-bold",
+                          errors.lastName ? "border-admin-error" : "",
+                        )}
+                        disabled={loading}
+                      />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                    </div>
+                    {errors.lastName && (
+                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1">
+                        {errors.lastName.message}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {errors.phone && (
-                  <p className="text-sm text-red-600">{errors.phone.message}</p>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <Label
-                  htmlFor="password"
-                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                >
-                  <Lock className="h-4 w-4" />
-                  Contraseña
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Mínimo 6 caracteres"
-                    {...register("password")}
-                    className={`h-11 pl-10 pr-10 ${errors.password ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
-                    disabled={loading}
-                  />
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="email"
+                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
+                    >
+                      Correo Corporativo
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="juan@optica.com"
+                        {...register("email")}
+                        className={cn(
+                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 focus:bg-white transition-all font-bold",
+                          errors.email ? "border-admin-error" : "",
+                        )}
+                        disabled={loading}
+                      />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                    </div>
+                    {errors.email && (
+                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1">
+                        {errors.email.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="phone"
+                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
+                    >
+                      Teléfono (Opcional)
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="phone"
+                        type="tel"
+                        placeholder="+56 9 1234 5678"
+                        {...register("phone")}
+                        className="h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 focus:bg-white transition-all font-bold"
+                        disabled={loading}
+                      />
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="password"
+                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
+                    >
+                      Contraseña Maestra
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Mín. 6 carcateres"
+                        {...register("password")}
+                        className={cn(
+                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 pr-12 focus:bg-white transition-all font-bold",
+                          errors.password ? "border-admin-error" : "",
+                        )}
+                        disabled={loading}
+                      />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 p-0 hover:bg-transparent text-admin-text-tertiary"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </Button>
+                    </div>
+                    {errors.password && (
+                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1 leading-tight">
+                        {errors.password.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="confirmPassword"
+                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
+                    >
+                      Confirmar Contraseña
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Repite tu contraseña"
+                        {...register("confirmPassword")}
+                        className={cn(
+                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 pr-12 focus:bg-white transition-all font-bold",
+                          errors.confirmPassword ? "border-admin-error" : "",
+                        )}
+                        disabled={loading}
+                      />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 p-0 hover:bg-transparent text-admin-text-tertiary"
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </Button>
+                    </div>
+                    {errors.confirmPassword && (
+                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1">
+                        {errors.confirmPassword.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2">
                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
+                    type="submit"
+                    className="w-full h-14 bg-admin-accent-primary hover:bg-admin-accent-primary/90 text-white rounded-2xl shadow-premium-md font-black uppercase text-[11px] tracking-widest transition-all active:scale-[0.98] group"
                     disabled={loading}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-500" />
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Creando Infraestructura...
+                      </>
                     ) : (
-                      <Eye className="h-4 w-4 text-gray-500" />
+                      <>
+                        Comenzar Ahora
+                        <Sparkles className="ml-2 h-5 w-5 transition-transform group-hover:scale-110" />
+                      </>
                     )}
                   </Button>
                 </div>
-                {errors.password && (
-                  <p className="text-sm text-red-600">
-                    {errors.password.message}
-                  </p>
-                )}
-              </div>
+              </form>
 
-              <div className="space-y-2">
-                <Label
-                  htmlFor="confirmPassword"
-                  className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                >
-                  <Lock className="h-4 w-4" />
-                  Confirmar Contraseña
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Confirma tu contraseña"
-                    {...register("confirmPassword")}
-                    className={`h-11 pl-10 pr-10 ${errors.confirmPassword ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`}
-                    disabled={loading}
-                  />
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    disabled={loading}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-500" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-500" />
-                    )}
-                  </Button>
-                </div>
-                {errors.confirmPassword && (
-                  <p className="text-sm text-red-600">
-                    {errors.confirmPassword.message}
-                  </p>
-                )}
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creando cuenta...
-                  </>
-                ) : (
-                  <>
-                    Crear Cuenta
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-gray-500">
-                    Already have an account?
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6 text-center">
+              <div className="mt-8 text-center pt-6 border-t border-admin-border-primary/10">
+                <p className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest mb-4">
+                  ¿Ya tienes una cuenta registrada?
+                </p>
                 <Link
                   href="/login"
-                  className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                  className="inline-flex items-center gap-2 text-[10px] font-black text-admin-accent-primary uppercase tracking-widest hover:underline"
                 >
-                  Sign in instead
-                  <ArrowRight className="ml-1 h-4 w-4" />
+                  Inicia sesión aquí
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <p className="mt-6 text-center text-xs text-gray-500">
-          Al crear una cuenta, aceptas nuestros términos de servicio
-        </p>
+          <p className="mt-8 text-center text-[9px] font-bold text-admin-text-tertiary uppercase tracking-widest opacity-60">
+            Al registrarte, confirmas que has leído y aceptado nuestros{" "}
+            <Link href="#" className="underline">
+              Términos de Servicio
+            </Link>{" "}
+            y{" "}
+            <Link href="#" className="underline">
+              Política de Privacidad
+            </Link>
+            .
+          </p>
+        </div>
       </div>
     </div>
   );

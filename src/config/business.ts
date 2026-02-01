@@ -14,7 +14,7 @@ export const businessConfig = {
 
   // Branding
   colors: {
-    primary: "#8B5A3C",
+    primary: "#AE0000",
     secondary: "#B17A47",
     accent: "#D4A574",
     success: "#4ade80",
@@ -25,9 +25,9 @@ export const businessConfig = {
 
   // Admin Panel
   admin: {
-    title: "Admin Panel",
-    subtitle: "Opttius - Sistema de Gestión Óptica",
-    logo: "/logo.svg", // Path to your logo
+    title: "Opttius Admin",
+    subtitle: "Sistema de Gestión Óptica",
+    logo: "/logo-opttius.png", // Path to the new logo
   },
 
   // Features

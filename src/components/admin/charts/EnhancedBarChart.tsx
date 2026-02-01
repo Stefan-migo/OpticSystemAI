@@ -27,7 +27,7 @@ const COLORS = [
   "#1E3A8A", // azul-profundo
   "#D4A853", // dorado
   "#8B4513", // tierra-media
-  "#AE0000", // rojo DA LUZ
+  "#AE0000", // rojo OPTTIUS
   "#4A7C59", // verde oscuro
   "#F6FBD6", // verde claro
   "#E5E7EB", // gris

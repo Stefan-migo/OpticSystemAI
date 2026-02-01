@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, X } from "lucide-react";
 import { ChatbotContent } from "./ChatbotContent";
+import { cn } from "@/lib/utils";
 import type { InsightSection } from "@/lib/ai/insights/schemas";
 
 interface ChatbotProps {
@@ -36,24 +36,54 @@ export default function Chatbot(
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setIsOpen = controlledOnOpenChange || setInternalOpen;
 
+  // Close on Escape key
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [setIsOpen]);
+
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Button
-          variant="default"
-          size="icon"
-          className="fixed bottom-6 right-6 rounded-full w-14 h-14 shadow-lg z-50"
-          title="Asistente IA"
-        >
-          <MessageSquare className="w-6 h-6" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent
-        side="right"
-        className="w-full sm:w-[800px] p-0 flex flex-col"
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
+      {/* Chat Window */}
+      <div
+        className={cn(
+          "w-[90vw] sm:w-[400px] h-[600px] max-h-[80vh] bg-white dark:bg-slate-950 rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col transition-all duration-300 origin-bottom-right",
+          isOpen
+            ? "scale-100 opacity-100 translate-y-0"
+            : "scale-95 opacity-0 translate-y-4 pointer-events-none",
+        )}
       >
-        <ChatbotContent className="h-full" currentSection={currentSection} />
-      </SheetContent>
-    </Sheet>
+        <ChatbotContent
+          className="h-full"
+          currentSection={currentSection}
+          onClose={() => setIsOpen(false)}
+        />
+      </div>
+
+      {/* Trigger Bubble */}
+      <Button
+        variant="default"
+        size="icon"
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "rounded-full w-14 h-14 shadow-xl transition-all duration-300 hover:scale-110 active:scale-95",
+          isOpen
+            ? "bg-slate-200 dark:bg-slate-800 text-slate-600 rotate-90"
+            : "bg-primary text-primary-foreground",
+        )}
+        title="Asistente IA"
+      >
+        {isOpen ? (
+          <X className="w-6 h-6" />
+        ) : (
+          <MessageSquare className="w-6 h-6" />
+        )}
+      </Button>
+    </div>
   );
 }

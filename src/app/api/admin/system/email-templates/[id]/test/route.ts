@@ -57,7 +57,7 @@ export async function POST(
       order_number: "ORD-12345",
       order_total: "$1,000.00",
       order_date: new Date().toLocaleDateString("es-AR"),
-      company_name: "DA LUZ CONSCIENTE",
+      company_name: "OPTTIUS CONSCIENTE",
       support_email: "soporte@daluz.com",
       ...variables,
     };

@@ -1,4 +1,4 @@
-import { sendEmail } from '../client';
+import { sendEmail } from "../client";
 
 interface SupportTicket {
   id: string;
@@ -22,7 +22,7 @@ interface TicketMessage {
  */
 export async function sendTicketCreatedEmail(ticket: SupportTicket) {
   const subject = `Ticket creado: ${ticket.subject} (#${ticket.ticket_number})`;
-  
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -40,7 +40,7 @@ export async function sendTicketCreatedEmail(ticket: SupportTicket) {
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #8B4513 0%, #D2691E 100%); padding: 30px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">DA LUZ CONSCIENTE</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">OPTTIUS CONSCIENTE</h1>
               <p style="margin: 10px 0 0 0; color: #f0e6d2; font-size: 14px;">Soporte al Cliente</p>
             </td>
           </tr>
@@ -53,7 +53,7 @@ export async function sendTicketCreatedEmail(ticket: SupportTicket) {
               </h2>
               
               <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
-                Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ''},
+                Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ""},
               </p>
               
               <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
@@ -102,7 +102,7 @@ export async function sendTicketCreatedEmail(ticket: SupportTicket) {
               <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                 <tr>
                   <td align="center">
-                    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconsciente.com'}/soporte/tickets/${ticket.id}" 
+                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://daluzconsciente.com"}/soporte/tickets/${ticket.id}" 
                        style="display: inline-block; background: linear-gradient(135deg, #8B4513 0%, #D2691E 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">
                       Ver Ticket
                     </a>
@@ -122,7 +122,7 @@ export async function sendTicketCreatedEmail(ticket: SupportTicket) {
                 contacto@daluzconsciente.com
               </p>
               <p style="margin: 15px 0 0 0; color: #999999; font-size: 12px;">
-                © ${new Date().getFullYear()} DA LUZ CONSCIENTE. Todos los derechos reservados.
+                © ${new Date().getFullYear()} OPTTIUS CONSCIENTE. Todos los derechos reservados.
               </p>
             </td>
           </tr>
@@ -136,9 +136,9 @@ export async function sendTicketCreatedEmail(ticket: SupportTicket) {
   `;
 
   const text = `
-DA LUZ CONSCIENTE - Tu ticket de soporte ha sido creado
+OPTTIUS CONSCIENTE - Tu ticket de soporte ha sido creado
 
-Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ''},
+Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ""},
 
 Hemos recibido tu solicitud de soporte y nuestro equipo está trabajando en ella.
 
@@ -150,11 +150,11 @@ Detalles del ticket:
 
 Nos esforzamos por responder a todos los tickets dentro de las próximas 24 horas.
 
-Ver ticket: ${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconsciente.com'}/soporte/tickets/${ticket.id}
+Ver ticket: ${process.env.NEXT_PUBLIC_APP_URL || "https://daluzconsciente.com"}/soporte/tickets/${ticket.id}
 
 ¿Tienes preguntas? Responde a este email o contáctanos en contacto@daluzconsciente.com
 
-© ${new Date().getFullYear()} DA LUZ CONSCIENTE
+© ${new Date().getFullYear()} OPTTIUS CONSCIENTE
   `;
 
   return sendEmail({
@@ -162,7 +162,7 @@ Ver ticket: ${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconsciente.com'}/
     subject,
     html,
     text,
-    replyTo: 'soporte@daluzconsciente.com'
+    replyTo: "soporte@daluzconsciente.com",
   });
 }
 
@@ -171,10 +171,10 @@ Ver ticket: ${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconsciente.com'}/
  */
 export async function sendNewResponseEmail(
   ticket: SupportTicket,
-  message: TicketMessage
+  message: TicketMessage,
 ) {
   const subject = `Nueva respuesta en tu ticket #${ticket.ticket_number}`;
-  
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -192,7 +192,7 @@ export async function sendNewResponseEmail(
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #8B4513 0%, #D2691E 100%); padding: 30px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">DA LUZ CONSCIENTE</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">OPTTIUS CONSCIENTE</h1>
               <p style="margin: 10px 0 0 0; color: #f0e6d2; font-size: 14px;">Soporte al Cliente</p>
             </td>
           </tr>
@@ -205,7 +205,7 @@ export async function sendNewResponseEmail(
               </h2>
               
               <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
-                Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ''},
+                Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ""},
               </p>
               
               <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
@@ -235,7 +235,7 @@ export async function sendNewResponseEmail(
               <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                 <tr>
                   <td align="center">
-                    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconsciente.com'}/soporte/tickets/${ticket.id}" 
+                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://daluzconsciente.com"}/soporte/tickets/${ticket.id}" 
                        style="display: inline-block; background: linear-gradient(135deg, #8B4513 0%, #D2691E 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">
                       Ver Ticket Completo
                     </a>
@@ -255,7 +255,7 @@ export async function sendNewResponseEmail(
                 soporte@daluzconsciente.com
               </p>
               <p style="margin: 15px 0 0 0; color: #999999; font-size: 12px;">
-                © ${new Date().getFullYear()} DA LUZ CONSCIENTE. Todos los derechos reservados.
+                © ${new Date().getFullYear()} OPTTIUS CONSCIENTE. Todos los derechos reservados.
               </p>
             </td>
           </tr>
@@ -269,9 +269,9 @@ export async function sendNewResponseEmail(
   `;
 
   const text = `
-DA LUZ CONSCIENTE - Nueva respuesta en tu ticket
+OPTTIUS CONSCIENTE - Nueva respuesta en tu ticket
 
-Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ''},
+Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ""},
 
 Nuestro equipo de soporte ha respondido a tu ticket #${ticket.ticket_number}.
 
@@ -280,9 +280,9 @@ Ticket: ${ticket.subject}
 Respuesta del equipo:
 ${message.message}
 
-Ver ticket completo: ${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconsciente.com'}/soporte/tickets/${ticket.id}
+Ver ticket completo: ${process.env.NEXT_PUBLIC_APP_URL || "https://daluzconsciente.com"}/soporte/tickets/${ticket.id}
 
-© ${new Date().getFullYear()} DA LUZ CONSCIENTE
+© ${new Date().getFullYear()} OPTTIUS CONSCIENTE
   `;
 
   return sendEmail({
@@ -290,7 +290,7 @@ Ver ticket completo: ${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconscien
     subject,
     html,
     text,
-    replyTo: 'soporte@daluzconsciente.com'
+    replyTo: "soporte@daluzconsciente.com",
   });
 }
 
@@ -300,10 +300,10 @@ Ver ticket completo: ${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconscien
 export async function sendStatusChangeEmail(
   ticket: SupportTicket,
   oldStatus: string,
-  newStatus: string
+  newStatus: string,
 ) {
   const subject = `Actualización de ticket #${ticket.ticket_number}: ${getStatusLabel(newStatus)}`;
-  
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -321,7 +321,7 @@ export async function sendStatusChangeEmail(
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #8B4513 0%, #D2691E 100%); padding: 30px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">DA LUZ CONSCIENTE</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">OPTTIUS CONSCIENTE</h1>
               <p style="margin: 10px 0 0 0; color: #f0e6d2; font-size: 14px;">Soporte al Cliente</p>
             </td>
           </tr>
@@ -334,7 +334,7 @@ export async function sendStatusChangeEmail(
               </h2>
               
               <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
-                Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ''},
+                Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ""},
               </p>
               
               <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
@@ -365,21 +365,27 @@ export async function sendStatusChangeEmail(
                 </tr>
               </table>
               
-              ${newStatus === 'resolved' || newStatus === 'closed' ? `
+              ${
+                newStatus === "resolved" || newStatus === "closed"
+                  ? `
               <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 4px;">
                 <p style="margin: 0; color: #2e7d32; font-size: 14px; line-height: 1.6;">
-                  <strong>✅ Ticket ${newStatus === 'resolved' ? 'resuelto' : 'cerrado'}:</strong> 
-                  ${newStatus === 'resolved' 
-                    ? 'Tu problema ha sido resuelto. Si necesitas ayuda adicional, puedes responder a este ticket.' 
-                    : 'Este ticket ha sido cerrado. Si necesitas ayuda adicional, puedes crear un nuevo ticket.'}
+                  <strong>✅ Ticket ${newStatus === "resolved" ? "resuelto" : "cerrado"}:</strong> 
+                  ${
+                    newStatus === "resolved"
+                      ? "Tu problema ha sido resuelto. Si necesitas ayuda adicional, puedes responder a este ticket."
+                      : "Este ticket ha sido cerrado. Si necesitas ayuda adicional, puedes crear un nuevo ticket."
+                  }
                 </p>
               </div>
-              ` : ''}
+              `
+                  : ""
+              }
               
               <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                 <tr>
                   <td align="center">
-                    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconsciente.com'}/soporte/tickets/${ticket.id}" 
+                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://daluzconsciente.com"}/soporte/tickets/${ticket.id}" 
                        style="display: inline-block; background: linear-gradient(135deg, #8B4513 0%, #D2691E 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">
                       Ver Ticket
                     </a>
@@ -399,7 +405,7 @@ export async function sendStatusChangeEmail(
                 soporte@daluzconsciente.com
               </p>
               <p style="margin: 15px 0 0 0; color: #999999; font-size: 12px;">
-                © ${new Date().getFullYear()} DA LUZ CONSCIENTE. Todos los derechos reservados.
+                © ${new Date().getFullYear()} OPTTIUS CONSCIENTE. Todos los derechos reservados.
               </p>
             </td>
           </tr>
@@ -413,9 +419,9 @@ export async function sendStatusChangeEmail(
   `;
 
   const text = `
-DA LUZ CONSCIENTE - Actualización del estado de tu ticket
+OPTTIUS CONSCIENTE - Actualización del estado de tu ticket
 
-Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ''},
+Hola${ticket.customer_name ? ` ${ticket.customer_name}` : ""},
 
 El estado de tu ticket #${ticket.ticket_number} ha cambiado.
 
@@ -423,9 +429,9 @@ Ticket: ${ticket.subject}
 Estado anterior: ${getStatusLabel(oldStatus)}
 Nuevo estado: ${getStatusLabel(newStatus)}
 
-Ver ticket: ${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconsciente.com'}/soporte/tickets/${ticket.id}
+Ver ticket: ${process.env.NEXT_PUBLIC_APP_URL || "https://daluzconsciente.com"}/soporte/tickets/${ticket.id}
 
-© ${new Date().getFullYear()} DA LUZ CONSCIENTE
+© ${new Date().getFullYear()} OPTTIUS CONSCIENTE
   `;
 
   return sendEmail({
@@ -433,29 +439,28 @@ Ver ticket: ${process.env.NEXT_PUBLIC_APP_URL || 'https://daluzconsciente.com'}/
     subject,
     html,
     text,
-    replyTo: 'soporte@daluzconsciente.com'
+    replyTo: "soporte@daluzconsciente.com",
   });
 }
 
 // Helper functions
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    open: 'Abierto',
-    in_progress: 'En Progreso',
-    pending_customer: 'Esperando Cliente',
-    resolved: 'Resuelto',
-    closed: 'Cerrado'
+    open: "Abierto",
+    in_progress: "En Progreso",
+    pending_customer: "Esperando Cliente",
+    resolved: "Resuelto",
+    closed: "Cerrado",
   };
   return labels[status] || status;
 }
 
 function getPriorityLabel(priority: string): string {
   const labels: Record<string, string> = {
-    low: 'Baja',
-    medium: 'Media',
-    high: 'Alta',
-    urgent: 'Urgente'
+    low: "Baja",
+    medium: "Media",
+    high: "Alta",
+    urgent: "Urgente",
   };
   return labels[priority] || priority;
 }
-

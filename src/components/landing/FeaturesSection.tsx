@@ -15,113 +15,90 @@ import {
 const features = [
   {
     icon: Users,
-    title: "Gestión de Clientes IA",
+    title: "Gestión de Pacientes IA",
     description:
-      "Sistema inteligente de gestión de clientes con historial completo, recetas y seguimiento automatizado.",
-    color: "blue",
+      "Historiales inteligentes con análisis predictivo de graduación y recetas digitales completas.",
   },
   {
     icon: ShoppingCart,
-    title: "POS Integrado",
+    title: "POS de Nueva Generación",
     description:
-      "Punto de venta completo con múltiples métodos de pago, gestión de inventario y facturación automática.",
-    color: "indigo",
+      "Venta rápida e intuitiva con integración de inventario y facturación en un clic.",
   },
   {
     icon: Building2,
-    title: "Multi-Sucursal",
+    title: "Control Multi-Sucursal",
     description:
-      "Gestiona múltiples sucursales desde un solo panel con sincronización en tiempo real y control centralizado.",
-    color: "cyan",
+      "Gestiona tu imperio óptico desde un solo lugar con sincronización en la nube 24/7.",
   },
   {
     icon: MessageSquare,
-    title: "Chatbot IA",
+    title: "Asistente AI 24/7",
     description:
-      "Asistente inteligente que responde consultas, gestiona citas y automatiza tareas administrativas.",
-    color: "teal",
+      "Atención al cliente automatizada que agenda citas y responde dudas sobre productos.",
   },
   {
     icon: BarChart3,
-    title: "Analíticas Avanzadas",
+    title: "Inteligencia de Negocio",
     description:
-      "Dashboard con métricas clave, reportes personalizados y insights para tomar decisiones informadas.",
-    color: "blue",
+      "Reportes ejecutivos automáticos que te dicen exactamente dónde estás ganando dinero.",
   },
   {
     icon: Calendar,
-    title: "Sistema de Citas",
+    title: "Agenda Inteligente",
     description:
-      "Calendario inteligente con disponibilidad automática, recordatorios y gestión de horarios.",
-    color: "indigo",
+      "Optimiza el tiempo de tus optometristas con recordatorios vía WhatsApp automáticos.",
   },
   {
     icon: FileText,
-    title: "Presupuestos y Órdenes",
+    title: "Laboratorio Conectado",
     description:
-      "Creación automática de presupuestos, conversión a órdenes y seguimiento completo del ciclo de vida.",
-    color: "cyan",
+      "Seguimiento en tiempo real de órdenes de laboratorio desde el taller hasta las manos del cliente.",
   },
   {
     icon: Package,
-    title: "Gestión de Inventario",
+    title: "Inventario Infinito",
     description:
-      "Control de stock en tiempo real, alertas de inventario bajo y gestión de productos ópticos.",
-    color: "teal",
+      "Control de stock con IA que te avisa cuándo reponer basándose en tus tendencias de venta.",
   },
 ];
 
 export function FeaturesSection() {
   return (
-    <section className="py-24 bg-gradient-to-b from-gray-50 to-white">
+    <section className="py-32 bg-white" id="caracteristicas">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 rounded-full text-blue-700 text-sm font-medium mb-4">
+        <div className="text-center mb-24 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-primary text-[10px] font-bold uppercase tracking-[0.2em] mb-6">
             <Sparkles className="h-4 w-4" />
-            <span>Características Principales</span>
+            <span>Capacidades Premium</span>
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Todo lo que necesitas en un solo lugar
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-malisha text-gray-900 mb-6">
+            Todo lo que necesitas,{" "}
+            <span className="text-primary italic">Elevado al Máximo</span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Herramientas poderosas diseñadas específicamente para ópticas y
-            laboratorios
+          <p className="text-lg text-gray-500 font-body">
+            Herramientas diseñadas con precisión suiza para el mercado óptico de
+            vanguardia.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => {
-            const colorClasses = {
-              blue: "bg-blue-100 text-blue-600",
-              indigo: "bg-indigo-100 text-indigo-600",
-              cyan: "bg-cyan-100 text-cyan-600",
-              teal: "bg-teal-100 text-teal-600",
-            };
-            const colorClass =
-              colorClasses[feature.color as keyof typeof colorClasses] ||
-              colorClasses.blue;
-
-            return (
-              <div
-                key={index}
-                className="group p-6 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2"
-              >
-                <div
-                  className={`inline-flex p-3 ${colorClass.split(" ")[0]} rounded-lg mb-4 group-hover:scale-110 transition-transform`}
-                >
-                  <feature.icon
-                    className={`h-6 w-6 ${colorClass.split(" ")[1]}`}
-                  />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  {feature.description}
-                </p>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {features.map((feature, index) => (
+            <div
+              key={index}
+              className="group p-8 bg-white rounded-[2rem] border border-gray-100 hover:border-primary/20 hover:shadow-premium-lg transition-all duration-500 hover:-translate-y-2"
+            >
+              <div className="inline-flex p-4 bg-gray-50 rounded-2xl mb-6 text-gray-400 group-hover:bg-primary/10 group-hover:text-primary transition-all duration-500">
+                <feature.icon className="h-7 w-7" />
               </div>
-            );
-          })}
+              <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-primary transition-colors">
+                {feature.title}
+              </h3>
+              <p className="text-gray-500 text-sm leading-relaxed font-body">
+                {feature.description}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </section>

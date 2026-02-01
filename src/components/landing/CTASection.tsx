@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
+import businessConfig from "@/config/business";
 
 export function CTASection() {
   const router = useRouter();
@@ -12,42 +13,65 @@ export function CTASection() {
   };
 
   return (
-    <section className="py-24 bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-600">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-medium mb-6">
+    <section className="py-32 relative overflow-hidden">
+      {/* High-impact background */}
+      <div className="absolute inset-0 bg-gray-900 -z-20"></div>
+      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/20 via-transparent to-blue-900/20 -z-10"></div>
+
+      {/* Decorative elements */}
+      <div className="absolute top-1/4 left-0 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px]"></div>
+      <div className="absolute bottom-1/4 right-0 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px]"></div>
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-md rounded-full text-primary text-[10px] font-bold uppercase tracking-[0.2em] mb-10 border border-white/10">
           <Sparkles className="h-4 w-4" />
-          <span>Prueba Gratuita - Sin Compromiso</span>
+          <span>Comienza tu Nueva Era</span>
         </div>
-        <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-          ¿Listo para transformar tu óptica?
+
+        <h2 className="text-4xl md:text-5xl lg:text-7xl font-malisha text-white mb-8 leading-tight">
+          Eleva tu Óptica al <br />
+          <span className="text-primary italic">Estándar de Excelencia</span>
         </h2>
-        <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-          Únete a cientos de ópticas que ya están optimizando sus operaciones
-          con Opttius. Regístrate gratis y prueba el sistema durante 14 días,
-          sin tarjeta de crédito.
+
+        <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto font-body leading-relaxed">
+          Únete a la nueva generación de ópticas que ya están dominando el
+          mercado con {businessConfig.name}. Tecnología suiza de gestión a tu
+          alcance.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+
+        <div className="flex flex-col sm:flex-row gap-6 justify-center">
           <Button
             onClick={() => router.push("/signup")}
             size="lg"
-            className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-6 text-lg shadow-xl hover:shadow-2xl transition-all"
+            className="h-16 px-12 rounded-2xl bg-primary text-white hover:bg-primary/90 text-lg font-bold shadow-2xl transition-all hover:scale-[1.05]"
           >
-            Registrarse Gratis Ahora
+            Empezar Gratis Ahora
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
           <Button
             onClick={handleDemoClick}
             size="lg"
             variant="outline"
-            className="border-2 border-white text-white hover:bg-white/10 px-8 py-6 text-lg backdrop-blur-sm"
+            className="h-16 px-12 rounded-2xl border-white/20 text-white hover:bg-white/5 text-lg font-bold backdrop-blur-sm transition-all"
           >
-            Explorar con Datos Demo
+            Ver Demo Interactiva
           </Button>
         </div>
-        <p className="mt-6 text-sm text-blue-100">
-          ✓ Sin tarjeta de crédito • ✓ Configuración en 5 minutos • ✓ Soporte
-          24/7
-        </p>
+
+        <div className="mt-12 flex flex-wrap justify-center gap-8 text-[10px] uppercase font-bold tracking-[0.2em] text-gray-500">
+          <span className="flex items-center gap-2">
+            <div className="h-1 w-1 bg-primary rounded-full"></div>
+            Sin Tarjeta
+          </span>
+          <span className="flex items-center gap-2">
+            <div className="h-1 w-1 bg-primary rounded-full"></div>
+            Setup en 5m
+          </span>
+          <span className="flex items-center gap-2">
+            <div className="h-1 w-1 bg-primary rounded-full"></div>
+            Soporte Global
+          </span>
+        </div>
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import businessConfig from "@/config/business";
 
 export function ProblemSolutionSection() {
   const problems = [
@@ -8,135 +9,143 @@ export function ProblemSolutionSection() {
       icon: XCircle,
       title: "Gestión Manual Desorganizada",
       description:
-        "Seguimiento de clientes, citas y recetas en múltiples sistemas o papel",
+        "Seguimiento de clientes, citas y recetas en múltiples sistemas o papel que generan caos.",
     },
     {
       icon: XCircle,
-      title: "Pérdida de Tiempo en Tareas Repetitivas",
+      title: "Pérdida de Tiempo Admin",
       description:
-        "Horas perdidas en procesos administrativos que podrían automatizarse",
+        "Horas perdidas en procesos manuales que consumen la energía de tu equipo.",
     },
     {
       icon: XCircle,
-      title: "Errores en Presupuestos y Órdenes",
+      title: "Errores en Recetas y Órdenes",
       description:
-        "Cálculos manuales propensos a errores que afectan la rentabilidad",
+        "Cálculos manuales propensos a errores que resultan en devoluciones y pérdida de dinero.",
     },
     {
       icon: XCircle,
-      title: "Falta de Visibilidad del Negocio",
-      description: "Sin datos claros sobre ventas, inventario y rendimiento",
+      title: "Falta de Visibilidad Real",
+      description:
+        "Sin datos claros sobre ventas e inventario, diriges tu negocio a ciegas.",
     },
   ];
 
   const solutions = [
     {
       icon: CheckCircle2,
-      title: "Sistema Centralizado Inteligente",
+      title: "Centro de Operaciones Inteligente",
       description:
-        "Todo en un solo lugar: clientes, citas, presupuestos, órdenes y más",
-      color: "blue",
+        "Una única plataforma para controlar pacientes, ventas y laboratorio con precisión total.",
     },
     {
       icon: CheckCircle2,
-      title: "Automatización con IA",
+      title: "Automatización con IA Avanzada",
       description:
-        "Chatbot inteligente que gestiona consultas y tareas automáticamente",
-      color: "indigo",
+        "Nuestra IA gestiona lo complejo mientras tú te enfocas en el crecimiento de tu óptica.",
     },
     {
       icon: CheckCircle2,
-      title: "Cálculos Precisos y Automáticos",
+      title: "Precisión Absoluta en Cálculos",
       description:
-        "Presupuestos y órdenes con cálculos automáticos sin errores",
-      color: "cyan",
+        "Elimina el error humano. Presupuestos y órdenes perfectas desde el primer intento.",
     },
     {
       icon: CheckCircle2,
-      title: "Analíticas en Tiempo Real",
+      title: "Analíticas de Alto Nivel",
       description:
-        "Dashboard con métricas clave para tomar decisiones informadas",
-      color: "teal",
+        "Toma decisiones basadas en datos reales. Imagina tener el control total de tus KPI.",
     },
   ];
 
   return (
-    <section className="py-24 bg-white">
+    <section className="py-32 bg-gray-50/50" id="beneficios">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            De Problemas a Soluciones
+        <div className="text-center mb-24 max-w-3xl mx-auto">
+          <h2 className="text-sm font-bold text-primary uppercase tracking-[0.3em] mb-4">
+            Evolución Digital
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Entendemos los desafíos que enfrentas y tenemos las herramientas
-            para resolverlos
+          <h3 className="text-4xl md:text-5xl lg:text-6xl font-malisha text-gray-900 mb-6 leading-tight">
+            De Problemas a una{" "}
+            <span className="text-primary italic">Gestión Impecable</span>
+          </h3>
+          <p className="text-lg text-gray-500 font-body">
+            Entendemos los desafíos del mercado óptico actual. Por eso hemos
+            creado la solución definitiva.
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-12">
+        <div className="grid lg:grid-cols-2 gap-20 items-stretch">
           {/* Problems Column */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-8">
-              <AlertCircle className="h-8 w-8 text-red-500" />
-              <h3 className="text-2xl font-bold text-gray-900">Los Desafíos</h3>
-            </div>
-            {problems.map((problem, index) => (
-              <div
-                key={index}
-                className="p-6 bg-red-50 border border-red-100 rounded-xl hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-start gap-4">
-                  <problem.icon className="h-6 w-6 text-red-500 mt-1 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">
-                      {problem.title}
-                    </h4>
-                    <p className="text-gray-600">{problem.description}</p>
-                  </div>
-                </div>
+          <div className="relative">
+            <div className="flex items-center gap-4 mb-10">
+              <div className="h-12 w-12 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400">
+                <AlertCircle className="h-6 w-6" />
               </div>
-            ))}
-          </div>
-
-          {/* Solutions Column */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-8">
-              <CheckCircle2 className="h-8 w-8 text-green-500" />
-              <h3 className="text-2xl font-bold text-gray-900">
-                La Solución Opttius
+              <h3 className="text-2xl font-malisha text-gray-900">
+                Los Desafíos Tradicionales
               </h3>
             </div>
-            {solutions.map((solution, index) => {
-              const colorClasses = {
-                blue: "from-blue-50 to-blue-100 border-blue-200 text-blue-600",
-                indigo:
-                  "from-indigo-50 to-indigo-100 border-indigo-200 text-indigo-600",
-                cyan: "from-cyan-50 to-cyan-100 border-cyan-200 text-cyan-600",
-                teal: "from-teal-50 to-teal-100 border-teal-200 text-teal-600",
-              };
-              const colorClass =
-                colorClasses[solution.color as keyof typeof colorClasses] ||
-                colorClasses.blue;
 
-              return (
+            <div className="space-y-4">
+              {problems.map((problem, index) => (
                 <div
                   key={index}
-                  className={`p-6 bg-gradient-to-br ${colorClass.split(" ")[0]} ${colorClass.split(" ")[1]} border ${colorClass.split(" ")[2]} rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-1`}
+                  className="group p-8 bg-white border border-gray-100 rounded-[2rem] transition-all duration-300 hover:border-red-100 hover:bg-red-50/10"
                 >
-                  <div className="flex items-start gap-4">
-                    <solution.icon
-                      className={`h-6 w-6 ${colorClass.split(" ")[3]} mt-1 flex-shrink-0`}
-                    />
+                  <div className="flex items-start gap-5">
+                    <div className="mt-1 h-6 w-6 rounded-full bg-gray-50 flex items-center justify-center text-gray-300 group-hover:text-red-400 group-hover:bg-red-50 transition-colors">
+                      <XCircle className="h-4 w-4" />
+                    </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">
-                        {solution.title}
+                      <h4 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-red-900 transition-colors">
+                        {problem.title}
                       </h4>
-                      <p className="text-gray-600">{solution.description}</p>
+                      <p className="text-gray-500 leading-relaxed text-sm">
+                        {problem.description}
+                      </p>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+
+          {/* Solutions Column */}
+          <div className="relative">
+            <div className="absolute -inset-6 bg-primary/5 rounded-[3rem] blur-3xl -z-10"></div>
+
+            <div className="flex items-center gap-4 mb-10">
+              <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <h3 className="text-2xl font-malisha text-gray-900">
+                La Solución {businessConfig.name}
+              </h3>
+            </div>
+
+            <div className="space-y-4">
+              {solutions.map((solution, index) => (
+                <div
+                  key={index}
+                  className="group p-8 bg-white border border-transparent rounded-[2rem] shadow-premium hover:shadow-premium-lg transition-all duration-500 hover:scale-[1.02] border-primary/5"
+                >
+                  <div className="flex items-start gap-5">
+                    <div className="mt-1 h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-gray-900 mb-2">
+                        {solution.title}
+                      </h4>
+                      <p className="text-gray-500 leading-relaxed text-sm">
+                        {solution.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

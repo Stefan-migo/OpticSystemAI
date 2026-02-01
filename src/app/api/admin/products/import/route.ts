@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
             rowData.gallery_4?.trim(),
           ].filter(Boolean),
           // track_inventory removed - managed in product_branch_stock
-          vendor: "ALKIMYA DA LUZ",
+          vendor: "OPTTIUS OPTTIUS",
           currency: "ARS",
         };
 

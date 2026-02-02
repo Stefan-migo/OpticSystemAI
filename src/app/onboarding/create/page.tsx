@@ -30,7 +30,9 @@ import {
   createOrganizationSchema,
   type CreateOrganizationInput,
 } from "@/lib/api/validation/organization-schemas";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export default function CreateOrganizationPage() {
   const router = useRouter();
@@ -45,7 +47,7 @@ export default function CreateOrganizationPage() {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<CreateOrganizationInput>({
+  } = useForm<any>({
     resolver: zodResolver(createOrganizationSchema),
     defaultValues: {
       subscription_tier: "basic",
@@ -174,137 +176,181 @@ export default function CreateOrganizationPage() {
   const showSlugValidation = slug && slug.length >= 2;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
-      <div className="w-full max-w-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 relative overflow-hidden px-4 py-12">
+      {/* Premium Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] animate-premium-float" />
+        <div
+          className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px] animate-premium-float"
+          style={{ animationDelay: "-2s" }}
+        />
+      </div>
+
+      <div className="w-full max-w-2xl relative z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg mb-4">
-            <Building2 className="h-8 w-8 text-white" />
+        <div className="text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl mb-6 relative group">
+            <div className="absolute inset-0 bg-primary/10 rounded-[2rem] scale-90 group-hover:scale-110 transition-transform duration-500" />
+            <Building2 className="h-10 w-10 text-primary relative z-10" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {hasOrganization ? "Activar tu Óptica" : "Crea tu Óptica"}
+          <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">
+            {hasOrganization ? "Activar tu Óptica" : "Configura tu Óptica"}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
             {hasOrganization
-              ? "Completa la información para activar tu organización real"
-              : "Configura los datos básicos de tu organización"}
+              ? "Estamos a un paso de comenzar. Completa los detalles finales para activar tu entorno profesional."
+              : "Definamos la identidad de tu organización en el sistema Opttius."}
           </p>
         </div>
 
-        <Card className="border-0 shadow-2xl">
-          <CardHeader>
-            <CardTitle className="text-2xl">Información de la Óptica</CardTitle>
-            <CardDescription>
-              Estos datos se usarán para identificar tu organización en el
-              sistema
+        <Card
+          variant="elevated"
+          className="border-0 shadow-2xl overflow-visible"
+        >
+          <CardHeader padding="lg">
+            <CardTitle size="lg" theme="modern">
+              Identidad de la Organización
+            </CardTitle>
+            <CardDescription size="lg">
+              Esta información será la base de tu perfil empresarial y aparecerá
+              en tus documentos oficiales.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <CardContent padding="lg" spacing="relaxed">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
               {error && (
-                <Alert variant="destructive">
+                <Alert
+                  variant="destructive"
+                  className="animate-in zoom-in-95 duration-300"
+                >
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
-              {/* Nombre de la organización */}
-              <div className="space-y-2">
-                <Label htmlFor="name">
-                  Nombre de la óptica <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  {...register("name")}
-                  placeholder="Ej. Óptica Centro"
-                  className={errors.name ? "border-red-500" : ""}
-                  disabled={isSubmitting}
-                />
-                {errors.name && (
-                  <p className="text-sm text-red-600">{errors.name.message}</p>
-                )}
-              </div>
-
-              {/* Slug */}
-              <div className="space-y-2">
-                <Label htmlFor="slug">
-                  Identificador (slug) <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="slug"
-                    {...register("slug")}
-                    placeholder="optica-centro"
-                    className={
-                      errors.slug || isSlugInvalid
-                        ? "border-red-500 pr-10"
-                        : isSlugValid
-                          ? "border-green-500 pr-10"
-                          : ""
-                    }
-                    disabled={isSubmitting}
-                  />
-                  {showSlugValidation && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {slugValidation.isValidating ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                      ) : isSlugValid ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      ) : isSlugInvalid ? (
-                        <XCircle className="h-4 w-4 text-red-500" />
-                      ) : null}
-                    </div>
+              <div className="grid gap-8">
+                {/* Nombre de la organización */}
+                <div className="space-y-3">
+                  <Label
+                    htmlFor="name"
+                    className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                  >
+                    Nombre comercial <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative group">
+                    <Input
+                      id="name"
+                      {...register("name")}
+                      placeholder="Ej. Óptica Visión Premium"
+                      className={cn(
+                        "h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10",
+                        errors.name && "border-red-500 focus:ring-red-500/10",
+                      )}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  {errors.name && (
+                    <p className="text-xs font-medium text-red-500 flex items-center gap-1">
+                      <XCircle className="h-3 w-3" /> {errors.name.message}
+                    </p>
                   )}
                 </div>
-                {errors.slug && (
-                  <p className="text-sm text-red-600">{errors.slug.message}</p>
-                )}
-                {slugValidation.error && (
-                  <p className="text-sm text-red-600">{slugValidation.error}</p>
-                )}
-                {isSlugValid && (
-                  <p className="text-sm text-green-600">
-                    ✓ Identificador disponible
-                  </p>
-                )}
-                <p className="text-xs text-gray-500">
-                  Se usará en URLs. Debe ser único. Solo letras minúsculas,
-                  números y guiones.
-                </p>
-              </div>
 
-              {/* Nombre de primera sucursal */}
-              <div className="space-y-2">
-                <Label htmlFor="branchName">
-                  Nombre de primera sucursal (opcional)
-                </Label>
-                <Input
-                  id="branchName"
-                  {...register("branchName")}
-                  placeholder="Casa Matriz"
-                  disabled={isSubmitting}
-                />
-                {errors.branchName && (
-                  <p className="text-sm text-red-600">
-                    {errors.branchName.message}
+                {/* Slug */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor="slug"
+                      className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                    >
+                      Identificador de URL (slug){" "}
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    {isSlugValid && (
+                      <Badge
+                        variant="healty"
+                        className="bg-green-500/10 text-green-600 border-none px-2 text-[10px]"
+                      >
+                        ✓ Disponible
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="slug"
+                      {...register("slug")}
+                      placeholder="vision-premium"
+                      className={cn(
+                        "h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10 pr-12",
+                        (errors.slug || isSlugInvalid) &&
+                          "border-red-500 focus:ring-red-500/10",
+                        isSlugValid &&
+                          "border-green-500/50 focus:ring-green-500/5",
+                      )}
+                      disabled={isSubmitting}
+                    />
+                    {showSlugValidation && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 transition-all">
+                        {slugValidation.isValidating ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        ) : isSlugValid ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        ) : isSlugInvalid ? (
+                          <XCircle className="h-5 w-5 text-red-500" />
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                  {errors.slug && (
+                    <p className="text-xs font-medium text-red-500">
+                      {errors.slug.message}
+                    </p>
+                  )}
+                  {slugValidation.error && (
+                    <p className="text-xs font-medium text-red-500">
+                      {slugValidation.error}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                    Tu acceso será:{" "}
+                    <span className="text-primary font-bold">
+                      opttius.com/{slug || "..."}
+                    </span>
+                    . Solo letras minúsculas y guiones.
                   </p>
-                )}
-                <p className="text-xs text-gray-500">
-                  Si no especificas un nombre, se creará una sucursal llamada
-                  "Casa Matriz"
-                </p>
+                </div>
+
+                {/* Nombre de primera sucursal */}
+                <div className="space-y-3">
+                  <Label
+                    htmlFor="branchName"
+                    className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                  >
+                    Nombre de tu primera sucursal
+                  </Label>
+                  <Input
+                    id="branchName"
+                    {...register("branchName")}
+                    placeholder="Ej. Sucursal Central o Casa Matriz"
+                    className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                    disabled={isSubmitting}
+                  />
+                  <p className="text-[11px] text-slate-500 font-medium italic">
+                    Puedes crear más sucursales después en la configuración.
+                  </p>
+                </div>
               </div>
 
               {/* Botones */}
-              <div className="flex gap-4 pt-4">
+              <div className="flex gap-4 pt-6">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => router.back()}
                   disabled={isSubmitting}
-                  className="flex-1"
+                  className="flex-1 h-12 border-2"
                 >
-                  Volver
+                  Regresar
                 </Button>
                 <Button
                   type="submit"
@@ -313,17 +359,18 @@ export default function CreateOrganizationPage() {
                     slugValidation.isValidating ||
                     slugValidation.isAvailable === false
                   }
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                  className="flex-1 h-12 shadow-xl shadow-primary/20"
+                  shimmer
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {hasOrganization ? "Activando..." : "Creando..."}
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Procesando...
                     </>
                   ) : (
                     <>
-                      {hasOrganization ? "Activar Óptica" : "Crear y continuar"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                      {hasOrganization ? "Activar Ahora" : "Crear Organización"}
+                      <ArrowRight className="ml-2 h-5 w-5" />
                     </>
                   )}
                 </Button>
@@ -333,14 +380,14 @@ export default function CreateOrganizationPage() {
         </Card>
 
         {/* Footer */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
-            ¿Prefieres explorar primero?{" "}
+        <div className="mt-10 text-center animate-in fade-in duration-1000 delay-300">
+          <p className="text-sm text-slate-500 dark:text-slate-500 font-medium">
+            ¿Solo quieres dar un vistazo?{" "}
             <Link
               href="/onboarding/choice"
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="text-primary hover:text-primary/80 font-bold hover:underline transition-all"
             >
-              Volver a las opciones
+              Explorar demo primero
             </Link>
           </p>
         </div>

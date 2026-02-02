@@ -139,6 +139,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Super admin: acceso global (branch_id null) para ver todas las sucursales de la nueva org
+    await supabaseServiceRole
+      .from("admin_branch_access")
+      .delete()
+      .eq("admin_user_id", user.id);
+    await supabaseServiceRole.from("admin_branch_access").insert({
+      admin_user_id: user.id,
+      branch_id: null,
+      role: "manager",
+      is_primary: true,
+    });
+
     // Crear primera sucursal (siempre se crea una, por defecto "Sucursal Principal")
     const finalBranchName = branchName || "Sucursal Principal";
     const branchCode = `${slug.toUpperCase().substring(0, 8)}-001`;

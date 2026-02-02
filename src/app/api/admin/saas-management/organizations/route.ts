@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
         const { data: subscription } = await supabaseServiceRole
           .from("subscriptions")
           .select(
-            "id, status, current_period_start, current_period_end, stripe_subscription_id",
+            "id, status, current_period_start, current_period_end, gateway_subscription_id",
           )
           .eq("organization_id", org.id)
           .eq("status", "active")

@@ -195,6 +195,8 @@ export async function PUT(
     const body = await request.json();
     const { role, permissions, is_active } = body;
 
+    const allowedRoles = ["admin", "super_admin", "employee", "vendedor"];
+
     const supabase = await createClient();
 
     // Check admin authorization (only super admin can update admin users)
@@ -227,9 +229,14 @@ export async function PUT(
 
     // Get branch context to check if requester is super admin
     const branchContext = await getBranchContext(request, user.id);
+    const isRequesterSuperAdmin =
+      branchContext.isSuperAdmin ||
+      adminRole === "super_admin" ||
+      adminRole === "root" ||
+      adminRole === "dev";
 
     // Only super admins can activate/deactivate other admins
-    if (is_active !== undefined && !branchContext.isSuperAdmin) {
+    if (is_active !== undefined && !isRequesterSuperAdmin) {
       return NextResponse.json(
         {
           error:
@@ -239,11 +246,11 @@ export async function PUT(
       );
     }
 
-    // Prevent self-demotion from admin
-    if (user.id === adminUserId && role && role !== "admin") {
+    // Prevent self-demotion from super_admin
+    if (user.id === adminUserId && role && role !== "super_admin") {
       return NextResponse.json(
         {
-          error: "Cannot change your own admin role",
+          error: "No puedes cambiar tu propio rol de Super Administrador",
         },
         { status: 400 },
       );
@@ -259,12 +266,26 @@ export async function PUT(
       );
     }
 
-    // Validate role if provided (only 'admin' is allowed)
-    if (role && role !== "admin") {
-      return NextResponse.json(
-        { error: 'Invalid role. Only "admin" role is allowed.' },
-        { status: 400 },
-      );
+    // Validate role if provided (admin, super_admin, employee, vendedor)
+    if (role !== undefined) {
+      if (!allowedRoles.includes(role)) {
+        return NextResponse.json(
+          {
+            error: `Rol inválido. Permitidos: ${allowedRoles.join(", ")}`,
+          },
+          { status: 400 },
+        );
+      }
+      // Solo super_admin puede asignar rol super_admin
+      if (role === "super_admin" && !isRequesterSuperAdmin) {
+        return NextResponse.json(
+          {
+            error:
+              "Solo los super administradores pueden asignar rol Super Administrador",
+          },
+          { status: 403 },
+        );
+      }
     }
 
     // Get current admin user

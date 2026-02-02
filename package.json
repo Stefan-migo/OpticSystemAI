@@ -30,6 +30,7 @@
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest --watch",
     "test:run": "vitest run",
+    "tunnel": "node scripts/tunnel.js",
     "prepare": "husky"
   },
   "dependencies": {

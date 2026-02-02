@@ -74,7 +74,7 @@ interface OrganizationDetails {
     status: string;
     current_period_start?: string;
     current_period_end?: string;
-    stripe_subscription_id?: string;
+    gateway_subscription_id?: string;
   }>;
   owner?: {
     id: string;
@@ -1174,7 +1174,7 @@ export default function OrganizationDetailsPage() {
                       <TableHead>Estado</TableHead>
                       <TableHead>Período Inicio</TableHead>
                       <TableHead>Período Fin</TableHead>
-                      <TableHead>Stripe Subscription ID</TableHead>
+                      <TableHead>ID Suscripción</TableHead>
                       <TableHead>Creada</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -1206,7 +1206,7 @@ export default function OrganizationDetailsPage() {
                             : "-"}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
-                          {sub.stripe_subscription_id || "-"}
+                          {sub.gateway_subscription_id || "-"}
                         </TableCell>
                         <TableCell>{formatDate(sub.created_at)}</TableCell>
                         <TableCell className="text-right">
@@ -1222,10 +1222,10 @@ export default function OrganizationDetailsPage() {
                                     sub.current_period_start || "",
                                   current_period_end:
                                     sub.current_period_end || "",
-                                  stripe_subscription_id:
-                                    sub.stripe_subscription_id || "",
-                                  stripe_customer_id:
-                                    sub.stripe_customer_id || "",
+                                  gateway_subscription_id:
+                                    sub.gateway_subscription_id || "",
+                                  gateway_customer_id:
+                                    sub.gateway_customer_id || "",
                                 });
                                 setShowSubscriptionDialog(true);
                               }}
@@ -1584,27 +1584,27 @@ export default function OrganizationDetailsPage() {
             </div>
             <div>
               <label className="text-sm font-medium">
-                Stripe Subscription ID
+                ID Suscripción Pasarela
               </label>
               <Input
-                value={subscriptionFormData.stripe_subscription_id}
+                value={subscriptionFormData.gateway_subscription_id}
                 onChange={(e) =>
                   setSubscriptionFormData({
                     ...subscriptionFormData,
-                    stripe_subscription_id: e.target.value,
+                    gateway_subscription_id: e.target.value,
                   })
                 }
                 placeholder="sub_xxxxx"
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Stripe Customer ID</label>
+              <label className="text-sm font-medium">ID Cliente Pasarela</label>
               <Input
-                value={subscriptionFormData.stripe_customer_id}
+                value={subscriptionFormData.gateway_customer_id}
                 onChange={(e) =>
                   setSubscriptionFormData({
                     ...subscriptionFormData,
-                    stripe_customer_id: e.target.value,
+                    gateway_customer_id: e.target.value,
                   })
                 }
                 placeholder="cus_xxxxx"

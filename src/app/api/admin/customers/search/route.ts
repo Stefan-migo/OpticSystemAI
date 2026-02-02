@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
               query,
               branchContext.branchId,
               branchContext.isSuperAdmin,
+              branchContext.organizationId,
             );
           };
 

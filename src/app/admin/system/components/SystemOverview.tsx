@@ -15,6 +15,7 @@ import {
   XCircle,
   Clock,
   CheckCircle,
+  Receipt,
 } from "lucide-react";
 import { HealthStatus } from "../hooks/useSystemHealth";
 
@@ -101,6 +102,14 @@ export default function SystemOverview({
               >
                 <Database className="h-4 w-4 mr-2" />
                 Mantenimiento
+              </Button>
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => onTabChange("billing")}
+              >
+                <Receipt className="h-4 w-4 mr-2" />
+                Boletas y Facturas
               </Button>
               <Button
                 variant="outline"

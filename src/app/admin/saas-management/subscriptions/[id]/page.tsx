@@ -16,7 +16,19 @@ import {
   AlertTriangle,
   Loader2,
   DollarSign,
+  Save,
+  Pencil,
+  Trash2,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
@@ -25,12 +37,13 @@ interface SubscriptionDetails {
   id: string;
   organization_id: string;
   status: string;
+  trial_ends_at?: string | null;
   current_period_start?: string;
   current_period_end?: string;
   cancel_at?: string;
   canceled_at?: string;
-  stripe_subscription_id?: string;
-  stripe_customer_id?: string;
+  gateway_subscription_id?: string;
+  gateway_customer_id?: string;
   created_at: string;
   updated_at: string;
   organization?: {
@@ -57,12 +70,80 @@ export default function SubscriptionDetailsPage() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editStatus, setEditStatus] = useState("");
+  const [editPeriodEnd, setEditPeriodEnd] = useState("");
+  const [editTrialEndsAt, setEditTrialEndsAt] = useState("");
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (subscriptionId) {
       fetchSubscriptionDetails();
     }
   }, [subscriptionId]);
+
+  useEffect(() => {
+    if (subscription) {
+      setEditStatus(subscription.status);
+      setEditPeriodEnd(subscription.current_period_end || "");
+      setEditTrialEndsAt(
+        subscription.trial_ends_at
+          ? subscription.trial_ends_at.slice(0, 16)
+          : "",
+      );
+    }
+  }, [subscription]);
+
+  const handleSaveEdit = async () => {
+    if (!subscription) return;
+    setSaveLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/saas-management/subscriptions/${subscriptionId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: editStatus,
+            current_period_end: editPeriodEnd || undefined,
+            trial_ends_at: editTrialEndsAt || undefined,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al guardar");
+      toast.success("Suscripción actualizada.");
+      setEditing(false);
+      fetchSubscriptionDetails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (
+      !confirm("¿Eliminar esta suscripción? Esta acción no se puede deshacer.")
+    )
+      return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/saas-management/subscriptions/${subscriptionId}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al eliminar");
+      toast.success("Suscripción eliminada.");
+      router.push("/admin/saas-management/subscriptions");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const fetchSubscriptionDetails = async () => {
     try {
@@ -81,11 +162,14 @@ export default function SubscriptionDetailsPage() {
       const data = await response.json();
       const sub = data.subscription;
 
-      // Calcular días hasta vencimiento
+      const today = new Date();
       let daysUntilExpiry: number | null = null;
-      if (sub.current_period_end) {
-        const endDate = new Date(sub.current_period_end);
-        const today = new Date();
+      const endSource =
+        sub.status === "trialing" && sub.trial_ends_at
+          ? sub.trial_ends_at
+          : sub.current_period_end;
+      if (endSource) {
+        const endDate = new Date(endSource);
         const diffTime = endDate.getTime() - today.getTime();
         daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       }
@@ -205,7 +289,7 @@ export default function SubscriptionDetailsPage() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -223,6 +307,29 @@ export default function SubscriptionDetailsPage() {
               Información completa de la suscripción
             </p>
           </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={editing ? "default" : "outline"}
+            size="sm"
+            onClick={() => setEditing(!editing)}
+          >
+            <Pencil className="h-4 w-4 mr-2" />
+            {editing ? "Cancelar edición" : "Editar"}
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDelete}
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-2" />
+            )}
+            Eliminar
+          </Button>
         </div>
       </div>
 
@@ -312,13 +419,83 @@ export default function SubscriptionDetailsPage() {
                 </p>
               </div>
             )}
+            {subscription.trial_ends_at && (
+              <div>
+                <label className="text-sm font-medium text-gray-500">
+                  Fin del período de prueba
+                </label>
+                <p className="text-lg flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  {formatDate(subscription.trial_ends_at)}
+                </p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
+      {/* Editar suscripción */}
+      {editing && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Editar suscripción
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Estado</Label>
+                <Select value={editStatus} onValueChange={setEditStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Activa</SelectItem>
+                    <SelectItem value="trialing">Trial</SelectItem>
+                    <SelectItem value="past_due">Vencida</SelectItem>
+                    <SelectItem value="incomplete">Incompleta</SelectItem>
+                    <SelectItem value="cancelled">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="period_end">Fin del período (YYYY-MM-DD)</Label>
+                <Input
+                  id="period_end"
+                  type="date"
+                  value={editPeriodEnd}
+                  onChange={(e) => setEditPeriodEnd(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="trial_ends">
+                  Fin del trial (fecha y hora, opcional)
+                </Label>
+                <Input
+                  id="trial_ends"
+                  type="datetime-local"
+                  value={editTrialEndsAt}
+                  onChange={(e) => setEditTrialEndsAt(e.target.value)}
+                />
+              </div>
+            </div>
+            <Button onClick={handleSaveEdit} disabled={saveLoading}>
+              {saveLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Guardar cambios
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Información de Stripe */}
-      {(subscription.stripe_subscription_id ||
-        subscription.stripe_customer_id) && (
+      {(subscription.gateway_subscription_id ||
+        subscription.gateway_customer_id) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
@@ -328,23 +505,23 @@ export default function SubscriptionDetailsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {subscription.stripe_subscription_id && (
+              {subscription.gateway_subscription_id && (
                 <div>
                   <label className="text-sm font-medium text-gray-500">
                     ID de Suscripción Stripe
                   </label>
                   <p className="text-sm font-mono text-gray-600">
-                    {subscription.stripe_subscription_id}
+                    {subscription.gateway_subscription_id}
                   </p>
                 </div>
               )}
-              {subscription.stripe_customer_id && (
+              {subscription.gateway_customer_id && (
                 <div>
                   <label className="text-sm font-medium text-gray-500">
-                    ID de Cliente Stripe
+                    ID de Cliente
                   </label>
                   <p className="text-sm font-mono text-gray-600">
-                    {subscription.stripe_customer_id}
+                    {subscription.gateway_customer_id}
                   </p>
                 </div>
               )}

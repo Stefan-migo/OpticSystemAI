@@ -80,6 +80,7 @@ export async function GET(
           query,
           branchContext.branchId,
           branchContext.isSuperAdmin,
+          branchContext.organizationId,
         );
       }
 
@@ -461,6 +462,7 @@ export async function PUT(
           query,
           branchContext.branchId,
           branchContext.isSuperAdmin,
+          branchContext.organizationId,
         );
       }
 
@@ -599,6 +601,7 @@ export async function DELETE(
           query,
           branchContext.branchId,
           branchContext.isSuperAdmin,
+          branchContext.organizationId,
         );
       }
 

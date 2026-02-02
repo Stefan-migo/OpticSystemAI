@@ -37,7 +37,7 @@ export async function GET(
     const { data: subscription } = await supabaseServiceRole
       .from("subscriptions")
       .select(
-        "id, status, current_period_start, current_period_end, cancel_at, canceled_at, stripe_subscription_id, stripe_customer_id, created_at, updated_at",
+        "id, status, current_period_start, current_period_end, cancel_at, canceled_at, gateway_subscription_id, gateway_customer_id, created_at, updated_at",
       )
       .eq("organization_id", id)
       .eq("status", "active")

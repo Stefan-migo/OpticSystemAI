@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
-import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
+import type {
+  IsAdminParams,
+  IsAdminResult,
+  GetAdminRoleParams,
+  GetAdminRoleResult,
+} from "@/types/supabase-rpc";
 
 /**
  * POST /api/admin/orders/[id]/cancel
- * Cancel/void an order (SuperAdmin only)
+ * Cancel/void an order (Admin or SuperAdmin; Admin only for orders in their branch)
  */
 export async function POST(
   request: NextRequest,
@@ -35,16 +40,26 @@ export async function POST(
       );
     }
 
-    // Get branch context
-    const branchContext = await getBranchContext(request, user.id);
-
-    // Only SuperAdmin can cancel orders
-    if (!branchContext.isSuperAdmin) {
+    const { data: adminRole } = (await supabase.rpc("get_admin_role", {
+      user_id: user.id,
+    } as GetAdminRoleParams)) as {
+      data: GetAdminRoleResult | null;
+      error: Error | null;
+    };
+    const canCancel =
+      adminRole === "super_admin" ||
+      adminRole === "admin" ||
+      adminRole === "root" ||
+      adminRole === "dev";
+    if (!canCancel) {
       return NextResponse.json(
-        { error: "Solo superadmin puede anular ventas" },
+        { error: "Solo administradores pueden anular ventas" },
         { status: 403 },
       );
     }
+
+    // Get branch context (for non-super-admin we validate order's branch access below)
+    const branchContext = await getBranchContext(request, user.id);
 
     const body = await request.json();
     const { reason } = body;
@@ -65,6 +80,19 @@ export async function POST(
 
     if (orderError || !order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // Non-super-admin can only cancel orders in their accessible branches
+    if (!branchContext.isSuperAdmin && order.branch_id) {
+      const hasAccess = branchContext.accessibleBranches.some(
+        (b) => b.id === order.branch_id,
+      );
+      if (!hasAccess) {
+        return NextResponse.json(
+          { error: "No tienes acceso a la sucursal de esta orden" },
+          { status: 403 },
+        );
+      }
     }
 
     // Update order status to cancelled

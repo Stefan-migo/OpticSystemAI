@@ -458,7 +458,7 @@ export default function SEOManager() {
                   onChange={(e) =>
                     handleUpdate("seo_twitter_handle", e.target.value)
                   }
-                  placeholder="@daluzconsciente"
+                  placeholder="@opttius"
                 />
                 <p className="text-xs text-tierra-media">
                   Tu nombre de usuario de Twitter (incluye el @)

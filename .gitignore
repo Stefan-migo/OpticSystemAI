@@ -16,6 +16,7 @@ node_modules/
 # Misc
 .DS_Store
 *.pem
+nul
 
 # Debug
 npm-debug.log*
@@ -25,6 +26,9 @@ yarn-error.log*
 # Local env files
 .env*.local
 .env
+
+# ngrok tunnel config (contains authtoken)
+.ngrok-tunnel.yml
 
 # Development scripts with credentials (optional - uncomment if you want to exclude from repo)
 # scripts/create-admin-via-api.js

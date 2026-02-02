@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       isSuperAdmin: branchContext.isSuperAdmin,
     });
 
-    // Build branch filter function
+    // Build branch filter function (Vision Global scoped to user's organization)
     const applyBranchFilter = (
       query: Parameters<typeof addBranchFilter>[0],
     ) => {
@@ -47,36 +47,62 @@ export async function GET(request: NextRequest) {
         query,
         branchContext.branchId,
         branchContext.isSuperAdmin,
+        branchContext.organizationId,
       );
     };
 
+    // In global view, orders may have organization_id null (legacy) but branch_id set.
+    // Fetch org branch IDs so we include orders by org_id OR by branch_id in org.
+    let orgBranchIds: string[] = [];
+    if (
+      branchContext.isSuperAdmin &&
+      !branchContext.branchId &&
+      branchContext.organizationId
+    ) {
+      const { data: branches } = await supabase
+        .from("branches")
+        .select("id")
+        .eq("organization_id", branchContext.organizationId);
+      orgBranchIds = (branches || []).map((b: { id: string }) => b.id);
+    }
+
+    // Orders query: in global view include orders by organization_id OR by branch in org
+    const ordersBaseQuery = supabase
+      .from("orders")
+      .select(
+        `
+        *,
+        order_items (
+          product_id,
+          quantity,
+          unit_price,
+          total_price,
+          product_name
+        )
+      `,
+      )
+      .order("created_at", { ascending: false });
+
+    let ordersQuery;
+    if (
+      branchContext.isSuperAdmin &&
+      !branchContext.branchId &&
+      branchContext.organizationId &&
+      orgBranchIds.length > 0
+    ) {
+      ordersQuery = ordersBaseQuery.or(
+        `organization_id.eq.${branchContext.organizationId},branch_id.in.(${orgBranchIds.join(",")})`,
+      );
+    } else {
+      ordersQuery = applyBranchFilter(ordersBaseQuery);
+    }
+
     // Fetch all data in parallel with branch filtering
     const [productsResult, ordersResult, customersResult] = await Promise.all([
-      // Products - filter by branch if selected, or get all if global view
       applyBranchFilter(
         supabase.from("products").select("*").eq("status", "active"),
       ),
-
-      // Orders - filtered by branch
-      applyBranchFilter(
-        supabase
-          .from("orders")
-          .select(
-            `
-            *,
-            order_items (
-              product_id,
-              quantity,
-              unit_price,
-              total_price,
-              product_name
-            )
-          `,
-          )
-          .order("created_at", { ascending: false }),
-      ),
-
-      // Customers - filter by branch if selected, or get all if global view
+      ordersQuery,
       applyBranchFilter(supabase.from("customers").select("*")),
     ]);
 

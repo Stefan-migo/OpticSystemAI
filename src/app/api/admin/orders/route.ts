@@ -57,12 +57,16 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const status = url.searchParams.get("status");
     const paymentStatus = url.searchParams.get("payment_status");
+    const dateFrom = url.searchParams.get("date_from");
+    const dateTo = url.searchParams.get("date_to");
     const limit = parseInt(url.searchParams.get("limit") || "50");
     const offset = parseInt(url.searchParams.get("offset") || "0");
 
     logger.debug("Query params", {
       status,
       paymentStatus,
+      dateFrom,
+      dateTo,
       limit,
       offset,
       userOrganizationId,
@@ -76,6 +80,7 @@ export async function GET(request: NextRequest) {
         id,
         order_number,
         email,
+        customer_name,
         status,
         payment_status,
         total_amount,
@@ -114,9 +119,11 @@ export async function GET(request: NextRequest) {
         });
       }
     } else if (branchContext.isSuperAdmin) {
-      // Super admin: use branch filter if branch is selected, otherwise show all
+      // Super admin: branch selected = filter by branch; Vision Global = only user's organization
       if (branchContext.branchId) {
         query = query.eq("branch_id", branchContext.branchId);
+      } else if (branchContext.organizationId) {
+        query = query.eq("organization_id", branchContext.organizationId);
       }
     }
 
@@ -128,6 +135,14 @@ export async function GET(request: NextRequest) {
     // Apply payment_status filter
     if (paymentStatus && paymentStatus !== "all") {
       query = query.eq("payment_status", paymentStatus);
+    }
+
+    // Apply date range (e.g. from Caja section)
+    if (dateFrom) {
+      query = query.gte("created_at", `${dateFrom}T00:00:00.000Z`);
+    }
+    if (dateTo) {
+      query = query.lte("created_at", `${dateTo}T23:59:59.999Z`);
     }
 
     const { data: orders, error: ordersError, count } = await query;
@@ -151,7 +166,7 @@ export async function GET(request: NextRequest) {
     const transformedOrders = orders?.map((order) => ({
       id: order.id,
       order_number: order.order_number,
-      customer_name: "Cliente", // For now, we'll use a generic name since we don't have the profiles join
+      customer_name: (order as any).customer_name || "Cliente",
       customer_email: order.email,
       total_amount: order.total_amount,
       status: order.status,

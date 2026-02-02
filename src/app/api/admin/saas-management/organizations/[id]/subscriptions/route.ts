@@ -75,8 +75,9 @@ export async function POST(
     const { id: organizationId } = params;
     const body = await request.json();
     const {
-      stripe_subscription_id,
-      stripe_customer_id,
+      gateway_subscription_id,
+      gateway_customer_id,
+      gateway = "flow",
       status = "trialing",
       current_period_start,
       current_period_end,
@@ -117,8 +118,9 @@ export async function POST(
         .from("subscriptions")
         .insert({
           organization_id: organizationId,
-          stripe_subscription_id: stripe_subscription_id || null,
-          stripe_customer_id: stripe_customer_id || null,
+          gateway_subscription_id: gateway_subscription_id || null,
+          gateway_customer_id: gateway_customer_id || null,
+          gateway: gateway || "flow",
           status,
           current_period_start: current_period_start || null,
           current_period_end: current_period_end || null,

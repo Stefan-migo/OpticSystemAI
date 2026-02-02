@@ -12,14 +12,21 @@ import type { PaymentStatus, WebhookEvent } from "@/types/payment";
 import { appLogger as logger } from "@/lib/logger";
 
 function getFlowConfig() {
-  const apiKey = process.env.FLOW_API_KEY;
-  const secretKey = process.env.FLOW_SECRET_KEY;
+  const sandboxMode = process.env.FLOW_SANDBOX_MODE === "true";
+  const apiKey = sandboxMode
+    ? process.env.FLOW_API_KEY_SANDBOX || process.env.FLOW_API_KEY
+    : process.env.FLOW_API_KEY;
+  const secretKey = sandboxMode
+    ? process.env.FLOW_SECRET_KEY_SANDBOX || process.env.FLOW_SECRET_KEY
+    : process.env.FLOW_SECRET_KEY;
   if (!apiKey || !secretKey) {
     throw new Error(
-      "FLOW_API_KEY and FLOW_SECRET_KEY must be set. Configure them in .env.local for Flow payments.",
+      sandboxMode
+        ? "FLOW_API_KEY_SANDBOX and FLOW_SECRET_KEY_SANDBOX (or FLOW_API_KEY/FLOW_SECRET_KEY) must be set for Flow sandbox."
+        : "FLOW_API_KEY and FLOW_SECRET_KEY must be set. Configure them in .env.local for Flow payments.",
     );
   }
-  return { apiKey, secretKey };
+  return { apiKey, secretKey, sandboxMode };
 }
 
 /**
@@ -45,9 +52,11 @@ export class FlowGateway implements IPaymentGateway {
     userId: string,
     organizationId: string,
   ): Promise<PaymentIntentResponse> {
-    const { apiKey, secretKey } = getFlowConfig();
+    const { apiKey, secretKey, sandboxMode } = getFlowConfig();
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-    const flowApiUrl = process.env.FLOW_API_URL || "https://www.flow.cl/api";
+    const flowApiUrl =
+      process.env.FLOW_API_URL ||
+      (sandboxMode ? "https://sandbox.flow.cl/api" : "https://www.flow.cl/api");
 
     try {
       // Flow requiere un commerceOrder único (usamos el paymentId que crearemos después, o un UUID temporal)

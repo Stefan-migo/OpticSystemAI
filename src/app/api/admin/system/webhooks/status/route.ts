@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         const isProduction =
           process.env.NODE_ENV === "production" ||
           host.includes("vercel.app") ||
-          host.includes("daluzconsciente.com");
+          host.includes("opttius.com");
         return `${isProduction ? "https" : protocol}://${host}`;
       }
 
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       }
 
       // 4. Fallback to production domain
-      return "https://daluzconsciente.com";
+      return "https://opttius.com";
     };
 
     const baseUrl = getBaseUrl();

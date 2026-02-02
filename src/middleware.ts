@@ -19,6 +19,7 @@ export async function middleware(request: NextRequest) {
     "/onboarding",
     "/login",
     "/signup",
+    "/reset-password",
     "/support", // Portal público de soporte
     "/api",
     "/_next",

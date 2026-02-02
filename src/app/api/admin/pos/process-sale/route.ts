@@ -648,6 +648,29 @@ export async function POST(request: NextRequest) {
             billingLastName = null;
           }
 
+          // Resolve organization_id so orders appear in org-scoped lists (Caja, etc.)
+          let orderOrganizationId: string | null = null;
+          if (branchContext.branchId) {
+            const { data: branchRow } = await supabaseServiceRole
+              .from("branches")
+              .select("organization_id")
+              .eq("id", branchContext.branchId)
+              .single();
+            orderOrganizationId =
+              (branchRow as { organization_id?: string } | null)
+                ?.organization_id ?? null;
+          }
+          if (orderOrganizationId == null) {
+            const { data: adminRow } = await supabaseServiceRole
+              .from("admin_users")
+              .select("organization_id")
+              .eq("id", user.id)
+              .single();
+            orderOrganizationId =
+              (adminRow as { organization_id?: string } | null)
+                ?.organization_id ?? null;
+          }
+
           const { data: newOrder, error: orderError } =
             await supabaseServiceRole
               .from("orders")
@@ -663,6 +686,7 @@ export async function POST(request: NextRequest) {
                 currency: currency || "CLP",
                 mp_payment_method: payment_method_type,
                 branch_id: branchContext.branchId,
+                organization_id: orderOrganizationId,
                 customer_notes: null,
                 is_pos_sale: true,
                 pos_session_id: posSessionId || null,

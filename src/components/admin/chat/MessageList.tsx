@@ -80,7 +80,7 @@ export function MessageList({
   }, [messages.length, isStreaming]);
 
   return (
-    <div className="h-full">
+    <div className="min-h-full">
       <div className="p-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-admin-text-secondary py-12">

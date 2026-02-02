@@ -125,6 +125,7 @@ export default function AppointmentsPage() {
     lockDateTime?: boolean;
   } | null>(null);
   const [scheduleSettings, setScheduleSettings] = useState<any>(null);
+  const [showWeeklyReport, setShowWeeklyReport] = useState(false);
 
   const {
     currentBranch,
@@ -336,6 +337,65 @@ export default function AppointmentsPage() {
     setSelectedAppointment(appointment);
     setPrefilledAppointmentData(null); // Clear prefilled data when viewing existing appointment
     setShowCreateAppointment(false); // Close create form if open
+  };
+
+  const getWeekRange = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d);
+    monday.setDate(diff);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return { start: monday, end: sunday };
+  };
+
+  const getWeeklyReportData = () => {
+    const { start, end } = getWeekRange(currentDate);
+    const startStr = start.toISOString().split("T")[0];
+    const endStr = end.toISOString().split("T")[0];
+    const weekAppointments = appointments.filter((a) => {
+      const d = a.appointment_date;
+      return d >= startStr && d <= endStr;
+    });
+    const byDay: Record<string, Appointment[]> = {};
+    const days = [
+      "Lunes",
+      "Martes",
+      "Miércoles",
+      "Jueves",
+      "Viernes",
+      "Sábado",
+      "Domingo",
+    ];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const dateStr = d.toISOString().split("T")[0];
+      byDay[days[i]] = weekAppointments
+        .filter((a) => a.appointment_date === dateStr)
+        .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+    }
+    const byStatus = {
+      scheduled: weekAppointments.filter((a) => a.status === "scheduled")
+        .length,
+      confirmed: weekAppointments.filter((a) => a.status === "confirmed")
+        .length,
+      completed: weekAppointments.filter((a) => a.status === "completed")
+        .length,
+      cancelled: weekAppointments.filter((a) => a.status === "cancelled")
+        .length,
+      no_show: weekAppointments.filter((a) => a.status === "no_show").length,
+    };
+    return {
+      start,
+      end,
+      startStr,
+      endStr,
+      appointments: weekAppointments,
+      byDay,
+      byStatus,
+    };
   };
 
   const handleSlotClick = (date: Date, time: string) => {
@@ -623,6 +683,7 @@ export default function AppointmentsPage() {
               <Button
                 variant="ghost"
                 className="w-full justify-start text-xs font-bold text-admin-text-secondary hover:text-admin-accent-primary hover:bg-admin-accent-primary/5 rounded-lg h-9"
+                onClick={() => setShowWeeklyReport(true)}
               >
                 <FileText className="h-3.5 w-3.5 mr-2" />
                 Reporte Semanal
@@ -984,6 +1045,188 @@ export default function AppointmentsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Weekly Report Dialog */}
+      <Dialog open={showWeeklyReport} onOpenChange={setShowWeeklyReport}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-none bg-admin-bg-secondary shadow-premium-xl rounded-2xl p-0">
+          <div
+            id="weekly-report-print"
+            className="p-8 space-y-8 print:p-4 print:max-w-none"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:flex-row">
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 bg-admin-accent-primary/10 rounded-xl flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-admin-accent-primary" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-xl font-bold text-admin-text-primary">
+                      Reporte Semanal de Citas
+                    </DialogTitle>
+                    <DialogDescription className="text-xs font-medium text-admin-text-tertiary uppercase tracking-widest mt-1">
+                      {(() => {
+                        const data = getWeeklyReportData();
+                        return `${data.start.toLocaleDateString("es-CL", {
+                          day: "numeric",
+                          month: "short",
+                        })} - ${data.end.toLocaleDateString("es-CL", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}`;
+                      })()}
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="flex gap-2 print:hidden">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.print()}
+                  className="gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Imprimir
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowWeeklyReport(false)}
+                >
+                  Cerrar
+                </Button>
+              </div>
+            </div>
+
+            {(() => {
+              const data = getWeeklyReportData();
+              return (
+                <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div className="p-4 rounded-xl bg-admin-bg-tertiary/50 border border-admin-border-primary/30">
+                      <p className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-wider">
+                        Total
+                      </p>
+                      <p className="text-2xl font-bold text-admin-text-primary">
+                        {data.appointments.length}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-admin-info/10 border border-admin-info/20">
+                      <p className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-wider">
+                        Programadas
+                      </p>
+                      <p className="text-2xl font-bold text-admin-info">
+                        {data.byStatus.scheduled}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-admin-success/10 border border-admin-success/20">
+                      <p className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-wider">
+                        Confirmadas
+                      </p>
+                      <p className="text-2xl font-bold text-admin-success">
+                        {data.byStatus.confirmed}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-admin-accent-secondary/10 border border-admin-accent-secondary/20">
+                      <p className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-wider">
+                        Completadas
+                      </p>
+                      <p className="text-2xl font-bold text-admin-accent-secondary">
+                        {data.byStatus.completed}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-admin-error/10 border border-admin-error/20 col-span-2 sm:col-span-1">
+                      <p className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-wider">
+                        Canceladas / No asistió
+                      </p>
+                      <p className="text-2xl font-bold text-admin-error">
+                        {data.byStatus.cancelled + data.byStatus.no_show}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Daily breakdown */}
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest">
+                      Detalle por día
+                    </p>
+                    <div className="space-y-4">
+                      {[
+                        "Lunes",
+                        "Martes",
+                        "Miércoles",
+                        "Jueves",
+                        "Viernes",
+                        "Sábado",
+                        "Domingo",
+                      ].map((day) => {
+                        const dayApts = data.byDay[day] || [];
+                        if (dayApts.length === 0) return null;
+                        const dateStr = dayApts[0]?.appointment_date;
+                        return (
+                          <div
+                            key={day}
+                            className="border border-admin-border-primary/30 rounded-xl overflow-hidden"
+                          >
+                            <div className="px-4 py-2 bg-admin-bg-tertiary/50 border-b border-admin-border-primary/30 flex justify-between items-center">
+                              <span className="font-bold text-sm text-admin-text-primary">
+                                {day}{" "}
+                                {dateStr &&
+                                  new Date(dateStr).toLocaleDateString(
+                                    "es-CL",
+                                    { day: "numeric", month: "short" },
+                                  )}
+                              </span>
+                              <span className="text-xs font-medium text-admin-text-tertiary">
+                                {dayApts.length} cita
+                                {dayApts.length !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                            <div className="divide-y divide-admin-border-primary/20">
+                              {dayApts.map((apt) => (
+                                <div
+                                  key={apt.id}
+                                  className="px-4 py-3 flex items-center justify-between gap-4 hover:bg-admin-bg-tertiary/20"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <span className="text-xs font-mono font-bold text-admin-text-tertiary shrink-0">
+                                      {apt.appointment_time.substring(0, 5)}
+                                    </span>
+                                    <span className="text-sm font-medium text-admin-text-primary truncate">
+                                      {apt.customer
+                                        ? `${apt.customer.first_name} ${apt.customer.last_name}`
+                                        : `${apt.guest_first_name} ${apt.guest_last_name}`}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-xs text-admin-text-tertiary">
+                                      {getAppointmentTypeLabel(
+                                        apt.appointment_type,
+                                      )}
+                                    </span>
+                                    {getStatusBadge(apt.status)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {data.appointments.length === 0 && (
+                      <p className="text-center py-12 text-admin-text-tertiary italic">
+                        No hay citas en esta semana
+                      </p>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

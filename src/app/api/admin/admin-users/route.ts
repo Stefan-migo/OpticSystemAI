@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { createServiceRoleClient } from "@/utils/supabase/service-role";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type {
@@ -77,8 +78,11 @@ export async function GET(request: NextRequest) {
       user_id: user.id,
     });
 
-    // Build the query - include branch access info and organization_id
-    let query = supabase.from("admin_users").select(`
+    // Usar service role para la consulta de lista y relación admin_branch_access:
+    // RLS en admin_branch_access solo permite ver la propia fila (o todas si super_admin),
+    // por lo que con createClient() la relación venía vacía para otros usuarios.
+    const supabaseServiceRole = createServiceRoleClient();
+    let query = supabaseServiceRole.from("admin_users").select(`
         id,
         email,
         role,
@@ -105,7 +109,6 @@ export async function GET(request: NextRequest) {
     if (!isRoot && !isSuperAdmin && userOrgId) {
       query = query.eq("organization_id", userOrgId);
     }
-    // Si es root/dev o super admin, no aplicar filtro (ver todos los usuarios)
 
     // Apply filters
     if (role && role !== "all") {

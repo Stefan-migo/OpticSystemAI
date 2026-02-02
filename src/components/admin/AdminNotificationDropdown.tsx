@@ -5,6 +5,7 @@ import {
   Bell,
   Check,
   CheckCheck,
+  ChevronRight,
   X,
   Package,
   ShoppingCart,

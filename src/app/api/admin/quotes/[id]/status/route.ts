@@ -51,6 +51,7 @@ export async function PUT(
         query,
         branchContext.branchId,
         branchContext.isSuperAdmin,
+        branchContext.organizationId,
       );
     };
 

@@ -28,10 +28,9 @@ export function replaceTemplateVariables(
 export function getDefaultVariables(): Record<string, string> {
   return {
     company_name: "OPTTIUS CONSCIENTE",
-    support_email: "soporte@daluzconsciente.com",
-    contact_email: "contacto@daluzconsciente.com",
-    website_url:
-      process.env.NEXT_PUBLIC_APP_URL || "https://daluzconsciente.com",
+    support_email: "soporte@opttius.com",
+    contact_email: "contacto@opttius.com",
+    website_url: process.env.NEXT_PUBLIC_APP_URL || "https://opttius.com",
   };
 }
 

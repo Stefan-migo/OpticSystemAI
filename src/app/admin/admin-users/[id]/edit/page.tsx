@@ -1,17 +1,32 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ArrowLeft, Crown, Save, X } from 'lucide-react';
-import Link from 'next/link';
-import { toast } from 'sonner';
-import { useBranch } from '@/hooks/useBranch';
-import BranchAccessManager from '@/components/admin/BranchAccessManager';
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ArrowLeft,
+  Crown,
+  Save,
+  X,
+  Globe,
+  User,
+  Building2,
+} from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { useBranch } from "@/hooks/useBranch";
+import BranchAccessManager from "@/components/admin/BranchAccessManager";
 
 interface AdminUser {
   id: string;
@@ -34,8 +49,9 @@ export default function EditAdminUserPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
+    role: "admin",
     is_active: true,
-    permissions: {} as Record<string, string[]>
+    permissions: {} as Record<string, string[]>,
   });
 
   useEffect(() => {
@@ -48,25 +64,28 @@ export default function EditAdminUserPage() {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/admin-users/${adminId}`);
-      
+
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error('Administrador no encontrado');
+          throw new Error("Administrador no encontrado");
         }
-        throw new Error('Error al cargar el administrador');
+        throw new Error("Error al cargar el administrador");
       }
 
       const data = await response.json();
       setAdminUser(data.adminUser);
       setFormData({
+        role: data.adminUser.role || "admin",
         is_active: data.adminUser.is_active,
-        permissions: data.adminUser.permissions || {}
+        permissions: data.adminUser.permissions || {},
       });
       setError(null);
     } catch (err) {
-      console.error('Error fetching admin user:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido');
-      toast.error(err instanceof Error ? err.message : 'Error al cargar el administrador');
+      console.error("Error fetching admin user:", err);
+      setError(err instanceof Error ? err.message : "Error desconocido");
+      toast.error(
+        err instanceof Error ? err.message : "Error al cargar el administrador",
+      );
     } finally {
       setLoading(false);
     }
@@ -76,26 +95,33 @@ export default function EditAdminUserPage() {
     try {
       setSaving(true);
       const response = await fetch(`/api/admin/admin-users/${adminId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          role: formData.role,
           is_active: formData.is_active,
-          permissions: formData.permissions
+          permissions: formData.permissions,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al actualizar el administrador');
+        throw new Error(
+          errorData.error || "Error al actualizar el administrador",
+        );
       }
 
-      toast.success('Administrador actualizado exitosamente');
+      toast.success("Administrador actualizado exitosamente");
       router.push(`/admin/admin-users/${adminId}`);
     } catch (err) {
-      console.error('Error updating admin user:', err);
-      toast.error(err instanceof Error ? err.message : 'Error al actualizar el administrador');
+      console.error("Error updating admin user:", err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Error al actualizar el administrador",
+      );
     } finally {
       setSaving(false);
     }
@@ -118,8 +144,12 @@ export default function EditAdminUserPage() {
         <Card className="bg-admin-bg-tertiary">
           <CardContent className="p-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-azul-profundo mb-4">Error</h2>
-              <p className="text-tierra-media mb-6">{error || 'Administrador no encontrado'}</p>
+              <h2 className="text-2xl font-bold text-azul-profundo mb-4">
+                Error
+              </h2>
+              <p className="text-tierra-media mb-6">
+                {error || "Administrador no encontrado"}
+              </p>
               <Link href="/admin/admin-users">
                 <Button variant="outline">
                   <ArrowLeft className="mr-2 h-4 w-4" />
@@ -138,8 +168,12 @@ export default function EditAdminUserPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">Editar Administrador</h1>
-          <p className="text-tierra-media">Modificar información del administrador</p>
+          <h1 className="text-3xl font-bold text-azul-profundo">
+            Editar Usuario
+          </h1>
+          <p className="text-tierra-media">
+            Modificar información del administrador
+          </p>
         </div>
         <Link href={`/admin/admin-users/${adminId}`}>
           <Button variant="default" size="sm">
@@ -173,18 +207,50 @@ export default function EditAdminUserPage() {
             </p>
           </div>
 
-          {/* Role (read-only) */}
+          {/* Role (editable) */}
           <div>
             <Label>Rol</Label>
-            <div className="mt-2 p-3 bg-admin-bg-tertiary rounded-md">
-              <div className="flex items-center gap-2">
-                <Crown className="h-4 w-4 text-admin-accent-tertiary" />
-                <span className="font-medium">Administrador</span>
-              </div>
-              <p className="text-sm text-tierra-media mt-1">
-                El rol no puede ser modificado
-              </p>
-            </div>
+            <Select
+              value={formData.role}
+              onValueChange={(value) =>
+                setFormData({ ...formData, role: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar rol" />
+              </SelectTrigger>
+              <SelectContent>
+                {isSuperAdmin && (
+                  <SelectItem value="super_admin">
+                    <span className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Super Administrador
+                    </span>
+                  </SelectItem>
+                )}
+                <SelectItem value="admin">
+                  <span className="flex items-center gap-2">
+                    <Crown className="h-4 w-4" />
+                    Administrador
+                  </span>
+                </SelectItem>
+                <SelectItem value="employee">
+                  <span className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Empleado
+                  </span>
+                </SelectItem>
+                <SelectItem value="vendedor">
+                  <span className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Vendedor
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-tierra-media mt-1">
+              El rol define el nivel de acceso del usuario en la organización
+            </p>
           </div>
 
           {/* Status */}
@@ -195,17 +261,22 @@ export default function EditAdminUserPage() {
                 <input
                   type="checkbox"
                   checked={formData.is_active}
-                  onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                  onChange={(e) =>
+                    setFormData({ ...formData, is_active: e.target.checked })
+                  }
                   className="h-4 w-4 rounded border-gray-300"
                 />
                 <span className="text-sm">
-                  {formData.is_active ? 'Activo' : 'Inactivo'}
+                  {formData.is_active ? "Activo" : "Inactivo"}
                 </span>
               </label>
               {formData.is_active ? (
-                <Badge 
-                  className="bg-verde-suave text-primary" 
-                  style={{ backgroundColor: 'var(--accent)', color: 'var(--admin-bg-primary)' }}
+                <Badge
+                  className="bg-verde-suave text-primary"
+                  style={{
+                    backgroundColor: "var(--accent)",
+                    color: "var(--admin-bg-primary)",
+                  }}
                 >
                   Activo
                 </Badge>
@@ -223,8 +294,8 @@ export default function EditAdminUserPage() {
             <Label>Permisos</Label>
             <div className="mt-2 p-4 bg-admin-bg-tertiary rounded-md">
               <p className="text-sm text-tierra-media">
-                Los administradores tienen acceso completo a todas las funciones del sistema.
-                Los permisos se gestionan automáticamente.
+                Los administradores tienen acceso completo a todas las funciones
+                del sistema. Los permisos se gestionan automáticamente.
               </p>
             </div>
           </div>
@@ -239,21 +310,18 @@ export default function EditAdminUserPage() {
             </Link>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
-              {saving ? 'Guardando...' : 'Guardar Cambios'}
+              {saving ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Branch Access Manager - Only for super admins */}
-      {isSuperAdmin && (
-        <BranchAccessManager
-          adminUserId={adminId}
-          isSuperAdmin={false}
-          canEdit={isSuperAdmin}
-        />
-      )}
+      {/* Branch Access Manager - Admin y Super Admin pueden asignar/editar sucursal */}
+      <BranchAccessManager
+        adminUserId={adminId}
+        isSuperAdmin={adminUser?.role === "super_admin"}
+        canEdit={true}
+      />
     </div>
   );
 }
-

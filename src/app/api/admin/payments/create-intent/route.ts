@@ -18,9 +18,14 @@ import {
 import { PaymentGatewayFactory, PaymentService } from "@/lib/payments";
 import type { PaymentGatewayType } from "@/lib/payments";
 
+const paymentRateLimitConfig =
+  process.env.NODE_ENV === "development"
+    ? { ...rateLimitConfigs.payment, maxRequests: 50 }
+    : rateLimitConfigs.payment;
+
 export async function POST(request: NextRequest) {
   return (
-    withRateLimit(rateLimitConfigs.payment) as (
+    withRateLimit(paymentRateLimitConfig) as (
       req: NextRequest,
       handler: () => Promise<NextResponse>,
     ) => Promise<NextResponse>
@@ -129,12 +134,22 @@ export async function POST(request: NextRequest) {
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Internal server error";
+        error instanceof Error
+          ? error.message
+          : typeof error === "object" && error !== null && "message" in error
+            ? String((error as { message: unknown }).message)
+            : "Internal server error";
       logger.error(
         "Payments create-intent error",
         error instanceof Error ? error : new Error(message),
       );
-      return NextResponse.json({ error: message }, { status: 500 });
+      return NextResponse.json(
+        {
+          error:
+            typeof message === "string" ? message : "Internal server error",
+        },
+        { status: 500 },
+      );
     }
   });
 }

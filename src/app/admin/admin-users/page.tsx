@@ -14,15 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -55,7 +46,6 @@ import {
   Clock,
   Mail,
   Phone,
-  Check,
   MoreVertical,
   Building2,
   Globe,
@@ -95,14 +85,6 @@ interface AdminUser {
   };
 }
 
-interface SuggestedUser {
-  id: string;
-  email: string;
-  fullName: string;
-  firstName?: string;
-  lastName?: string;
-}
-
 export default function AdminUsersPage() {
   const { isSuperAdmin } = useBranch();
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
@@ -123,28 +105,6 @@ export default function AdminUsersPage() {
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<AdminUser[]>([]);
 
-  // Create admin dialog
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [newAdminData, setNewAdminData] = useState({
-    email: "",
-    role: "admin",
-    is_active: true,
-    branch_ids: [] as string[],
-    is_super_admin: false,
-  });
-
-  // Branches for selection
-  const [availableBranches, setAvailableBranches] = useState<
-    Array<{ id: string; name: string; code: string }>
-  >([]);
-
-  // Autocomplete state
-  const [openUserSelect, setOpenUserSelect] = useState(false);
-  const [userSearchQuery, setUserSearchQuery] = useState("");
-  const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUser[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
   // Permissions editor state
   const [showPermissionsEditor, setShowPermissionsEditor] = useState(false);
   const [selectedUserForPermissions, setSelectedUserForPermissions] =
@@ -152,57 +112,12 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchAdminUsers();
-    fetchBranches();
   }, [roleFilter, statusFilter, currentPage, itemsPerPage]);
-
-  const fetchBranches = async () => {
-    try {
-      const response = await fetch("/api/admin/branches");
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableBranches(data.branches || []);
-      }
-    } catch (error) {
-      console.error("Error fetching branches:", error);
-    }
-  };
-
-  // Fetch suggested users when search query changes
-  useEffect(() => {
-    if (openUserSelect) {
-      fetchSuggestedUsers(userSearchQuery);
-    }
-  }, [userSearchQuery, openUserSelect]);
-
-  // Fetch users when dialog opens and reset state when closed
-  useEffect(() => {
-    if (showCreateDialog) {
-      fetchSuggestedUsers("");
-      setUserSearchQuery("");
-      setOpenUserSelect(false);
-      // Reset form
-      setNewAdminData({
-        email: "",
-        role: "admin",
-        is_active: true,
-        branch_ids: [],
-        is_super_admin: false,
-      });
-    } else {
-      // Clean up when dialog closes
-      setUserSearchQuery("");
-      setSuggestedUsers([]);
-      setOpenUserSelect(false);
-    }
-  }, [showCreateDialog]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (openUserSelect && !target.closest(".autocomplete-container")) {
-        setOpenUserSelect(false);
-      }
       if (
         showSearchSuggestions &&
         !target.closest(".search-autocomplete-container")
@@ -213,7 +128,7 @@ export default function AdminUsersPage() {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [openUserSelect, showSearchSuggestions]);
+  }, [showSearchSuggestions]);
 
   // Generate search suggestions from existing admin users
   useEffect(() => {
@@ -231,29 +146,6 @@ export default function AdminUsersPage() {
       setShowSearchSuggestions(false);
     }
   }, [searchTerm, adminUsers]);
-
-  const fetchSuggestedUsers = async (query: string) => {
-    try {
-      setLoadingUsers(true);
-      const params = new URLSearchParams();
-      if (query.trim()) {
-        params.set("q", query);
-      }
-
-      const response = await fetch(`/api/admin/users/search?${params}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-
-      const data = await response.json();
-      setSuggestedUsers(data.users || []);
-    } catch (err) {
-      console.error("Error fetching users:", err);
-      setSuggestedUsers([]);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
 
   const fetchAdminUsers = async () => {
     try {
@@ -285,67 +177,6 @@ export default function AdminUsersPage() {
       setError(err instanceof Error ? err.message : "Unknown error occurred");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleCreateAdmin = async () => {
-    if (!newAdminData.email) {
-      toast.error("Email es requerido");
-      return;
-    }
-
-    // Validate: if not super admin, must have at least one branch
-    if (
-      !newAdminData.is_super_admin &&
-      (!newAdminData.branch_ids || newAdminData.branch_ids.length === 0)
-    ) {
-      toast.error("Debe asignar al menos una sucursal al administrador");
-      return;
-    }
-
-    try {
-      setCreating(true);
-
-      const response = await fetch("/api/admin/admin-users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: newAdminData.email,
-          role: "admin",
-          is_active: newAdminData.is_active,
-          is_super_admin: newAdminData.is_super_admin,
-          branch_ids: newAdminData.is_super_admin
-            ? []
-            : newAdminData.branch_ids,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create admin user");
-      }
-
-      toast.success("Usuario administrador creado exitosamente");
-      setShowCreateDialog(false);
-      setNewAdminData({
-        email: "",
-        role: "admin",
-        is_active: true,
-        branch_ids: [],
-        is_super_admin: false,
-      });
-      fetchAdminUsers();
-    } catch (error) {
-      console.error("Error creating admin user:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Error al crear usuario administrador",
-      );
-    } finally {
-      setCreating(false);
     }
   };
 
@@ -538,225 +369,11 @@ export default function AdminUsersPage() {
         </div>
 
         <Link href="/admin/admin-users/register">
-          <Button variant="outline">
+          <Button>
             <UserPlus className="h-4 w-4 mr-2" />
             Registrar Nuevo Usuario
           </Button>
         </Link>
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Nuevo Administrador
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Crear Nuevo Administrador</DialogTitle>
-              <DialogDescription>
-                Otorga acceso administrativo a un usuario registrado
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div className="relative autocomplete-container">
-                <Label htmlFor="email">Email del Usuario</Label>
-                <div className="relative">
-                  <Input
-                    id="email"
-                    type="text"
-                    placeholder="Buscar por email o nombre..."
-                    value={userSearchQuery}
-                    onChange={(e) => {
-                      setUserSearchQuery(e.target.value);
-                      setOpenUserSelect(true);
-                    }}
-                    onFocus={() => setOpenUserSelect(true)}
-                    className="w-full"
-                  />
-                  {loadingUsers && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="animate-spin h-4 w-4 border-2 border-admin-accent-tertiary border-t-transparent rounded-full" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Autocomplete Suggestions */}
-                {openUserSelect &&
-                  (userSearchQuery.length > 0 || suggestedUsers.length > 0) && (
-                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                      {suggestedUsers.length === 0 && !loadingUsers && (
-                        <div className="px-4 py-3 text-sm text-tierra-media text-center">
-                          No se encontraron usuarios
-                        </div>
-                      )}
-                      {suggestedUsers.map((user) => (
-                        <div
-                          key={user.id}
-                          className="px-4 py-3 hover:bg-admin-bg-tertiary cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
-                          onClick={() => {
-                            setNewAdminData({
-                              ...newAdminData,
-                              email: user.email,
-                            });
-                            setUserSearchQuery(user.email);
-                            setOpenUserSelect(false);
-                          }}
-                        >
-                          <div className="flex items-center gap-3">
-                            {newAdminData.email === user.email && (
-                              <Check className="h-4 w-4 text-admin-accent-tertiary flex-shrink-0" />
-                            )}
-                            <div className="flex flex-col min-w-0 flex-1">
-                              <span className="font-medium text-sm truncate">
-                                {user.fullName}
-                              </span>
-                              <span className="text-xs text-tierra-media truncate">
-                                {user.email}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                <p className="text-sm text-tierra-media mt-1">
-                  Escribe para buscar un usuario registrado del sistema
-                </p>
-              </div>
-
-              {/* Super Admin Option - Only for super admins */}
-              {isSuperAdmin && (
-                <div>
-                  <Label>Tipo de Administrador</Label>
-                  <div className="mt-2 space-y-3">
-                    <label className="flex items-start gap-3 p-3 border rounded-md cursor-pointer hover:bg-admin-bg-tertiary transition-colors">
-                      <input
-                        type="radio"
-                        name="admin_type"
-                        checked={newAdminData.is_super_admin}
-                        onChange={() =>
-                          setNewAdminData({
-                            ...newAdminData,
-                            is_super_admin: true,
-                            branch_ids: [],
-                          })
-                        }
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-dorado" />
-                          <span className="font-medium">
-                            Super Administrador
-                          </span>
-                        </div>
-                        <p className="text-sm text-tierra-media mt-1">
-                          Acceso a todas las sucursales y funciones del sistema
-                        </p>
-                      </div>
-                    </label>
-                    <label className="flex items-start gap-3 p-3 border rounded-md cursor-pointer hover:bg-admin-bg-tertiary transition-colors">
-                      <input
-                        type="radio"
-                        name="admin_type"
-                        checked={!newAdminData.is_super_admin}
-                        onChange={() =>
-                          setNewAdminData({
-                            ...newAdminData,
-                            is_super_admin: false,
-                            branch_ids: [],
-                          })
-                        }
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-admin-accent-tertiary" />
-                          <span className="font-medium">
-                            Administrador de Sucursal
-                          </span>
-                        </div>
-                        <p className="text-sm text-tierra-media mt-1">
-                          Acceso limitado a sucursales específicas
-                        </p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {/* Branch Selection - Only for branch admins */}
-              {!newAdminData.is_super_admin && (
-                <div>
-                  <Label>Sucursales</Label>
-                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
-                    {availableBranches.length === 0 ? (
-                      <p className="text-sm text-tierra-media">
-                        No hay sucursales disponibles
-                      </p>
-                    ) : (
-                      availableBranches.map((branch) => (
-                        <label
-                          key={branch.id}
-                          className="flex items-center gap-2 cursor-pointer hover:bg-admin-bg-tertiary p-2 rounded"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={newAdminData.branch_ids.includes(
-                              branch.id,
-                            )}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setNewAdminData({
-                                  ...newAdminData,
-                                  branch_ids: [
-                                    ...newAdminData.branch_ids,
-                                    branch.id,
-                                  ],
-                                });
-                              } else {
-                                setNewAdminData({
-                                  ...newAdminData,
-                                  branch_ids: newAdminData.branch_ids.filter(
-                                    (id) => id !== branch.id,
-                                  ),
-                                });
-                              }
-                            }}
-                            className="rounded"
-                          />
-                          <span className="text-sm">
-                            {branch.name} ({branch.code})
-                          </span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                  {newAdminData.branch_ids.length > 0 && (
-                    <p className="text-xs text-tierra-media mt-1">
-                      {newAdminData.branch_ids.length} sucursal(es)
-                      seleccionada(s)
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateDialog(false)}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleCreateAdmin} disabled={creating}>
-                {creating ? "Creando..." : "Crear Administrador"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Stats */}
@@ -944,7 +561,7 @@ export default function AdminUsersPage() {
               <TableRow>
                 <TableHead>Usuario</TableHead>
                 <TableHead>Rol</TableHead>
-                <TableHead>Acceso</TableHead>
+                <TableHead>Sucursal</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Última Actividad</TableHead>
                 <TableHead>Actividad (30d)</TableHead>

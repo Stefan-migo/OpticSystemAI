@@ -19,6 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   Loader2,
   Eye,
@@ -341,227 +342,246 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-white overflow-hidden">
-      {/* Left Side: Branding & Visuals */}
-      <div className="relative hidden lg:flex lg:w-1/2 xl:w-7/12 bg-admin-bg-primary overflow-hidden">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
+      {/* Premium Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] right-[-10%] w-[45%] h-[45%] bg-primary/10 rounded-full blur-[120px] animate-premium-float" />
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-10000 hover:scale-110"
-          style={{
-            backgroundImage: `url('/luxury_optics_auth_bg_1769965128142.png')`,
-          }}
+          className="absolute bottom-[-10%] left-[-10%] w-[45%] h-[45%] bg-indigo-500/10 rounded-full blur-[120px] animate-premium-float"
+          style={{ animationDelay: "-3s" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-tr from-admin-bg-primary/95 via-admin-bg-primary/40 to-transparent" />
+      </div>
 
-        <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 bg-white rounded-3xl flex items-center justify-center shadow-premium-lg overflow-hidden p-2">
+      {/* Left Side: Branding & Value Props (Visible only on LG up) */}
+      <div className="relative hidden lg:flex lg:w-5/12 xl:w-1/2 overflow-hidden z-10">
+        {/* Deep Dark Gradient Background */}
+        <div className="absolute inset-0 bg-slate-900" />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900/95 to-primary/20" />
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
+
+        <div className="relative z-10 flex flex-col justify-between p-16 w-full">
+          {/* Logo Section */}
+          <div className="flex items-center gap-5 group cursor-pointer w-fit">
+            <div className="h-16 w-16 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[2rem] flex items-center justify-center shadow-2xl transition-all duration-500 group-hover:bg-white group-hover:scale-110">
               <Image
                 src="/logo-opttius.png"
                 alt="Opttius Logo"
-                width={40}
-                height={40}
-                className="object-contain"
+                width={42}
+                height={42}
+                className="object-contain transition-all duration-500 group-hover:brightness-100 invert group-hover:invert-0"
               />
             </div>
-            <span className="text-3xl font-black text-white tracking-tighter uppercase">
+            <span className="text-4xl font-black text-white tracking-tighter uppercase font-heading">
               Opttius
             </span>
           </div>
 
-          <div className="max-w-xl">
-            <h2 className="text-5xl font-black text-white leading-tight tracking-tight mb-6">
-              Escala tu óptica al{" "}
-              <span className="text-admin-accent-primary">siguiente</span>
-              <br />
-              nivel hoy.
-            </h2>
-            <div className="h-1 w-24 bg-admin-accent-primary rounded-full mb-8" />
-            <p className="text-xl text-white/80 font-medium leading-relaxed">
-              Únete a cientos de profesionales que ya confían en Opttius para
-              gestionar sus sucursales, inventarios y ventas con una plataforma
-              diseñada para el éxito.
-            </p>
+          {/* Main Content */}
+          <div className="space-y-12 animate-in fade-in slide-in-from-left-10 duration-1000">
+            <div className="space-y-6">
+              <Badge
+                variant="healty"
+                className="bg-primary/20 text-primary border-none text-[10px] font-black tracking-[0.2em] px-5 py-2 rounded-full"
+              >
+                REGISTRO DE SOCIOS
+              </Badge>
+              <h2 className="text-7xl font-black text-white leading-[1] tracking-tighter">
+                Diseña el <br />
+                <span className="text-primary">futuro</span> de tu <br />
+                óptica.
+              </h2>
+              <p className="text-2xl text-slate-300 font-medium leading-relaxed max-w-lg font-body">
+                Únete a la red de ópticas inteligentes más avanzada.
+                Automatización total, diseño exquisito y crecimiento
+                exponencial.
+              </p>
+            </div>
+
+            {/* Feature List */}
+            <div className="space-y-6">
+              {[
+                {
+                  icon: Shield,
+                  text: "Infraestructura de Alta Seguridad",
+                  color: "text-blue-400",
+                },
+                {
+                  icon: Sparkles,
+                  text: "Inteligencia Artificial Predictiva",
+                  color: "text-amber-400",
+                },
+                {
+                  icon: CheckCircle2,
+                  text: "Soporte Premium 24/7",
+                  color: "text-emerald-400",
+                },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-4 group">
+                  <div className="p-3 bg-white/5 border border-white/10 rounded-2xl group-hover:bg-white/10 transition-colors">
+                    <item.icon className={cn("h-6 w-6", item.color)} />
+                  </div>
+                  <span className="text-lg text-slate-200 font-bold tracking-tight">
+                    {item.text}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="flex items-center gap-6 text-white/50 text-sm font-bold uppercase tracking-widest">
-            <span>Enterprise Edition</span>
-            <div className="h-1 w-1 rounded-full bg-white/30" />
-            <span>v2.5.0</span>
+          {/* Footer Info */}
+          <div className="flex items-center gap-4">
+            <p className="text-[10px] font-black text-primary border border-primary/30 px-4 py-1.5 rounded-full uppercase tracking-widest bg-primary/5">
+              Lanzamiento Exclusivo 2026
+            </p>
           </div>
         </div>
       </div>
 
       {/* Right Side: Signup Form */}
-      <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-12 lg:p-20 bg-slate-50/50 relative overflow-y-auto">
-        <div className="absolute top-0 right-0 p-8 flex items-center gap-3 lg:hidden">
-          <Image
-            src="/logo-opttius.png"
-            alt="Opttius Logo"
-            width={32}
-            height={32}
-            className="object-contain"
-          />
-          <span className="text-xl font-black text-admin-text-primary tracking-tighter uppercase">
+      <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 xl:p-24 relative z-10 overflow-y-auto">
+        {/* Mobile Header */}
+        <div className="absolute top-8 left-8 flex items-center gap-3 lg:hidden">
+          <Image src="/logo-opttius.png" alt="Logo" width={32} height={32} />
+          <span className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">
             Opttius
           </span>
         </div>
 
-        <div className="w-full max-w-xl animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="text-center mb-8 lg:text-left">
-            <h1 className="text-4xl font-black text-admin-text-primary tracking-tight mb-2">
-              Crea tu Cuenta
+        <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-10 duration-700">
+          <div className="text-center lg:text-left mb-12 space-y-4">
+            <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+              Comienza tu <br className="sm:hidden" /> Gran Obra.
             </h1>
-            <p className="text-admin-text-tertiary font-bold uppercase text-[10px] tracking-widest">
-              Estás a pocos pasos de optimizar tu visión de negocio
+            <p className="text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em] leading-relaxed">
+              Estás a un paso de revolucionar la gestión de tu negocio óptico
+              con tecnología de élite.
             </p>
           </div>
 
-          <Card className="border-none bg-white shadow-premium-lg rounded-[2.5rem] overflow-hidden">
+          <Card
+            variant="glass"
+            rounded="lg"
+            className="border-white/40 dark:border-slate-800/50 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.12)]"
+          >
             <CardContent className="p-8 sm:p-12">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
                 {error && (
                   <Alert
                     variant="destructive"
-                    className="bg-admin-error/5 border-admin-error/20 rounded-2xl"
+                    className="bg-red-500/10 border-red-500/20 rounded-2xl animate-in shake-in duration-500"
                   >
-                    <AlertDescription className="text-admin-error font-bold text-xs">
+                    <AlertDescription className="text-red-500 font-bold text-xs">
                       {error}
                     </AlertDescription>
                   </Alert>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="firstName"
-                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
-                    >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                       Nombre
                     </Label>
                     <div className="relative group">
                       <Input
-                        id="firstName"
                         placeholder="Juan"
                         {...register("firstName")}
                         className={cn(
-                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 focus:bg-white transition-all font-bold",
-                          errors.firstName ? "border-admin-error" : "",
+                          "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold",
+                          errors.firstName &&
+                            "border-red-500 focus-visible:ring-red-500",
                         )}
                         disabled={loading}
                       />
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
                     </div>
                     {errors.firstName && (
-                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1">
+                      <p className="text-[10px] text-red-500 font-black uppercase tracking-tight ml-1">
                         {errors.firstName.message}
                       </p>
                     )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="lastName"
-                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
-                    >
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                       Apellido
                     </Label>
                     <div className="relative group">
                       <Input
-                        id="lastName"
                         placeholder="Pérez"
                         {...register("lastName")}
                         className={cn(
-                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 focus:bg-white transition-all font-bold",
-                          errors.lastName ? "border-admin-error" : "",
+                          "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold",
+                          errors.lastName &&
+                            "border-red-500 focus-visible:ring-red-500",
                         )}
                         disabled={loading}
                       />
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
                     </div>
-                    {errors.lastName && (
-                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1">
-                        {errors.lastName.message}
-                      </p>
-                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="email"
-                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
-                    >
-                      Correo Corporativo
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Email Corporativo
                     </Label>
                     <div className="relative group">
                       <Input
-                        id="email"
                         type="email"
-                        placeholder="juan@optica.com"
+                        placeholder="socio@opttius.com"
                         {...register("email")}
                         className={cn(
-                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 focus:bg-white transition-all font-bold",
-                          errors.email ? "border-admin-error" : "",
+                          "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold",
+                          errors.email &&
+                            "border-red-500 focus-visible:ring-red-500",
                         )}
                         disabled={loading}
                       />
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
                     </div>
-                    {errors.email && (
-                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1">
-                        {errors.email.message}
-                      </p>
-                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="phone"
-                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
-                    >
-                      Teléfono (Opcional)
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Teléfono Móvil
                     </Label>
                     <div className="relative group">
                       <Input
-                        id="phone"
                         type="tel"
-                        placeholder="+56 9 1234 5678"
+                        placeholder="+56 9"
                         {...register("phone")}
-                        className="h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 focus:bg-white transition-all font-bold"
+                        className="h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold"
                         disabled={loading}
                       />
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="password"
-                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
-                    >
-                      Contraseña Maestra
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Llave de Seguridad
                     </Label>
                     <div className="relative group">
                       <Input
-                        id="password"
                         type={showPassword ? "text" : "password"}
-                        placeholder="Mín. 6 carcateres"
+                        placeholder="••••••••"
                         {...register("password")}
                         className={cn(
-                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 pr-12 focus:bg-white transition-all font-bold",
-                          errors.password ? "border-admin-error" : "",
+                          "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 pr-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold",
+                          errors.password &&
+                            "border-red-500 focus-visible:ring-red-500",
                         )}
                         disabled={loading}
                       />
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 p-0 hover:bg-transparent text-admin-text-tertiary"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 hover:bg-transparent text-slate-400"
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         {showPassword ? (
@@ -571,38 +591,30 @@ export default function SignupPage() {
                         )}
                       </Button>
                     </div>
-                    {errors.password && (
-                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1 leading-tight">
-                        {errors.password.message}
-                      </p>
-                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="confirmPassword"
-                      className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest ml-1"
-                    >
-                      Confirmar Contraseña
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Repetir Llave
                     </Label>
                     <div className="relative group">
                       <Input
-                        id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Repite tu contraseña"
+                        placeholder="••••••••"
                         {...register("confirmPassword")}
                         className={cn(
-                          "h-14 rounded-2xl border-admin-border-primary/50 bg-slate-50/50 pl-12 pr-12 focus:bg-white transition-all font-bold",
-                          errors.confirmPassword ? "border-admin-error" : "",
+                          "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 pr-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold",
+                          errors.confirmPassword &&
+                            "border-red-500 focus-visible:ring-red-500",
                         )}
                         disabled={loading}
                       />
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-text-tertiary group-focus-within:text-admin-accent-primary transition-colors" />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 p-0 hover:bg-transparent text-admin-text-tertiary"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 hover:bg-transparent text-slate-400"
                         onClick={() =>
                           setShowConfirmPassword(!showConfirmPassword)
                         }
@@ -614,58 +626,55 @@ export default function SignupPage() {
                         )}
                       </Button>
                     </div>
-                    {errors.confirmPassword && (
-                      <p className="text-[9px] text-admin-error font-black uppercase tracking-tight ml-1">
-                        {errors.confirmPassword.message}
-                      </p>
-                    )}
                   </div>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-6">
                   <Button
                     type="submit"
-                    className="w-full h-14 bg-admin-accent-primary hover:bg-admin-accent-primary/90 text-white rounded-2xl shadow-premium-md font-black uppercase text-[11px] tracking-widest transition-all active:scale-[0.98] group"
+                    size="lg"
+                    className="w-full h-16 rounded-2xl shadow-2xl shadow-primary/30 font-black uppercase text-xs tracking-[0.3em] group transition-all"
                     disabled={loading}
+                    shimmer
                   >
                     {loading ? (
                       <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Creando Infraestructura...
+                        <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+                        Finalizando Configuración...
                       </>
                     ) : (
                       <>
-                        Comenzar Ahora
-                        <Sparkles className="ml-2 h-5 w-5 transition-transform group-hover:scale-110" />
+                        Iniciar mi Evolución
+                        <ArrowRight className="ml-3 h-5 w-5 transition-transform group-hover:translate-x-3" />
                       </>
                     )}
                   </Button>
                 </div>
               </form>
 
-              <div className="mt-8 text-center pt-6 border-t border-admin-border-primary/10">
-                <p className="text-[10px] font-bold text-admin-text-tertiary uppercase tracking-widest mb-4">
-                  ¿Ya tienes una cuenta registrada?
+              <div className="mt-12 text-center pt-8 border-t border-slate-100 dark:border-slate-800">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+                  ¿Ya tienes una identidad registrada?
                 </p>
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 text-[10px] font-black text-admin-accent-primary uppercase tracking-widest hover:underline"
+                  className="inline-flex items-center gap-2 text-xs font-black text-primary uppercase tracking-[0.2em] hover:brightness-110 transition-all group"
                 >
-                  Inicia sesión aquí
-                  <ArrowRight className="h-4 w-4" />
+                  Acceder al Panel Maestro
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </div>
             </CardContent>
           </Card>
 
-          <p className="mt-8 text-center text-[9px] font-bold text-admin-text-tertiary uppercase tracking-widest opacity-60">
-            Al registrarte, confirmas que has leído y aceptado nuestros{" "}
-            <Link href="#" className="underline">
-              Términos de Servicio
+          <p className="mt-12 text-center text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] opacity-80 leading-relaxed max-w-lg mx-auto">
+            Al registrarte en Opttius, aceptas nuestros{" "}
+            <Link href="#" className="text-slate-900 dark:text-white underline">
+              Términos de Élite
             </Link>{" "}
-            y{" "}
-            <Link href="#" className="underline">
-              Política de Privacidad
+            y la{" "}
+            <Link href="#" className="text-slate-900 dark:text-white underline">
+              Política de Soberanía de Datos
             </Link>
             .
           </p>

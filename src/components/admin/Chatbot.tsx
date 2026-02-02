@@ -48,14 +48,14 @@ export default function Chatbot(
   }, [setIsOpen]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
-      {/* Chat Window */}
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end justify-end w-fit">
+      {/* Chat Window - absolute so it doesn't expand parent and block clicks on right side */}
       <div
         className={cn(
-          "w-[90vw] sm:w-[400px] h-[600px] max-h-[80vh] bg-white dark:bg-slate-950 rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col transition-all duration-300 origin-bottom-right",
+          "absolute right-0 bottom-full mb-2 w-[90vw] sm:w-[400px] h-[600px] max-h-[80vh] bg-white dark:bg-slate-950 rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col transition-all duration-300 origin-bottom-right",
           isOpen
-            ? "scale-100 opacity-100 translate-y-0"
-            : "scale-95 opacity-0 translate-y-4 pointer-events-none",
+            ? "scale-100 opacity-100 translate-y-0 pointer-events-auto"
+            : "scale-95 opacity-0 translate-y-4 pointer-events-none invisible",
         )}
       >
         <ChatbotContent

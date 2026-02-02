@@ -49,6 +49,7 @@ export async function POST(
         query,
         branchContext.branchId,
         branchContext.isSuperAdmin,
+        branchContext.organizationId,
       );
     };
 

@@ -1,22 +1,187 @@
 /**
- * GET /api/webhooks/mercadopago
+ * GET/POST /api/webhooks/mercadopago
  * Recibe notificaciones de Mercado Pago (topic=payment, id=payment_id).
- * Sin rate limiting. Idempotencia con webhook_events.
+ * Valida firma HMAC cuando MERCADOPAGO_WEBHOOK_SECRET está configurado.
+ * Idempotencia con webhook_events.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { MercadoPagoGateway } from "@/lib/payments/mercadopago/gateway";
+import { MercadoPagoWebhookValidator } from "@/lib/payments/mercadopago/webhook-validator";
 import { PaymentService } from "@/lib/payments/services/payment-service";
 import { appLogger as logger } from "@/lib/logger";
 
-export async function GET(request: NextRequest) {
+async function processWebhook(request: NextRequest): Promise<NextResponse> {
   const supabase = createServiceRoleClient();
   const mpGateway = new MercadoPagoGateway();
   const paymentService = new PaymentService(supabase);
+  const validator = new MercadoPagoWebhookValidator();
 
   try {
-    const webhookEvent = await mpGateway.processWebhookEvent(request);
+    const searchParams = request.nextUrl.searchParams;
+    let dataId = searchParams.get("data.id") ?? searchParams.get("id") ?? null;
+    let topicFromBody: string | null = null;
+    let bodyParsed: Record<string, unknown> | null = null;
+
+    if (request.method === "POST") {
+      try {
+        bodyParsed = (await request.json()) as Record<string, unknown>;
+        if (bodyParsed && typeof bodyParsed === "object") {
+          if (!dataId) {
+            const data = bodyParsed.data;
+            if (data != null && typeof data === "object" && "id" in data)
+              dataId = String((data as { id: unknown }).id);
+            else if (typeof data === "string") dataId = data;
+            else if (
+              typeof bodyParsed.id === "string" ||
+              typeof bodyParsed.id === "number"
+            )
+              dataId = String(bodyParsed.id);
+            else if (
+              typeof bodyParsed.api_id === "string" ||
+              typeof bodyParsed.api_id === "number"
+            )
+              dataId = String(bodyParsed.api_id);
+          }
+          topicFromBody =
+            (typeof bodyParsed.type === "string" ? bodyParsed.type : null) ??
+            (typeof bodyParsed.action === "string"
+              ? bodyParsed.action
+              : null) ??
+            null;
+        }
+      } catch {
+        // body not JSON or empty
+      }
+    }
+
+    const topic =
+      topicFromBody ?? searchParams.get("topic") ?? (dataId ? "payment" : null);
+    const id = dataId ?? searchParams.get("id") ?? null;
+
+    if (!id) {
+      logger.warn("Mercado Pago Webhook: missing id in query and body", {
+        hasBody: !!bodyParsed,
+      });
+      return NextResponse.json(
+        { received: true, message: "Missing id" },
+        { status: 200 },
+      );
+    }
+
+    const xSignature = request.headers.get("x-signature");
+    const xRequestId = request.headers.get("x-request-id");
+
+    if (topic === "merchant_order") {
+      // Process merchant_order without signature: fetch order from MP API and update subscription.
+      try {
+        const orderInfo = await mpGateway.getMerchantOrder(id);
+        if (!orderInfo?.preference_id) {
+          logger.warn(
+            "Mercado Pago merchant_order: no preference_id in order",
+            { id },
+          );
+          return NextResponse.json({ received: true }, { status: 200 });
+        }
+        const hasApproved = orderInfo.payments?.some(
+          (p) => String(p.status).toLowerCase() === "approved",
+        );
+        if (!hasApproved) {
+          logger.info("Mercado Pago merchant_order: no approved payment yet", {
+            id,
+            preference_id: orderInfo.preference_id,
+          });
+          return NextResponse.json({ received: true }, { status: 200 });
+        }
+        const existingPayment =
+          await paymentService.getPaymentByGatewayPaymentIntentId(
+            orderInfo.preference_id,
+          );
+        if (!existingPayment) {
+          logger.warn(
+            "Mercado Pago merchant_order: no internal payment for preference",
+            {
+              preference_id: orderInfo.preference_id,
+            },
+          );
+          return NextResponse.json({ received: true }, { status: 200 });
+        }
+        const gatewayEventId = `merchant_order-${id}`;
+        const alreadyProcessed = await paymentService.recordWebhookEvent(
+          "mercadopago",
+          gatewayEventId,
+          "merchant_order",
+          null,
+          undefined,
+        );
+        if (alreadyProcessed) {
+          logger.info("Mercado Pago merchant_order already processed", { id });
+          return NextResponse.json({ received: true }, { status: 200 });
+        }
+        await paymentService.updatePaymentStatus(
+          existingPayment.id,
+          "succeeded",
+          String(orderInfo.payments?.[0]?.id ?? id),
+          undefined,
+          orderInfo.preference_id,
+        );
+        await paymentService.markWebhookEventAsProcessed(
+          "mercadopago",
+          gatewayEventId,
+        );
+        if (existingPayment.order_id) {
+          await paymentService.fulfillOrder(existingPayment.order_id);
+        }
+        if (existingPayment.organization_id) {
+          await paymentService.applyPaymentSuccessToOrganization(
+            existingPayment.organization_id,
+            { ...existingPayment, status: "succeeded" },
+            orderInfo.preference_id,
+            String(orderInfo.payments?.[0]?.id ?? id),
+          );
+        }
+        logger.info(
+          "Mercado Pago merchant_order processed, subscription updated",
+          {
+            id,
+            preference_id: orderInfo.preference_id,
+            organizationId: existingPayment.organization_id,
+          },
+        );
+      } catch (err) {
+        logger.error(
+          "Error processing merchant_order webhook",
+          err instanceof Error ? err : new Error(String(err)),
+          { id },
+        );
+      }
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
+
+    const validationResult = validator.validate(xSignature, xRequestId, id);
+    if (!validationResult.isValid) {
+      logger.error(
+        "Webhook signature validation failed",
+        new Error(validationResult.error),
+        {
+          xSignature: xSignature ? "[present]" : "[missing]",
+          xRequestId: xRequestId ? "[present]" : "[missing]",
+          dataId: id,
+        },
+      );
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    url.searchParams.set("topic", topic ?? "payment");
+    url.searchParams.set("id", id);
+    const requestToProcess = new NextRequest(url, {
+      method: "GET",
+      headers: request.headers,
+    });
+
+    const webhookEvent = await mpGateway.processWebhookEvent(requestToProcess);
     logger.info("Mercado Pago Webhook Event processed", {
       gatewayEventId: webhookEvent.gatewayEventId,
       type: webhookEvent.type,
@@ -96,6 +261,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    if (
+      webhookEvent.status === "succeeded" &&
+      existingPayment.organization_id
+    ) {
+      await paymentService.applyPaymentSuccessToOrganization(
+        existingPayment.organization_id,
+        { ...existingPayment, status: "succeeded" },
+        gatewayPaymentIntentId ?? null,
+        webhookEvent.gatewayTransactionId ?? null,
+      );
+    }
+
     return NextResponse.json({ received: true }, { status: 200 });
   } catch (error) {
     const message =
@@ -112,4 +289,12 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+export async function GET(request: NextRequest) {
+  return processWebhook(request);
+}
+
+export async function POST(request: NextRequest) {
+  return processWebhook(request);
 }

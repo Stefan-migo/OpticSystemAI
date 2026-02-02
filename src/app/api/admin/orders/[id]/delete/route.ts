@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
-import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
+import type {
+  IsAdminParams,
+  IsAdminResult,
+  GetAdminRoleParams,
+  GetAdminRoleResult,
+} from "@/types/supabase-rpc";
 
 /**
  * DELETE /api/admin/orders/[id]
- * Delete an order permanently (SuperAdmin only, for cancelled orders)
+ * Delete an order permanently (Admin or SuperAdmin, for cancelled orders only)
  */
 export async function DELETE(
   request: NextRequest,
@@ -35,16 +40,26 @@ export async function DELETE(
       );
     }
 
-    // Get branch context
-    const branchContext = await getBranchContext(request, user.id);
-
-    // Only SuperAdmin can delete orders
-    if (!branchContext.isSuperAdmin) {
+    const { data: adminRole } = (await supabase.rpc("get_admin_role", {
+      user_id: user.id,
+    } as GetAdminRoleParams)) as {
+      data: GetAdminRoleResult | null;
+      error: Error | null;
+    };
+    const canDelete =
+      adminRole === "super_admin" ||
+      adminRole === "admin" ||
+      adminRole === "root" ||
+      adminRole === "dev";
+    if (!canDelete) {
       return NextResponse.json(
-        { error: "Solo superadmin puede eliminar ventas" },
+        { error: "Solo administradores pueden eliminar ventas anuladas" },
         { status: 403 },
       );
     }
+
+    // Get branch context (for non-super-admin we validate order's branch access below)
+    const branchContext = await getBranchContext(request, user.id);
 
     // Get order to verify it's cancelled
     const { data: order, error: orderError } = await supabaseServiceRole
@@ -55,6 +70,19 @@ export async function DELETE(
 
     if (orderError || !order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // Non-super-admin can only delete orders in their accessible branches
+    if (!branchContext.isSuperAdmin && order.branch_id) {
+      const hasAccess = branchContext.accessibleBranches.some(
+        (b) => b.id === order.branch_id,
+      );
+      if (!hasAccess) {
+        return NextResponse.json(
+          { error: "No tienes acceso a la sucursal de esta orden" },
+          { status: 403 },
+        );
+      }
     }
 
     // Only allow deleting cancelled/refunded orders

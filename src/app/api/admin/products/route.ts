@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
       // If no branch selected, show all products from organization (no branch_id filter)
       // If search is present, branch filter will be applied in post-processing
     } else if (branchContext.isSuperAdmin) {
-      // Super admin: use branch filter if branch is selected, otherwise show all
+      // Super admin: branch selected = filter by branch; Vision Global = only user's organization
       if (currentBranchId) {
         try {
           query = query.or(`branch_id.is.null,branch_id.eq.${currentBranchId}`);
@@ -178,8 +178,9 @@ export async function GET(request: NextRequest) {
             { error },
           );
         }
+      } else if (branchContext.organizationId) {
+        query = query.eq("organization_id", branchContext.organizationId);
       }
-      // If no branch selected, super admin sees all (no filter)
     } else {
       // Fallback: no organization_id found, use branch filter only
       if (currentBranchId) {

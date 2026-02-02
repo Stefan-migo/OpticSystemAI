@@ -67,13 +67,12 @@ export async function POST(
         updateData.current_period_end = newEnd.toISOString().split("T")[0];
         break;
 
-      case "sync_stripe":
-        // Sincronizar con Stripe (placeholder - implementar según integración)
-        // Por ahora solo log
-        logger.info(`Stripe sync requested for subscription ${id}`);
+      case "sync_gateway":
+        // Sincronizar con Flow/Mercado Pago (placeholder - implementar según integración)
+        logger.info(`Gateway sync requested for subscription ${id}`);
         return NextResponse.json({
           success: true,
-          message: "Stripe sync functionality to be implemented",
+          message: "Sincronización con pasarela pendiente de implementación",
         });
 
       default:

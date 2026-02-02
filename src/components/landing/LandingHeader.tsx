@@ -66,7 +66,6 @@ export function LandingHeader() {
     { name: "Inicio", href: "#inicio" },
     { name: "Características", href: "#caracteristicas" },
     { name: "Beneficios", href: "#beneficios" },
-    { name: "Testimonios", href: "#testimonios" },
     { name: "Precios", href: "#precios" },
   ];
 

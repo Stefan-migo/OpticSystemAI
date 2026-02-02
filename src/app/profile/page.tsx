@@ -47,9 +47,11 @@ import {
   Settings,
   CreditCard,
   ArrowRight,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
+import { SubscriptionManagementSection } from "@/components/admin/SubscriptionManagementSection";
 
 // Form schemas
 const personalInfoSchema = z.object({
@@ -347,51 +349,80 @@ function ProfilePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-12 relative overflow-hidden">
+      {/* Premium Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-5%] left-[-5%] w-[30%] h-[30%] bg-primary/5 rounded-full blur-[100px] animate-premium-float" />
+        <div
+          className="absolute middle-[-10%] right-[-5%] w-[25%] h-[25%] bg-indigo-500/5 rounded-full blur-[100px] animate-premium-float"
+          style={{ animationDelay: "-3s" }}
+        />
+      </div>
+
+      <div className="max-w-6xl mx-auto relative z-10">
         {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Mi Perfil</h1>
-          <p className="text-muted-foreground">
+        <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">
+            Mi Perfil
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400 font-medium font-body">
             Gestiona tu información personal, preferencias y configuración de
-            cuenta
+            cuenta con seguridad.
           </p>
         </div>
 
-        {/* Profile Overview Card */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+        {/* Profile Hero Card */}
+        <Card
+          variant="glass"
+          rounded="lg"
+          className="mb-10 overflow-hidden border-white/40 dark:border-slate-800/50 shadow-2xl animate-in zoom-in-95 duration-500"
+        >
+          <CardContent className="p-8 md:p-10">
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-10">
               {/* Avatar Section */}
-              <div className="flex-shrink-0">
-                <AvatarUpload
-                  currentAvatarUrl={profile?.avatar_url || undefined}
-                  onUploadSuccess={handleAvatarUpload}
-                  isEditing={true}
-                  size="lg"
-                />
+              <div className="relative group">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-500 scale-75" />
+                <div className="relative z-10 p-1 bg-white dark:bg-slate-800 rounded-full shadow-xl">
+                  <AvatarUpload
+                    currentAvatarUrl={profile?.avatar_url || undefined}
+                    onUploadSuccess={handleAvatarUpload}
+                    isEditing={true}
+                    size="lg"
+                  />
+                </div>
               </div>
 
               {/* User Info */}
-              <div className="flex-1 text-center md:text-left">
-                <h2 className="text-2xl font-semibold mb-1">
-                  {profile?.first_name && profile?.last_name
-                    ? `${profile.first_name} ${profile.last_name}`
-                    : user.email}
-                </h2>
-                <p className="text-muted-foreground mb-4">{user.email}</p>
+              <div className="flex-1 text-center md:text-left space-y-4">
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-1 tracking-tight">
+                    {profile?.first_name && profile?.last_name
+                      ? `${profile.first_name} ${profile.last_name}`
+                      : user.email?.split("@")[0]}
+                  </h2>
+                  <p className="text-lg text-slate-500 dark:text-slate-400 font-medium">
+                    {user.email}
+                  </p>
+                </div>
 
                 {/* Badges */}
-                <div className="flex flex-wrap gap-2 justify-center md:justify-start mb-4">
+                <div className="flex flex-wrap gap-3 justify-center md:justify-start">
                   {profile?.is_member && (
-                    <Badge className="gap-1 bg-primary">
-                      <Sparkles className="h-3 w-3" />
-                      Miembro
+                    <Badge className="gap-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 px-4 py-1.5 rounded-full transition-all">
+                      <Sparkles className="h-4 w-4" />
+                      <span className="font-bold tracking-wide text-[10px] uppercase">
+                        MIEMBRO GOLD
+                      </span>
                     </Badge>
                   )}
-                  <Badge variant="outline" className="gap-1">
-                    <Award className="h-3 w-3" />
-                    Miembro desde {memberSince}
+                  <Badge
+                    variant="outline"
+                    className="gap-2 border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 px-4 py-1.5 rounded-full transition-all"
+                  >
+                    <Award className="h-4 w-4 text-amber-500" />
+                    <span className="text-slate-600 dark:text-slate-400 text-[10px] font-bold uppercase">
+                      Desde {memberSince}
+                    </span>
                   </Badge>
                 </div>
               </div>
@@ -403,43 +434,125 @@ function ProfilePageContent() {
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="space-y-6"
+          className="space-y-8"
         >
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
-            <TabsTrigger value="overview">Resumen</TabsTrigger>
-            <TabsTrigger value="personal">Personal</TabsTrigger>
-            <TabsTrigger value="address">Dirección</TabsTrigger>
-            <TabsTrigger value="settings">Configuración</TabsTrigger>
+          <TabsList className="p-1.5 bg-slate-200/50 dark:bg-slate-800/50 backdrop-blur-md rounded-2xl grid w-full grid-cols-2 md:grid-cols-5 gap-2">
+            {[
+              { id: "overview", label: "Resumen", icon: User },
+              { id: "personal", label: "Personal", icon: Edit3 },
+              { id: "address", label: "Dirección", icon: MapPin },
+              { id: "subscription", label: "Suscripción", icon: CreditCard },
+              { id: "settings", label: "Ajustes", icon: Settings },
+            ].map((tab) => (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="rounded-xl py-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-lg data-[state=active]:text-primary transition-all duration-300"
+              >
+                <tab.icon className="h-4 w-4 mr-2" />
+                <span className="font-bold tracking-tight">{tab.label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* Onboarding Status Card */}
+          {/* Overview Tab Content */}
+          <TabsContent
+            value="overview"
+            className="space-y-8 animate-in fade-in slide-in-from-top-2 duration-500"
+          >
+            {/* Onboarding Status - Premium Alert */}
             {!onboardingStatus.isLoading &&
               onboardingStatus.needsOnboarding && (
-                <Card className="border-blue-200 bg-blue-50">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Building2 className="h-6 w-6 text-blue-600" />
+                <Card
+                  variant="glass"
+                  className="border-primary/20 bg-primary/5 shadow-xl shadow-primary/5 overflow-hidden"
+                >
+                  <CardContent className="p-8">
+                    <div className="flex flex-col md:flex-row items-center gap-8">
+                      <div className="flex-shrink-0 relative">
+                        <div className="absolute inset-0 bg-primary/20 blur-xl animate-pulse rounded-full" />
+                        <div className="relative z-10 w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center shadow-2xl">
+                          <Building2 className="h-8 w-8 text-primary" />
                         </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                          Configura tu Óptica
+                      <div className="flex-1 text-center md:text-left">
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">
+                          Configura tu Óptica Profesional
                         </h3>
-                        <p className="text-gray-600 mb-4">
-                          Para comenzar a usar la plataforma, necesitas
-                          configurar tu organización y crear tu primera
-                          sucursal.
+                        <p className="text-slate-600 dark:text-slate-400 mb-0 font-medium font-body leading-relaxed">
+                          Desbloquea todas las herramientas especializadas
+                          configurando tu organización real. Toma menos de 2
+                          minutos.
                         </p>
+                      </div>
+                      <Button
+                        onClick={() => router.push("/onboarding/choice")}
+                        size="lg"
+                        shimmer
+                        className="whitespace-nowrap shadow-xl shadow-primary/20 font-bold"
+                      >
+                        Comenzar Ahora
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+            {/* Organization Status */}
+            {!onboardingStatus.isLoading &&
+              onboardingStatus.hasOrganization && (
+                <Card
+                  variant="elevated"
+                  className="overflow-hidden border-2 border-primary/5 shadow-2xl shadow-primary/5"
+                >
+                  <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                    <CardTitle className="flex items-center gap-3 text-2xl font-bold tracking-tight">
+                      <div className="p-2 bg-primary/10 rounded-xl">
+                        <Building2 className="h-6 w-6 text-primary" />
+                      </div>
+                      Mi Organización
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                      <div className="flex gap-10">
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                            Estado Cuenta
+                          </p>
+                          <Badge
+                            variant="healty"
+                            className="px-4 py-1 text-[10px] font-bold"
+                          >
+                            ACTIVA
+                          </Badge>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                            Plan Actual
+                          </p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            Professional Pro
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 w-full md:w-auto">
                         <Button
-                          onClick={() => router.push("/onboarding/choice")}
-                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                          variant="outline"
+                          onClick={() => router.push("/admin/settings")}
+                          className="flex-1 md:flex-none border-2 h-12"
                         >
-                          Comenzar Onboarding
-                          <ArrowRight className="ml-2 h-4 w-4" />
+                          <Settings className="h-5 w-5 mr-2" />
+                          Ajustes
+                        </Button>
+                        <Button
+                          onClick={() => router.push("/admin")}
+                          className="flex-1 md:flex-none h-12 shadow-xl shadow-primary/10"
+                          shimmer
+                        >
+                          Panel Administrativo
+                          <ArrowRight className="ml-2 h-5 w-5" />
                         </Button>
                       </div>
                     </div>
@@ -447,269 +560,289 @@ function ProfilePageContent() {
                 </Card>
               )}
 
-            {/* Organization & Subscription Card */}
-            {!onboardingStatus.isLoading &&
-              onboardingStatus.hasOrganization && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5" />
-                      Mi Organización
-                    </CardTitle>
-                    <CardDescription>
-                      Gestiona tu organización y suscripción
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Estado</p>
-                        <p className="font-medium">Activa</p>
-                      </div>
-                      <Button
-                        onClick={() => router.push("/admin")}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                      >
-                        Ir al Dashboard
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t">
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Suscripción
-                        </p>
-                        <p className="font-medium">Plan Básico</p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => router.push("/admin")}
-                      >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Configuración
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
+            <div className="grid gap-8 md:grid-cols-2">
+              <Card variant="interactive" className="group">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Información Personal
+                  <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight text-slate-800 dark:text-white group-hover:text-primary transition-colors">
+                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl group-hover:bg-primary/10 transition-colors">
+                      <User className="h-5 w-5 text-slate-600 dark:text-slate-400 group-hover:text-primary" />
+                    </div>
+                    Información Base
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div>
-                    <Label className="text-muted-foreground">Nombre</Label>
-                    <p className="font-medium">
-                      {profile?.first_name && profile?.last_name
-                        ? `${profile.first_name} ${profile.last_name}`
-                        : "No establecido"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Correo Electrónico
-                    </Label>
-                    <p className="font-medium">{user.email}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Teléfono</Label>
-                    <p className="font-medium">
-                      {profile?.phone || "No establecido"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Fecha de Nacimiento
-                    </Label>
-                    <p className="font-medium">
-                      {profile?.date_of_birth
-                        ? formatDate(profile.date_of_birth)
-                        : "No establecido"}
-                    </p>
+                <CardContent spacing="relaxed" className="p-6 pt-0">
+                  <div className="space-y-4">
+                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Nombre Completo
+                      </Label>
+                      <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                        {profile?.first_name && profile?.last_name
+                          ? `${profile.first_name} ${profile.last_name}`
+                          : "Pendiente de completar"}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Canal de Acceso
+                      </Label>
+                      <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                        {user.email}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          Teléfono
+                        </Label>
+                        <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                          {profile?.phone || "Sin registro"}
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          Cumpleaños
+                        </Label>
+                        <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                          {profile?.date_of_birth
+                            ? formatDate(profile.date_of_birth)
+                            : "Sin registro"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <Button
                     variant="outline"
-                    size="sm"
-                    className="w-full mt-4"
+                    className="w-full mt-6 border-slate-200 dark:border-slate-800 rounded-2xl font-bold h-12"
                     onClick={() => {
                       setActiveTab("personal");
                       setIsEditingPersonal(true);
                     }}
                   >
                     <Edit3 className="h-4 w-4 mr-2" />
-                    Editar Información Personal
+                    Actualizar Información
                   </Button>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card variant="interactive" className="group">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    Dirección
+                  <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight text-slate-800 dark:text-white group-hover:text-amber-500 transition-colors">
+                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl group-hover:bg-amber-500/10 transition-colors">
+                      <MapPin className="h-5 w-5 text-slate-600 dark:text-slate-400 group-hover:text-amber-500" />
+                    </div>
+                    Ubicación Principal
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div>
-                    <Label className="text-muted-foreground">Dirección</Label>
-                    <p className="font-medium">
-                      {profile?.address_line_1 || "No establecido"}
-                    </p>
-                    {profile?.address_line_2 && (
-                      <p className="font-medium">{profile.address_line_2}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Ciudad</Label>
-                    <p className="font-medium">
-                      {profile?.city || "No establecido"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">País</Label>
-                    <p className="font-medium">
-                      {profile?.country || "No establecido"}
-                    </p>
+                <CardContent spacing="relaxed" className="p-6 pt-0">
+                  <div className="space-y-4">
+                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 min-h-[84px]">
+                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Dirección Lineal
+                      </Label>
+                      <div className="mt-1">
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                          {profile?.address_line_1 || "Pendiente de completar"}
+                        </p>
+                        {profile?.address_line_2 && (
+                          <p className="text-sm font-medium text-slate-500">
+                            {profile.address_line_2}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          Ciudad
+                        </Label>
+                        <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                          {profile?.city || "—"}
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          País
+                        </Label>
+                        <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                          {profile?.country || "—"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <Button
                     variant="outline"
-                    size="sm"
-                    className="w-full mt-4"
+                    className="w-full mt-6 border-slate-200 dark:border-slate-800 rounded-2xl font-bold h-12"
                     onClick={() => {
                       setActiveTab("address");
                       setIsEditingAddress(true);
                     }}
                   >
                     <Edit3 className="h-4 w-4 mr-2" />
-                    Editar Dirección
+                    Gestionar Dirección
                   </Button>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          {/* Personal Information Tab */}
-          <TabsContent value="personal">
-            <Card>
-              <CardHeader>
+          {/* Personal Information Tab Content */}
+          <TabsContent
+            value="personal"
+            className="animate-in fade-in slide-in-from-top-2 duration-500"
+          >
+            <Card variant="elevated" className="border-0 shadow-2xl">
+              <CardHeader
+                padding="lg"
+                className="border-b border-slate-100 dark:border-slate-800"
+              >
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Información Personal</CardTitle>
-                    <CardDescription>
-                      Actualiza tus datos personales y biografía
-                    </CardDescription>
-                  </div>
+                  <CardTitle size="lg" theme="modern">
+                    Datos Personales
+                  </CardTitle>
                   {!isEditingPersonal && (
                     <Button
-                      variant="outline"
                       onClick={() => setIsEditingPersonal(true)}
+                      variant="outline"
+                      className="border-2 font-bold px-6"
                     >
                       <Edit3 className="h-4 w-4 mr-2" />
-                      Editar
+                      Editar Información
                     </Button>
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent padding="lg">
                 <form
                   onSubmit={personalForm.handleSubmit(handlePersonalInfoSubmit)}
-                  className="space-y-4"
+                  className="space-y-8"
                 >
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">
-                        Nombre <span className="text-destructive">*</span>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-3">
+                      <Label
+                        htmlFor="firstName"
+                        className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                      >
+                        Nombre <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         id="firstName"
                         {...personalForm.register("firstName")}
                         disabled={!isEditingPersonal || isLoading}
+                        className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
                       />
                       {personalForm.formState.errors.firstName && (
-                        <p className="text-sm text-destructive">
+                        <p className="text-xs font-medium text-red-500 flex items-center gap-1">
+                          <XCircle className="h-3 w-3" />{" "}
                           {personalForm.formState.errors.firstName.message}
                         </p>
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">
-                        Apellido <span className="text-destructive">*</span>
+                    <div className="space-y-3">
+                      <Label
+                        htmlFor="lastName"
+                        className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                      >
+                        Apellido <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         id="lastName"
                         {...personalForm.register("lastName")}
                         disabled={!isEditingPersonal || isLoading}
+                        className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
                       />
                       {personalForm.formState.errors.lastName && (
-                        <p className="text-sm text-destructive">
+                        <p className="text-xs font-medium text-red-500 flex items-center gap-1">
+                          <XCircle className="h-3 w-3" />{" "}
                           {personalForm.formState.errors.lastName.message}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Teléfono</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      {...personalForm.register("phone")}
-                      disabled={!isEditingPersonal || isLoading}
-                    />
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-3">
+                      <Label
+                        htmlFor="phone"
+                        className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                      >
+                        Teléfono
+                      </Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        {...personalForm.register("phone")}
+                        disabled={!isEditingPersonal || isLoading}
+                        className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label
+                        htmlFor="dateOfBirth"
+                        className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                      >
+                        Fecha de Nacimiento
+                      </Label>
+                      <Input
+                        id="dateOfBirth"
+                        type="date"
+                        {...personalForm.register("dateOfBirth")}
+                        disabled={!isEditingPersonal || isLoading}
+                        className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="dateOfBirth">Fecha de Nacimiento</Label>
-                    <Input
-                      id="dateOfBirth"
-                      type="date"
-                      {...personalForm.register("dateOfBirth")}
-                      disabled={!isEditingPersonal || isLoading}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bio">Biografía</Label>
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="bio"
+                      className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                    >
+                      Biografía
+                    </Label>
                     <Textarea
                       id="bio"
                       {...personalForm.register("bio")}
                       disabled={!isEditingPersonal || isLoading}
-                      rows={4}
-                      placeholder="Cuéntanos sobre ti..."
+                      rows={5}
+                      placeholder="Cuéntanos un poco sobre ti, tu rol en la óptica, etc."
+                      className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10 rounded-2xl p-4"
                     />
                     {personalForm.formState.errors.bio && (
-                      <p className="text-sm text-destructive">
+                      <p className="text-xs font-medium text-red-500">
                         {personalForm.formState.errors.bio.message}
                       </p>
                     )}
                   </div>
 
                   {isEditingPersonal && (
-                    <div className="flex gap-2">
-                      <Button type="submit" disabled={isLoading}>
+                    <div className="flex gap-4 pt-4">
+                      <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="flex-1 h-12 shadow-xl shadow-primary/20"
+                        shimmer
+                      >
                         {isLoading ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                         ) : (
-                          <Save className="h-4 w-4 mr-2" />
+                          <Save className="h-5 w-5 mr-2" />
                         )}
                         Guardar Cambios
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
+                        className="flex-1 h-12 border-2"
                         onClick={() => {
                           setIsEditingPersonal(false);
                           personalForm.reset();
                         }}
                         disabled={isLoading}
                       >
-                        <X className="h-4 w-4 mr-2" />
+                        <X className="h-5 w-5 mr-2" />
                         Cancelar
                       </Button>
                     </div>
@@ -719,111 +852,161 @@ function ProfilePageContent() {
             </Card>
           </TabsContent>
 
-          {/* Address Tab */}
-          <TabsContent value="address">
-            <Card>
-              <CardHeader>
+          {/* Address Tab Content */}
+          <TabsContent
+            value="address"
+            className="animate-in fade-in slide-in-from-top-2 duration-500"
+          >
+            <Card variant="elevated" className="border-0 shadow-2xl">
+              <CardHeader
+                padding="lg"
+                className="border-b border-slate-100 dark:border-slate-800"
+              >
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Dirección de Envío</CardTitle>
-                    <CardDescription>
-                      Actualiza tu información de dirección
-                    </CardDescription>
-                  </div>
+                  <CardTitle size="lg" theme="modern">
+                    Dirección de Envío / Oficina
+                  </CardTitle>
                   {!isEditingAddress && (
                     <Button
-                      variant="outline"
                       onClick={() => setIsEditingAddress(true)}
+                      variant="outline"
+                      className="border-2 font-bold px-6"
                     >
                       <Edit3 className="h-4 w-4 mr-2" />
-                      Editar
+                      Editar Dirección
                     </Button>
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent padding="lg">
                 <form
                   onSubmit={addressForm.handleSubmit(handleAddressSubmit)}
-                  className="space-y-4"
+                  className="space-y-8"
                 >
-                  <div className="space-y-2">
-                    <Label htmlFor="addressLine1">Dirección Línea 1</Label>
-                    <Input
-                      id="addressLine1"
-                      {...addressForm.register("addressLine1")}
-                      disabled={!isEditingAddress || isLoading}
-                    />
-                  </div>
+                  <div className="grid gap-8">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor="addressLine1"
+                          className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                        >
+                          Dirección Línea 1
+                        </Label>
+                        <Input
+                          id="addressLine1"
+                          {...addressForm.register("addressLine1")}
+                          disabled={!isEditingAddress || isLoading}
+                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                        />
+                      </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="addressLine2">Dirección Línea 2</Label>
-                    <Input
-                      id="addressLine2"
-                      {...addressForm.register("addressLine2")}
-                      disabled={!isEditingAddress || isLoading}
-                    />
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">Ciudad</Label>
-                      <Input
-                        id="city"
-                        {...addressForm.register("city")}
-                        disabled={!isEditingAddress || isLoading}
-                      />
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor="addressLine2"
+                          className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                        >
+                          Dirección Línea 2
+                        </Label>
+                        <Input
+                          id="addressLine2"
+                          {...addressForm.register("addressLine2")}
+                          disabled={!isEditingAddress || isLoading}
+                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="state">Región/Provincia</Label>
-                      <Input
-                        id="state"
-                        {...addressForm.register("state")}
-                        disabled={!isEditingAddress || isLoading}
-                      />
-                    </div>
-                  </div>
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor="city"
+                          className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                        >
+                          Ciudad
+                        </Label>
+                        <Input
+                          id="city"
+                          {...addressForm.register("city")}
+                          disabled={!isEditingAddress || isLoading}
+                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                        />
+                      </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="postalCode">Código Postal</Label>
-                      <Input
-                        id="postalCode"
-                        {...addressForm.register("postalCode")}
-                        disabled={!isEditingAddress || isLoading}
-                      />
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor="state"
+                          className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                        >
+                          Región / Provincia
+                        </Label>
+                        <Input
+                          id="state"
+                          {...addressForm.register("state")}
+                          disabled={!isEditingAddress || isLoading}
+                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="country">País</Label>
-                      <Input
-                        id="country"
-                        {...addressForm.register("country")}
-                        disabled={!isEditingAddress || isLoading}
-                      />
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor="postalCode"
+                          className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                        >
+                          Código Postal
+                        </Label>
+                        <Input
+                          id="postalCode"
+                          {...addressForm.register("postalCode")}
+                          disabled={!isEditingAddress || isLoading}
+                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor="country"
+                          className="text-sm font-bold text-slate-700 dark:text-slate-300"
+                        >
+                          País
+                        </Label>
+                        <Input
+                          id="country"
+                          {...addressForm.register("country")}
+                          disabled={!isEditingAddress || isLoading}
+                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                        />
+                      </div>
                     </div>
                   </div>
 
                   {isEditingAddress && (
-                    <div className="flex gap-2">
-                      <Button type="submit" disabled={isLoading}>
+                    <div className="flex gap-4 pt-4">
+                      <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="flex-1 h-12 shadow-xl shadow-primary/20"
+                        shimmer
+                      >
                         {isLoading ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                         ) : (
-                          <Save className="h-4 w-4 mr-2" />
+                          <Save className="h-5 w-5 mr-2" />
                         )}
-                        Guardar Cambios
+                        Guardar Dirección
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
+                        className="flex-1 h-12 border-2"
                         onClick={() => {
                           setIsEditingAddress(false);
                           addressForm.reset();
                         }}
                         disabled={isLoading}
                       >
-                        <X className="h-4 w-4 mr-2" />
+                        <X className="h-5 w-5 mr-2" />
                         Cancelar
                       </Button>
                     </div>
@@ -833,145 +1016,190 @@ function ProfilePageContent() {
             </Card>
           </TabsContent>
 
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-6">
-            {/* Password Change */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="h-5 w-5" />
-                  Cambiar Contraseña
+          {/* Subscription Tab Content */}
+          <TabsContent
+            value="subscription"
+            className="space-y-8 animate-in fade-in slide-in-from-top-2 duration-500"
+          >
+            <SubscriptionManagementSection />
+          </TabsContent>
+
+          {/* Settings Tab Content */}
+          <TabsContent
+            value="settings"
+            className="space-y-8 animate-in fade-in slide-in-from-top-2 duration-500"
+          >
+            {/* Password Change Card */}
+            <Card
+              variant="elevated"
+              className="border-0 shadow-2xl overflow-hidden"
+            >
+              <CardHeader
+                padding="lg"
+                className="bg-slate-50 dark:bg-slate-800/20 border-b border-slate-100 dark:border-slate-800"
+              >
+                <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight">
+                  <div className="p-2 bg-primary/10 rounded-xl">
+                    <Lock className="h-5 w-5 text-primary" />
+                  </div>
+                  Seguridad de la Cuenta
                 </CardTitle>
                 <CardDescription>
-                  Actualiza tu contraseña para mantener tu cuenta segura
+                  Administra tu contraseña y métodos de acceso.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent padding="lg">
                 {!isChangingPassword ? (
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsChangingPassword(true)}
-                  >
-                    Cambiar Contraseña
-                  </Button>
+                  <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-white">
+                        Contraseña
+                      </h4>
+                      <p className="text-sm text-slate-500 tracking-widest mt-1">
+                        ••••••••••••••••
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsChangingPassword(true)}
+                      className="border-2 font-bold"
+                    >
+                      Cambiar Contraseña
+                    </Button>
+                  </div>
                 ) : (
                   <form
                     onSubmit={passwordForm.handleSubmit(handlePasswordChange)}
-                    className="space-y-4"
+                    className="space-y-6 max-w-xl"
                   >
-                    <div className="space-y-2">
-                      <Label htmlFor="currentPassword">Contraseña Actual</Label>
+                    <div className="space-y-3">
+                      <Label
+                        htmlFor="currentPassword"
+                        className="text-sm font-bold"
+                      >
+                        Contraseña Actual
+                      </Label>
                       <div className="relative">
                         <Input
                           id="currentPassword"
                           type={showCurrentPassword ? "text" : "password"}
                           {...passwordForm.register("currentPassword")}
                           disabled={isLoading}
+                          className="h-12 pr-12 rounded-2xl border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
                         />
                         <Button
                           type="button"
                           variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3"
+                          size="icon"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-transparent"
                           onClick={() =>
                             setShowCurrentPassword(!showCurrentPassword)
                           }
                         >
                           {showCurrentPassword ? (
-                            <EyeOff className="h-4 w-4" />
+                            <EyeOff className="h-4 w-4 text-slate-400" />
                           ) : (
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4 text-slate-400" />
                           )}
                         </Button>
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">Nueva Contraseña</Label>
-                      <div className="relative">
-                        <Input
-                          id="newPassword"
-                          type={showNewPassword ? "text" : "password"}
-                          {...passwordForm.register("newPassword")}
-                          disabled={isLoading}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor="newPassword"
+                          className="text-sm font-bold"
                         >
-                          {showNewPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      {passwordForm.formState.errors.newPassword && (
-                        <p className="text-sm text-destructive">
-                          {passwordForm.formState.errors.newPassword.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">
-                        Confirmar Nueva Contraseña
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          {...passwordForm.register("confirmPassword")}
-                          disabled={isLoading}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3"
-                          onClick={() =>
-                            setShowConfirmPassword(!showConfirmPassword)
-                          }
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      {passwordForm.formState.errors.confirmPassword && (
-                        <p className="text-sm text-destructive">
-                          {
-                            passwordForm.formState.errors.confirmPassword
-                              .message
-                          }
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button type="submit" disabled={isLoading}>
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4 mr-2" />
+                          Nueva Contraseña
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="newPassword"
+                            type={showNewPassword ? "text" : "password"}
+                            {...passwordForm.register("newPassword")}
+                            disabled={isLoading}
+                            className="h-12 pr-12 rounded-2xl border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-transparent"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                          >
+                            {showNewPassword ? (
+                              <EyeOff className="h-4 w-4 text-slate-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-slate-400" />
+                            )}
+                          </Button>
+                        </div>
+                        {passwordForm.formState.errors.newPassword && (
+                          <p className="text-xs font-medium text-red-500">
+                            {passwordForm.formState.errors.newPassword.message}
+                          </p>
                         )}
-                        Actualizar Contraseña
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor="confirmPassword"
+                          className="text-sm font-bold"
+                        >
+                          Confirmar Nueva
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="confirmPassword"
+                            type={showConfirmPassword ? "text" : "password"}
+                            {...passwordForm.register("confirmPassword")}
+                            disabled={isLoading}
+                            className="h-12 pr-12 rounded-2xl border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-transparent"
+                            onClick={() =>
+                              setShowConfirmPassword(!showConfirmPassword)
+                            }
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4 text-slate-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-slate-400" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4 pt-4">
+                      <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="flex-1 h-12 shadow-xl shadow-primary/20"
+                        shimmer
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Save className="h-5 w-5 mr-2" />
+                        )}
+                        Actualizar Ahora
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
+                        className="flex-1 h-12 border-2"
                         onClick={() => {
                           setIsChangingPassword(false);
                           passwordForm.reset();
                         }}
                         disabled={isLoading}
                       >
-                        <X className="h-4 w-4 mr-2" />
                         Cancelar
                       </Button>
                     </div>
@@ -980,57 +1208,76 @@ function ProfilePageContent() {
               </CardContent>
             </Card>
 
-            {/* Preferences */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-5 w-5" />
-                  Preferencias
+            {/* Preferences Card */}
+            <Card
+              variant="elevated"
+              className="border-0 shadow-2xl overflow-hidden"
+            >
+              <CardHeader
+                padding="lg"
+                className="bg-slate-50 dark:bg-slate-800/20 border-b border-slate-100 dark:border-slate-800"
+              >
+                <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight">
+                  <div className="p-2 bg-amber-500/10 rounded-xl">
+                    <Bell className="h-5 w-5 text-amber-500" />
+                  </div>
+                  Personalización
                 </CardTitle>
                 <CardDescription>
-                  Gestiona las preferencias de tu cuenta
+                  Ajusta el sistema a tus necesidades regionales.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="timezone">Zona Horaria</Label>
-                  <Select
-                    value={preferences.timezone}
-                    onValueChange={(value) =>
-                      setPreferences((prev) => ({ ...prev, timezone: value }))
-                    }
-                  >
-                    <SelectTrigger id="timezone">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="America/Santiago">
-                        Santiago, Chile (GMT-3)
-                      </SelectItem>
-                      <SelectItem value="America/Argentina/Buenos_Aires">
-                        Buenos Aires, Argentina (GMT-3)
-                      </SelectItem>
-                      <SelectItem value="America/Lima">
-                        Lima, Perú (GMT-5)
-                      </SelectItem>
-                      <SelectItem value="America/Bogota">
-                        Bogotá, Colombia (GMT-5)
-                      </SelectItem>
-                      <SelectItem value="America/Mexico_City">
-                        Ciudad de México, México (GMT-6)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <CardContent padding="lg" spacing="relaxed">
+                <div className="space-y-4 max-w-md">
+                  <div className="space-y-3">
+                    <Label htmlFor="timezone" className="text-sm font-bold">
+                      Zona Horaria Regional
+                    </Label>
+                    <Select
+                      value={preferences.timezone}
+                      onValueChange={(value) =>
+                        setPreferences((prev) => ({ ...prev, timezone: value }))
+                      }
+                    >
+                      <SelectTrigger
+                        id="timezone"
+                        className="h-12 rounded-2xl border-slate-200 dark:border-slate-800"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800">
+                        <SelectItem value="America/Santiago">
+                          Santiago, Chile (GMT-3)
+                        </SelectItem>
+                        <SelectItem value="America/Argentina/Buenos_Aires">
+                          Buenos Aires, Argentina (GMT-3)
+                        </SelectItem>
+                        <SelectItem value="America/Lima">
+                          Lima, Perú (GMT-5)
+                        </SelectItem>
+                        <SelectItem value="America/Bogota">
+                          Bogotá, Colombia (GMT-5)
+                        </SelectItem>
+                        <SelectItem value="America/Mexico_City">
+                          CDMX, México (GMT-6)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <Button onClick={handlePreferencesUpdate} disabled={isLoading}>
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Guardar Preferencias
-                </Button>
+                  <Button
+                    onClick={handlePreferencesUpdate}
+                    className="w-full h-12 shadow-xl shadow-amber-500/20"
+                    shimmer
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Save className="h-5 w-5 mr-2" />
+                    )}
+                    Guardar Preferencias
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   Loader2,
   Sparkles,
@@ -27,6 +28,14 @@ export default function OnboardingChoicePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasOrganization, setHasOrganization] = useState<boolean | null>(null);
+
+  // Redirigir a login si no hay usuario (en efecto, no durante render)
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
 
   // Verificar si el usuario ya tiene organización
   useEffect(() => {
@@ -92,83 +101,118 @@ export default function OnboardingChoicePage() {
     );
   }
 
-  // Si no está autenticado, redirigir a login
+  // Si no está autenticado, mostrar nada mientras el useEffect redirige
   if (!user) {
-    router.push("/login");
     return null;
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
-      <div className="w-full max-w-4xl">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 relative overflow-hidden px-4 py-12">
+      {/* Premium Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] animate-premium-float" />
+        <div
+          className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px] animate-premium-float"
+          style={{ animationDelay: "-2s" }}
+        />
+        <div
+          className="absolute top-1/4 right-[15%] w-64 h-64 bg-blue-400/5 rounded-full blur-[80px] animate-premium-float"
+          style={{ animationDelay: "-4s" }}
+        />
+      </div>
+
+      <div className="w-full max-w-4xl relative z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg mb-4">
-            <Building2 className="h-8 w-8 text-white" />
+        <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl mb-6 relative group">
+            <div className="absolute inset-0 bg-primary/10 rounded-[2rem] scale-90 group-hover:scale-110 transition-transform duration-500" />
+            <Building2 className="h-10 w-10 text-primary relative z-10" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Bienvenido a Opttius
+          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight">
+            Bienvenido a{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-600">
+              Opttius
+            </span>
           </h1>
-          <p className="text-gray-600 text-lg">Elige cómo quieres empezar</p>
+          <p className="text-slate-600 dark:text-slate-400 text-lg max-w-xl mx-auto">
+            Estamos listos para transformar tu óptica. Elige cómo te gustaría
+            comenzar tu experiencia.
+          </p>
         </div>
 
         {error && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert
+            variant="destructive"
+            className="mb-8 animate-in zoom-in-95 duration-300"
+          >
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         {/* Choice Cards */}
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-8 h-full">
           {/* Demo Option */}
-          <Card className="border-2 hover:border-blue-500 transition-all cursor-pointer">
-            <CardHeader>
-              <div className="flex items-center justify-between mb-2">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <Sparkles className="h-6 w-6 text-blue-600" />
+          <Card
+            variant="interactive"
+            shimmer
+            className="flex flex-col h-full group"
+          >
+            <CardHeader padding="lg">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-4 bg-primary/10 rounded-2xl group-hover:scale-110 transition-transform duration-500">
+                  <Sparkles className="h-8 w-8 text-primary" />
                 </div>
-                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                <Badge className="bg-primary/10 text-primary border-none px-3 py-1 font-bold text-[10px] tracking-wider uppercase">
                   RECOMENDADO
-                </span>
+                </Badge>
               </div>
-              <CardTitle className="text-xl">Explorar con datos demo</CardTitle>
-              <CardDescription className="text-base mt-2">
-                Accede al sistema con datos pre-cargados para explorar todas las
-                funcionalidades antes de configurar tu propia óptica.
+              <CardTitle
+                size="lg"
+                theme="sophisticated"
+                className="text-2xl group-hover:text-primary transition-colors"
+              >
+                Explorar con datos demo
+              </CardTitle>
+              <CardDescription size="lg" className="mt-4 leading-relaxed">
+                Accede al sistema con una óptica pre-configurada. Ideal para
+                conocer todas las herramientas en segundos.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                <li className="flex items-start">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Dashboard con gráficas y datos realistas</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Clientes, citas y órdenes de ejemplo</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>
-                    Puedes activar tu óptica real en cualquier momento
-                  </span>
-                </li>
-              </ul>
+            <CardContent className="flex-1" padding="lg" spacing="relaxed">
+              <div className="space-y-4 mb-8">
+                {[
+                  "Dashboard con analíticas realistas",
+                  "Catálogo de productos e inventario",
+                  "Flujo completo de ventas y agenda",
+                  "Sin compromiso, activa tu óptica real luego",
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="mt-1 bg-green-500/10 rounded-full p-0.5">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    </div>
+                    <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                      {item}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
               <Button
                 onClick={handleDemoChoice}
                 disabled={isLoading}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                 size="lg"
+                className="w-full shadow-xl shadow-primary/20"
+                shimmer
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Asignando...
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Asignando entorno...
                   </>
                 ) : (
                   <>
-                    Explorar con datos demo
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    Comenzar con Demo
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
               </Button>
@@ -176,57 +220,74 @@ export default function OnboardingChoicePage() {
           </Card>
 
           {/* Real Option */}
-          <Card className="border-2 hover:border-indigo-500 transition-all cursor-pointer">
-            <CardHeader>
-              <div className="p-3 bg-indigo-100 rounded-lg w-fit mb-2">
-                <Building2 className="h-6 w-6 text-indigo-600" />
+          <Card
+            variant="interactive"
+            shimmer
+            className="flex flex-col h-full group"
+          >
+            <CardHeader padding="lg">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-4 bg-primary/10 rounded-2xl group-hover:scale-110 transition-transform duration-500">
+                  <Building2 className="h-8 w-8 text-primary" />
+                </div>
+                <Badge className="bg-primary/10 text-primary border-none px-3 py-1 font-bold text-[10px] tracking-wider uppercase">
+                  PERSONALIZADO
+                </Badge>
               </div>
-              <CardTitle className="text-xl">
-                Configurar mi óptica desde cero
+              <CardTitle
+                size="lg"
+                theme="sophisticated"
+                className="text-2xl group-hover:text-primary transition-colors"
+              >
+                Configurar mi óptica
               </CardTitle>
-              <CardDescription className="text-base mt-2">
-                Crea tu organización y configura tu primera sucursal para
-                empezar a trabajar inmediatamente con tus propios datos.
+              <CardDescription size="lg" className="mt-4 leading-relaxed">
+                Empieza hoy mismo con tu propia información. Configura tu marca,
+                sucursales y equipo.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                <li className="flex items-start">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Configuración personalizada de tu óptica</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Crea tu primera sucursal durante el onboarding</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Empieza a trabajar con tus propios datos</span>
-                </li>
-              </ul>
+            <CardContent className="flex-1" padding="lg" spacing="relaxed">
+              <div className="space-y-4 mb-8">
+                {[
+                  "Identificador único para tu óptica",
+                  "Configuración de tu primera sucursal",
+                  "Personalización de marca y preferencias",
+                  "Listo para vender desde el primer día",
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="mt-1 bg-green-500/10 rounded-full p-0.5">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    </div>
+                    <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                      {item}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
               <Button
                 onClick={handleRealChoice}
                 disabled={isLoading}
-                variant="outline"
-                className="w-full border-2 hover:bg-indigo-50"
                 size="lg"
+                className="w-full shadow-xl shadow-primary/20"
+                shimmer
               >
-                Configurar mi óptica
-                <ArrowRight className="ml-2 h-4 w-4" />
+                Configurar Organización
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </CardContent>
           </Card>
         </div>
 
         {/* Footer */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
-            ¿Necesitas ayuda?{" "}
+        <div className="mt-12 text-center animate-in fade-in duration-1000 delay-500">
+          <p className="text-sm text-slate-500 dark:text-slate-500 flex items-center justify-center gap-2">
+            ¿Tienes dudas sobre los planes?{" "}
             <Link
               href="/support"
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="text-primary hover:text-primary/80 font-bold hover:underline transition-all"
             >
-              Contacta soporte
+              Contacta con nosotros
             </Link>
           </p>
         </div>

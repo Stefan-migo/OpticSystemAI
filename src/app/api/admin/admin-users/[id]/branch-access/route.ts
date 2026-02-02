@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { createServiceRoleClient } from "@/utils/supabase/service-role";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type {
@@ -41,8 +42,9 @@ export async function GET(
       );
     }
 
-    // Get branch access for the admin user
-    const { data: branchAccess, error } = await supabase
+    // Use service role so admins can view any user's branch access (RLS only allows viewing own)
+    const supabaseServiceRole = createServiceRoleClient();
+    const { data: branchAccess, error } = await supabaseServiceRole
       .from("admin_branch_access")
       .select(
         `
@@ -145,16 +147,17 @@ export async function POST(
       );
     }
 
+    // Use service role for writes (RLS on admin_branch_access only allows super_admin to INSERT/UPDATE/DELETE)
+    const supabaseServiceRole = createServiceRoleClient();
+
     // If assigning super admin (branch_id = null), remove all other access
     if (branch_id === null) {
-      // Delete all existing access
-      await supabase
+      await supabaseServiceRole
         .from("admin_branch_access")
         .delete()
         .eq("admin_user_id", id);
 
-      // Create super admin access
-      const { data: newAccess, error: insertError } = await supabase
+      const { data: newAccess, error: insertError } = await supabaseServiceRole
         .from("admin_branch_access")
         .insert({
           admin_user_id: id,
@@ -171,7 +174,10 @@ export async function POST(
           adminUserId: id,
         });
         return NextResponse.json(
-          { error: "Failed to assign super admin access" },
+          {
+            error: "Failed to assign super admin access",
+            details: insertError.message,
+          },
           { status: 500 },
         );
       }
@@ -192,14 +198,14 @@ export async function POST(
 
     // If setting as primary, unset other primary flags
     if (is_primary) {
-      await supabase
+      await supabaseServiceRole
         .from("admin_branch_access")
         .update({ is_primary: false })
         .eq("admin_user_id", id);
     }
 
-    // Upsert branch access
-    const { data: branchAccess, error: upsertError } = await supabase
+    // Upsert branch access (service role bypasses RLS)
+    const { data: branchAccess, error: upsertError } = await supabaseServiceRole
       .from("admin_branch_access")
       .upsert(
         {
@@ -222,7 +228,10 @@ export async function POST(
         branchId: branch_id,
       });
       return NextResponse.json(
-        { error: "Failed to assign branch access" },
+        {
+          error: "Failed to assign branch access",
+          details: upsertError.message,
+        },
         { status: 500 },
       );
     }
@@ -289,12 +298,16 @@ export async function DELETE(
       );
     }
 
-    // Delete branch access
-    const { error: deleteError } = await supabase
+    const supabaseServiceRole = createServiceRoleClient();
+    const deleteQuery = supabaseServiceRole
       .from("admin_branch_access")
       .delete()
-      .eq("admin_user_id", id)
-      .eq("branch_id", branch_id);
+      .eq("admin_user_id", id);
+
+    const { error: deleteError } =
+      branch_id === "null"
+        ? await deleteQuery.is("branch_id", null)
+        : await deleteQuery.eq("branch_id", branch_id);
 
     if (deleteError) {
       logger.error("Error removing branch access:", {

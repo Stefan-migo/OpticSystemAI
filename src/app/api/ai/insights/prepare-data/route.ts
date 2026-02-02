@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
           ordersQuery,
           branchContext.branchId,
           branchContext.isSuperAdmin,
+          branchContext.organizationId,
         );
 
         const { data: orders } = await ordersQuery;
@@ -131,6 +132,8 @@ export async function GET(request: NextRequest) {
         workOrdersQuery = addBranchFilter(
           workOrdersQuery,
           branchContext.branchId,
+          branchContext.isSuperAdmin,
+          branchContext.organizationId,
         );
 
         const { data: workOrders } = await workOrdersQuery;
@@ -156,6 +159,7 @@ export async function GET(request: NextRequest) {
           quotesQuery,
           branchContext.branchId,
           branchContext.isSuperAdmin,
+          branchContext.organizationId,
         );
 
         const { data: quotes } = await quotesQuery;
@@ -180,6 +184,7 @@ export async function GET(request: NextRequest) {
           productsQuery,
           branchContext.branchId,
           branchContext.isSuperAdmin,
+          branchContext.organizationId,
         );
 
         const { data: products } = await productsQuery;
@@ -267,6 +272,8 @@ export async function GET(request: NextRequest) {
         customersQuery = addBranchFilter(
           customersQuery,
           branchContext.branchId,
+          branchContext.isSuperAdmin,
+          branchContext.organizationId,
         );
 
         const { data: customers } = await customersQuery;
@@ -354,6 +361,7 @@ export async function GET(request: NextRequest) {
           ordersQuery,
           branchContext.branchId,
           branchContext.isSuperAdmin,
+          branchContext.organizationId,
         );
 
         const { data: orders } = await ordersQuery;

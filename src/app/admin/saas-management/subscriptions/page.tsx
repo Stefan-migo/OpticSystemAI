@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   CreditCard,
-  Search,
   Eye,
   MoreVertical,
   CheckCircle2,
@@ -42,7 +41,19 @@ import {
   Play,
   Ban,
   ArrowLeft,
+  Plus,
+  Trash2,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
@@ -55,8 +66,8 @@ interface Subscription {
   current_period_end?: string;
   cancel_at?: string;
   canceled_at?: string;
-  stripe_subscription_id?: string;
-  stripe_customer_id?: string;
+  gateway_subscription_id?: string;
+  gateway_customer_id?: string;
   created_at: string;
   daysUntilExpiry?: number | null;
   isExpiringSoon?: boolean;
@@ -92,6 +103,17 @@ export default function SubscriptionsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Crear suscripción
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createOrgId, setCreateOrgId] = useState("");
+  const [createStatus, setCreateStatus] = useState("trialing");
+  const [createTrialDays, setCreateTrialDays] = useState("7");
+  const [createLoading, setCreateLoading] = useState(false);
+
+  // Eliminar
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     fetchOrganizations();
@@ -179,6 +201,67 @@ export default function SubscriptionsPage() {
     }
   };
 
+  const handleCreate = async () => {
+    const orgId = createOrgId?.trim();
+    if (!orgId) {
+      toast.error("Selecciona una organización.");
+      return;
+    }
+    const trialDaysNum = parseInt(createTrialDays, 10);
+    if (isNaN(trialDaysNum) || trialDaysNum < 1) {
+      toast.error("Días de prueba debe ser un número mayor a 0.");
+      return;
+    }
+    setCreateLoading(true);
+    try {
+      const res = await fetch("/api/admin/saas-management/subscriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organization_id: orgId,
+          status: createStatus,
+          trial_days: trialDaysNum,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al crear suscripción");
+      toast.success("Suscripción creada.");
+      setCreateOpen(false);
+      setCreateOrgId("");
+      setCreateStatus("trialing");
+      setCreateTrialDays("7");
+      fetchSubscriptions();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleDelete = async (subscriptionId: string) => {
+    if (
+      !confirm("¿Eliminar esta suscripción? Esta acción no se puede deshacer.")
+    )
+      return;
+    setDeleteId(subscriptionId);
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/saas-management/subscriptions/${subscriptionId}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al eliminar");
+      toast.success("Suscripción eliminada.");
+      fetchSubscriptions();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setDeleteId(null);
+      setDeleteLoading(false);
+    }
+  };
+
   const getStatusBadge = (
     status: string,
     isExpiringSoon?: boolean,
@@ -260,23 +343,95 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push("/admin/saas-management/dashboard")}
-          title="Volver al dashboard"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold text-azul-profundo">
-            Gestión de Suscripciones
-          </h1>
-          <p className="text-tierra-media mt-2">
-            Administra todas las suscripciones del sistema
-          </p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push("/admin/saas-management/dashboard")}
+            title="Volver al dashboard"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-azul-profundo">
+              Gestión de Suscripciones
+            </h1>
+            <p className="text-tierra-media mt-2">
+              Administra todas las suscripciones del sistema
+            </p>
+          </div>
         </div>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva suscripción
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nueva suscripción</DialogTitle>
+              <DialogDescription>
+                Crea una suscripción para una organización. Se asignará período
+                de prueba según los días indicados.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label>Organización</Label>
+                <Select value={createOrgId} onValueChange={setCreateOrgId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona organización" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name} ({org.slug})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Estado</Label>
+                <Select value={createStatus} onValueChange={setCreateStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="trialing">Trial</SelectItem>
+                    <SelectItem value="active">Activa</SelectItem>
+                    <SelectItem value="past_due">Vencida</SelectItem>
+                    <SelectItem value="incomplete">Incompleta</SelectItem>
+                    <SelectItem value="cancelled">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="trial_days">Días de prueba (si es trial)</Label>
+                <Input
+                  id="trial_days"
+                  type="number"
+                  min={1}
+                  value={createTrialDays}
+                  onChange={(e) => setCreateTrialDays(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreate} disabled={createLoading}>
+                {createLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                Crear
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Alertas */}
@@ -442,9 +597,9 @@ export default function SubscriptionsPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {sub.stripe_subscription_id ? (
+                        {sub.gateway_subscription_id ? (
                           <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                            {sub.stripe_subscription_id.substring(0, 20)}...
+                            {sub.gateway_subscription_id.substring(0, 20)}...
                           </code>
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -486,6 +641,15 @@ export default function SubscriptionsPage() {
                                 Cancelar
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDelete(sub.id)}
+                              disabled={deleteId === sub.id && deleteLoading}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Eliminar
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

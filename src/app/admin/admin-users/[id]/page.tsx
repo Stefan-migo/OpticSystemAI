@@ -211,7 +211,7 @@ export default function AdminUserDetailPage() {
             </p>
           </div>
           <Link href={`/admin/admin-users/${adminId}/edit`}>
-            <Button>Editar Administrador</Button>
+            <Button>Editar Usuario</Button>
           </Link>
         </div>
       </div>

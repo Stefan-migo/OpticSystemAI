@@ -366,41 +366,62 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // MEJORA: Asignación de sucursal opcional (no automática)
-    // Si se proporciona branch_id en el body, asignar acceso
-    // Si no se proporciona y hay sucursales, permitir selección manual después
+    // Asignación de sucursal cuando se proporciona branch_id
     if (branch_id && organizationId) {
-      // Verificar que la sucursal pertenece a la organización
-      const { data: branch } = await supabaseServiceRole
-        .from("branches")
-        .select("id, organization_id")
-        .eq("id", branch_id)
-        .eq("organization_id", organizationId)
-        .single();
+      const branchId =
+        typeof branch_id === "string" && branch_id.trim() !== ""
+          ? branch_id.trim()
+          : null;
+      if (branchId) {
+        const { data: branch, error: branchError } = await supabaseServiceRole
+          .from("branches")
+          .select("id, organization_id")
+          .eq("id", branchId)
+          .eq("organization_id", organizationId)
+          .maybeSingle();
 
-      if (!branch) {
-        // No hacer rollback, solo log warning
-        logger.warn(
-          `Branch ${branch_id} does not belong to organization ${organizationId}`,
-        );
-      } else {
-        // Asignar acceso a la sucursal especificada
+        if (branchError) {
+          logger.error("Error checking branch", branchError);
+          return NextResponse.json(
+            {
+              error: "Error al verificar la sucursal",
+              details: branchError.message,
+            },
+            { status: 500 },
+          );
+        }
+        if (!branch) {
+          return NextResponse.json(
+            {
+              error:
+                "La sucursal no existe o no pertenece a tu organización. Elige otra sucursal.",
+            },
+            { status: 400 },
+          );
+        }
+
         const { error: accessError } = await supabaseServiceRole
           .from("admin_branch_access")
           .insert({
             admin_user_id: newAdmin.id,
-            branch_id: branch_id,
+            branch_id: branchId,
             role:
               role === "employee" || role === "vendedor" ? "staff" : "manager",
             is_primary: true,
           });
 
         if (accessError) {
-          logger.warn(
-            "Error assigning branch access (non-critical)",
+          logger.error(
+            "Error assigning branch access on register",
             accessError,
           );
-          // No hacer rollback, el usuario ya está creado
+          return NextResponse.json(
+            {
+              error: "El usuario se creó pero no se pudo asignar la sucursal",
+              details: accessError.message,
+            },
+            { status: 500 },
+          );
         }
       }
     } else if (

@@ -251,12 +251,11 @@ export async function POST(request: NextRequest) {
     const organizationId = newOrganization.id;
 
     // Crear/actualizar admin_users con organization_id
-    // Si el usuario no existe en admin_users, crearlo; si existe, actualizarlo
-    // Nota: Después de la migración 20250210000001, el rol debe ser 'admin' (simplificado)
+    // El primer usuario creador de la organización es siempre Super Administrador
     const adminUserData = {
       id: user.id,
       email: user.email,
-      role: "admin", // Sistema simplificado usa solo 'admin'
+      role: "super_admin",
       organization_id: organizationId,
       is_active: true,
       permissions: {
@@ -268,6 +267,7 @@ export async function POST(request: NextRequest) {
         admin_users: ["read", "create", "update", "delete"],
         support: ["read", "create", "update", "delete"],
         bulk_operations: ["read", "create", "update", "delete"],
+        branches: ["read", "create", "update", "delete"],
       },
     };
 
@@ -328,31 +328,64 @@ export async function POST(request: NextRequest) {
     } else {
       branch = newBranch;
 
-      // Crear admin_branch_access para el usuario
+      // Super admin: acceso global (branch_id null) para ver todas las sucursales
+      const { error: globalAccessError } = await supabaseServiceRole
+        .from("admin_branch_access")
+        .insert({
+          admin_user_id: user.id,
+          branch_id: null,
+          role: "manager",
+          is_primary: true,
+        });
+
+      if (globalAccessError) {
+        logger.error(
+          "Error creating super admin global access",
+          globalAccessError,
+        );
+      }
+
+      // También acceso explícito a la primera sucursal (opcional, para consistencia)
       const { error: accessError } = await supabaseServiceRole
         .from("admin_branch_access")
         .insert({
           admin_user_id: user.id,
           branch_id: newBranch.id,
           role: "manager",
-          is_primary: true,
+          is_primary: false,
         });
 
       if (accessError) {
         logger.error("Error creating branch access", accessError);
-        // No crítico, el usuario puede tener acceso después
+        // No crítico, el super_admin ya tiene acceso global
       }
     }
 
-    // Crear subscription inicial (trialing o incomplete según el tier)
-    const subscriptionStatus =
-      subscription_tier === "basic" ? "trialing" : "incomplete";
+    // Siempre iniciar período de prueba (7 días por defecto)
+    let trialDays = 7;
+    const { data: trialConfig } = await supabaseServiceRole
+      .from("system_config")
+      .select("config_value")
+      .eq("config_key", "membership_trial_days")
+      .maybeSingle();
+    if (trialConfig?.config_value != null) {
+      const parsed = parseInt(
+        String(trialConfig.config_value).replace(/"/g, ""),
+        10,
+      );
+      if (!isNaN(parsed) && parsed > 0) trialDays = parsed;
+    }
+
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
     const { error: subscriptionError } = await supabaseServiceRole
       .from("subscriptions")
       .insert({
         organization_id: organizationId,
-        status: subscriptionStatus,
+        status: "trialing",
+        trial_ends_at: trialEndsAt.toISOString(),
+        current_period_end: trialEndsAt.toISOString().split("T")[0],
       });
 
     if (subscriptionError) {

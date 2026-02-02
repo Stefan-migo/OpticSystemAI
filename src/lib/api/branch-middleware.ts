@@ -6,6 +6,8 @@ export interface BranchContext {
   branchId: string | null;
   isGlobalView: boolean;
   isSuperAdmin: boolean;
+  /** User's organization_id from admin_users. Vision Global must be scoped to this org only. */
+  organizationId: string | null;
   accessibleBranches: Array<{
     id: string;
     name: string;
@@ -61,11 +63,25 @@ export async function getBranchContext(
       branchId: null,
       isGlobalView: false,
       isSuperAdmin: false,
+      organizationId: null,
       accessibleBranches: [],
     };
   }
 
-  // Check if user is super admin
+  // User's organization_id (Vision Global must be scoped to this org only)
+  let organizationId: string | null = null;
+  try {
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", userId)
+      .single();
+    organizationId =
+      (adminUser as { organization_id?: string } | null)?.organization_id ??
+      null;
+  } catch (_) {}
+
+  // Check if user is super admin: RPC (admin_branch_access.branch_id = null) OR role in admin_users
   let isSuperAdmin = false;
   try {
     const { data: superAdminData, error: superAdminError } = await supabase.rpc(
@@ -76,9 +92,20 @@ export async function getBranchContext(
     );
     if (superAdminError) {
       console.error("Error checking super admin status:", superAdminError);
-      // Continue with isSuperAdmin = false
     } else {
       isSuperAdmin = superAdminData || false;
+    }
+    // Fallback: if RPC says no but user has super_admin/root/dev role, treat as super admin
+    if (!isSuperAdmin) {
+      const { data: adminUser } = await supabase
+        .from("admin_users")
+        .select("role")
+        .eq("id", userId)
+        .single();
+      const role = (adminUser as { role?: string } | null)?.role;
+      if (role === "super_admin" || role === "root" || role === "dev") {
+        isSuperAdmin = true;
+      }
     }
   } catch (err) {
     console.error("Exception checking super admin status:", err);
@@ -102,6 +129,7 @@ export async function getBranchContext(
         branchId: null,
         isGlobalView: false,
         isSuperAdmin: false,
+        organizationId,
         accessibleBranches: [],
       };
     }
@@ -114,6 +142,7 @@ export async function getBranchContext(
       branchId: null,
       isGlobalView: false,
       isSuperAdmin: false,
+      organizationId,
       accessibleBranches: [],
     };
   }
@@ -175,6 +204,7 @@ export async function getBranchContext(
     branchId,
     isGlobalView,
     isSuperAdmin: isSuperAdmin || false,
+    organizationId,
     accessibleBranches,
   };
 }
@@ -205,24 +235,28 @@ export async function validateBranchAccess(
 }
 
 /**
- * Add branch filter to a Supabase query
+ * Add branch filter to a Supabase query.
+ * When in global view (isSuperAdmin && !branchId), scope by organizationId so Vision Global
+ * never shows data from other organizations.
  */
 export function addBranchFilter(
   query: any,
   branchId: string | null,
   isSuperAdmin: boolean,
+  organizationId?: string | null,
 ) {
   if (isSuperAdmin && branchId === null) {
-    // Super admin in global view sees everything (including products without branch_id)
-    return query;
+    // Vision Global: only show data from the user's organization
+    if (organizationId) {
+      return query.eq("organization_id", organizationId);
+    }
+    // No organization (e.g. platform admin): return no rows to avoid leaking other orgs
+    return query.eq("organization_id", "00000000-0000-0000-0000-000000000000");
   }
 
   if (branchId) {
-    // Filter by specific branch - exclude products without branch_id (legacy)
     return query.eq("branch_id", branchId);
   }
 
-  // No branch selected and not super admin - return empty result
-  // This should not happen in normal flow, but return empty to be safe
-  return query.eq("branch_id", "00000000-0000-0000-0000-000000000000"); // Non-existent UUID to return empty
+  return query.eq("branch_id", "00000000-0000-0000-0000-000000000000");
 }

@@ -155,14 +155,14 @@ export function SmartContextWidget({ section }: SmartContextWidgetProps) {
   const badgeCount = insights.length;
 
   return (
-    <div className="fixed top-20 right-4 z-40">
+    <div className="fixed bottom-6 left-6 z-40">
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             size="sm"
             className={cn(
-              "shadow-lg bg-white hover:bg-gray-50 border-2 transition-all",
+              "shadow-xl bg-white/80 backdrop-blur-md hover:bg-white border-2 transition-all hover:scale-105 active:scale-95",
               hasInsights
                 ? "border-blue-300 hover:border-blue-400"
                 : "border-gray-200 hover:border-gray-300",
@@ -177,7 +177,7 @@ export function SmartContextWidget({ section }: SmartContextWidgetProps) {
                 isLoading && "animate-pulse",
               )}
             />
-            <span className="text-xs font-medium text-gray-700">
+            <span className="text-xs font-bold text-gray-700">
               {isLoading
                 ? "Cargando..."
                 : hasInsights
@@ -185,7 +185,7 @@ export function SmartContextWidget({ section }: SmartContextWidgetProps) {
                   : "Insights"}
             </span>
             {hasInsights && (
-              <span className="ml-2 text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">
+              <span className="ml-2 text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full font-black">
                 {badgeCount}
               </span>
             )}
@@ -197,9 +197,10 @@ export function SmartContextWidget({ section }: SmartContextWidgetProps) {
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-96 max-w-[calc(100vw-2rem)] p-0"
-          align="end"
-          side="bottom"
+          className="w-96 max-w-[calc(100vw-2rem)] p-0 shadow-2xl border-blue-100 rounded-2xl overflow-hidden"
+          align="start"
+          side="top"
+          sideOffset={10}
         >
           {/* Header */}
           <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">

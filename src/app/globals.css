@@ -480,3 +480,13 @@ html.dark .admin-header {
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out forwards;
 }
+
+/* Print styles for Weekly Report */
+@media print {
+  [data-radix-dialog-overlay] {
+    background: transparent !important;
+  }
+  #weekly-report-print {
+    max-width: none !important;
+  }
+}

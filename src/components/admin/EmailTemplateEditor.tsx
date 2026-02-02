@@ -272,12 +272,12 @@ export default function EmailTemplateEditor({
     {
       key: "support_email",
       label: "Email de Soporte",
-      description: "soporte@daluzconsciente.com",
+      description: "soporte@opttius.com",
     },
     {
       key: "contact_email",
       label: "Email de Contacto",
-      description: "contacto@daluzconsciente.com",
+      description: "contacto@opttius.com",
     },
     {
       key: "website_url",
@@ -409,11 +409,11 @@ export default function EmailTemplateEditor({
       amount: "$15.000,00",
       membership_tier: "Transformación Completa",
       membership_start_date: "15 de enero de 2025",
-      access_url: "https://daluzconsciente.com/mi-cuenta",
-      reset_link: "https://daluzconsciente.com/reset-password?token=xxx",
-      reset_url: "https://daluzconsciente.com/reset-password?token=xxx",
-      account_url: "https://daluzconsciente.com/mi-cuenta",
-      renewal_url: "https://daluzconsciente.com/membresias",
+      access_url: "https://opttius.com/mi-cuenta",
+      reset_link: "https://opttius.com/reset-password?token=xxx",
+      reset_url: "https://opttius.com/reset-password?token=xxx",
+      account_url: "https://opttius.com/mi-cuenta",
+      renewal_url: "https://opttius.com/membresias",
       days_remaining: "15",
       low_stock_products:
         "<div>Producto A - Stock: 3</div><div>Producto B - Stock: 2</div>",

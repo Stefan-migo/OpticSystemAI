@@ -55,22 +55,19 @@ export function LandingFooter() {
               Soluciones
             </h3>
             <ul className="space-y-4 text-sm font-body">
-              {[
-                "Características",
-                "Precios",
-                "Casos de Éxito",
-                "API & Developers",
-              ].map((item, i) => (
-                <li key={i}>
-                  <Link
-                    href={`#${item.toLowerCase().replace(/ /g, "-")}`}
-                    className="text-gray-500 hover:text-primary transition-colors flex items-center group"
-                  >
-                    <div className="w-0 group-hover:w-2 h-px bg-primary mr-0 group-hover:mr-2 transition-all"></div>
-                    {item}
-                  </Link>
-                </li>
-              ))}
+              {["Características", "Precios", "API & Developers"].map(
+                (item, i) => (
+                  <li key={i}>
+                    <Link
+                      href={`#${item.toLowerCase().replace(/ /g, "-")}`}
+                      className="text-gray-500 hover:text-primary transition-colors flex items-center group"
+                    >
+                      <div className="w-0 group-hover:w-2 h-px bg-primary mr-0 group-hover:mr-2 transition-all"></div>
+                      {item}
+                    </Link>
+                  </li>
+                ),
+              )}
             </ul>
           </div>
 

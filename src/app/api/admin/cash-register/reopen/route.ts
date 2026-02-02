@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/utils/supabase/server";
-import {
-  getBranchContext,
-  validateBranchAccess,
-} from "@/lib/api/branch-middleware";
+import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
-import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
+import type {
+  IsAdminParams,
+  IsAdminResult,
+  GetAdminRoleParams,
+  GetAdminRoleResult,
+} from "@/types/supabase-rpc";
 
 /**
  * POST /api/admin/cash-register/reopen
- * Reopen a closed cash register session (superadmin only)
+ * Reopen a closed cash register session (admin or super_admin)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -35,18 +37,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get branch context
-    const branchContext = await getBranchContext(request, user.id);
-
-    // Validate branch access for non-super admins
-    if (!branchContext.isSuperAdmin) {
+    const { data: adminRole } = (await supabase.rpc("get_admin_role", {
+      user_id: user.id,
+    } as GetAdminRoleParams)) as {
+      data: GetAdminRoleResult | null;
+      error: Error | null;
+    };
+    const canReopen =
+      adminRole === "super_admin" ||
+      adminRole === "admin" ||
+      adminRole === "root" ||
+      adminRole === "dev";
+    if (!canReopen) {
       return NextResponse.json(
         {
-          error: "Solo superadmin puede reabrir cajas cerradas",
+          error:
+            "Solo administradores o super administradores pueden reabrir cajas",
         },
         { status: 403 },
       );
     }
+
+    // Get branch context (for non-super-admins we'll validate branch access after loading session)
+    const branchContext = await getBranchContext(request, user.id);
 
     const body = await request.json();
     const { session_id } = body;
@@ -74,6 +87,21 @@ export async function POST(request: NextRequest) {
         },
         { status: 404 },
       );
+    }
+
+    // Non-super-admin must have access to the session's branch
+    if (!branchContext.isSuperAdmin) {
+      const hasAccess = branchContext.accessibleBranches.some(
+        (b) => b.id === session.branch_id,
+      );
+      if (!hasAccess) {
+        return NextResponse.json(
+          {
+            error: "No tienes acceso a la sucursal de esta caja",
+          },
+          { status: 403 },
+        );
+      }
     }
 
     // Check if there's already an open session for this branch

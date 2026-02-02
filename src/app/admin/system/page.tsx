@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ import {
   RotateCcw,
   Trash2,
   Download,
+  Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useBranch } from "@/hooks/useBranch";
@@ -40,10 +42,51 @@ import SystemOverview from "./components/SystemOverview";
 import SystemConfig from "./components/SystemConfig";
 import SystemHealth from "./components/SystemHealth";
 import SystemMaintenance from "./components/SystemMaintenance";
+import dynamic from "next/dynamic";
+
+const POSBillingSettings = dynamic(
+  () => import("./pos-billing-settings/page").then((mod) => mod.default),
+  {
+    ssr: false,
+    loading: () => <div className="p-8 text-center">Cargando...</div>,
+  },
+);
 
 export default function SystemAdministrationPage() {
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
   const { currentBranchId, isSuperAdmin, branches } = useBranch();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(
+    tabFromUrl &&
+      [
+        "overview",
+        "config",
+        "email",
+        "notifications",
+        "billing",
+        "health",
+        "maintenance",
+      ].includes(tabFromUrl)
+      ? tabFromUrl
+      : "overview",
+  );
+
+  useEffect(() => {
+    if (
+      tabFromUrl &&
+      [
+        "overview",
+        "config",
+        "email",
+        "notifications",
+        "billing",
+        "health",
+        "maintenance",
+      ].includes(tabFromUrl)
+    ) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   // Dialogs for maintenance results
   const [showSecurityAuditDialog, setShowSecurityAuditDialog] = useState(false);
@@ -418,6 +461,10 @@ export default function SystemAdministrationPage() {
             <Bell className="h-4 w-4 mr-1" />
             Notificaciones
           </TabsTrigger>
+          <TabsTrigger value="billing" className="flex-1">
+            <Receipt className="h-4 w-4 mr-1" />
+            Boletas y Facturas
+          </TabsTrigger>
           <TabsTrigger value="health" className="flex-1">
             Salud
           </TabsTrigger>
@@ -447,6 +494,10 @@ export default function SystemAdministrationPage() {
 
         <TabsContent value="notifications" className="space-y-6">
           <NotificationSettings />
+        </TabsContent>
+
+        <TabsContent value="billing" className="space-y-6">
+          <POSBillingSettings />
         </TabsContent>
 
         <TabsContent value="health" className="space-y-6">

@@ -83,7 +83,7 @@ export default function PaymentConfig({
       process.env.NEXT_PUBLIC_SITE_URL ||
       process.env.NEXT_PUBLIC_APP_URL ||
       (typeof window !== "undefined" ? window.location.origin : "") ||
-      "https://daluzconsciente.com";
+      "https://opttius.com";
     setWebhookUrl(`${baseUrl}/api/webhooks/mercadopago`);
   }, []);
 

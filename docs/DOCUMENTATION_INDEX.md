@@ -97,6 +97,37 @@ Resumen ejecutivo de próximos pasos para tests
 
 ---
 
+### 6a. **PLAN_PRODUCCION_TAREAS_PENDIENTES.md** ⭐ NUEVO (2026-02-01)
+
+Plan detallado de implementación para tareas pendientes antes de producción
+
+- Configuración POS (min depósito) - visibilidad y consolidación
+- Configuración boletas y facturas - formatos de impresión
+- Remover referencias Daluz - migraciones y reemplazo en código
+- Pasarelas: migrar Stripe → Flow/Mercado Pago
+- Payflow con sandboxes
+- Gestión total de suscripciones (SaaS, root)
+- Funcionalidad total de tiers (features por plan)
+- Prueba gratuita completa (7 días, configurable, override por org)
+- Lógica post-trial: bloqueo e invitación a pago/soporte
+- Orden de ejecución y timeline estimado
+
+👉 **Usar cuando:** Necesitas implementar las tareas pendientes para entrar a producción
+
+---
+
+### 6a2. **PAYFLOW_SANDBOX_TESTING.md** ⭐ NUEVO (2026-02-01)
+
+Guía para probar el flujo de pagos con Flow y Mercado Pago en modo sandbox
+
+- Variables de entorno FLOW_SANDBOX_MODE, MERCADOPAGO_SANDBOX_MODE
+- Tarjetas de prueba
+- Webhooks en desarrollo local
+
+👉 **Usar cuando:** Necesitas probar pagos sin cobrar dinero real
+
+---
+
 ### 6b. **PAYMENT_GATEWAYS_ENV_SETUP.md** ⭐ (2026-01-29)
 
 Guía para darse de alta y obtener variables de entorno de pasarelas de pago

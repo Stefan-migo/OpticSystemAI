@@ -78,8 +78,13 @@ export async function PATCH(
 
     const { id } = params;
     const body = await request.json();
-    const { status, current_period_start, current_period_end, cancel_at } =
-      body;
+    const {
+      status,
+      current_period_start,
+      current_period_end,
+      trial_ends_at,
+      cancel_at,
+    } = body;
 
     // Verificar que la suscripción existe
     const { data: existingSub } = await supabaseServiceRole
@@ -115,6 +120,12 @@ export async function PATCH(
 
     if (current_period_end !== undefined) {
       updates.current_period_end = current_period_end;
+    }
+
+    if (trial_ends_at !== undefined) {
+      updates.trial_ends_at = trial_ends_at
+        ? new Date(trial_ends_at).toISOString()
+        : null;
     }
 
     if (cancel_at !== undefined) {
@@ -177,7 +188,7 @@ export async function DELETE(
     // Verificar que la suscripción existe
     const { data: existingSub } = await supabaseServiceRole
       .from("subscriptions")
-      .select("id, organization_id, stripe_subscription_id")
+      .select("id, organization_id, gateway_subscription_id")
       .eq("id", id)
       .single();
 

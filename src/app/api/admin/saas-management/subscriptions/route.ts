@@ -93,15 +93,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Calcular días hasta vencimiento
+    // Calcular días hasta vencimiento (para trial usar trial_ends_at, para activa usar current_period_end)
     const subscriptionsWithDetails = (subscriptions || []).map((sub: any) => {
+      const today = new Date();
       let daysUntilExpiry: number | null = null;
-      if (sub.current_period_end) {
-        const endDate = new Date(sub.current_period_end);
-        const today = new Date();
+      const isTrialing = sub.status === "trialing";
+      const endSource =
+        isTrialing && sub.trial_ends_at
+          ? sub.trial_ends_at
+          : sub.current_period_end;
+      if (endSource) {
+        const endDate = new Date(endSource);
         const diffTime = endDate.getTime() - today.getTime();
         daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       }
+
+      const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
 
       return {
         ...sub,
@@ -110,7 +117,7 @@ export async function GET(request: NextRequest) {
           daysUntilExpiry !== null &&
           daysUntilExpiry <= 7 &&
           daysUntilExpiry >= 0,
-        isExpired: daysUntilExpiry !== null && daysUntilExpiry < 0,
+        isExpired,
       };
     });
 
@@ -128,6 +135,91 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 403 });
     }
     logger.error("Error in subscriptions API GET", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * POST /api/admin/saas-management/subscriptions
+ * Crear una nueva suscripción (solo root/dev)
+ */
+export async function POST(request: NextRequest) {
+  try {
+    await requireRoot(request);
+    const supabaseServiceRole = createServiceRoleClient();
+
+    const body = await request.json();
+    const {
+      organization_id,
+      status = "trialing",
+      trial_days,
+      trial_ends_at,
+      current_period_start,
+      current_period_end,
+    } = body;
+
+    if (!organization_id) {
+      return NextResponse.json(
+        { error: "organization_id es requerido" },
+        { status: 400 },
+      );
+    }
+
+    const validStatuses = [
+      "active",
+      "past_due",
+      "cancelled",
+      "trialing",
+      "incomplete",
+    ];
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json({ error: "status inválido" }, { status: 400 });
+    }
+
+    let trialEndsAt: string | null = null;
+    let periodEnd: string | null = null;
+    if (trial_ends_at) {
+      trialEndsAt = new Date(trial_ends_at).toISOString();
+      periodEnd = trialEndsAt.split("T")[0];
+    } else if (trial_days != null && trial_days > 0) {
+      const end = new Date();
+      end.setDate(end.getDate() + Number(trial_days));
+      trialEndsAt = end.toISOString();
+      periodEnd = trialEndsAt.split("T")[0];
+    }
+    if (current_period_end) periodEnd = current_period_end;
+
+    const { data: newSub, error } = await supabaseServiceRole
+      .from("subscriptions")
+      .insert({
+        organization_id,
+        status,
+        trial_ends_at: trialEndsAt,
+        current_period_start:
+          current_period_start ||
+          (periodEnd ? new Date().toISOString().split("T")[0] : null),
+        current_period_end: periodEnd,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logger.error("Error creating subscription", error);
+      return NextResponse.json(
+        { error: "Error al crear suscripción", details: error.message },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ subscription: newSub });
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    logger.error("Error in subscriptions API POST", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

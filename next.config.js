@@ -15,7 +15,7 @@ const nextConfig = {
         'onnxruntime-node': 'commonjs onnxruntime-node',
       });
     }
-    
+
     // Ignore native .node files
     config.module = config.module || {};
     config.module.rules = config.module.rules || [];
@@ -23,7 +23,7 @@ const nextConfig = {
       test: /\.node$/,
       use: 'ignore-loader',
     });
-    
+
     return config;
   },
   images: {
@@ -58,26 +58,38 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'i.pravatar.cc',
+        port: '',
+        pathname: '/**',
+      },
     ],
+  },
+  async redirects() {
+    return [
+      // POS config moved to Sistema > Boletas y Facturas
+      { source: '/admin/pos/settings', destination: '/admin/system?tab=billing', permanent: false },
+    ];
   },
   async headers() {
     const isProduction = process.env.NODE_ENV === 'production';
-    
+
     // Get Supabase URL for CSP
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseDomain = supabaseUrl 
-      ? new URL(supabaseUrl).origin 
+    const supabaseDomain = supabaseUrl
+      ? new URL(supabaseUrl).origin
       : 'https://*.supabase.co';
-    
+
     // Build Content Security Policy
     const cspParts = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://www.google.com https://www.googletagmanager.com https://www.gstatic.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://http2.mlstatic.com https://www.google.com https://www.googletagmanager.com https://www.gstatic.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com data:",
+      "font-src 'self' https://fonts.gstatic.com https://http2.mlstatic.com data:",
       `img-src 'self' data: https: blob: ${supabaseDomain !== 'https://*.supabase.co' ? supabaseDomain : 'https://*.supabase.co'}`,
       `connect-src 'self' https: wss: ${supabaseDomain !== 'https://*.supabase.co' ? supabaseDomain : 'https://*.supabase.co'} https://*.supabase.co`,
-      `frame-src 'self' https://www.mercadopago.com https://www.google.com ${supabaseDomain !== 'https://*.supabase.co' ? supabaseDomain : 'https://*.supabase.co'}`,
+      `frame-src 'self' https://www.mercadopago.com https://www.mercadolibre.com https://http2.mlstatic.com https://www.google.com ${supabaseDomain !== 'https://*.supabase.co' ? supabaseDomain : 'https://*.supabase.co'}`,
       "media-src 'self' https:",
       "object-src 'none'",
       "base-uri 'self'",
@@ -85,14 +97,14 @@ const nextConfig = {
       "worker-src 'self' blob:",
       "manifest-src 'self'",
     ];
-    
+
     // Add upgrade-insecure-requests in production
     if (isProduction) {
       cspParts.push("upgrade-insecure-requests");
     }
-    
+
     const csp = cspParts.join('; ');
-    
+
     return [
       {
         source: '/(.*)',

@@ -11,6 +11,7 @@ import { ChatHeader } from "./chat/ChatHeader";
 import { ExportDialog } from "./chat/ExportDialog";
 import { useChatSession } from "@/hooks/useChatSession";
 import { useChatConfig } from "@/hooks/useChatConfig";
+import { cn } from "@/lib/utils";
 
 interface Message {
   id: string;
@@ -539,7 +540,7 @@ export function ChatbotContent({
   const sessionTitle = currentSession?.title || "Nueva conversación";
 
   return (
-    <div className={className || "flex h-full min-h-0"}>
+    <div className={cn("flex h-full min-h-0 overflow-hidden", className)}>
       {showHistory && (
         <ResizablePanel
           defaultWidth={historyWidth}

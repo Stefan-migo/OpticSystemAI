@@ -41,6 +41,7 @@ import { ThemeSelector } from "@/components/theme-selector";
 import { DemoModeBanner } from "@/components/onboarding/DemoModeBanner";
 import { TourProvider } from "@/components/onboarding/TourProvider";
 import { TourButton } from "@/components/onboarding/TourButton";
+import { SubscriptionGuard } from "@/components/admin/SubscriptionGuard";
 import { useBranch } from "@/hooks/useBranch";
 import { useRoot } from "@/hooks/useRoot";
 import { getBranchHeader } from "@/lib/utils/branch";
@@ -130,6 +131,7 @@ const createNavigationItems = (
     label: "Administradores",
     icon: Users,
     description: "Gestión de usuarios admin",
+    adminOrSuperAdminOnly: true, // Solo visible para admin y super_admin (y root/dev)
   },
   {
     href: "/admin/branches",
@@ -179,6 +181,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     hasChecked: false,
     checkedUserId: null,
   });
+
+  // Admin role (admin, super_admin, employee, vendedor, root, dev) - para filtrar navegación
+  const [adminRole, setAdminRole] = useState<string | null>(null);
 
   // Organization state
   const [organizationState, setOrganizationState] = useState<{
@@ -291,6 +296,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
         if (data.organization) {
           const isRootUser = data.organization.isRootUser || false;
+          setAdminRole(data.adminCheck?.role ?? null);
           const orgState = {
             hasOrganization: data.organization.hasOrganization || isRootUser, // Root users no necesitan organización
             organizationName: data.organization.organizationName || null,
@@ -327,6 +333,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           }
         } else {
           // Si no hay datos de organización pero el usuario es admin
+          setAdminRole(data.adminCheck?.role ?? null);
           // Verificar si es root/dev usando el hook del componente
           console.warn(
             "⚠️ No organization data in check-status response, but user is admin",
@@ -335,6 +342,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           // Si es root/dev, no necesita onboarding
           if (isRoot) {
             console.log("✅ Root/dev user - skipping onboarding requirement");
+            setAdminRole("root");
             setOrganizationState({
               hasOrganization: true, // Root/dev no necesita organización pero marcamos como true
               organizationName: null,
@@ -820,129 +828,133 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <TourProvider>
-      <div className="admin-layout">
-        {/* Mobile Header */}
-        <div className="lg:hidden admin-header">
-          <div className="admin-header-content">
-            <div className="flex items-center space-x-3">
-              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Menu className="h-5 w-5 text-admin-text-primary" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-80 p-0">
-                  <AdminSidebar
-                    pathname={pathname}
-                    onNavigate={() => setSidebarOpen(false)}
-                    stats={stats}
-                    organizationState={organizationState}
-                  />
-                </SheetContent>
-              </Sheet>
+      <SubscriptionGuard>
+        <div className="admin-layout">
+          {/* Mobile Header */}
+          <div className="lg:hidden admin-header">
+            <div className="admin-header-content">
+              <div className="flex items-center space-x-3">
+                <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <Menu className="h-5 w-5 text-admin-text-primary" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-80 p-0">
+                    <AdminSidebar
+                      pathname={pathname}
+                      onNavigate={() => setSidebarOpen(false)}
+                      stats={stats}
+                      organizationState={organizationState}
+                      adminRole={adminRole}
+                    />
+                  </SheetContent>
+                </Sheet>
 
-              <div className="flex items-center gap-2">
-                {organizationState.organizationLogo && (
-                  <Image
-                    src={organizationState.organizationLogo}
-                    alt="Logo"
-                    width={28}
-                    height={28}
-                    className="rounded-lg shadow-sm"
-                  />
-                )}
-                <h1 className="admin-header-title font-malisha">
-                  {organizationState.organizationName || businessConfig.name}
-                </h1>
+                <div className="flex items-center gap-2">
+                  {organizationState.organizationLogo && (
+                    <Image
+                      src={organizationState.organizationLogo}
+                      alt="Logo"
+                      width={28}
+                      height={28}
+                      className="rounded-lg shadow-sm"
+                    />
+                  )}
+                  <h1 className="admin-header-title font-malisha">
+                    {organizationState.organizationName || businessConfig.name}
+                  </h1>
+                </div>
+              </div>
+
+              <div className="admin-header-actions">
+                <BranchSelector />
+                <ThemeSelector />
+                <AdminNotificationDropdown />
               </div>
             </div>
+          </div>
 
-            <div className="admin-header-actions">
-              <BranchSelector />
-              <ThemeSelector />
-              <AdminNotificationDropdown />
+          <div className="lg:flex">
+            {/* Desktop Sidebar */}
+            <div className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0">
+              <AdminSidebar
+                pathname={pathname}
+                stats={stats}
+                onChatbotClick={() => setChatbotOpen(true)}
+                organizationState={organizationState}
+                adminRole={adminRole}
+              />
             </div>
-          </div>
-        </div>
 
-        <div className="lg:flex">
-          {/* Desktop Sidebar */}
-          <div className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0">
-            <AdminSidebar
-              pathname={pathname}
-              stats={stats}
-              onChatbotClick={() => setChatbotOpen(true)}
-              organizationState={organizationState}
-            />
-          </div>
-
-          {/* Main Content */}
-          <div className="lg:pl-72 flex-1 min-w-0 w-full">
-            {/* Desktop Header */}
-            <div className="hidden lg:block admin-header">
-              <div className="admin-header-content">
-                <div>
-                  <div className="flex items-center gap-3">
-                    {organizationState.organizationLogo && (
-                      <Image
-                        src={organizationState.organizationLogo}
-                        alt="Logo"
-                        width={36}
-                        height={36}
-                        className="rounded-xl shadow-sm border border-admin-border-secondary/30"
-                      />
-                    )}
-                    <div>
-                      <h1 className="admin-header-title font-malisha text-admin-text-primary">
-                        {organizationState.organizationName ||
-                          businessConfig.displayName ||
-                          businessConfig.name}
-                      </h1>
-                      <p className="admin-header-subtitle font-caption text-admin-text-tertiary">
-                        {organizationState.organizationName
-                          ? "Panel de Administración"
-                          : businessConfig.admin.subtitle}
-                      </p>
+            {/* Main Content */}
+            <div className="lg:pl-72 flex-1 min-w-0 w-full">
+              {/* Desktop Header */}
+              <div className="hidden lg:block admin-header">
+                <div className="admin-header-content">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      {organizationState.organizationLogo && (
+                        <Image
+                          src={organizationState.organizationLogo}
+                          alt="Logo"
+                          width={36}
+                          height={36}
+                          className="rounded-xl shadow-sm border border-admin-border-secondary/30"
+                        />
+                      )}
+                      <div>
+                        <h1 className="admin-header-title font-malisha text-admin-text-primary">
+                          {organizationState.organizationName ||
+                            businessConfig.displayName ||
+                            businessConfig.name}
+                        </h1>
+                        <p className="admin-header-subtitle font-caption text-admin-text-tertiary">
+                          {organizationState.organizationName
+                            ? "Panel de Administración"
+                            : businessConfig.admin.subtitle}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="admin-header-actions">
-                  <BranchSelector />
-                  <ThemeSelector />
-                  <AdminNotificationDropdown />
+                  <div className="admin-header-actions">
+                    <BranchSelector />
+                    <ThemeSelector />
+                    <AdminNotificationDropdown />
 
-                  {/* Botón "Activar tu óptica" - Solo visible en modo demo */}
-                  {organizationState.isDemoMode && (
-                    <Button
-                      onClick={() => router.push("/onboarding/create")}
-                      className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2"
-                      size="sm"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      Activar tu Óptica
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  )}
+                    {/* Botón "Activar tu óptica" - Solo visible en modo demo */}
+                    {organizationState.isDemoMode && (
+                      <Button
+                        onClick={() => router.push("/onboarding/create")}
+                        className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2"
+                        size="sm"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        Activar tu Óptica
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Page Content */}
+              <main className="admin-content">
+                {/* Demo Mode Banner */}
+                {organizationState.isDemoMode && <DemoModeBanner />}
+                {children}
+              </main>
             </div>
-
-            {/* Page Content */}
-            <main className="admin-content">
-              {/* Demo Mode Banner */}
-              {organizationState.isDemoMode && <DemoModeBanner />}
-              {children}
-            </main>
           </div>
+
+          {/* Chatbot - Floating Button */}
+          <Chatbot />
+
+          {/* Tour Help Button - Floating */}
+          <TourButton />
         </div>
-
-        {/* Chatbot - Floating Button */}
-        <Chatbot />
-
-        {/* Tour Help Button - Floating */}
-        <TourButton />
-      </div>
+      </SubscriptionGuard>
     </TourProvider>
   );
 }
@@ -954,6 +966,7 @@ function AdminSidebar({
   stats,
   onChatbotClick,
   organizationState,
+  adminRole,
 }: {
   pathname: string;
   onNavigate?: () => void;
@@ -975,6 +988,7 @@ function AdminSidebar({
     onboardingRequired: boolean;
     isChecking: boolean;
   };
+  adminRole?: string | null;
 }) {
   const { isSuperAdmin } = useBranch();
   const { isRoot } = useRoot();
@@ -1018,6 +1032,12 @@ function AdminSidebar({
             .filter((item: any) => {
               if (item.superAdminOnly && !isSuperAdmin) return false;
               if (item.rootOnly && !isRoot) return false;
+              if (
+                item.adminOrSuperAdminOnly &&
+                adminRole != null &&
+                !["admin", "super_admin", "root", "dev"].includes(adminRole)
+              )
+                return false;
               if (item.onboardingOnly) {
                 if (
                   organizationState?.hasOrganization &&

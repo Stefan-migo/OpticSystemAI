@@ -212,4 +212,117 @@ export class PaymentService {
     }
     logger.info("Order fulfilled successfully", { orderId });
   }
+
+  /**
+   * On successful payment: update organization subscription_tier (from metadata or by amount)
+   * and create/update subscription record. Used by Mercado Pago (and other gateways) webhook.
+   */
+  async applyPaymentSuccessToOrganization(
+    organizationId: string,
+    payment: Payment,
+    gatewayPaymentIntentId: string | null,
+    gatewayTransactionId: string | null,
+  ): Promise<void> {
+    type TierName = "basic" | "pro" | "premium";
+    const validTiers: TierName[] = ["basic", "pro", "premium"];
+
+    let tier: TierName = "basic";
+    const metaTier = payment.metadata?.subscription_tier as string | undefined;
+    if (metaTier && validTiers.includes(metaTier as TierName)) {
+      tier = metaTier as TierName;
+    } else {
+      const { data: tiers } = await this.supabase
+        .from("subscription_tiers")
+        .select("name, price_monthly")
+        .order("price_monthly", { ascending: false });
+      const match = (tiers ?? []).find(
+        (t) => Number(t.price_monthly) === payment.amount,
+      );
+      if (match && validTiers.includes(match.name as TierName)) {
+        tier = match.name as TierName;
+      }
+    }
+
+    const { error: orgError } = await this.supabase
+      .from("organizations")
+      .update({
+        subscription_tier: tier,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", organizationId);
+
+    if (orgError) {
+      logger.error("Failed to update organization tier", orgError, {
+        organizationId,
+        tier,
+      });
+      throw new Error(`Error updating organization tier: ${orgError.message}`);
+    }
+    logger.info("Organization subscription_tier updated", {
+      organizationId,
+      tier,
+    });
+
+    // Calculate period: 1 full month from payment date (not calendar month)
+    const now = new Date();
+    const periodStart = new Date(now);
+    periodStart.setHours(0, 0, 0, 0);
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    periodEnd.setHours(23, 59, 59, 999);
+
+    // Find existing subscription by organization_id (including trial without gateway)
+    // This allows converting trial to paid subscription
+    const { data: existing } = await this.supabase
+      .from("subscriptions")
+      .select("id, status")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      // Update existing subscription (trial or previous paid subscription)
+      await this.supabase
+        .from("subscriptions")
+        .update({
+          status: "active",
+          current_period_start: periodStart.toISOString().slice(0, 10),
+          current_period_end: periodEnd.toISOString().slice(0, 10),
+          gateway: payment.gateway,
+          gateway_subscription_id:
+            gatewayPaymentIntentId ?? gatewayTransactionId ?? undefined,
+          cancel_at: null, // Clear any cancellation if reactivating
+          canceled_at: null,
+          updated_at: now.toISOString(),
+        })
+        .eq("id", existing.id);
+      logger.info(
+        "Existing subscription updated (trial converted or renewed)",
+        {
+          subscriptionId: existing.id,
+          previousStatus: existing.status,
+        },
+      );
+    } else {
+      // Create new subscription record
+      await this.supabase.from("subscriptions").insert({
+        organization_id: organizationId,
+        gateway: payment.gateway,
+        status: "active",
+        current_period_start: periodStart.toISOString().slice(0, 10),
+        current_period_end: periodEnd.toISOString().slice(0, 10),
+        gateway_subscription_id:
+          gatewayPaymentIntentId ?? gatewayTransactionId ?? null,
+      });
+      logger.info("New subscription record created", {
+        organizationId,
+        gateway: payment.gateway,
+      });
+    }
+    logger.info("Subscription record updated for organization", {
+      organizationId,
+      gateway: payment.gateway,
+    });
+  }
 }

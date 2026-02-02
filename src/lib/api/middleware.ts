@@ -341,11 +341,11 @@ export function withSecurityHeaders(response: NextResponse): NextResponse {
     "default-src 'self'",
     // Scripts: allow self, Next.js inline scripts, and trusted third parties
     // unsafe-inline is required for Next.js but should be replaced with nonces in future
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://www.google.com https://www.googletagmanager.com https://www.gstatic.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://http2.mlstatic.com https://www.google.com https://www.googletagmanager.com https://www.gstatic.com",
     // Styles: unsafe-inline required for Next.js CSS-in-JS
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    // Fonts: allow self, Google Fonts, and data URIs
-    "font-src 'self' https://fonts.gstatic.com data:",
+    // Fonts: allow self, Google Fonts, Mercado Pago Bricks, and data URIs
+    "font-src 'self' https://fonts.gstatic.com https://http2.mlstatic.com data:",
     // Images: allow self, data URIs, blob, HTTPS sources, and Supabase storage
     "img-src 'self' data: https: blob: " +
       (supabaseDomain !== "https://*.supabase.co"
@@ -357,8 +357,8 @@ export function withSecurityHeaders(response: NextResponse): NextResponse {
         ? supabaseDomain
         : "https://*.supabase.co") +
       " https://*.supabase.co",
-    // Frames: allow trusted iframes (MercadoPago, Google, Supabase)
-    "frame-src 'self' https://www.mercadopago.com https://www.google.com " +
+    // Frames: allow trusted iframes (MercadoPago, MercadoLibre, ML static, Google, Supabase)
+    "frame-src 'self' https://www.mercadopago.com https://www.mercadolibre.com https://http2.mlstatic.com https://www.google.com " +
       (supabaseDomain !== "https://*.supabase.co"
         ? supabaseDomain
         : "https://*.supabase.co"),
@@ -411,8 +411,8 @@ export function withCORS(
   const allowedOrigins = [
     process.env.NEXT_PUBLIC_APP_URL,
     "http://localhost:3000",
-    "https://daluzconsciente.com",
-    "https://www.daluzconsciente.com",
+    "https://opttius.com",
+    "https://www.opttius.com",
   ].filter(Boolean);
 
   if (origin && allowedOrigins.includes(origin)) {

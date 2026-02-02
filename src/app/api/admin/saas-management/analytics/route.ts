@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
       .from("subscriptions")
       .select("*", { count: "exact", head: true })
       .eq("status", "active")
-      .not("stripe_subscription_id", "is", null);
+      .not("gateway_subscription_id", "is", null);
 
     const trialConversionRate =
       totalTrials && totalTrials > 0

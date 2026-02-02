@@ -47,6 +47,7 @@ import {
   Settings,
   CreditCard,
   ArrowRight,
+  Zap,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -352,11 +353,12 @@ function ProfilePageContent() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-12 relative overflow-hidden">
       {/* Premium Background Elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-5%] left-[-5%] w-[30%] h-[30%] bg-primary/5 rounded-full blur-[100px] animate-premium-float" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-premium-float" />
         <div
-          className="absolute middle-[-10%] right-[-5%] w-[25%] h-[25%] bg-indigo-500/5 rounded-full blur-[100px] animate-premium-float"
+          className="absolute bottom-[-10%] right-[-10%] w-[35%] h-[35%] bg-indigo-500/10 rounded-full blur-[120px] animate-premium-float"
           style={{ animationDelay: "-3s" }}
         />
+        <div className="absolute top-[20%] right-[15%] w-[20%] h-[20%] bg-blue-500/5 rounded-full blur-[80px]" />
       </div>
 
       <div className="max-w-6xl mx-auto relative z-10">
@@ -375,7 +377,7 @@ function ProfilePageContent() {
         <Card
           variant="glass"
           rounded="lg"
-          className="mb-10 overflow-hidden border-white/40 dark:border-slate-800/50 shadow-2xl animate-in zoom-in-95 duration-500"
+          className="mb-10 overflow-hidden border-white/20 dark:border-slate-800/50 shadow-2xl animate-in zoom-in-95 duration-500 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl"
         >
           <CardContent className="p-8 md:p-10">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-10">
@@ -572,38 +574,38 @@ function ProfilePageContent() {
                 </CardHeader>
                 <CardContent spacing="relaxed" className="p-6 pt-0">
                   <div className="space-y-4">
-                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 group-hover:border-primary/30 transition-all">
+                      <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         Nombre Completo
                       </Label>
-                      <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                      <p className="text-base font-bold mt-1 text-slate-800 dark:text-slate-100">
                         {profile?.first_name && profile?.last_name
                           ? `${profile.first_name} ${profile.last_name}`
                           : "Pendiente de completar"}
                       </p>
                     </div>
-                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 group-hover:border-primary/30 transition-all">
+                      <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         Canal de Acceso
                       </Label>
-                      <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                      <p className="text-base font-bold mt-1 text-slate-800 dark:text-slate-100">
                         {user.email}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 group-hover:border-primary/30 transition-all">
+                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           Teléfono
                         </Label>
-                        <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                        <p className="text-sm font-bold mt-1 text-slate-800 dark:text-slate-100">
                           {profile?.phone || "Sin registro"}
                         </p>
                       </div>
-                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <div className="bg-admin-bg-tertiary p-5 rounded-3xl border border-admin-border-primary group-hover:border-primary/30 transition-all">
+                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           Cumpleaños
                         </Label>
-                        <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                        <p className="text-sm font-bold mt-1 text-slate-800 dark:text-slate-100">
                           {profile?.date_of_birth
                             ? formatDate(profile.date_of_birth)
                             : "Sin registro"}
@@ -613,7 +615,7 @@ function ProfilePageContent() {
                   </div>
                   <Button
                     variant="outline"
-                    className="w-full mt-6 border-slate-200 dark:border-slate-800 rounded-2xl font-bold h-12"
+                    className="w-full mt-6 border-slate-200 dark:border-slate-800 rounded-2xl font-bold h-12 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300"
                     onClick={() => {
                       setActiveTab("personal");
                       setIsEditingPersonal(true);
@@ -636,35 +638,35 @@ function ProfilePageContent() {
                 </CardHeader>
                 <CardContent spacing="relaxed" className="p-6 pt-0">
                   <div className="space-y-4">
-                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 min-h-[84px]">
-                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="bg-admin-bg-tertiary p-5 rounded-3xl border border-admin-border-primary group-hover:border-primary/30 transition-all min-h-[84px]">
+                      <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         Dirección Lineal
                       </Label>
                       <div className="mt-1">
-                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                        <p className="text-base font-bold text-slate-800 dark:text-slate-100">
                           {profile?.address_line_1 || "Pendiente de completar"}
                         </p>
                         {profile?.address_line_2 && (
-                          <p className="text-sm font-medium text-slate-500">
+                          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                             {profile.address_line_2}
                           </p>
                         )}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <div className="bg-admin-bg-tertiary p-5 rounded-3xl border border-admin-border-primary group-hover:border-primary/30 transition-all">
+                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           Ciudad
                         </Label>
-                        <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                        <p className="text-sm font-bold mt-1 text-slate-800 dark:text-slate-100">
                           {profile?.city || "—"}
                         </p>
                       </div>
-                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <div className="bg-admin-bg-tertiary p-5 rounded-3xl border border-admin-border-primary group-hover:border-primary/30 transition-all">
+                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           País
                         </Label>
-                        <p className="text-sm font-bold mt-1 text-slate-700 dark:text-slate-200">
+                        <p className="text-sm font-bold mt-1 text-slate-800 dark:text-slate-100">
                           {profile?.country || "—"}
                         </p>
                       </div>
@@ -672,7 +674,7 @@ function ProfilePageContent() {
                   </div>
                   <Button
                     variant="outline"
-                    className="w-full mt-6 border-slate-200 dark:border-slate-800 rounded-2xl font-bold h-12"
+                    className="w-full mt-6 border-slate-200 dark:border-slate-800 rounded-2xl font-bold h-12 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all duration-300"
                     onClick={() => {
                       setActiveTab("address");
                       setIsEditingAddress(true);
@@ -681,6 +683,46 @@ function ProfilePageContent() {
                     <Edit3 className="h-4 w-4 mr-2" />
                     Gestionar Dirección
                   </Button>
+                </CardContent>
+              </Card>
+
+              {/* Added Subscription Summary Card to Overview */}
+              <Card variant="interactive" className="group md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight text-admin-text-primary group-hover:text-primary transition-colors">
+                    <div className="p-2 bg-admin-bg-tertiary rounded-xl group-hover:bg-primary/10 transition-colors">
+                      <CreditCard className="h-5 w-5 text-admin-text-secondary group-hover:text-primary" />
+                    </div>
+                    Estado de Suscripción
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 pt-0">
+                  <div className="bg-primary/5 dark:bg-primary/10 rounded-[2rem] p-8 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 rounded-3xl bg-primary flex items-center justify-center text-white shadow-xl shadow-primary/30">
+                        <Zap className="h-8 w-8" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-primary/60 uppercase tracking-[0.2em] mb-1">
+                          Tu Nivel Actual
+                        </p>
+                        <h3 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">
+                          Plan Premium Enterprise
+                        </h3>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 w-full md:w-auto">
+                      <Button
+                        size="lg"
+                        className="flex-1 md:flex-none h-14 rounded-2xl font-bold px-8 shadow-xl shadow-primary/20"
+                        onClick={() => setActiveTab("subscription")}
+                        shimmer
+                      >
+                        Gestionar Suscripción
+                        <ArrowRight className="h-5 w-5 ml-2" />
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>

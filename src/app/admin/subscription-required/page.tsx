@@ -61,7 +61,7 @@ export default function SubscriptionRequiredPage() {
 
           <div className="flex flex-col gap-3">
             {PAYFLOW_ENABLED ? (
-              <Link href="/admin/checkout" className="w-full">
+              <Link href="/checkout" className="w-full">
                 <Button className="w-full h-12 font-bold" size="lg">
                   <CreditCard className="h-5 w-5 mr-2" />
                   Suscribirme ahora

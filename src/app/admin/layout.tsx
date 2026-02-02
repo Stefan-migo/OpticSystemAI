@@ -110,7 +110,7 @@ const createNavigationItems = (
     description: "Reportes y estadísticas",
   },
   {
-    href: "/admin/checkout",
+    href: "/checkout",
     label: "Checkout",
     icon: DollarSign,
     description: "Pagos con Flow / pasarelas",
@@ -1082,7 +1082,7 @@ function AdminSidebar({
       {/* User & Footer Section */}
       <div className="mt-auto p-4 space-y-4 bg-admin-bg-tertiary/20">
         {/* User Profile Hookup */}
-        <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/50 backdrop-blur-sm shadow-sm border border-white/50">
+        <div className="flex items-center gap-3 p-3 rounded-2xl bg-admin-bg-secondary shadow-sm border border-admin-border-primary">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
             {profile?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
           </div>

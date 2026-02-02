@@ -137,7 +137,7 @@
     /* Blue-50 */
     --foreground: #1e3a8a;
     /* Blue-900 */
-    --card: #ffffff;
+    --card: #eff6ff;
     --card-foreground: #1e3a8a;
     --popover: #ffffff;
     --popover-foreground: #1e3a8a;
@@ -158,7 +158,8 @@
     --ring: #2563eb;
 
     --admin-bg-primary: #f0f9ff;
-    --admin-bg-secondary: #ffffff;
+    --admin-bg-secondary: #f0f7ff;
+    /* Harmony: Light blue instead of white */
     --admin-bg-tertiary: #e0f2fe;
     --admin-border-primary: #bae6fd;
     --admin-border-secondary: #7dd3fc;
@@ -180,7 +181,7 @@
     /* Green-50 */
     --foreground: #14532d;
     /* Green-900 */
-    --card: #ffffff;
+    --card: #f0fdf4;
     --card-foreground: #14532d;
     --popover: #ffffff;
     --popover-foreground: #14532d;
@@ -201,7 +202,8 @@
     --ring: #166534;
 
     --admin-bg-primary: #f0fdf4;
-    --admin-bg-secondary: #ffffff;
+    --admin-bg-secondary: #ecfdf5;
+    /* Harmony: Hint of emerald/green */
     --admin-bg-tertiary: #dcfce7;
     --admin-border-primary: #bbf7d0;
     --admin-border-secondary: #86efac;
@@ -223,7 +225,7 @@
     /* Red-50 */
     --foreground: #7f1d1d;
     /* Red-900 */
-    --card: #ffffff;
+    --card: #fef2f2;
     --card-foreground: #7f1d1d;
     --popover: #ffffff;
     --popover-foreground: #7f1d1d;
@@ -244,7 +246,8 @@
     --ring: #b91c1c;
 
     --admin-bg-primary: #fef2f2;
-    --admin-bg-secondary: #ffffff;
+    --admin-bg-secondary: #fff5f5;
+    /* Harmony: Hint of rose/red */
     --admin-bg-tertiary: #fee2e2;
     --admin-border-primary: #fecaca;
     --admin-border-secondary: #fca5a5;
@@ -281,7 +284,7 @@
 }
 
 .admin-header {
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--admin-bg-secondary);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--admin-border-primary);
@@ -294,7 +297,7 @@
 }
 
 html.dark .admin-header {
-  background: rgba(15, 23, 42, 0.8);
+  background: var(--admin-bg-secondary);
 }
 
 .admin-header-content {
@@ -389,7 +392,7 @@ html.dark .admin-header {
 .admin-nav-item.active {
   background: var(--admin-accent-primary);
   color: white;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--admin-accent-primary), transparent 75%);
 }
 
 .admin-nav-item.active p {
@@ -486,6 +489,7 @@ html.dark .admin-header {
   [data-radix-dialog-overlay] {
     background: transparent !important;
   }
+
   #weekly-report-print {
     max-width: none !important;
   }

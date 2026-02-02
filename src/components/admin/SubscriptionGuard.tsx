@@ -29,7 +29,7 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
     // Don't block on subscription-required, checkout, or help (user can pay or request SaaS support)
     if (
       pathname?.includes("/subscription-required") ||
-      pathname?.includes("/admin/checkout") ||
+      pathname?.includes("/checkout") ||
       pathname?.includes("/admin/help")
     ) {
       setChecking(false);
@@ -58,7 +58,7 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
 
   if (
     pathname?.includes("/subscription-required") ||
-    pathname?.includes("/admin/checkout") ||
+    pathname?.includes("/checkout") ||
     pathname?.includes("/admin/help")
   ) {
     return children;

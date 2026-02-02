@@ -65,7 +65,7 @@ export class FlowGateway implements IPaymentGateway {
       const email = process.env.FLOW_DEFAULT_EMAIL || "test@example.com"; // En producción, obtener del usuario
 
       const urlConfirmation = `${baseUrl}/api/webhooks/flow`;
-      const urlReturn = `${baseUrl}/admin/checkout?success=true&orderId=${orderId ?? ""}`;
+      const urlReturn = `${baseUrl}/checkout/result?success=1&orderId=${orderId ?? ""}`;
 
       const params: Record<string, string> = {
         apiKey,

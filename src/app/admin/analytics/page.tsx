@@ -350,7 +350,7 @@ export default function AnalyticsPage() {
 
       {/* Main KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-2 border-green-200 dark:border-green-700 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-lg hover:shadow-xl transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">
@@ -379,7 +379,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-2 border-blue-200 dark:border-blue-700 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-lg hover:shadow-xl transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
@@ -411,7 +411,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-2 border-amber-200 dark:border-amber-700 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-lg hover:shadow-xl transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wide">
@@ -436,7 +436,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-2 border-purple-200 dark:border-purple-700 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-lg hover:shadow-xl transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wide">
@@ -464,7 +464,7 @@ export default function AnalyticsPage() {
 
       {/* Secondary KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-all duration-300">
+        <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-md hover:shadow-lg transition-all duration-300">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -488,7 +488,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-all duration-300">
+        <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-md hover:shadow-lg transition-all duration-300">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -512,7 +512,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-all duration-300">
+        <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-md hover:shadow-lg transition-all duration-300">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -536,7 +536,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-all duration-300">
+        <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-md hover:shadow-lg transition-all duration-300">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -592,7 +592,7 @@ export default function AnalyticsPage() {
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Revenue Trend */}
-            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+            <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-soft hover:shadow-medium transition-all duration-300">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -648,7 +648,7 @@ export default function AnalyticsPage() {
             </Card>
 
             {/* Work Orders Trend */}
-            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+            <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-soft hover:shadow-medium transition-all duration-300">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -704,7 +704,7 @@ export default function AnalyticsPage() {
             </Card>
 
             {/* Work Orders Status Distribution */}
-            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+            <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-soft hover:shadow-medium transition-all duration-300">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <PieChartIcon className="h-5 w-5" />
@@ -735,7 +735,7 @@ export default function AnalyticsPage() {
             </Card>
 
             {/* Quotes Status Distribution */}
-            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+            <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-soft hover:shadow-medium transition-all duration-300">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <PieChartIcon className="h-5 w-5" />
@@ -770,7 +770,7 @@ export default function AnalyticsPage() {
         <TabsContent value="work-orders" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Work Orders Metrics */}
-            <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+            <Card className="bg-admin-bg-tertiary border border-admin-border-primary shadow-soft hover:shadow-medium transition-all duration-300">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Target className="h-5 w-5 mr-2" />

@@ -190,3 +190,41 @@ La búsqueda del pago interno se hace por `gateway_payment_intent_id` = preferen
 2. Probar webhook con un pago de prueba y verificar que el tier y la suscripción se actualicen.
 3. Fase B (confirm-payment + Bricks) para pago en página.
 4. Fase C cuando se requiera guardar tarjeta o suscripciones recurrentes.
+
+---
+
+## 10. Estado de implementación (actualizado)
+
+### Fase A – Completada
+
+| Tarea                                                   | Estado | Notas                                                                                     |
+| ------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------- |
+| Rutas y páginas `/checkout`, `/checkout/result`, layout | Hecho  | `src/app/checkout/page.tsx`, `result/page.tsx`, `layout.tsx`                              |
+| GET /api/checkout/tiers                                 | Hecho  | Requiere sesión                                                                           |
+| POST /api/checkout/create-intent                        | Hecho  | Sesión + organization_id desde admin_users                                                |
+| back_urls Mercado Pago                                  | Hecho  | `gateway.ts` usa `/checkout/result`                                                       |
+| Enlaces internos                                        | Hecho  | SubscriptionManagementSection, layout admin, subscription-required → `/checkout`          |
+| Flow y PayPal return/cancel URLs                        | Hecho  | Apuntan a `/checkout/result`                                                              |
+| Autenticación `/checkout`                               | Hecho  | Solo autenticados; sin sesión se muestra “Inicia sesión” con link a login                 |
+| Deprecar rutas admin                                    | Hecho  | `/admin/checkout` y `/admin/checkout/result` redirigen a `/checkout` y `/checkout/result` |
+| SubscriptionGuard                                       | Hecho  | No bloquea en `/checkout` (ni `/admin/checkout`)                                          |
+| CheckoutForm (legacy)                                   | Hecho  | Usa `/api/checkout/tiers`                                                                 |
+
+### Fase B – Completada
+
+| Tarea                              | Estado | Notas                                                                |
+| ---------------------------------- | ------ | -------------------------------------------------------------------- |
+| POST /api/checkout/confirm-payment | Hecho  | Recibe token, payment_method_id, issuer_id; crea pago en MP          |
+| Card Payment Brick en `/checkout`  | Hecho  | `CheckoutPageContent.tsx` con Bricks, payer email, upgrade/downgrade |
+| CSP                                | Hecho  | `secure-fields.mercadopago.com` en frame-src                         |
+| Webhook y payment_id               | Hecho  | Pagos Bricks se asocian por payment_id de MP                         |
+| Metadata subscription_tier         | Hecho  | create-intent y confirm-payment envían tier en metadata              |
+
+### Fase C – Completada (opcional)
+
+| Tarea                     | Estado | Notas                                                                                                                                                                                                             |
+| ------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Guardar método de pago    | Hecho  | Customers API de MP; columna `gateway_payment_method_id` en `subscriptions`; opción "Guardar tarjeta" en checkout; `createCustomerAndAddCard` en gateway                                                          |
+| Suscripciones recurrentes | Hecho  | PreApprovalPlan/PreApproval en gateway; `gateway_plan_id` en `subscription_tiers`; GET `/api/checkout/recurring-plans`, POST `/api/checkout/create-preapproval`; webhook `subscription_preapproval`/`preapproval` |
+
+**Archivos Fase C:** Migraciones `20260207000000_add_subscription_gateway_payment_method.sql`, `20260207000001_add_gateway_plan_id_to_subscription_tiers.sql`; `src/lib/payments/mercadopago/gateway.ts` (createCustomer, addCardToCustomer, createPreApprovalPlan, createPreApproval, getPreApproval); `src/lib/payments/services/payment-service.ts` (updateSubscriptionPaymentMethod); `src/app/api/checkout/confirm-payment/route.ts` (saveCard); `src/app/api/checkout/recurring-plans/route.ts`, `src/app/api/checkout/create-preapproval/route.ts`; `src/app/api/webhooks/mercadopago/route.ts` (topic subscription_preapproval/preapproval); `src/components/checkout/CheckoutPageContent.tsx` (checkbox Guardar tarjeta).

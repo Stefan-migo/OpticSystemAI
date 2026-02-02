@@ -325,4 +325,51 @@ export class PaymentService {
       gateway: payment.gateway,
     });
   }
+
+  /**
+   * Updates the subscription record with saved payment method (gateway customer + card id).
+   * Used after successful payment when user opts to save card (Phase C).
+   */
+  async updateSubscriptionPaymentMethod(
+    organizationId: string,
+    gatewayCustomerId: string,
+    gatewayPaymentMethodId: string,
+  ): Promise<void> {
+    const { data: existing } = await this.supabase
+      .from("subscriptions")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!existing) {
+      logger.warn("No subscription found to update payment method", {
+        organizationId,
+      });
+      return;
+    }
+
+    const { error } = await this.supabase
+      .from("subscriptions")
+      .update({
+        gateway_customer_id: gatewayCustomerId,
+        gateway_payment_method_id: gatewayPaymentMethodId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+
+    if (error) {
+      logger.error("Failed to update subscription payment method", error, {
+        organizationId,
+      });
+      throw new Error(
+        `Error updating subscription payment method: ${error.message}`,
+      );
+    }
+    logger.info("Subscription payment method updated", {
+      organizationId,
+      subscriptionId: existing.id,
+    });
+  }
 }

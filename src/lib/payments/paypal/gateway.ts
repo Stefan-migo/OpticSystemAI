@@ -89,8 +89,8 @@ export class PayPalGateway implements IPaymentGateway {
             },
           ],
           application_context: {
-            return_url: `${baseUrl}/admin/checkout?success=1&orderId=${orderId ?? ""}`,
-            cancel_url: `${baseUrl}/admin/checkout?success=0&orderId=${orderId ?? ""}`,
+            return_url: `${baseUrl}/checkout/result?success=1&orderId=${orderId ?? ""}`,
+            cancel_url: `${baseUrl}/checkout/result?success=0&orderId=${orderId ?? ""}`,
             user_action: "PAY_NOW",
           },
         }),

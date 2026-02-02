@@ -73,6 +73,77 @@ async function processWebhook(request: NextRequest): Promise<NextResponse> {
     const xSignature = request.headers.get("x-signature");
     const xRequestId = request.headers.get("x-request-id");
 
+    // Phase C: subscription/preapproval notifications (Plans and Subscriptions)
+    const subscriptionTopics = ["subscription_preapproval", "preapproval"];
+    if (topic && subscriptionTopics.includes(topic)) {
+      try {
+        if (!("getPreApproval" in mpGateway)) {
+          logger.warn("Mercado Pago: getPreApproval not available", { topic });
+          return NextResponse.json({ received: true }, { status: 200 });
+        }
+        const preapproval = await (
+          mpGateway as {
+            getPreApproval: (
+              id: string,
+            ) => Promise<{
+              id: string;
+              status: string;
+              external_reference?: string | null;
+            } | null>;
+          }
+        ).getPreApproval(id);
+        if (!preapproval?.external_reference) {
+          logger.warn(
+            "Mercado Pago preapproval webhook: no external_reference",
+            { id },
+          );
+          return NextResponse.json({ received: true }, { status: 200 });
+        }
+        const orgId = preapproval.external_reference;
+        const { data: sub } = await supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("gateway_subscription_id", id)
+          .eq("organization_id", orgId)
+          .maybeSingle();
+        if (sub) {
+          const statusMap: Record<string, string> = {
+            authorized: "active",
+            pending: "active",
+            cancelled: "cancelled",
+            paused: "past_due",
+          };
+          const newStatus =
+            statusMap[preapproval.status.toLowerCase()] ?? "active";
+          await supabase
+            .from("subscriptions")
+            .update({
+              status: newStatus,
+              updated_at: new Date().toISOString(),
+              ...(newStatus === "cancelled"
+                ? { canceled_at: new Date().toISOString() }
+                : {}),
+            })
+            .eq("id", sub.id);
+          logger.info(
+            "Mercado Pago subscription webhook: subscription updated",
+            {
+              id,
+              organizationId: orgId,
+              status: preapproval.status,
+            },
+          );
+        }
+      } catch (err) {
+        logger.error(
+          "Error processing subscription/preapproval webhook",
+          err instanceof Error ? err : new Error(String(err)),
+          { id, topic },
+        );
+      }
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
+
     if (topic === "merchant_order") {
       // Process merchant_order without signature: fetch order from MP API and update subscription.
       try {

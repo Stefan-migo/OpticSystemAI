@@ -408,7 +408,7 @@ export default function AdminDashboard() {
 
       {/* Stock Alert Banner - Compact */}
       {data.lowStockProducts.length > 0 && (
-        <Card className="border-none bg-admin-error/5 shadow-soft overflow-hidden animate-in slide-in-from-top duration-500">
+        <Card className="border-none bg-admin-bg-tertiary shadow-soft overflow-hidden animate-in slide-in-from-top duration-500">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -458,7 +458,7 @@ export default function AdminDashboard() {
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {/* Revenue Card */}
-            <Card className="border-none bg-admin-bg-secondary shadow-soft hover:shadow-premium-lg transition-all duration-300 group overflow-hidden">
+            <Card className="border-none bg-admin-bg-tertiary shadow-soft hover:shadow-premium-lg transition-all duration-300 group overflow-hidden">
               <CardContent className="p-6 relative">
                 <div className="flex items-start justify-between mb-4">
                   <div className="h-12 w-12 bg-admin-success/10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
@@ -501,14 +501,14 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.5] transition-opacity">
                   <DollarSign size={80} />
                 </div>
               </CardContent>
             </Card>
 
             {/* Appointments Card */}
-            <Card className="border-none bg-admin-bg-secondary shadow-soft hover:shadow-premium-lg transition-all duration-300 group overflow-hidden">
+            <Card className="border-none bg-admin-bg-tertiary shadow-soft hover:shadow-premium-lg transition-all duration-300 group overflow-hidden">
               <CardContent className="p-6 relative">
                 <div className="flex items-start justify-between mb-4">
                   <div className="h-12 w-12 bg-admin-accent-primary/10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
@@ -540,14 +540,14 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.5] transition-opacity">
                   <Calendar size={80} />
                 </div>
               </CardContent>
             </Card>
 
             {/* Products Card */}
-            <Card className="border-none bg-admin-bg-secondary shadow-soft hover:shadow-premium-lg transition-all duration-300 group overflow-hidden">
+            <Card className="border-none bg-admin-bg-tertiary shadow-soft hover:shadow-premium-lg transition-all duration-300 group overflow-hidden">
               <CardContent className="p-6 relative">
                 <div className="flex items-start justify-between mb-4">
                   <div className="h-12 w-12 bg-admin-accent-secondary/10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
@@ -592,14 +592,14 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.5] transition-opacity">
                   <Package size={80} />
                 </div>
               </CardContent>
             </Card>
 
             {/* Customers Card */}
-            <Card className="border-none bg-admin-bg-secondary shadow-soft hover:shadow-premium-lg transition-all duration-300 group overflow-hidden">
+            <Card className="border-none bg-admin-bg-tertiary shadow-soft hover:shadow-premium-lg transition-all duration-300 group overflow-hidden">
               <CardContent className="p-6 relative">
                 <div className="flex items-start justify-between mb-4">
                   <div className="h-12 w-12 bg-admin-info/10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
@@ -625,7 +625,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.5] transition-opacity">
                   <Users size={80} />
                 </div>
               </CardContent>
@@ -637,7 +637,7 @@ export default function AdminDashboard() {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Trend Chart */}
-        <Card className="border-none bg-admin-bg-secondary shadow-soft overflow-hidden group">
+        <Card className="border-none bg-admin-bg-tertiary shadow-soft overflow-hidden group">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 bg-admin-success/10 rounded-lg flex items-center justify-center">
@@ -755,7 +755,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Work Orders Status Distribution */}
-        <Card className="border-none bg-admin-bg-secondary shadow-soft overflow-hidden group">
+        <Card className="border-none bg-admin-bg-tertiary shadow-soft overflow-hidden group">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 bg-admin-accent-secondary/10 rounded-lg flex items-center justify-center">
@@ -941,7 +941,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Today's Appointments - Takes 2 columns */}
         <div className="lg:col-span-2">
-          <Card className="border-none bg-admin-bg-secondary shadow-soft hover:shadow-premium-lg transition-all duration-300">
+          <Card className="border-none bg-admin-bg-tertiary shadow-soft hover:shadow-premium-lg transition-all duration-300">
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -1039,7 +1039,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <Card className="border-none bg-admin-bg-secondary shadow-soft hover:shadow-premium-lg transition-all duration-300">
+        <Card className="border-none bg-admin-bg-tertiary shadow-soft hover:shadow-premium-lg transition-all duration-300">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 bg-admin-info/10 rounded-xl flex items-center justify-center">

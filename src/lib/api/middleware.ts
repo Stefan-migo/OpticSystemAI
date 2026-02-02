@@ -357,8 +357,8 @@ export function withSecurityHeaders(response: NextResponse): NextResponse {
         ? supabaseDomain
         : "https://*.supabase.co") +
       " https://*.supabase.co",
-    // Frames: allow trusted iframes (MercadoPago, MercadoLibre, ML static, Google, Supabase)
-    "frame-src 'self' https://www.mercadopago.com https://www.mercadolibre.com https://http2.mlstatic.com https://www.google.com " +
+    // Frames: allow trusted iframes (MercadoPago Bricks secure fields, MercadoLibre, ML static, Google, Supabase)
+    "frame-src 'self' https://www.mercadopago.com https://www.mercadolibre.com https://http2.mlstatic.com https://secure-fields.mercadopago.com https://www.google.com " +
       (supabaseDomain !== "https://*.supabase.co"
         ? supabaseDomain
         : "https://*.supabase.co"),

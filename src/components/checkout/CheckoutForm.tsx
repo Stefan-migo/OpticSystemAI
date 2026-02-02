@@ -34,7 +34,7 @@ export function CheckoutForm() {
   const [preferenceId, setPreferenceId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/checkout/tiers", { credentials: "include" })
+    fetch("/api/checkout/tiers", { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
         if (data.tiers?.length) setTiers(data.tiers);

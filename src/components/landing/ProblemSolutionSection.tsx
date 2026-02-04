@@ -59,7 +59,7 @@ export function ProblemSolutionSection() {
   ];
 
   return (
-    <section className="py-32 bg-gray-50/50" id="beneficios">
+    <section className="py-32 bg-[var(--admin-bg-primary)]" id="beneficios">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-24 max-w-3xl mx-auto">
           <h2 className="text-sm font-bold text-primary uppercase tracking-[0.3em] mb-4">

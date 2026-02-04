@@ -11,6 +11,7 @@ export type PaymentIntentResponse = {
   clientSecret?: string;
   preferenceId?: string;
   approvalUrl?: string;
+  invoiceUrl?: string;
   paymentId?: string;
   gatewayPaymentIntentId?: string;
   status: PaymentStatus;

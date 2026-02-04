@@ -99,10 +99,18 @@ export async function POST(
 
     logger.info(`Subscription action performed: ${action} on ${id}`);
 
+    const messages: Record<string, string> = {
+      cancel:
+        "Suscripción cancelada. La organización mantendrá el acceso hasta el final del periodo actual.",
+      reactivate: "Suscripción reactivada.",
+      extend: "Periodo extendido correctamente.",
+    };
+
     return NextResponse.json({
       success: true,
       subscription: updatedSub,
       action,
+      message: messages[action] || "Acción realizada.",
     });
   } catch (error) {
     if (error instanceof AuthorizationError) {

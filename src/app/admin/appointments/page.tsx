@@ -448,7 +448,7 @@ export default function AppointmentsPage() {
       </div>
 
       {/* View Controls */}
-      <Card className="border-none bg-admin-bg-secondary shadow-soft overflow-hidden">
+      <Card className="border-none bg-admin-bg-tertiary shadow-soft overflow-hidden">
         <CardContent className="p-4 md:p-6">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-4">
@@ -585,7 +585,7 @@ export default function AppointmentsPage() {
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* Sidebar Mini-Dashboard */}
         <div className="space-y-6 xl:col-span-1">
-          <Card className="border-none bg-admin-bg-secondary shadow-soft overflow-hidden">
+          <Card className="border-none bg-admin-bg-tertiary shadow-soft overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-bold text-admin-text-primary uppercase tracking-widest flex items-center gap-2">
                 <Activity className="h-4 w-4 text-admin-accent-primary" />
@@ -665,7 +665,7 @@ export default function AppointmentsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-none bg-admin-bg-secondary shadow-soft overflow-hidden">
+          <Card className="border-none bg-admin-bg-tertiary shadow-soft overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-bold text-admin-text-primary uppercase tracking-widest flex items-center gap-2">
                 <Settings className="h-4 w-4 text-admin-info" />
@@ -694,7 +694,7 @@ export default function AppointmentsPage() {
 
         {/* Calendar View - Main Area */}
         <Card
-          className="xl:col-span-3 border-none bg-admin-bg-secondary shadow-soft overflow-hidden min-h-[600px]"
+          className="xl:col-span-3 border-none bg-admin-bg-tertiary shadow-soft overflow-hidden min-h-[600px]"
           data-tour="appointments-calendar"
         >
           <CardContent className="p-0">

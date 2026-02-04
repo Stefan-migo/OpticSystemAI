@@ -65,8 +65,11 @@ const features = [
 
 export function FeaturesSection() {
   return (
-    <section className="py-32 bg-white" id="caracteristicas">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section
+      className="py-32 bg-[var(--admin-bg-primary)]"
+      id="caracteristicas"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-[var(--admin-bg-primary)]">
         <div className="text-center mb-24 max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-primary text-[10px] font-bold uppercase tracking-[0.2em] mb-6">
             <Sparkles className="h-4 w-4" />
@@ -86,9 +89,9 @@ export function FeaturesSection() {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="group p-8 bg-white rounded-[2rem] border border-gray-100 hover:border-primary/20 hover:shadow-premium-lg transition-all duration-500 hover:-translate-y-2"
+              className="group p-8 bg-[var(--admin-bg-tertiary)] rounded-[2rem] border border-gray-100 hover:border-primary/20 hover:shadow-premium-lg transition-all duration-500 hover:-translate-y-2"
             >
-              <div className="inline-flex p-4 bg-gray-50 rounded-2xl mb-6 text-gray-400 group-hover:bg-primary/10 group-hover:text-primary transition-all duration-500">
+              <div className="inline-flex p-4 bg-[var(--admin-bg-tertiary)] rounded-2xl mb-6 text-gray-400 group-hover:bg-primary/10 group-hover:text-primary transition-all duration-500">
                 <feature.icon className="h-7 w-7" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-primary transition-colors">

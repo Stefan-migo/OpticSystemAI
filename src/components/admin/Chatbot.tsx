@@ -48,7 +48,7 @@ export default function Chatbot(
   }, [setIsOpen]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end justify-end w-fit">
+    <div className="relative z-[100] flex flex-col items-end justify-end w-fit">
       {/* Chat Window - absolute so it doesn't expand parent and block clicks on right side */}
       <div
         className={cn(

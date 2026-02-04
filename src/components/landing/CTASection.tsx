@@ -13,7 +13,7 @@ export function CTASection() {
   };
 
   return (
-    <section className="py-32 relative overflow-hidden">
+    <section className="py-32 relative overflow-hidden bg-[var(--admin-bg-primary)]">
       {/* High-impact background */}
       <div className="absolute inset-0 bg-gray-900 -z-20"></div>
       <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/20 via-transparent to-blue-900/20 -z-10"></div>
@@ -28,7 +28,7 @@ export function CTASection() {
           <span>Comienza tu Nueva Era</span>
         </div>
 
-        <h2 className="text-4xl md:text-5xl lg:text-7xl font-malisha text-white mb-8 leading-tight">
+        <h2 className="text-4xl md:text-5xl lg:text-7xl font-malisha text-[var(--admin-accent-primary)] mb-8 leading-tight">
           Eleva tu Óptica al <br />
           <span className="text-primary italic">Estándar de Excelencia</span>
         </h2>
@@ -52,7 +52,7 @@ export function CTASection() {
             onClick={handleDemoClick}
             size="lg"
             variant="outline"
-            className="h-16 px-12 rounded-2xl border-white/20 text-white hover:bg-white/5 text-lg font-bold backdrop-blur-sm transition-all"
+            className="h-16 px-12 rounded-2xl border-[var(--admin-accent-secondary)] text-[var(--accent-foreground)] bg-[var(--admin-bg-tertiary)] hover:bg-white/5 text-lg font-bold backdrop-blur-sm transition-all"
           >
             Ver Demo Interactiva
           </Button>

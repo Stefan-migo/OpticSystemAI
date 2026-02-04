@@ -36,8 +36,10 @@ import {
 } from "lucide-react";
 import AdminNotificationDropdown from "@/components/admin/AdminNotificationDropdown";
 import Chatbot from "@/components/admin/Chatbot";
+import { InsightsFloatingButton } from "@/components/admin/InsightsFloatingButton";
 import { BranchSelector } from "@/components/admin/BranchSelector";
 import { ThemeSelector } from "@/components/theme-selector";
+import { useTheme } from "@/components/theme-provider";
 import { DemoModeBanner } from "@/components/onboarding/DemoModeBanner";
 import { TourProvider } from "@/components/onboarding/TourProvider";
 import { TourButton } from "@/components/onboarding/TourButton";
@@ -190,6 +192,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     hasOrganization: boolean | null;
     organizationName: string | null;
     organizationLogo: string | null;
+    organizationSlogan: string | null;
     isDemoMode: boolean;
     onboardingRequired: boolean;
     isChecking: boolean;
@@ -197,6 +200,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     hasOrganization: null,
     organizationName: null,
     organizationLogo: null,
+    organizationSlogan: null,
     isDemoMode: false,
     onboardingRequired: false,
     isChecking: true,
@@ -261,6 +265,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           setOrganizationState({
             hasOrganization: false,
             organizationName: null,
+            organizationLogo: null,
+            organizationSlogan: null,
             isDemoMode: false,
             onboardingRequired: false,
             isChecking: false,
@@ -276,6 +282,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           hasOrganization: true, // Root users no necesitan organización pero marcamos como true para evitar redirección
           organizationName: null,
           organizationLogo: null,
+          organizationSlogan: null,
           isDemoMode: false,
           onboardingRequired: false,
           isChecking: false,
@@ -301,6 +308,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             hasOrganization: data.organization.hasOrganization || isRootUser, // Root users no necesitan organización
             organizationName: data.organization.organizationName || null,
             organizationLogo: data.organization.organizationLogo || null,
+            organizationSlogan: data.organization.organizationSlogan || null,
             isDemoMode: data.organization.isDemoMode || false,
             onboardingRequired:
               data.organization.onboardingRequired && !isRootUser, // Root users nunca necesitan onboarding
@@ -347,6 +355,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               hasOrganization: true, // Root/dev no necesita organización pero marcamos como true
               organizationName: null,
               organizationLogo: null,
+              organizationSlogan: null,
               isDemoMode: false,
               onboardingRequired: false,
               isChecking: false,
@@ -359,6 +368,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             hasOrganization: false,
             organizationName: null,
             organizationLogo: null,
+            organizationSlogan: null,
             isDemoMode: false,
             onboardingRequired: true,
             isChecking: false,
@@ -381,6 +391,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             hasOrganization: true, // Root/dev no necesita organización
             organizationName: null,
             organizationLogo: null,
+            organizationSlogan: null,
             isDemoMode: false,
             onboardingRequired: false,
             isChecking: false,
@@ -391,6 +402,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             hasOrganization: false,
             organizationName: null,
             organizationLogo: null,
+            organizationSlogan: null,
             isDemoMode: false,
             onboardingRequired: true,
             isChecking: false,
@@ -909,11 +921,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                             businessConfig.displayName ||
                             businessConfig.name}
                         </h1>
-                        <p className="admin-header-subtitle font-caption text-admin-text-tertiary">
-                          {organizationState.organizationName
-                            ? "Panel de Administración"
-                            : businessConfig.admin.subtitle}
-                        </p>
+                        {organizationState.organizationSlogan ? (
+                          <p className="admin-header-subtitle font-caption text-admin-text-tertiary">
+                            {organizationState.organizationSlogan}
+                          </p>
+                        ) : (
+                          <p className="admin-header-subtitle font-caption text-admin-text-tertiary">
+                            {organizationState.organizationName
+                              ? "Panel de Administración"
+                              : businessConfig.admin.subtitle}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -948,8 +966,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
           </div>
 
-          {/* Chatbot - Floating Button */}
-          <Chatbot />
+          {/* Insights + Chatbot - Floating (Insights sobre Chat IA, ambos círculos) */}
+          <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3">
+            <InsightsFloatingButton />
+            <Chatbot />
+          </div>
 
           {/* Tour Help Button - Floating */}
           <TourButton />
@@ -984,6 +1005,8 @@ function AdminSidebar({
   organizationState?: {
     hasOrganization: boolean | null;
     organizationName: string | null;
+    organizationLogo: string | null;
+    organizationSlogan: string | null;
     isDemoMode: boolean;
     onboardingRequired: boolean;
     isChecking: boolean;
@@ -993,7 +1016,39 @@ function AdminSidebar({
   const { isSuperAdmin } = useBranch();
   const { isRoot } = useRoot();
   const { user, profile, signOut } = useAuthContext();
+  const { theme } = useTheme(); // Hook para detectar el tema
   const router = useRouter();
+
+  // Mapeo de logos por tema
+  const getThemeLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-opttius-dark.png";
+      case "blue":
+        return "/logo-opttius-blue.png";
+      case "green":
+        return "/logo-opttius-green.png";
+      case "red":
+        return "/logo-opttius-red.png";
+      default:
+        return "/logo-opttius.png";
+    }
+  };
+
+  const getThemeTextLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-text-dark.svg";
+      case "blue":
+        return "/logo-text-blue.svg";
+      case "green":
+        return "/logo-text-green.svg";
+      case "red":
+        return "/logo-text-red.svg";
+      default:
+        return "/logo-text-default.svg";
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -1006,21 +1061,20 @@ function AdminSidebar({
       <div className="admin-sidebar-header">
         <Link href="/" className="admin-sidebar-logo">
           <Image
-            src={businessConfig.admin.logo}
+            src={getThemeLogo()}
             alt="Logo"
-            width={40}
-            height={40}
-            className="rounded-xl shadow-md"
+            width={50}
+            height={50}
+            className="rounded-[30px] shadow-md"
           />
-          <div className="flex flex-col">
-            <span className="font-malisha text-lg leading-tight">
-              {businessConfig.name}
-            </span>
-            {organizationState?.organizationName && (
-              <span className="text-[10px] text-admin-text-tertiary font-medium truncate max-w-[150px]">
-                {organizationState.organizationName}
-              </span>
-            )}
+          <div className="flex flex-col ml-1">
+            <Image
+              src={getThemeTextLogo()}
+              alt="Opttius"
+              width={140}
+              height={30}
+              className="object-contain pt-2"
+            />
           </div>
         </Link>
       </div>
@@ -1082,7 +1136,7 @@ function AdminSidebar({
       {/* User & Footer Section */}
       <div className="mt-auto p-4 space-y-4 bg-admin-bg-tertiary/20">
         {/* User Profile Hookup */}
-        <div className="flex items-center gap-3 p-3 rounded-2xl bg-admin-bg-secondary shadow-sm border border-admin-border-primary">
+        <div className="flex items-center gap-3 p-3 rounded-2xl bg-admin-bg-tertiary shadow-sm border border-admin-border-primary">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
             {profile?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
           </div>
@@ -1113,7 +1167,7 @@ function AdminSidebar({
             <Button
               variant="outline"
               size="sm"
-              className="w-full text-[10px] gap-1.5 h-8"
+              className="w-full text-[10px] gap-1.5 h-8 bg-admin-bg-tertiary"
             >
               <HelpCircle className="h-3.5 w-3.5" />
               Ayuda
@@ -1123,7 +1177,7 @@ function AdminSidebar({
             variant="outline"
             size="sm"
             onClick={handleSignOut}
-            className="w-full text-[10px] gap-1.5 h-8 text-destructive hover:text-destructive"
+            className="w-full text-[10px] gap-1.5 h-8 text-destructive hover:text-destructive bg-[var(--admin-border-primary)]"
           >
             <LogOut className="h-3.5 w-3.5" />
             Salir

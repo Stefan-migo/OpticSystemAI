@@ -66,7 +66,7 @@ export default function OnboardingCompletePage() {
   // Mostrar loading mientras se verifica autenticación
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--admin-bg-primary)]">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
           <p className="text-gray-600">Preparando tu entorno...</p>
@@ -82,7 +82,7 @@ export default function OnboardingCompletePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--admin-bg-primary)] px-4 py-12">
       <div className="w-full max-w-md">
         <Card className="border-0 shadow-2xl">
           <CardHeader className="space-y-1 pb-6 text-center">
@@ -98,7 +98,7 @@ export default function OnboardingCompletePage() {
           </CardHeader>
           <CardContent className="space-y-6">
             {organizationInfo && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+              <div className="bg-[var(--admin-border-primary)] border border-[var(--accent-foreground)] rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2 text-blue-900">
                   <Building2 className="h-5 w-5" />
                   <span className="font-semibold">{organizationInfo.name}</span>
@@ -138,7 +138,7 @@ export default function OnboardingCompletePage() {
 
             <Button
               onClick={handleGoToAdmin}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+              className="w-full bg-[var(--accent-foreground)]"
               size="lg"
             >
               Ir al panel

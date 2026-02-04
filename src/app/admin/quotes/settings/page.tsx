@@ -107,8 +107,17 @@ export default function QuoteSettingsPage() {
     }
   };
 
+  const isGlobalView = !currentBranchId && isSuperAdmin;
+
   const handleSave = async () => {
     if (!settings) return;
+
+    if (isGlobalView) {
+      const confirmGlobal = window.confirm(
+        "¿Está seguro de que desea guardar esta configuración GLOBALMENTE? Se aplicará a todas las sucursales existentes y futuras.",
+      );
+      if (!confirmGlobal) return;
+    }
 
     try {
       setSaving(true);
@@ -137,11 +146,19 @@ export default function QuoteSettingsPage() {
         window.dispatchEvent(new Event("quote-settings-updated"));
       }
 
-      toast.success("Configuración guardada exitosamente", {
-        description:
-          "Los cambios se aplicarán automáticamente a los nuevos presupuestos",
-        duration: 5000,
-      });
+      if (currentBranchId) {
+        toast.success("Configuración guardada exitosamente", {
+          description:
+            "Los cambios se aplicarán automáticamente a los nuevos presupuestos en esta sucursal",
+          duration: 5000,
+        });
+      } else {
+        toast.success("Configuración GLOBAL guardada exitosamente", {
+          description:
+            "Los cambios se han aplicado a TODAS las sucursales de la organización",
+          duration: 7000,
+        });
+      }
     } catch (error) {
       console.error("Error saving settings:", error);
       toast.error("Error al guardar configuración");
@@ -300,11 +317,12 @@ export default function QuoteSettingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">
-            Configuración de Presupuestos
+            Configuración de Presupuestos {isGlobalView && "(VISTA GLOBAL)"}
           </h1>
           <p className="text-tierra-media mt-2">
-            Personaliza los valores por defecto y parámetros del sistema de
-            presupuestos
+            {isGlobalView
+              ? "Configura los parámetros predeterminados para todas las sucursales de la organización"
+              : "Personaliza los valores por defecto y parámetros del sistema de presupuestos"}
           </p>
         </div>
         <div className="flex items-center gap-2">

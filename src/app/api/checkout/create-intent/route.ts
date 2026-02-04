@@ -18,7 +18,9 @@ import { z } from "zod";
 const createCheckoutIntentSchema = z.object({
   amount: z.number().positive("El monto debe ser positivo"),
   currency: z.string().default("CLP"),
-  gateway: z.enum(["flow", "mercadopago", "paypal"]).default("mercadopago"),
+  gateway: z
+    .enum(["flow", "mercadopago", "paypal", "nowpayments"])
+    .default("mercadopago"),
   subscription_tier: z.enum(["basic", "pro", "premium"]).optional(),
   isUpgrade: z.boolean().optional(),
   isDowngrade: z.boolean().optional(),
@@ -105,8 +107,21 @@ export async function POST(request: NextRequest) {
         throw error;
       }
 
-      const { amount, currency, gateway, subscription_tier } = body;
-      const amountNum = Number(amount);
+      let { amount, currency, gateway, subscription_tier } = body;
+      let amountNum = Number(amount);
+
+      // NOWPayments normalization: Convert CLP to USD because NOWPayments doesn't support CLP fiat price
+      if (gateway === "nowpayments" && currency === "CLP") {
+        const CLP_TO_USD_RATE = 950; // Approximated rate for sandbox/testing
+        const originalAmount = amountNum;
+        amountNum = Math.round((amountNum / CLP_TO_USD_RATE) * 100) / 100;
+        currency = "USD";
+        logger.info("NOWPayments Currency Normalization Applied", {
+          original: `${originalAmount} CLP`,
+          normalized: `${amountNum} USD`,
+          rate: CLP_TO_USD_RATE,
+        });
+      }
       if (!Number.isFinite(amountNum) || amountNum <= 0) {
         return NextResponse.json(
           { error: "El monto debe ser un número positivo." },
@@ -213,7 +228,8 @@ export async function POST(request: NextRequest) {
         paymentId: paymentRecord.id,
         clientSecret: intentResponse.clientSecret,
         preferenceId: intentResponse.preferenceId,
-        approvalUrl: intentResponse.approvalUrl,
+        approvalUrl: intentResponse.approvalUrl || intentResponse.invoiceUrl,
+        invoiceUrl: intentResponse.invoiceUrl,
         gatewayPaymentIntentId: intentResponse.gatewayPaymentIntentId,
         status: intentResponse.status,
       });

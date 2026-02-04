@@ -51,9 +51,10 @@ export function DashboardSearch({ type, placeholder }: DashboardSearchProps) {
 
     setLoading(true);
     try {
-      const endpoint = type === "customer" 
-        ? `/api/admin/customers/search?q=${encodeURIComponent(query)}`
-        : `/api/admin/products/search?q=${encodeURIComponent(query)}&limit=10`;
+      const endpoint =
+        type === "customer"
+          ? `/api/admin/customers/search?q=${encodeURIComponent(query)}`
+          : `/api/admin/products/search?q=${encodeURIComponent(query)}&limit=10`;
 
       const response = await fetch(endpoint);
       const data = await response.json();
@@ -63,10 +64,13 @@ export function DashboardSearch({ type, placeholder }: DashboardSearchProps) {
           setResults(
             (data.customers || []).map((c: any) => ({
               id: c.id,
-              name: `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.email || "Sin nombre",
+              name:
+                `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+                c.email ||
+                "Sin nombre",
               type: "customer" as const,
               subtitle: c.email || c.phone || c.rut || "",
-            }))
+            })),
           );
         } else {
           setResults(
@@ -74,8 +78,9 @@ export function DashboardSearch({ type, placeholder }: DashboardSearchProps) {
               id: p.id,
               name: p.name,
               type: "product" as const,
-              subtitle: p.sku || p.barcode || `Stock: ${p.inventory_quantity || 0}`,
-            }))
+              subtitle:
+                p.sku || p.barcode || `Stock: ${p.inventory_quantity || 0}`,
+            })),
           );
         }
       }
@@ -105,12 +110,13 @@ export function DashboardSearch({ type, placeholder }: DashboardSearchProps) {
         className="w-full justify-start h-10 hover:bg-[#AE0000]/5 hover:border-[#AE0000] border-gray-300 transition-all duration-300"
       >
         {type === "customer" ? (
-          <User className="h-4 w-4 mr-2 flex-shrink-0" />
+          <User className="h-4 w-4 mr-2 flex-shrink-0 text-[var(--admin-accent-secondary)]" />
         ) : (
           <Package className="h-4 w-4 mr-2 flex-shrink-0" />
         )}
         <span className="truncate">
-          {placeholder || (type === "customer" ? "Buscar Cliente" : "Buscar Producto")}
+          {placeholder ||
+            (type === "customer" ? "Buscar Cliente" : "Buscar Producto")}
         </span>
       </Button>
 
@@ -128,7 +134,12 @@ export function DashboardSearch({ type, placeholder }: DashboardSearchProps) {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder={placeholder || (type === "customer" ? "Nombre, email o RUT..." : "Nombre, SKU o código de barras...")}
+                placeholder={
+                  placeholder ||
+                  (type === "customer"
+                    ? "Nombre, email o RUT..."
+                    : "Nombre, SKU o código de barras...")
+                }
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="pl-10"
@@ -183,4 +194,3 @@ export function DashboardSearch({ type, placeholder }: DashboardSearchProps) {
     </>
   );
 }
-

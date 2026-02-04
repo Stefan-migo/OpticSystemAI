@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     // Obtener información de la organización
     const { data: organization, error: orgError } = await supabaseServiceRole
       .from("organizations")
-      .select("id, name, slug, subscription_tier, status")
+      .select("id, name, slug, logo_url, slogan, subscription_tier, status")
       .eq("id", adminUser.organization_id)
       .single();
 
@@ -80,6 +80,8 @@ export async function GET(request: NextRequest) {
         id: organization.id,
         name: organization.name,
         slug: organization.slug,
+        logo_url: organization.logo_url,
+        slogan: organization.slogan,
         subscription_tier: organization.subscription_tier,
         status: organization.status,
       },
@@ -110,7 +112,7 @@ export async function GET(request: NextRequest) {
  * Body:
  * - name: string (requerido) - Nombre de la organización
  * - slug: string (requerido) - Identificador único URL-friendly
- * - subscription_tier: 'basic' | 'pro' | 'premium' (opcional, default: 'basic')
+ * - subscription_tier: 'basic' | 'pro' | 'premium' (opcional, default: 'pro')
  * - branchName: string (opcional) - Nombre de la primera sucursal
  *
  * Returns:

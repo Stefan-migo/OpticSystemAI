@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -72,23 +72,27 @@ const TIER_LABELS: Record<SubscriptionTier, string> = {
 };
 
 export function SubscriptionManagementSection() {
+  const router = useRouter();
   const [status, setStatus] = useState<SubscriptionStatusResult | null>(null);
   const [currentSubscription, setCurrentSubscription] =
     useState<CurrentSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [dbTiers, setDbTiers] = useState<any[]>([]);
 
   const fetchStatus = async () => {
     setLoading(true);
     try {
-      const [statusRes, subscriptionRes] = await Promise.all([
+      const [statusRes, subscriptionRes, tiersRes] = await Promise.all([
         fetch("/api/admin/subscription-status"),
         fetch("/api/checkout/current-subscription", { credentials: "include" }),
+        fetch("/api/checkout/tiers"),
       ]);
 
       const statusData = await statusRes.json();
       const subscriptionData = await subscriptionRes.json();
+      const tiersData = await tiersRes.json();
 
       if (statusRes.ok) {
         setStatus({
@@ -105,6 +109,10 @@ export function SubscriptionManagementSection() {
 
       if (subscriptionRes.ok) {
         setCurrentSubscription(subscriptionData);
+      }
+
+      if (tiersRes.ok) {
+        setDbTiers(tiersData.tiers || []);
       }
     } catch {
       setStatus(null);
@@ -206,7 +214,9 @@ export function SubscriptionManagementSection() {
   const isCancelled = status.status === "cancelled";
   const isExpired = status.isExpired;
   const currentTier = currentSubscription?.currentTier || "basic";
-  const tierConfig = TIER_LIMITS[currentTier];
+  const tierPrice =
+    dbTiers.find((t) => t.name === currentTier)?.price_monthly ||
+    TIER_LIMITS[currentTier].price;
 
   return (
     <div className="space-y-8">
@@ -284,7 +294,7 @@ export function SubscriptionManagementSection() {
               Inversión Mensual
             </p>
             <p className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter text-emerald-600">
-              ${tierConfig.price.toLocaleString()}{" "}
+              ${Number(tierPrice).toLocaleString()}{" "}
               <span className="text-xs text-slate-400">CLP</span>
             </p>
           </CardContent>
@@ -302,7 +312,7 @@ export function SubscriptionManagementSection() {
             </p>
             <Badge
               variant={isActive ? "healty" : "destructive"}
-              className="px-6 py-1.5 font-black text-[11px] tracking-widest bg-slate-100 dark:bg-slate-800 border-none shadow-sm"
+              className="px-6 py-1.5 font-black text-[11px] tracking-widest bg-[var(--admin-bg-primary)] border-solid border-[var(--admin-border-secondary)] shadow-sm"
             >
               {statusLabel.toUpperCase()}
             </Badge>
@@ -320,8 +330,9 @@ export function SubscriptionManagementSection() {
                   <CardTitle className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white uppercase mb-1">
                     Detalles de Facturación
                   </CardTitle>
-                  <CardDescription className="font-medium">
-                    Gestión administrativa de tu suscripción Enterprise
+                  <CardDescription className="font-medium text-[var(--admin-accent-primary)]">
+                    Gestión administrativa de tu suscripción{" "}
+                    {TIER_LABELS[currentTier] || "Básica"}
                   </CardDescription>
                 </div>
                 <div className="p-3 bg-primary rounded-3xl text-white shadow-xl shadow-primary/20">
@@ -353,24 +364,37 @@ export function SubscriptionManagementSection() {
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Método Principal
                   </p>
-                  <p className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                    <CreditCard className="h-4 w-4" /> Visa •••• 4242
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      {currentSubscription?.hasSubscription
+                        ? currentSubscription.subscription?.status === "active"
+                          ? "Pasarela Activa"
+                          : "Pendiente de Configurar"
+                        : "No Registrado"}
+                    </p>
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-[10px] font-black uppercase text-primary"
+                      onClick={() => router.push("/checkout")}
+                    >
+                      Configurar
+                    </Button>
+                  </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="pt-8 border-t border-slate-200/50 dark:border-slate-800/50 flex flex-col sm:flex-row gap-4">
                 <Button
-                  asChild
+                  type="button"
                   size="lg"
-                  className="h-14 rounded-2xl font-bold px-10 shadow-xl shadow-primary/25"
+                  className="inline-flex h-14 rounded-2xl font-bold px-10 shadow-xl shadow-primary/25"
                   shimmer
+                  onClick={() => router.push("/checkout")}
                 >
-                  <Link href="/checkout">
-                    <RefreshCw className="h-5 w-5 mr-2" />
-                    Actualizar o Cambiar Plan
-                  </Link>
+                  <RefreshCw className="h-5 w-5 mr-2" />
+                  Actualizar o Cambiar Plan
                 </Button>
 
                 {isActive && (

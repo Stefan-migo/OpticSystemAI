@@ -45,7 +45,8 @@ export async function GET(
           name,
           brand,
           lens_type,
-          lens_material
+          lens_material,
+          organization_id
         )
       `,
       )
@@ -63,6 +64,30 @@ export async function GET(
       return NextResponse.json(
         { error: "Error al cargar matriz de precios" },
         { status: 500 },
+      );
+    }
+
+    // Enforce organization ownership
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+    const isSuperAdmin =
+      (adminUser as { role?: string })?.role === "super_admin";
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
+    const familyOrgId = (
+      matrix.lens_families as { organization_id?: string } | null
+    )?.organization_id;
+    if (
+      !isSuperAdmin &&
+      userOrganizationId &&
+      familyOrgId !== userOrganizationId
+    ) {
+      return NextResponse.json(
+        { error: "Matriz de precios no encontrada" },
+        { status: 404 },
       );
     }
 
@@ -101,6 +126,36 @@ export async function PUT(
         { error: "Admin access required" },
         { status: 403 },
       );
+    }
+
+    // Verify matrix's lens_family belongs to user's organization
+    const { data: matrixRow } = await supabase
+      .from("lens_price_matrices")
+      .select("lens_family_id")
+      .eq("id", params.id)
+      .single();
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+    const isSuperAdmin =
+      (adminUser as { role?: string })?.role === "super_admin";
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
+    if (matrixRow && !isSuperAdmin && userOrganizationId) {
+      const { data: family } = await supabase
+        .from("lens_families")
+        .select("id")
+        .eq("id", matrixRow.lens_family_id)
+        .eq("organization_id", userOrganizationId)
+        .maybeSingle();
+      if (!family) {
+        return NextResponse.json(
+          { error: "Matriz de precios no encontrada" },
+          { status: 404 },
+        );
+      }
     }
 
     // Validate body
@@ -180,6 +235,36 @@ export async function DELETE(
         { error: "Admin access required" },
         { status: 403 },
       );
+    }
+
+    // Verify matrix's lens_family belongs to user's organization before delete
+    const { data: matrixRow } = await supabase
+      .from("lens_price_matrices")
+      .select("lens_family_id")
+      .eq("id", params.id)
+      .single();
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+    const isSuperAdmin =
+      (adminUser as { role?: string })?.role === "super_admin";
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
+    if (matrixRow && !isSuperAdmin && userOrganizationId) {
+      const { data: family } = await supabase
+        .from("lens_families")
+        .select("id")
+        .eq("id", matrixRow.lens_family_id)
+        .eq("organization_id", userOrganizationId)
+        .maybeSingle();
+      if (!family) {
+        return NextResponse.json(
+          { error: "Matriz de precios no encontrada" },
+          { status: 404 },
+        );
+      }
     }
 
     // Delete price matrix (hard delete)

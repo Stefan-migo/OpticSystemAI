@@ -272,6 +272,100 @@ Documentos del plan e implementación del panel root/dev:
 
 ---
 
+### 6k. **NOWPayments - Pagos con Criptomonedas** ✅ COMPLETADO (2026-02-03)
+
+Documentación completa de la integración de pagos con criptomonedas:
+
+#### Documentos Principales:
+
+- **NOWPAYMENTS_RESUMEN_REGISTRO.md** ⚡ – Resumen ejecutivo del proceso de registro (5 minutos)
+  - Proceso en 3 pasos
+  - Sandbox vs Producción
+  - Inicio rápido
+  - FAQ
+
+- **NOWPAYMENTS_REGISTRO_GUIA.md** 📖 – Guía completa paso a paso de registro
+  - Crear cuenta en NOWPayments
+  - Configurar perfil de negocio
+  - Configurar billetera de pagos
+  - Obtener API Keys (Sandbox y Production)
+  - Configurar IPN (webhooks)
+  - Proceso KYC completo
+  - Solución de problemas
+
+- **CRYPTO_PAYMENTS_QUICKSTART.md** 🚀 – Guía de inicio rápido (5 minutos)
+  - Configuración rápida
+  - Testing local
+  - Verificación de instalación
+  - Troubleshooting
+
+- **CRYPTO_PAYMENTS_IMPLEMENTATION_SUMMARY.md** 📋 – Resumen de implementación
+  - Archivos creados (10 nuevos)
+  - Archivos modificados (7)
+  - Arquitectura técnica
+  - Características implementadas
+  - Métricas y estado
+
+- **CRYPTO_PAYMENTS_TESTING_GUIDE.md** 🧪 – Guía de testing
+  - Casos de prueba
+  - Mocking de webhooks
+  - Verificación en Supabase
+  - Troubleshooting
+
+- **CRYPTO_PAYMENTS_DEPLOYMENT_CHECKLIST.md** ✅ – Checklist de producción
+  - Pre-deployment
+  - Deployment steps
+  - Post-deployment
+  - Monitoring setup
+  - Rollback plan
+
+#### Documentación Técnica:
+
+- **src/lib/payments/nowpayments/README.md** 🔧 – Documentación técnica completa
+  - Características y arquitectura
+  - Configuración detallada
+  - API reference
+  - Status mapping
+  - Testing
+  - Security considerations
+
+#### Herramientas:
+
+- **scripts/setup-nowpayments.js** – Script de configuración interactivo
+  - Validación de API keys
+  - Testing de conectividad
+  - Configuración automática de .env.local
+
+#### Implementación:
+
+✅ **Gateway Implementation:**
+
+- `src/lib/payments/nowpayments/gateway.ts` (239 líneas)
+- `src/app/api/webhooks/nowpayments/route.ts` (67 líneas)
+
+✅ **Testing:**
+
+- `src/__tests__/unit/lib/payments/nowpayments-gateway.test.ts` (165 líneas)
+- `src/__tests__/integration/api/webhooks/nowpayments.test.ts` (125 líneas)
+
+✅ **Características:**
+
+- Soporte para 300+ criptomonedas (BTC, ETH, USDT, etc.)
+- Verificación HMAC-SHA512 de webhooks
+- Sandbox mode para testing
+- Hosted invoice pages
+- Multi-gateway architecture
+
+👉 **Usar cuando:**
+
+- Necesitas configurar pagos con criptomonedas
+- Quieres registrarte en NOWPayments
+- Necesitas probar la integración
+- Vas a desplegar a producción
+- Necesitas troubleshooting de crypto payments
+
+---
+
 ### 7. **Cómo ejecutar tests**
 
 **Estructura:** `src/__tests__/unit/` (unitarios), `src/__tests__/integration/api/` (integración).

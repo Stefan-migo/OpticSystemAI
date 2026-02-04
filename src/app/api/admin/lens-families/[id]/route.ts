@@ -55,6 +55,27 @@ export async function GET(
       );
     }
 
+    // Enforce organization ownership (super_admin can access any)
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+    const isSuperAdmin =
+      (adminUser as { role?: string })?.role === "super_admin";
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
+    if (
+      !isSuperAdmin &&
+      userOrganizationId &&
+      family.organization_id !== userOrganizationId
+    ) {
+      return NextResponse.json(
+        { error: "Familia de lentes no encontrada" },
+        { status: 404 },
+      );
+    }
+
     return NextResponse.json({ family });
   } catch (error) {
     logger.error("Error in lens families API GET [id]", error);
@@ -92,7 +113,34 @@ export async function PUT(
       );
     }
 
-    // Validate body
+    // Verify family belongs to user's organization before update
+    const { data: existing } = await supabase
+      .from("lens_families")
+      .select("organization_id")
+      .eq("id", params.id)
+      .single();
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+    const isSuperAdmin =
+      (adminUser as { role?: string })?.role === "super_admin";
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
+    if (
+      existing &&
+      !isSuperAdmin &&
+      userOrganizationId &&
+      existing.organization_id !== userOrganizationId
+    ) {
+      return NextResponse.json(
+        { error: "Familia de lentes no encontrada" },
+        { status: 404 },
+      );
+    }
+
+    // Validate body (do not allow changing organization_id via update)
     const body = await parseAndValidateBody(request, updateLensFamilySchema);
 
     // Update lens family
@@ -154,6 +202,33 @@ export async function DELETE(
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },
+      );
+    }
+
+    // Verify family belongs to user's organization before delete
+    const { data: existing } = await supabase
+      .from("lens_families")
+      .select("organization_id")
+      .eq("id", params.id)
+      .single();
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+    const isSuperAdmin =
+      (adminUser as { role?: string })?.role === "super_admin";
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
+    if (
+      existing &&
+      !isSuperAdmin &&
+      userOrganizationId &&
+      existing.organization_id !== userOrganizationId
+    ) {
+      return NextResponse.json(
+        { error: "Familia de lentes no encontrada" },
+        { status: 404 },
       );
     }
 

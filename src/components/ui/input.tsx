@@ -107,7 +107,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const computedVariant = error ? "error" : success ? "success" : variant;
 
     return (
-      <div className="w-full space-y-2">
+      <div className="w-full space-y-2" style={{ background: "unset" }}>
         {label && (
           <label className="text-sm font-medium text-foreground font-body">
             {label}

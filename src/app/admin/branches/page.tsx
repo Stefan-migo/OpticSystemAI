@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -23,14 +29,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Plus,
   Edit,
@@ -42,9 +48,9 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { useBranch } from '@/hooks/useBranch';
+} from "lucide-react";
+import { toast } from "sonner";
+import { useBranch } from "@/hooks/useBranch";
 
 interface Branch {
   id: string;
@@ -75,16 +81,16 @@ export default function BranchesPage() {
 
   // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    code: '',
-    address_line_1: '',
-    address_line_2: '',
-    city: '',
-    state: '',
-    postal_code: '',
-    country: 'Chile',
-    phone: '',
-    email: '',
+    name: "",
+    code: "",
+    address_line_1: "",
+    address_line_2: "",
+    city: "",
+    state: "",
+    postal_code: "",
+    country: "Chile",
+    phone: "",
+    email: "",
     is_active: true,
   });
 
@@ -95,17 +101,17 @@ export default function BranchesPage() {
   const fetchBranches = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/admin/branches');
-      
+      const response = await fetch("/api/admin/branches");
+
       if (!response.ok) {
-        throw new Error('Failed to fetch branches');
+        throw new Error("Failed to fetch branches");
       }
 
       const data = await response.json();
       setBranches(data.branches || []);
     } catch (error: any) {
-      console.error('Error fetching branches:', error);
-      toast.error('Error al cargar sucursales');
+      console.error("Error fetching branches:", error);
+      toast.error("Error al cargar sucursales");
     } finally {
       setIsLoading(false);
     }
@@ -117,29 +123,29 @@ export default function BranchesPage() {
       setFormData({
         name: branch.name,
         code: branch.code,
-        address_line_1: branch.address_line_1 || '',
-        address_line_2: branch.address_line_2 || '',
-        city: branch.city || '',
-        state: branch.state || '',
-        postal_code: branch.postal_code || '',
-        country: branch.country || 'Chile',
-        phone: branch.phone || '',
-        email: branch.email || '',
+        address_line_1: branch.address_line_1 || "",
+        address_line_2: branch.address_line_2 || "",
+        city: branch.city || "",
+        state: branch.state || "",
+        postal_code: branch.postal_code || "",
+        country: branch.country || "Chile",
+        phone: branch.phone || "",
+        email: branch.email || "",
         is_active: branch.is_active,
       });
     } else {
       setSelectedBranch(null);
       setFormData({
-        name: '',
-        code: '',
-        address_line_1: '',
-        address_line_2: '',
-        city: '',
-        state: '',
-        postal_code: '',
-        country: 'Chile',
-        phone: '',
-        email: '',
+        name: "",
+        code: "",
+        address_line_1: "",
+        address_line_2: "",
+        city: "",
+        state: "",
+        postal_code: "",
+        country: "Chile",
+        phone: "",
+        email: "",
         is_active: true,
       });
     }
@@ -153,9 +159,9 @@ export default function BranchesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.code) {
-      toast.error('El nombre y código son obligatorios');
+      toast.error("El nombre y código son obligatorios");
       return;
     }
 
@@ -163,29 +169,29 @@ export default function BranchesPage() {
       setIsSubmitting(true);
       const url = selectedBranch
         ? `/api/admin/branches/${selectedBranch.id}`
-        : '/api/admin/branches';
-      
-      const method = selectedBranch ? 'PUT' : 'POST';
+        : "/api/admin/branches";
+
+      const method = selectedBranch ? "PUT" : "POST";
 
       const response = await fetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Error al guardar sucursal');
+        throw new Error(error.error || "Error al guardar sucursal");
       }
 
       toast.success(
         selectedBranch
-          ? 'Sucursal actualizada exitosamente'
-          : 'Sucursal creada exitosamente'
+          ? "Sucursal actualizada exitosamente"
+          : "Sucursal creada exitosamente",
       );
-      
+
       handleCloseDialog();
       fetchBranches();
       // Refresh branches in context so selector updates
@@ -193,8 +199,8 @@ export default function BranchesPage() {
         await refreshBranches();
       }
     } catch (error: any) {
-      console.error('Error saving branch:', error);
-      toast.error(error.message || 'Error al guardar sucursal');
+      console.error("Error saving branch:", error);
+      toast.error(error.message || "Error al guardar sucursal");
     } finally {
       setIsSubmitting(false);
     }
@@ -206,15 +212,15 @@ export default function BranchesPage() {
     try {
       setIsSubmitting(true);
       const response = await fetch(`/api/admin/branches/${selectedBranch.id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Error al eliminar sucursal');
+        throw new Error(error.error || "Error al eliminar sucursal");
       }
 
-      toast.success('Sucursal eliminada exitosamente');
+      toast.success("Sucursal eliminada exitosamente");
       setIsDeleteDialogOpen(false);
       setSelectedBranch(null);
       fetchBranches();
@@ -223,8 +229,8 @@ export default function BranchesPage() {
         await refreshBranches();
       }
     } catch (error: any) {
-      console.error('Error deleting branch:', error);
-      toast.error(error.message || 'Error al eliminar sucursal');
+      console.error("Error deleting branch:", error);
+      toast.error(error.message || "Error al eliminar sucursal");
     } finally {
       setIsSubmitting(false);
     }
@@ -254,7 +260,7 @@ export default function BranchesPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold mb-2">Gestión de Sucursales</h1>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--admin-accent-primary)]">
             Administra las sucursales de tu negocio
           </p>
         </div>
@@ -268,12 +274,12 @@ export default function BranchesPage() {
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {selectedBranch ? 'Editar Sucursal' : 'Nueva Sucursal'}
+                {selectedBranch ? "Editar Sucursal" : "Nueva Sucursal"}
               </DialogTitle>
               <DialogDescription>
                 {selectedBranch
-                  ? 'Modifica la información de la sucursal'
-                  : 'Completa los datos para crear una nueva sucursal'}
+                  ? "Modifica la información de la sucursal"
+                  : "Completa los datos para crear una nueva sucursal"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
@@ -301,7 +307,10 @@ export default function BranchesPage() {
                       id="code"
                       value={formData.code}
                       onChange={(e) =>
-                        setFormData({ ...formData, code: e.target.value.toUpperCase() })
+                        setFormData({
+                          ...formData,
+                          code: e.target.value.toUpperCase(),
+                        })
                       }
                       placeholder="Ej: SUC-001"
                       required
@@ -321,7 +330,10 @@ export default function BranchesPage() {
                     id="address_line_1"
                     value={formData.address_line_1}
                     onChange={(e) =>
-                      setFormData({ ...formData, address_line_1: e.target.value })
+                      setFormData({
+                        ...formData,
+                        address_line_1: e.target.value,
+                      })
                     }
                     placeholder="Calle y número"
                   />
@@ -333,7 +345,10 @@ export default function BranchesPage() {
                     id="address_line_2"
                     value={formData.address_line_2}
                     onChange={(e) =>
-                      setFormData({ ...formData, address_line_2: e.target.value })
+                      setFormData({
+                        ...formData,
+                        address_line_2: e.target.value,
+                      })
                     }
                     placeholder="Depto, oficina, etc."
                   />
@@ -368,7 +383,10 @@ export default function BranchesPage() {
                       id="postal_code"
                       value={formData.postal_code}
                       onChange={(e) =>
-                        setFormData({ ...formData, postal_code: e.target.value })
+                        setFormData({
+                          ...formData,
+                          postal_code: e.target.value,
+                        })
                       }
                       placeholder="Código postal"
                     />
@@ -416,9 +434,12 @@ export default function BranchesPage() {
                 <div className="space-y-2">
                   <Label htmlFor="is_active">Estado</Label>
                   <Select
-                    value={formData.is_active ? 'active' : 'inactive'}
+                    value={formData.is_active ? "active" : "inactive"}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, is_active: value === 'active' })
+                      setFormData({
+                        ...formData,
+                        is_active: value === "active",
+                      })
                     }
                   >
                     <SelectTrigger>
@@ -447,7 +468,7 @@ export default function BranchesPage() {
                       Guardando...
                     </>
                   ) : (
-                    'Guardar'
+                    "Guardar"
                   )}
                 </Button>
               </DialogFooter>
@@ -459,7 +480,7 @@ export default function BranchesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Sucursales</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-[var(--admin-accent-primary)]">
             Lista de todas las sucursales del negocio
           </CardDescription>
         </CardHeader>
@@ -484,8 +505,12 @@ export default function BranchesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Código</TableHead>
+                  <TableHead className="text-[var(--admin-accent-primary)]">
+                    Nombre
+                  </TableHead>
+                  <TableHead className="text-[var(--admin-accent-primary)]">
+                    Código
+                  </TableHead>
                   <TableHead>Ubicación</TableHead>
                   <TableHead>Contacto</TableHead>
                   <TableHead>Estado</TableHead>
@@ -500,12 +525,12 @@ export default function BranchesPage() {
                       <Badge variant="outline">{branch.code}</Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
+                      <div className="flex items-center gap-2 text-sm text-foreground">
+                        <MapPin className="h-4 w-4 text-[var(--accent-foreground)]" />
                         <span>
                           {branch.city || branch.state
-                            ? `${branch.city || ''}${branch.city && branch.state ? ', ' : ''}${branch.state || ''}`
-                            : 'Sin ubicación'}
+                            ? `${branch.city || ""}${branch.city && branch.state ? ", " : ""}${branch.state || ""}`
+                            : "Sin ubicación"}
                         </span>
                       </div>
                     </TableCell>
@@ -524,7 +549,7 @@ export default function BranchesPage() {
                           </div>
                         )}
                         {!branch.phone && !branch.email && (
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-foreground">
                             Sin contacto
                           </span>
                         )}
@@ -559,7 +584,7 @@ export default function BranchesPage() {
                             setSelectedBranch(branch);
                             setIsDeleteDialogOpen(true);
                           }}
-                          disabled={branch.code === 'MAIN'}
+                          disabled={branch.code === "MAIN"}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -578,11 +603,13 @@ export default function BranchesPage() {
           <DialogHeader>
             <DialogTitle>¿Eliminar sucursal?</DialogTitle>
             <DialogDescription>
-              Esta acción no se puede deshacer. Se eliminará la sucursal{' '}
-              <strong>{selectedBranch?.name}</strong> y todos sus datos asociados.
-              {selectedBranch?.code === 'MAIN' && (
+              Esta acción no se puede deshacer. Se eliminará la sucursal{" "}
+              <strong>{selectedBranch?.name}</strong> y todos sus datos
+              asociados.
+              {selectedBranch?.code === "MAIN" && (
                 <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                  <strong>Advertencia:</strong> No se puede eliminar la sucursal principal.
+                  <strong>Advertencia:</strong> No se puede eliminar la sucursal
+                  principal.
                 </div>
               )}
             </DialogDescription>
@@ -601,7 +628,7 @@ export default function BranchesPage() {
             <Button
               variant="destructive"
               onClick={handleDelete}
-              disabled={isSubmitting || selectedBranch?.code === 'MAIN'}
+              disabled={isSubmitting || selectedBranch?.code === "MAIN"}
             >
               {isSubmitting ? (
                 <>
@@ -609,7 +636,7 @@ export default function BranchesPage() {
                   Eliminando...
                 </>
               ) : (
-                'Eliminar'
+                "Eliminar"
               )}
             </Button>
           </DialogFooter>

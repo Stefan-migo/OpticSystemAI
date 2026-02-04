@@ -275,7 +275,7 @@ export default function ResetPasswordPage() {
                         )}
                         disabled={authLoading}
                       />
-                      <Mail className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 transition-colors group-focus-within:text-primary" />
+                      <Mail className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 transition-colors group-focus-within:text-accent-foreground" />
                     </div>
                     {requestForm.formState.errors.email && (
                       <p className="text-[10px] text-red-500 font-black uppercase tracking-tight ml-1">

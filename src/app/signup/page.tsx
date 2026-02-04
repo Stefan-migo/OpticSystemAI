@@ -34,6 +34,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/components/theme-provider";
 
 const signupSchema = z
   .object({
@@ -65,12 +66,43 @@ type SignupForm = z.infer<typeof signupSchema>;
 export default function SignupPage() {
   const router = useRouter();
   const { signUp, loading } = useAuthContext();
+  const { theme } = useTheme();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [requiresEmailConfirmation, setRequiresEmailConfirmation] =
     useState(false);
+
+  const getThemeLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-opttius-dark.png";
+      case "blue":
+        return "/logo-opttius-blue.png";
+      case "green":
+        return "/logo-opttius-green.png";
+      case "red":
+        return "/logo-opttius-red.png";
+      default:
+        return "/logo-opttius.png";
+    }
+  };
+
+  const getThemeTextLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-text-dark.svg";
+      case "blue":
+        return "/logo-text-blue.svg";
+      case "green":
+        return "/logo-text-green.svg";
+      case "red":
+        return "/logo-text-red.svg";
+      default:
+        return "/logo-text-default.svg";
+    }
+  };
 
   const {
     register,
@@ -236,18 +268,22 @@ export default function SignupPage() {
 
           <div className="relative z-10 flex flex-col justify-between p-12 w-full">
             <div className="flex items-center gap-4">
-              <div className="h-14 w-14 bg-white rounded-3xl flex items-center justify-center shadow-premium-lg overflow-hidden p-2">
+              <div className="h-14 w-14 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl flex items-center justify-center shadow-premium-lg overflow-hidden p-2">
                 <Image
-                  src="/logo-opttius.png"
+                  src={getThemeLogo()}
                   alt="Opttius Logo"
                   width={40}
                   height={40}
-                  className="object-contain"
+                  className="object-contain transition-all duration-500 brightness-100"
                 />
               </div>
-              <span className="text-3xl font-black text-white tracking-tighter uppercase">
-                Opttius
-              </span>
+              <Image
+                src={getThemeTextLogo()}
+                alt="Opttius"
+                width={140}
+                height={40}
+                className="object-contain brightness-0 invert"
+              />
             </div>
 
             <div className="max-w-xl">
@@ -258,7 +294,7 @@ export default function SignupPage() {
                 tecnología.
               </h2>
               <div className="h-1 w-24 bg-admin-accent-primary rounded-full mb-8" />
-              <p className="text-xl text-white/80 font-medium leading-relaxed">
+              <p className="text-xl text-[var(--background)] font-medium leading-relaxed bg-[rgba(240,253,244,0.1)] rounded-[10px]">
                 Únete a la red de ópticas que están transformando la salud
                 visual con gestión inteligente y experiencia de usuario
                 superior.
@@ -274,21 +310,25 @@ export default function SignupPage() {
         </div>
 
         {/* Right Side: Success Message */}
-        <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-12 lg:p-20 bg-slate-50/50 relative overflow-y-auto">
+        <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-12 lg:p-20 bg-[var(--admin-bg-primary)] relative overflow-y-auto">
           <div className="absolute top-0 right-0 p-8 flex items-center gap-3 lg:hidden">
             <Image
-              src="/logo-opttius.png"
+              src={getThemeLogo()}
               alt="Opttius Logo"
               width={32}
               height={32}
               className="object-contain"
             />
-            <span className="text-xl font-black text-admin-text-primary tracking-tighter uppercase">
-              Opttius
-            </span>
+            <Image
+              src={getThemeTextLogo()}
+              alt="Opttius"
+              width={80}
+              height={25}
+              className="object-contain"
+            />
           </div>
           <div className="w-full max-w-md animate-in zoom-in-95 duration-500">
-            <Card className="border-none bg-white shadow-premium-lg rounded-[2.5rem] overflow-hidden">
+            <Card className="border-none bg-[var(--admin-bg-tertiary)] shadow-premium-lg rounded-[2.5rem] overflow-hidden">
               <CardContent className="p-10 text-center">
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-admin-success/10 rounded-3xl mb-8">
                   <CheckCircle2 className="h-10 w-10 text-admin-success" />
@@ -303,7 +343,7 @@ export default function SignupPage() {
 
                 {requiresEmailConfirmation ? (
                   <div className="space-y-8">
-                    <div className="p-6 bg-admin-info/5 border border-admin-info/20 rounded-2xl text-left">
+                    <div className="p-6 bg-admin-info/5 border border-[var(--accent-foreground)] rounded-2xl text-left">
                       <p className="text-xs font-bold text-admin-text-secondary leading-relaxed">
                         Por favor, revisa tu correo electrónico y haz clic en el
                         enlace de confirmación para activar tu cuenta.
@@ -311,7 +351,7 @@ export default function SignupPage() {
                     </div>
                     <Button
                       onClick={() => router.push("/login")}
-                      className="w-full h-14 bg-admin-accent-primary hover:bg-admin-accent-primary/90 text-white rounded-2xl shadow-premium-md font-black uppercase text-[11px] tracking-widest transition-all"
+                      className="w-full h-14 border border-[var(--admin-border-secondary)] bg-admin-accent-primary hover:bg-admin-accent-primary/90 text-white rounded-2xl shadow-premium-md font-black uppercase text-[11px] tracking-widest transition-all"
                     >
                       Ir a Iniciar Sesión
                       <ArrowRight className="ml-2 h-5 w-5" />
@@ -364,16 +404,20 @@ export default function SignupPage() {
           <div className="flex items-center gap-5 group cursor-pointer w-fit">
             <div className="h-16 w-16 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[2rem] flex items-center justify-center shadow-2xl transition-all duration-500 group-hover:bg-white group-hover:scale-110">
               <Image
-                src="/logo-opttius.png"
+                src={getThemeLogo()}
                 alt="Opttius Logo"
                 width={42}
                 height={42}
-                className="object-contain transition-all duration-500 group-hover:brightness-100 invert group-hover:invert-0"
+                className="object-contain transition-all duration-500 group-hover:brightness-100"
               />
             </div>
-            <span className="text-4xl font-black text-white tracking-tighter uppercase font-heading">
-              Opttius
-            </span>
+            <Image
+              src={getThemeTextLogo()}
+              alt="Opttius"
+              width={160}
+              height={50}
+              className="object-contain brightness-0 invert"
+            />
           </div>
 
           {/* Main Content */}
@@ -438,13 +482,17 @@ export default function SignupPage() {
       </div>
 
       {/* Right Side: Signup Form */}
-      <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 xl:p-24 relative z-10 overflow-y-auto">
+      <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 xl:p-24 relative z-10 overflow-y-auto bg-[var(--admin-bg-primary)]">
         {/* Mobile Header */}
         <div className="absolute top-8 left-8 flex items-center gap-3 lg:hidden">
-          <Image src="/logo-opttius.png" alt="Logo" width={32} height={32} />
-          <span className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">
-            Opttius
-          </span>
+          <Image src={getThemeLogo()} alt="Logo" width={32} height={32} />
+          <Image
+            src={getThemeTextLogo()}
+            alt="Opttius"
+            width={100}
+            height={30}
+            className="object-contain"
+          />
         </div>
 
         <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-10 duration-700">
@@ -486,7 +534,7 @@ export default function SignupPage() {
                         placeholder="Juan"
                         {...register("firstName")}
                         className={cn(
-                          "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold",
+                          "h-14 rounded-2xl border-[var(--admin-border-secondary)] bg-[var(--admin-bg-primary)] pl-12 focus:bg-[var(--admin-bg-primary)] transition-all font-bold",
                           errors.firstName &&
                             "border-red-500 focus-visible:ring-red-500",
                         )}
@@ -551,7 +599,7 @@ export default function SignupPage() {
                         type="tel"
                         placeholder="+56 9"
                         {...register("phone")}
-                        className="h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold"
+                        className="h-14 rounded-2xl border-[var(--admin-border-secondary)] bg-[var(--admin-bg-primary)] pl-12 focus:bg-[var(--admin-bg-primary)] transition-all font-bold"
                         disabled={loading}
                       />
                       <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
@@ -570,7 +618,7 @@ export default function SignupPage() {
                         placeholder="••••••••"
                         {...register("password")}
                         className={cn(
-                          "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 pr-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold",
+                          "h-14 rounded-2xl border-[var(--admin-border-secondary)] bg-[var(--admin-bg-primary)] pl-12 pr-12 focus:bg-[var(--admin-bg-primary)] transition-all font-bold",
                           errors.password &&
                             "border-red-500 focus-visible:ring-red-500",
                         )}
@@ -603,7 +651,7 @@ export default function SignupPage() {
                         placeholder="••••••••"
                         {...register("confirmPassword")}
                         className={cn(
-                          "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-12 pr-12 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold",
+                          "h-14 rounded-2xl border-[var(--admin-border-secondary)] bg-[var(--admin-bg-primary)] pl-12 pr-12 focus:bg-[var(--admin-bg-primary)] transition-all font-bold",
                           errors.confirmPassword &&
                             "border-red-500 focus-visible:ring-red-500",
                         )}

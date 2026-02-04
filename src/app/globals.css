@@ -363,6 +363,11 @@ html.dark .admin-header {
   letter-spacing: -0.04em;
 }
 
+.admin-sidebar-logo span.text-\[10px\] {
+  font-weight: 600;
+  font-size: 12px;
+}
+
 .admin-sidebar-nav {
   padding: 1.25rem 0.75rem;
   flex: 1;

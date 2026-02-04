@@ -67,8 +67,6 @@ import ProductList from "./components/ProductList";
 import ProductPagination from "./components/ProductPagination";
 import QuickActions from "./components/QuickActions";
 import { formatCurrency } from "@/lib/utils";
-import { SmartContextWidget } from "@/components/ai/SmartContextWidget";
-
 export default function ProductsPage() {
   const { currentBranchId, isSuperAdmin, branches } = useBranch();
   const isGlobalView = !currentBranchId && isSuperAdmin;
@@ -837,9 +835,6 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       )}
-
-      {/* AI Insights Widget */}
-      {currentBranchId && <SmartContextWidget section="inventory" />}
 
       {/* Tabs for Products, Categories, Lens Families, and Lens Matrices */}
       <Tabs

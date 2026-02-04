@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { ValidationError } from "../errors";
+export { ValidationError };
 import { logger } from "@/lib/logger";
 
 /**

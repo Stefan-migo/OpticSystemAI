@@ -10,6 +10,7 @@ import type {
   PaymentCreationAttributes,
   PaymentStatus,
   PaymentGateway,
+  WebhookEvent,
 } from "@/types/payment";
 import { appLogger as logger } from "@/lib/logger";
 
@@ -103,6 +104,82 @@ export class PaymentService {
       throw new Error(`Error fetching payment: ${error.message}`);
     }
     return payment as Payment | null;
+  }
+
+  /**
+   * Processes a webhook event and updates payment status.
+   * If payment succeeds, it also updates organization subscription.
+   */
+  async updatePaymentFromWebhook(event: WebhookEvent): Promise<void> {
+    const paymentIntentId = event.gatewayPaymentIntentId;
+    if (!paymentIntentId) {
+      logger.warn("Webhook event missing payment intent ID", { event });
+      return;
+    }
+
+    const alreadyProcessed = await this.recordWebhookEvent(
+      event.gateway,
+      event.gatewayEventId,
+      event.type,
+      null,
+      event.metadata,
+    );
+
+    if (alreadyProcessed) {
+      logger.info("Webhook event already processed, skipping update", {
+        gateway: event.gateway,
+        eventId: event.gatewayEventId,
+      });
+      return;
+    }
+
+    const payment =
+      await this.getPaymentByGatewayPaymentIntentId(paymentIntentId);
+    if (!payment) {
+      logger.warn("No payment found for gateway intent ID", {
+        paymentIntentId,
+        gateway: event.gateway,
+      });
+      // Mark as processed anyway to avoid retries
+      await this.markWebhookEventAsProcessed(
+        event.gateway,
+        event.gatewayEventId,
+      );
+      return;
+    }
+
+    // Update internal payment status
+    await this.updatePaymentStatus(
+      payment.id,
+      event.status,
+      event.gatewayTransactionId,
+      event.metadata,
+    );
+
+    // If payment succeeded, fulfill order and update organization
+    if (event.status === "succeeded") {
+      if (payment.order_id) {
+        await this.fulfillOrder(payment.order_id);
+      }
+
+      if (payment.organization_id) {
+        await this.applyPaymentSuccessToOrganization(
+          payment.organization_id,
+          { ...payment, status: "succeeded" },
+          paymentIntentId,
+          event.gatewayTransactionId ?? null,
+        );
+      }
+    }
+
+    // Mark webhook as processed
+    await this.markWebhookEventAsProcessed(event.gateway, event.gatewayEventId);
+
+    logger.info("Payment updated from webhook successfully", {
+      paymentId: payment.id,
+      status: event.status,
+      gateway: event.gateway,
+    });
   }
 
   /** Fetches payment by gateway payment intent ID (for webhooks). */

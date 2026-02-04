@@ -12,25 +12,68 @@ import {
   Sparkles,
 } from "lucide-react";
 import businessConfig from "@/config/business";
+import { useTheme } from "@/components/theme-provider";
+import Image from "next/image";
 
 export function LandingFooter() {
   const currentYear = new Date().getFullYear();
+  const { theme } = useTheme();
+
+  const getThemeLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-opttius-dark.png";
+      case "blue":
+        return "/logo-opttius-blue.png";
+      case "green":
+        return "/logo-opttius-green.png";
+      case "red":
+        return "/logo-opttius-red.png";
+      default:
+        return "/logo-opttius.png";
+    }
+  };
+
+  const getThemeTextLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-text-dark.svg";
+      case "blue":
+        return "/logo-text-blue.svg";
+      case "green":
+        return "/logo-text-green.svg";
+      case "red":
+        return "/logo-text-red.svg";
+      default:
+        return "/logo-text-default.svg";
+    }
+  };
 
   return (
-    <footer className="bg-white border-t border-gray-100 relative overflow-hidden">
+    <footer className="bg-[var(--admin-bg-primary)] border-t border-gray-100 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent"></div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 bg-[var(--admin-bg-primary)]">
         <div className="grid md:grid-cols-4 gap-16">
           {/* Brand Column */}
           <div className="space-y-8">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-primary/10 rounded-xl">
-                <Sparkles className="h-6 w-6 text-primary" />
+              <div className="relative overflow-hidden rounded-xl shadow-md">
+                <Image
+                  src={getThemeLogo()}
+                  alt="Logo"
+                  width={40}
+                  height={40}
+                  className="object-contain"
+                />
               </div>
-              <span className="text-2xl font-malisha text-gray-900 tracking-tight">
-                {businessConfig.name}
-              </span>
+              <Image
+                src={getThemeTextLogo()}
+                alt="Opttius"
+                width={100}
+                height={30}
+                className="object-contain"
+              />
             </div>
             <p className="text-gray-500 text-sm font-body leading-relaxed max-w-xs">
               Redefiniendo el estándar tecnológico en la industria óptica global
@@ -41,7 +84,7 @@ export function LandingFooter() {
                 <a
                   key={i}
                   href="#"
-                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-gray-50 text-gray-400 hover:bg-primary/10 hover:text-primary transition-all duration-300"
+                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-[var(--admin-bg-tertiary)] text-gray-400 hover:bg-primary/10 hover:text-primary transition-all duration-300"
                 >
                   <Icon className="h-5 w-5" />
                 </a>

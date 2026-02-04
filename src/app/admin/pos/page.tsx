@@ -34,7 +34,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { SmartContextWidget } from "@/components/ai/SmartContextWidget";
 import {
   Select,
   SelectContent,
@@ -515,24 +514,43 @@ export default function POSPage() {
     return () => clearTimeout(debounce);
   }, [customerSearchTerm, currentBranchId]);
 
-  // Fetch customer quotes when customer is selected
+  // Fetch customer quotes when customer is selected.
+  // Pass customerRut so the API returns quotes for ALL customer rows with that RUT in the org
+  // (same person can have different customer records per branch).
   const fetchCustomerQuotes = async (
     customerId: string,
     skipAutoLoad: boolean = false,
+    customerRut?: string | null,
+    customerEmail?: string | null,
   ) => {
     setLoadingQuotes(true);
     try {
-      const response = await fetch(
-        `/api/admin/quotes?customer_id=${customerId}&status=all&limit=10`,
-      );
+      const params = new URLSearchParams({
+        customer_id: customerId,
+        status: "all",
+        limit: "10",
+      });
+      if (customerRut && customerRut.trim()) {
+        params.set("customer_rut", customerRut.trim());
+      }
+      if (customerEmail && customerEmail.trim()) {
+        params.set("customer_email", customerEmail.trim());
+      }
+      console.log("📋 POS: Fetching customer quotes:", {
+        customerId,
+        customerRut: customerRut || null,
+        customerEmail: customerEmail || null,
+        params: params.toString(),
+      });
+      const response = await fetch(`/api/admin/quotes?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
-        // Get all quotes (including expired, converted, etc.) for the dropdown
         const allQuotes = data.quotes || [];
+        console.log("✅ POS: Quotes response:", {
+          status: response.status,
+          count: allQuotes.length,
+        });
         setCustomerQuotes(allQuotes);
-
-        // Don't auto-load quotes - user must manually select a quote
-        // This prevents automatic loading when customer is selected
       }
     } catch (error) {
       console.error("Error fetching customer quotes:", error);
@@ -574,10 +592,14 @@ export default function POSPage() {
         }
         setCustomerBusinessName(customer.business_name || "");
 
-        // Fetch customer quotes and prescriptions for the dropdown
-        // Skip auto-loading since we're already loading this quote
+        // Fetch customer quotes (by RUT for cross-branch) and prescriptions for the dropdown
         await fetchCustomerPrescriptions(fullQuote.customer_id);
-        await fetchCustomerQuotes(fullQuote.customer_id, true);
+        await fetchCustomerQuotes(
+          fullQuote.customer_id,
+          true,
+          fullQuote.customer?.rut ?? undefined,
+          fullQuote.customer?.email ?? undefined,
+        );
       }
 
       // Set selected quote (if not already set - may be set by URL loader)
@@ -1051,7 +1073,12 @@ export default function POSPage() {
 
     // Fetch customer quotes and prescriptions
     await Promise.all([
-      fetchCustomerQuotes(customer.id),
+      fetchCustomerQuotes(
+        customer.id,
+        false,
+        customer.rut ?? undefined,
+        customer.email ?? undefined,
+      ),
       fetchCustomerPrescriptions(customer.id),
     ]);
   };
@@ -1215,9 +1242,14 @@ export default function POSPage() {
         setCustomerRUT(formatRUT(customer.rut));
       }
 
-      // Fetch prescriptions and set the new one as selected
+      // Fetch prescriptions and quotes for the new customer
       await fetchCustomerPrescriptions(customer.id);
-      await fetchCustomerQuotes(customer.id);
+      await fetchCustomerQuotes(
+        customer.id,
+        false,
+        customer.rut ?? undefined,
+        customer.email ?? undefined,
+      );
 
       // Set the new prescription as selected after a short delay
       setTimeout(() => {
@@ -2802,9 +2834,9 @@ export default function POSPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-[var(--admin-bg-primary)]">
       {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
+      <div className="border-b px-6 py-4 bg-[var(--admin-bg-tertiary)]">
         <div className="flex flex-col gap-3">
           {/* First row: Branch selector and Caja button */}
           <div className="flex items-center justify-between">
@@ -2856,9 +2888,6 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* AI Insights Widget */}
-      {currentBranchId && <SmartContextWidget section="pos" />}
-
       {/* Cash Status Alert */}
       {!isSuperAdmin && currentBranchId && (
         <div
@@ -2893,11 +2922,11 @@ export default function POSPage() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Customer & Order Form */}
-        <div className="w-2/3 flex flex-col border-r bg-gray-50 overflow-hidden">
+        <div className="w-2/3 flex flex-col border-r overflow-hidden bg-[var(--admin-bg-primary)]">
           {/* Scrollable Content - Customer & Order Form */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--admin-bg-primary)]">
             {/* Customer Info */}
-            <Card>
+            <Card className="bg-[var(--admin-bg-tertiary)]">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Cliente</CardTitle>
               </CardHeader>
@@ -3060,7 +3089,7 @@ export default function POSPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 bg-[var(--admin-bg-tertiary)]">
                     <div className="text-xs text-gray-500">
                       Cliente no seleccionado (opcional para ventas simples)
                     </div>
@@ -3129,7 +3158,7 @@ export default function POSPage() {
             </Card>
 
             {/* Product Search */}
-            <Card>
+            <Card className="bg-[var(--admin-bg-tertiary)]">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center">
                   <span className="flex items-center">
@@ -3267,7 +3296,7 @@ export default function POSPage() {
             </Card>
 
             {/* Complete Order Form - Always visible */}
-            <Card>
+            <Card className="bg-[var(--admin-bg-tertiary)]">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center">
                   <span className="flex items-center">
@@ -5224,7 +5253,7 @@ export default function POSPage() {
         {/* Right Panel - Cart, Payment Summary & Payment Method */}
         <div className="w-1/3 flex flex-col bg-white border-l overflow-hidden">
           {/* Scrollable Content - Cart, Summary & Payment */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto bg-[var(--admin-bg-primary)]">
             {/* Cart */}
             <div className="p-4 border-b">
               <div className="flex items-center justify-between mb-4">
@@ -5306,7 +5335,7 @@ export default function POSPage() {
             </div>
 
             {/* Payment Summary */}
-            <Card className="mx-4 mb-4 flex-shrink-0">
+            <Card className="mx-4 mb-4 flex-shrink-0 bg-[var(--admin-bg-tertiary)]">
               <CardHeader>
                 <CardTitle className="text-lg">Resumen</CardTitle>
               </CardHeader>
@@ -5329,7 +5358,7 @@ export default function POSPage() {
             </Card>
 
             {/* Payment Method */}
-            <Card className="mx-4 mb-4 flex-shrink-0">
+            <Card className="mx-4 mb-4 flex-shrink-0 bg-[var(--admin-bg-tertiary)]">
               <CardHeader>
                 <CardTitle className="text-lg">Método de Pago</CardTitle>
               </CardHeader>
@@ -5536,7 +5565,7 @@ export default function POSPage() {
           </div>
 
           {/* Fixed Process Payment Button */}
-          <div className="p-4 border-t bg-white flex-shrink-0 space-y-3">
+          <div className="p-4 border-t flex-shrink-0 space-y-3 bg-[var(--admin-bg-primary)]">
             {/* Warning if cash closed */}
             {isCashOpen === false && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">

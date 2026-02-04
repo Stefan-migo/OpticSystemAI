@@ -36,7 +36,9 @@ import { toast } from "sonner";
 import { useBranch } from "@/hooks/useBranch";
 import { getBranchHeader } from "@/lib/utils/branch";
 import { BranchSelector } from "@/components/admin/BranchSelector";
-import { Loader2 } from "lucide-react";
+import { Loader2, Copy, Sparkles } from "lucide-react";
+import ImageUpload from "@/components/ui/ImageUpload";
+import Image from "next/image";
 
 interface POSSettings {
   min_deposit_percent: number;
@@ -108,11 +110,6 @@ export default function POSBillingSettingsPage() {
   }, [currentBranchId, branchLoading]);
 
   const fetchAllSettings = async () => {
-    if (isGlobalView) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
       const headers = {
@@ -162,9 +159,16 @@ export default function POSBillingSettingsPage() {
   };
 
   const handleSavePOS = async () => {
-    if (isGlobalView) {
+    if (isGlobalView && !isSuperAdmin) {
       toast.error("Debe seleccionar una sucursal para configurar el POS");
       return;
+    }
+
+    if (isGlobalView) {
+      const confirmGlobal = window.confirm(
+        "¿Está seguro de que desea guardar esta configuración GLOBALMENTE? Se aplicará a todas las sucursales existentes y futuras de esta organización.",
+      );
+      if (!confirmGlobal) return;
     }
 
     if (
@@ -212,6 +216,18 @@ export default function POSBillingSettingsPage() {
   };
 
   const handleSaveBilling = async () => {
+    if (isGlobalView && !isSuperAdmin) {
+      toast.error("Debe seleccionar una sucursal para configurar las boletas");
+      return;
+    }
+
+    if (isGlobalView) {
+      const confirmGlobal = window.confirm(
+        "¿Está seguro de que desea guardar esta configuración de boletas GLOBALMENTE? Se aplicará a todas las sucursales existentes y futuras.",
+      );
+      if (!confirmGlobal) return;
+    }
+
     if (!billingSettings.business_name || !billingSettings.business_rut) {
       toast.error("Nombre y RUT de la empresa son requeridos");
       return;
@@ -246,12 +262,25 @@ export default function POSBillingSettingsPage() {
     }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // TODO: Implement actual file upload to Supabase Storage
-    toast.info("Subida de logo: Por implementar (Supabase Storage)");
+  const handleReuseMainLogo = async () => {
+    try {
+      const response = await fetch("/api/admin/organizations/current");
+      if (response.ok) {
+        const data = await response.json();
+        if (data.organization?.logo_url) {
+          setBillingSettings((prev) => ({
+            ...prev,
+            logo_url: data.organization.logo_url,
+          }));
+          toast.success("Logo de la óptica copiado correctamente");
+        } else {
+          toast.error("No se ha configurado un logo para la óptica aún");
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching main logo:", error);
+      toast.error("Error al obtener el logo de la óptica");
+    }
   };
 
   const handlePrinterTypeChange = (type: string) => {
@@ -281,41 +310,18 @@ export default function POSBillingSettingsPage() {
     );
   }
 
-  if (isGlobalView) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-azul-profundo">
-              Configuración POS y Boletas
-            </h1>
-            <p className="text-tierra-media mt-1">
-              Personaliza la configuración del punto de venta y boletas
-            </p>
-          </div>
-          {isSuperAdmin && <BranchSelector />}
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-tierra-media text-center">
-              Por favor, seleccione una sucursal para configurar
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-azul-profundo">
-            Configuración POS y Boletas
+            Configuración POS y Boletas {isGlobalView && "(VISTA GLOBAL)"}
           </h1>
           <p className="text-tierra-media mt-1">
-            Configura el punto de venta y personaliza tus boletas y facturas
+            {isGlobalView
+              ? "Configuración global para todas las sucursales"
+              : "Configura el punto de venta y personaliza tus boletas y facturas"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -526,29 +532,52 @@ export default function POSBillingSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label>Logo de la Empresa</Label>
-                  <div className="mt-2 flex items-center gap-4">
-                    {billingSettings.logo_url && (
-                      <img
-                        src={billingSettings.logo_url}
-                        alt="Logo"
-                        className="h-20 w-auto object-contain border rounded p-2"
-                      />
-                    )}
-                    <label className="cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoUpload}
-                        className="hidden"
-                      />
-                      <Button type="button" variant="outline" size="sm">
-                        <Upload className="h-4 w-4 mr-2" />
-                        {billingSettings.logo_url
-                          ? "Cambiar Logo"
-                          : "Subir Logo"}
-                      </Button>
-                    </label>
+                  <Label className="text-sm font-bold text-azul-profundo mb-2 block">
+                    Logo de la Empresa (Boleta/Factura)
+                  </Label>
+                  <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-blue-800 font-medium flex items-center gap-2">
+                      <Sparkles className="h-3 w-3" />
+                      Dimensiones Requeridas:
+                    </p>
+                    <ul className="text-[11px] text-blue-700/80 list-disc list-inside mt-1 space-y-0.5">
+                      <li>
+                        Formato horizontal:{" "}
+                        <strong>400px ancho × 120px alto</strong>
+                      </li>
+                      <li>
+                        Fondo sugerido: <strong>Transparente (PNG)</strong> o{" "}
+                        <strong>Blanco</strong>
+                      </li>
+                      <li>
+                        Este logo aparecerá en el encabezado de sus documentos
+                        fiscales.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-4">
+                    <ImageUpload
+                      value={billingSettings.logo_url || ""}
+                      onChange={(url) =>
+                        setBillingSettings({
+                          ...billingSettings,
+                          logo_url: url,
+                        })
+                      }
+                      folder="billing"
+                    />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs shadow-sm"
+                      onClick={handleReuseMainLogo}
+                    >
+                      <Copy className="h-3 w-3 mr-2" />
+                      Reutilizar Logo de la Óptica (Header)
+                    </Button>
                   </div>
                 </div>
                 <div>

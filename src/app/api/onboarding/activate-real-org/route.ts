@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
         name,
         slug,
         owner_id: user.id,
-        subscription_tier: "basic", // Default tier
+        subscription_tier: "pro", // Default tier for trial period (7 days)
         status: "active",
       })
       .select()
@@ -361,12 +361,16 @@ export async function POST(request: NextRequest) {
       // Crítico: el usuario podría no tener acceso global
     }
 
-    // Crear subscription inicial
+    // Crear subscription inicial con periodo de prueba de 7 días
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+
     const { error: subscriptionError } = await supabaseServiceRole
       .from("subscriptions")
       .insert({
         organization_id: organizationId,
         status: "trialing",
+        trial_ends_at: trialEndsAt.toISOString(),
       });
 
     if (subscriptionError) {

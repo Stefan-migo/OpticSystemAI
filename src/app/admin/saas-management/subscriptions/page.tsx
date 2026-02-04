@@ -35,6 +35,7 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  AlertCircle,
   Clock,
   Loader2,
   Building2,
@@ -93,6 +94,10 @@ export default function SubscriptionsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Confirmaciones con UI del programa (no window.confirm)
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Filtros
   const [organizationFilter, setOrganizationFilter] = useState("all");
@@ -194,7 +199,8 @@ export default function SubscriptionsPage() {
         throw new Error(data.error || "Error al realizar acción");
       }
 
-      toast.success("Acción realizada exitosamente");
+      toast.success(data.message || "Acción realizada exitosamente");
+      setCancelConfirmId(null);
       fetchSubscriptions();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error desconocido");
@@ -239,10 +245,6 @@ export default function SubscriptionsPage() {
   };
 
   const handleDelete = async (subscriptionId: string) => {
-    if (
-      !confirm("¿Eliminar esta suscripción? Esta acción no se puede deshacer.")
-    )
-      return;
     setDeleteId(subscriptionId);
     setDeleteLoading(true);
     try {
@@ -253,6 +255,7 @@ export default function SubscriptionsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al eliminar");
       toast.success("Suscripción eliminada.");
+      setDeleteConfirmId(null);
       fetchSubscriptions();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error desconocido");
@@ -635,7 +638,7 @@ export default function SubscriptionsPage() {
                               </DropdownMenuItem>
                             ) : (
                               <DropdownMenuItem
-                                onClick={() => handleAction(sub.id, "cancel")}
+                                onClick={() => setCancelConfirmId(sub.id)}
                               >
                                 <Ban className="h-4 w-4 mr-2" />
                                 Cancelar
@@ -644,7 +647,7 @@ export default function SubscriptionsPage() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
-                              onClick={() => handleDelete(sub.id)}
+                              onClick={() => setDeleteConfirmId(sub.id)}
                               disabled={deleteId === sub.id && deleteLoading}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -690,6 +693,73 @@ export default function SubscriptionsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Diálogo de confirmación: cancelar suscripción (toast del programa) */}
+      <Dialog
+        open={cancelConfirmId !== null}
+        onOpenChange={(open) => !open && setCancelConfirmId(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="mx-auto bg-red-100 dark:bg-red-500/20 p-4 rounded-3xl w-fit mb-4">
+              <AlertCircle className="h-10 w-10 text-red-600 dark:text-red-500" />
+            </div>
+            <DialogTitle>¿Cancelar suscripción?</DialogTitle>
+            <DialogDescription>
+              La organización mantendrá el acceso hasta el final del periodo
+              actual. Después la suscripción quedará cancelada.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelConfirmId(null)}>
+              Volver
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!cancelConfirmId}
+              onClick={() =>
+                cancelConfirmId && handleAction(cancelConfirmId, "cancel")
+              }
+            >
+              Confirmar cancelación
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de confirmación: eliminar suscripción (toast del programa) */}
+      <Dialog
+        open={deleteConfirmId !== null}
+        onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="mx-auto bg-red-100 dark:bg-red-500/20 p-4 rounded-3xl w-fit mb-4">
+              <AlertCircle className="h-10 w-10 text-red-600 dark:text-red-500" />
+            </div>
+            <DialogTitle>¿Eliminar esta suscripción?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el registro de
+              suscripción.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
+              Volver
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!deleteConfirmId || deleteLoading}
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+            >
+              {deleteLoading && deleteId === deleteConfirmId ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

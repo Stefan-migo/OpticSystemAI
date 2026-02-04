@@ -4,21 +4,21 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const cardVariants = cva(
-  "rounded-2xl border bg-card text-card-foreground shadow-sm transition-all duration-300",
+  "rounded-2xl border bg-[var(--admin-bg-tertiary)] text-card-foreground shadow-sm transition-all duration-300",
   {
     variants: {
       variant: {
-        default: "border-border bg-card hover:shadow-md",
+        default: "border-border bg-[var(--admin-bg-tertiary)] hover:shadow-md",
         elevated:
-          "border-border/50 bg-card shadow-md hover:shadow-xl hover:-translate-y-1",
+          "border-border/50 bg-[var(--admin-bg-tertiary)] shadow-md hover:shadow-xl hover:-translate-y-1",
         interactive:
-          "border-border bg-card shadow-sm hover:shadow-xl hover:border-primary/20 hover:-translate-y-1.5 cursor-pointer active:translate-y-0 active:shadow-md",
+          "border-border bg-[var(--admin-bg-tertiary)] shadow-sm hover:shadow-xl hover:border-primary/20 hover:-translate-y-1.5 cursor-pointer active:translate-y-0 active:shadow-md",
         outline:
           "border-2 border-border bg-transparent hover:bg-accent/5 hover:shadow-sm",
         ghost:
           "border-transparent bg-transparent hover:bg-accent/10 hover:border-border/50",
         glass:
-          "border-white/10 dark:border-slate-800/10 bg-white/70 dark:bg-slate-900/40 backdrop-blur-md shadow-lg",
+          "border-white/10 dark:border-slate-800/10 bg-[var(--admin-bg-tertiary)] backdrop-blur-md shadow-lg",
       },
       padding: {
         none: "",

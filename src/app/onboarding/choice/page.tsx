@@ -107,7 +107,7 @@ export default function OnboardingChoicePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 relative overflow-hidden px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--admin-bg-primary)] relative overflow-hidden px-4 py-12">
       {/* Premium Background Elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] animate-premium-float" />
@@ -124,8 +124,8 @@ export default function OnboardingChoicePage() {
       <div className="w-full max-w-4xl relative z-10">
         {/* Header */}
         <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl mb-6 relative group">
-            <div className="absolute inset-0 bg-primary/10 rounded-[2rem] scale-90 group-hover:scale-110 transition-transform duration-500" />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-[var(--admin-bg-primary)] rounded-[2rem] shadow-2xl mb-6 relative group">
+            <div className="absolute inset-0 bg-[var(--admin-bg-primary)] rounded-[2rem] scale-90 group-hover:scale-110 transition-transform duration-500" />
             <Building2 className="h-10 w-10 text-primary relative z-10" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight">
@@ -173,7 +173,10 @@ export default function OnboardingChoicePage() {
               >
                 Explorar con datos demo
               </CardTitle>
-              <CardDescription size="lg" className="mt-4 leading-relaxed">
+              <CardDescription
+                size="lg"
+                className="mt-4 leading-relaxed text-accent-foreground"
+              >
                 Accede al sistema con una óptica pre-configurada. Ideal para
                 conocer todas las herramientas en segundos.
               </CardDescription>
@@ -241,7 +244,10 @@ export default function OnboardingChoicePage() {
               >
                 Configurar mi óptica
               </CardTitle>
-              <CardDescription size="lg" className="mt-4 leading-relaxed">
+              <CardDescription
+                size="lg"
+                className="mt-4 leading-relaxed text-accent-foreground"
+              >
                 Empieza hoy mismo con tu propia información. Configura tu marca,
                 sucursales y equipo.
               </CardDescription>

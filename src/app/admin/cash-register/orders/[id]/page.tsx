@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,13 +14,15 @@ import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 export default function OrderDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const orderId = params.id as string;
   const { currentBranchId } = useBranch();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchOrderDetail();
+    // Redirigir a la vista principal de órdenes
+    router.push(`/admin/orders/${orderId}`);
   }, [orderId]);
 
   const fetchOrderDetail = async () => {

@@ -99,6 +99,12 @@ export async function GET(request: NextRequest) {
           quantity,
           unit_price,
           total_price
+        ),
+        order_payments (
+          id,
+          amount,
+          payment_method,
+          paid_at
         )
       `,
         { count: "exact" },
@@ -177,6 +183,7 @@ export async function GET(request: NextRequest) {
       mp_payment_method: order.mp_payment_method,
       mp_payment_type: order.mp_payment_type,
       order_items: order.order_items || [],
+      order_payments: (order as any).order_payments || [],
     }));
 
     return NextResponse.json({

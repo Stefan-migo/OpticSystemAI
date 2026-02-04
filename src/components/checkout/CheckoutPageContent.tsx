@@ -77,6 +77,8 @@ export function CheckoutPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [saveCard, setSaveCard] = useState(false);
+  const [selectedGateway, setSelectedGateway] = useState<string>("mercadopago");
+  const [availableGateways, setAvailableGateways] = useState<any[]>([]);
 
   useEffect(() => {
     // Initialize MercadoPago
@@ -89,7 +91,7 @@ export function CheckoutPageContent() {
       setIsInitialized(true);
     }
 
-    // Load tiers and current subscription (no cache so prices from DB are always fresh)
+    // Load tiers, subscriptions and active gateways
     Promise.all([
       fetch("/api/checkout/tiers", {
         credentials: "include",
@@ -109,6 +111,16 @@ export function CheckoutPageContent() {
           // Auto-select current tier if exists
           if (data.currentTier) {
             setSelectedTier(data.currentTier);
+          }
+        })
+        .catch(() => {}),
+      fetch("/api/checkout/gateways")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.gateways?.length) {
+            setAvailableGateways(data.gateways);
+            // Default select the first one if available
+            setSelectedGateway(data.gateways[0].gateway_id);
           }
         })
         .catch(() => {}),
@@ -211,32 +223,38 @@ export function CheckoutPageContent() {
       const response = await fetch("/api/checkout/create-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           amount,
           currency: "CLP",
-          gateway: "mercadopago",
+          gateway: selectedGateway,
           subscription_tier: selectedTier,
           isUpgrade: changeType === "upgrade",
           isDowngrade: changeType === "downgrade",
         }),
       });
+      const data = await response.json();
 
-      let data: { error?: string; paymentId?: string };
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error(
-          response.ok
-            ? "Error al leer la respuesta"
-            : "Error al crear intento de pago",
-        );
-      }
       if (!response.ok) {
         throw new Error(data.error || "Error al crear intento de pago");
       }
 
       setPaymentId(data.paymentId);
+
+      // Handle Redirect-based gateways (NOWPayments, PayPal)
+      if (data.approvalUrl) {
+        const gatewayNames = {
+          nowpayments: "la pasarela de criptomonedas",
+          paypal: "PayPal",
+          mercadopago: "la pasarela de pago",
+          flow: "Flow",
+        };
+        toast.info(
+          `Redirigiendo a ${gatewayNames[selectedGateway as keyof typeof gatewayNames] || "la pasarela de pago"}...`,
+        );
+        window.location.href = data.approvalUrl;
+        return;
+      }
+
       toast.success(
         "Intento de pago creado. Completa los datos de tu tarjeta.",
       );
@@ -549,66 +567,74 @@ export function CheckoutPageContent() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Mercado Pago - Active */}
-                <button
-                  type="button"
-                  className="flex flex-col items-center justify-center p-6 rounded-3xl border-2 border-primary bg-white dark:bg-slate-900 shadow-xl shadow-primary/5 transition-all"
-                >
-                  <div className="w-14 h-14 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mb-3">
-                    <Globe className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                {availableGateways.length === 0 ? (
+                  <div className="col-span-full py-10 text-center bg-slate-50 dark:bg-slate-900/40 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-300 mb-2" />
+                    <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">
+                      Cargando pasarelas disponibles...
+                    </p>
                   </div>
-                  <span className="font-bold text-slate-900 dark:text-white">
-                    Mercado Pago
-                  </span>
-                  <Badge
-                    variant="healty"
-                    className="mt-2 bg-green-500/10 text-green-600 border-none px-2 py-0 text-[10px] font-black"
-                  >
-                    ACTIVO
-                  </Badge>
-                </button>
-
-                {/* Flow - Coming Soon */}
-                <div className="flex flex-col items-center justify-center p-6 rounded-3xl border-2 border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20 opacity-60 cursor-not-allowed grayscale group relative">
-                  <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-3">
-                    <CreditCard className="h-8 w-8 text-slate-400" />
-                  </div>
-                  <span className="font-bold text-slate-400">Flow</span>
-                  <Badge
-                    variant="outline"
-                    className="mt-2 text-[10px] font-bold uppercase tracking-widest border-slate-300"
-                  >
-                    Próximamente
-                  </Badge>
-                </div>
-
-                {/* PayPal - Coming Soon */}
-                <div className="flex flex-col items-center justify-center p-6 rounded-3xl border-2 border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20 opacity-60 cursor-not-allowed grayscale group">
-                  <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-3">
-                    <CreditCard className="h-8 w-8 text-slate-400" />
-                  </div>
-                  <span className="font-bold text-slate-400">PayPal</span>
-                  <Badge
-                    variant="outline"
-                    className="mt-2 text-[10px] font-bold uppercase tracking-widest border-slate-300"
-                  >
-                    Próximamente
-                  </Badge>
-                </div>
-
-                {/* Crypto - Coming Soon */}
-                <div className="flex flex-col items-center justify-center p-6 rounded-3xl border-2 border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20 opacity-60 cursor-not-allowed grayscale group">
-                  <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-3">
-                    <Coins className="h-8 w-8 text-slate-400" />
-                  </div>
-                  <span className="font-bold text-slate-400">Cripto</span>
-                  <Badge
-                    variant="outline"
-                    className="mt-2 text-[10px] font-bold uppercase tracking-widest border-slate-300"
-                  >
-                    Próximamente
-                  </Badge>
-                </div>
+                ) : (
+                  availableGateways.map((gw) => (
+                    <button
+                      key={gw.gateway_id}
+                      type="button"
+                      onClick={() => setSelectedGateway(gw.gateway_id)}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all duration-300 group relative",
+                        selectedGateway === gw.gateway_id
+                          ? "border-primary bg-white dark:bg-slate-900 shadow-xl shadow-primary/5 ring-4 ring-primary/5"
+                          : "border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20 hover:border-primary/40",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "w-14 h-14 rounded-2xl flex items-center justify-center mb-3 transition-colors",
+                          selectedGateway === gw.gateway_id
+                            ? "bg-primary/10 text-primary"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:text-primary/60",
+                        )}
+                      >
+                        {gw.gateway_id === "mercadopago" && (
+                          <Globe className="h-8 w-8" />
+                        )}
+                        {gw.gateway_id === "paypal" && (
+                          <CreditCard className="h-8 w-8" />
+                        )}
+                        {gw.gateway_id === "nowpayments" && (
+                          <Coins className="h-8 w-8" />
+                        )}
+                        {gw.gateway_id === "flow" && (
+                          <CreditCard className="h-8 w-8" />
+                        )}
+                      </div>
+                      <span
+                        className={cn(
+                          "font-bold transition-colors",
+                          selectedGateway === gw.gateway_id
+                            ? "text-slate-900 dark:text-white"
+                            : "text-slate-500",
+                        )}
+                      >
+                        {gw.name}
+                      </span>
+                      {gw.config?.badge && (
+                        <Badge
+                          variant="healty"
+                          className={cn(
+                            "mt-2 border-none px-2 py-0 text-[10px] font-black uppercase tracking-wider",
+                            gw.config.badge === "PROXIMAMENTE" ||
+                              gw.config.badge === "PRÓXIMAMENTE"
+                              ? "bg-slate-200 text-slate-500"
+                              : "bg-green-500/10 text-green-600",
+                          )}
+                        >
+                          {gw.config.badge}
+                        </Badge>
+                      )}
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
@@ -676,8 +702,18 @@ export function CheckoutPageContent() {
                               </>
                             ) : (
                               <>
-                                <Lock className="h-5 w-5 mr-2" />
-                                Proceder al pago seguro
+                                {selectedGateway === "nowpayments" ? (
+                                  <Coins className="h-5 w-5 mr-2" />
+                                ) : selectedGateway === "paypal" ? (
+                                  <CreditCard className="h-5 w-5 mr-2" />
+                                ) : (
+                                  <Lock className="h-5 w-5 mr-2" />
+                                )}
+                                {selectedGateway === "nowpayments"
+                                  ? "Pagar con Cripto"
+                                  : selectedGateway === "paypal"
+                                    ? "Pagar con PayPal"
+                                    : "Proceder al pago seguro"}
                               </>
                             )}
                           </Button>
@@ -729,8 +765,10 @@ export function CheckoutPageContent() {
                           Completa los pasos anteriores
                         </h4>
                         <p className="text-slate-400 text-sm max-w-xs mx-auto">
-                          Selecciona tu plan ideal para desbloquear el
-                          formulario de pago seguro.
+                          Selecciona tu plan ideal
+                          {selectedGateway !== "mercadopago"
+                            ? " para ser redirigido a la pasarela de pago seleccionada."
+                            : " para desbloquear el formulario de pago seguro."}
                         </p>
                       </div>
                     </div>

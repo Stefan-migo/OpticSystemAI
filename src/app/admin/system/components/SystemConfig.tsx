@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,15 @@ import {
   Shield,
   Eye,
   EyeOff,
+  Save,
+  Building2,
+  Image as ImageIcon,
+  Loader2,
 } from "lucide-react";
 import { SystemConfig as SystemConfigType } from "../hooks/useSystemConfig";
+import { toast } from "sonner";
+import Image from "next/image";
+import ImageUpload from "@/components/ui/ImageUpload";
 
 interface SystemConfigProps {
   configs: SystemConfigType[];
@@ -103,6 +110,30 @@ export default function SystemConfig({
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [showSensitive, setShowSensitive] = useState(false);
 
+  // Local state for config values (to prevent page reload on input)
+  const [localConfigValues, setLocalConfigValues] = useState<
+    Record<string, any>
+  >({});
+  const [savingConfigKeys, setSavingConfigKeys] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Organization data state
+  const [organizationData, setOrganizationData] = useState<{
+    id: string;
+    name: string;
+    slug: string;
+    logo_url: string | null;
+    slogan: string | null;
+  } | null>(null);
+  const [localOrgData, setLocalOrgData] = useState<{
+    name: string;
+    logo_url: string;
+    slogan: string;
+  } | null>(null);
+  const [loadingOrg, setLoadingOrg] = useState(true);
+  const [savingOrg, setSavingOrg] = useState(false);
+
   const filteredConfigs = useMemo(() => {
     return configs.filter((config) => {
       if (categoryFilter !== "all" && config.category !== categoryFilter)
@@ -136,6 +167,104 @@ export default function SystemConfig({
 
   const uniqueCategories = Array.from(new Set(configs.map((c) => c.category)));
 
+  // Initialize local config values from props
+  useEffect(() => {
+    const initialValues: Record<string, any> = {};
+    configs.forEach((config) => {
+      initialValues[config.config_key] = config.config_value;
+    });
+    setLocalConfigValues(initialValues);
+  }, [configs]);
+
+  // Fetch organization data
+  useEffect(() => {
+    const fetchOrganization = async () => {
+      try {
+        setLoadingOrg(true);
+        const response = await fetch("/api/admin/organizations/current");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.organization) {
+            setOrganizationData(data.organization);
+            setLocalOrgData({
+              name: data.organization.name || "",
+              logo_url: data.organization.logo_url || "",
+              slogan: data.organization.slogan || "",
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching organization:", error);
+        toast.error("Error al cargar información de la organización");
+      } finally {
+        setLoadingOrg(false);
+      }
+    };
+
+    fetchOrganization();
+  }, []);
+
+  // Handle save config
+  const handleSaveConfig = async (configKey: string) => {
+    const value = localConfigValues[configKey];
+    if (value === undefined) return;
+
+    try {
+      setSavingConfigKeys((prev) => new Set(prev).add(configKey));
+      await onUpdateConfig(configKey, value);
+      toast.success("Configuración guardada correctamente");
+    } catch (error) {
+      console.error("Error saving config:", error);
+      toast.error("Error al guardar la configuración");
+    } finally {
+      setSavingConfigKeys((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(configKey);
+        return newSet;
+      });
+    }
+  };
+
+  // Handle save organization
+  const handleSaveOrganization = async () => {
+    if (!localOrgData) return;
+
+    try {
+      setSavingOrg(true);
+      const response = await fetch("/api/admin/organizations/current", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: localOrgData.name,
+          logo_url: localOrgData.logo_url || null,
+          slogan: localOrgData.slogan || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Error al actualizar la organización");
+      }
+
+      const data = await response.json();
+      if (data.organization) {
+        setOrganizationData(data.organization);
+        toast.success("Información de la óptica actualizada correctamente");
+        // Reload page to update header
+        window.location.reload();
+      }
+    } catch (error: any) {
+      console.error("Error saving organization:", error);
+      toast.error(
+        error.message || "Error al guardar la información de la óptica",
+      );
+    } finally {
+      setSavingOrg(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header con información */}
@@ -154,8 +283,8 @@ export default function SystemConfig({
         </CardHeader>
         <CardContent>
           <p className="text-sm text-tierra-media">
-            Gestiona las configuraciones del sistema. Los cambios se aplican
-            inmediatamente.
+            Gestiona las configuraciones del sistema. Usa el botón "Guardar"
+            para aplicar los cambios.
           </p>
         </CardContent>
       </Card>
@@ -208,6 +337,129 @@ export default function SystemConfig({
         </CardContent>
       </Card>
 
+      {/* Organization Settings Card - Special card for General category */}
+      {categoryFilter === "all" || categoryFilter === "general" ? (
+        <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Building2 className="h-5 w-5 mr-2" />
+                Información de la Óptica (Header)
+              </div>
+              <Badge variant="default">Personalización</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingOrg ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-admin-accent-primary" />
+              </div>
+            ) : localOrgData ? (
+              <div className="space-y-6">
+                {/* Clinic Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="clinic_name">
+                    Nombre de la Óptica (Clínica) *
+                  </Label>
+                  <p className="text-xs text-tierra-media">
+                    Este nombre se mostrará en el header de las secciones
+                  </p>
+                  <Input
+                    id="clinic_name"
+                    type="text"
+                    value={localOrgData.name}
+                    onChange={(e) =>
+                      setLocalOrgData({ ...localOrgData, name: e.target.value })
+                    }
+                    placeholder="Ej: Óptica Visión Premium"
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Slogan */}
+                <div className="space-y-2">
+                  <Label htmlFor="slogan">Slogan (Opcional)</Label>
+                  <p className="text-xs text-tierra-media">
+                    Slogan o tagline que aparecerá debajo del nombre en el
+                    header
+                  </p>
+                  <Input
+                    id="slogan"
+                    type="text"
+                    value={localOrgData.slogan}
+                    onChange={(e) =>
+                      setLocalOrgData({
+                        ...localOrgData,
+                        slogan: e.target.value,
+                      })
+                    }
+                    placeholder="Ej: Tu visión, nuestra pasión"
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Logo */}
+                <div className="space-y-4">
+                  <Label>Logo de la Clínica</Label>
+                  <p className="text-xs text-tierra-media">
+                    Logo de la óptica que se mostrará en el header de todas las
+                    sucursales.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-6 items-start">
+                    <div className="flex-1 w-full max-w-sm">
+                      <ImageUpload
+                        value={localOrgData.logo_url || ""}
+                        onChange={(url) =>
+                          setLocalOrgData({ ...localOrgData, logo_url: url })
+                        }
+                        folder="logos"
+                      />
+                    </div>
+
+                    {localOrgData.logo_url && (
+                      <div className="space-y-2">
+                        <Label className="text-xs">Vista Previa Actual</Label>
+                        <div className="relative w-32 h-32 rounded-xl overflow-hidden border-2 border-admin-border-tertiary bg-white shadow-sm flex items-center justify-center">
+                          <Image
+                            src={localOrgData.logo_url}
+                            alt="Logo preview"
+                            width={128}
+                            height={128}
+                            className="object-contain p-2"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex justify-end pt-4 border-t border-admin-border-primary/10">
+                  <Button
+                    onClick={handleSaveOrganization}
+                    disabled={savingOrg}
+                    className="min-w-[120px]"
+                  >
+                    {savingOrg ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Guardar Cambios
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* Configuraciones por Categoría */}
       {Object.keys(configsByCategory).length === 0 ? (
         <Card className="bg-admin-bg-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
@@ -244,115 +496,168 @@ export default function SystemConfig({
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {(categoryConfigs as SystemConfigType[]).map((config) => (
-                    <div
-                      key={config.id}
-                      className="p-4 bg-admin-bg-tertiary border border-gray-200 dark:border-gray-700 rounded-lg hover:border-admin-accent-tertiary transition-colors"
-                    >
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-semibold text-azul-profundo">
-                                {translateConfigKey(config.config_key)}
-                              </h4>
-                              {config.is_sensitive && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs bg-yellow-50 border-yellow-200"
-                                >
-                                  <Shield className="h-3 w-3 mr-1" />
-                                  Sensible
-                                </Badge>
-                              )}
-                              {config.is_public && (
-                                <Badge variant="outline" className="text-xs">
-                                  Público
-                                </Badge>
+                  {(categoryConfigs as SystemConfigType[]).map((config) => {
+                    const localValue = localConfigValues[config.config_key];
+                    const hasChanges = localValue !== config.config_value;
+                    const isSaving = savingConfigKeys.has(config.config_key);
+
+                    return (
+                      <div
+                        key={config.id}
+                        className="p-4 bg-admin-bg-tertiary border border-gray-200 dark:border-gray-700 rounded-lg hover:border-admin-accent-tertiary transition-colors"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-azul-profundo">
+                                  {translateConfigKey(config.config_key)}
+                                </h4>
+                                {config.is_sensitive && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs bg-yellow-50 border-yellow-200"
+                                  >
+                                    <Shield className="h-3 w-3 mr-1" />
+                                    Sensible
+                                  </Badge>
+                                )}
+                                {config.is_public && (
+                                  <Badge variant="outline" className="text-xs">
+                                    Público
+                                  </Badge>
+                                )}
+                                {hasChanges && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs bg-blue-50 border-blue-200 text-blue-700"
+                                  >
+                                    Sin guardar
+                                  </Badge>
+                                )}
+                              </div>
+                              {config.description && (
+                                <p className="text-sm text-tierra-media mt-1">
+                                  {config.description}
+                                </p>
                               )}
                             </div>
-                            {config.description && (
-                              <p className="text-sm text-tierra-media mt-1">
-                                {config.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-end gap-4">
-                          <div className="flex-1">
-                            <Label className="text-xs text-tierra-media mb-1 block">
-                              Valor
-                            </Label>
-                            {config.value_type === "boolean" ? (
-                              <Select
-                                value={config.config_value.toString()}
-                                onValueChange={(value) =>
-                                  onUpdateConfig(
-                                    config.config_key,
-                                    value === "true",
-                                  )
-                                }
-                                disabled={isUpdating}
-                              >
-                                <SelectTrigger className="w-full md:w-[180px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="true">
-                                    Verdadero
-                                  </SelectItem>
-                                  <SelectItem value="false">Falso</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : config.value_type === "number" ? (
-                              <Input
-                                type="number"
-                                value={config.config_value}
-                                onChange={(e) => {
-                                  const value = parseFloat(e.target.value) || 0;
-                                  onUpdateConfig(config.config_key, value);
-                                }}
-                                className="w-full md:w-[200px]"
-                                disabled={isUpdating}
-                              />
-                            ) : (
-                              <Input
-                                type="text"
-                                value={config.config_value}
-                                onChange={(e) => {
-                                  onUpdateConfig(
-                                    config.config_key,
-                                    e.target.value,
-                                  );
-                                }}
-                                className="w-full md:w-[400px]"
-                                disabled={isUpdating}
-                              />
-                            )}
                           </div>
 
-                          <div className="text-right">
-                            <p className="text-xs text-tierra-media">
-                              Actualizado
-                            </p>
-                            <p className="text-xs font-medium">
-                              {new Date(config.updated_at).toLocaleDateString(
-                                "es-AR",
-                                {
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                },
+                          <div className="flex items-end gap-4">
+                            <div className="flex-1">
+                              <Label className="text-xs text-tierra-media mb-1 block">
+                                Valor
+                              </Label>
+                              {config.value_type === "boolean" ? (
+                                <Select
+                                  value={
+                                    localValue !== undefined
+                                      ? localValue.toString()
+                                      : config.config_value.toString()
+                                  }
+                                  onValueChange={(value) => {
+                                    setLocalConfigValues({
+                                      ...localConfigValues,
+                                      [config.config_key]: value === "true",
+                                    });
+                                  }}
+                                  disabled={isUpdating || isSaving}
+                                >
+                                  <SelectTrigger className="w-full md:w-[180px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="true">
+                                      Verdadero
+                                    </SelectItem>
+                                    <SelectItem value="false">Falso</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : config.value_type === "number" ? (
+                                <Input
+                                  type="number"
+                                  value={
+                                    localValue !== undefined
+                                      ? localValue
+                                      : config.config_value
+                                  }
+                                  onChange={(e) => {
+                                    const value =
+                                      parseFloat(e.target.value) || 0;
+                                    setLocalConfigValues({
+                                      ...localConfigValues,
+                                      [config.config_key]: value,
+                                    });
+                                  }}
+                                  className="w-full md:w-[200px]"
+                                  disabled={isUpdating || isSaving}
+                                />
+                              ) : (
+                                <Input
+                                  type="text"
+                                  value={
+                                    localValue !== undefined
+                                      ? localValue
+                                      : config.config_value
+                                  }
+                                  onChange={(e) => {
+                                    setLocalConfigValues({
+                                      ...localConfigValues,
+                                      [config.config_key]: e.target.value,
+                                    });
+                                  }}
+                                  className="w-full md:w-[400px]"
+                                  disabled={isUpdating || isSaving}
+                                />
                               )}
-                            </p>
+                            </div>
+
+                            <div className="flex flex-col items-end gap-2">
+                              {hasChanges && (
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    handleSaveConfig(config.config_key)
+                                  }
+                                  disabled={isSaving}
+                                  className="min-w-[100px]"
+                                >
+                                  {isSaving ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      Guardando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Save className="h-3 w-3 mr-1" />
+                                      Guardar
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                              <div className="text-right">
+                                <p className="text-xs text-tierra-media">
+                                  Actualizado
+                                </p>
+                                <p className="text-xs font-medium">
+                                  {new Date(
+                                    config.updated_at,
+                                  ).toLocaleDateString("es-AR", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

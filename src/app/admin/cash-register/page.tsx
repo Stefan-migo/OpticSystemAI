@@ -1313,50 +1313,96 @@ export default function CashRegisterPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-semibold">
-                          {formatCurrency(order.total_amount)}
+                        <TableCell>
+                          <div className="font-semibold">
+                            {formatCurrency(order.total_amount)}
+                          </div>
+                          {(() => {
+                            const paid =
+                              order.order_payments?.reduce(
+                                (sum: number, p: any) =>
+                                  sum + Number(p.amount || 0),
+                                0,
+                              ) || 0;
+                            const pending = Math.max(
+                              0,
+                              order.total_amount - paid,
+                            );
+                            if (pending > 0 && order.status !== "cancelled") {
+                              return (
+                                <div className="text-xs text-red-600 font-medium">
+                                  Pdte: {formatCurrency(pending)}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </TableCell>
                         <TableCell>
-                          {order.payment_methods &&
-                          order.payment_methods.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {order.payment_methods.map(
-                                (method: string, idx: number) => (
-                                  <Badge
-                                    key={idx}
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    {method}
-                                  </Badge>
-                                ),
-                              )}
-                            </div>
-                          ) : (
-                            <Badge variant="outline">
-                              {order.payment_method_type === "cash" &&
-                                "Efectivo"}
-                              {order.payment_method_type === "debit_card" &&
-                                "Tarjeta Débito"}
-                              {order.payment_method_type === "credit_card" &&
-                                "Tarjeta Crédito"}
-                              {order.payment_method_type === "transfer" &&
-                                "Transferencia"}
-                              {order.payment_method_type === "deposit" &&
-                                "Abono"}
-                              {order.payment_method_type === "installments" &&
-                                "Cuotas"}
-                              {![
-                                "cash",
-                                "debit_card",
-                                "credit_card",
-                                "transfer",
-                                "deposit",
-                                "installments",
-                              ].includes(order.payment_method_type) &&
-                                (order.payment_method_type || "N/A")}
-                            </Badge>
-                          )}
+                          {(() => {
+                            const methodsFromPayments =
+                              order.order_payments?.map(
+                                (p: any) => p.payment_method,
+                              ) || [];
+                            const uniqueMethods = Array.from(
+                              new Set(methodsFromPayments),
+                            );
+
+                            if (uniqueMethods.length > 0) {
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {uniqueMethods.map(
+                                    (method: any, idx: number) => (
+                                      <Badge
+                                        key={idx}
+                                        variant="outline"
+                                        className="text-[10px] px-1 h-5 capitalize"
+                                      >
+                                        {method === "cash"
+                                          ? "Efectivo"
+                                          : method === "debit"
+                                            ? "Débito"
+                                            : method === "credit"
+                                              ? "Crédito"
+                                              : method === "transfer"
+                                                ? "Transf."
+                                                : method}
+                                      </Badge>
+                                    ),
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1 h-5"
+                              >
+                                {order.payment_method_type === "cash" &&
+                                  "Efectivo"}
+                                {order.payment_method_type === "debit_card" &&
+                                  "Débito"}
+                                {order.payment_method_type === "credit_card" &&
+                                  "Crédito"}
+                                {order.payment_method_type === "transfer" &&
+                                  "Transf."}
+                                {order.payment_method_type === "deposit" &&
+                                  "Abono"}
+                                {order.payment_method_type === "installments" &&
+                                  "Cuotas"}
+                                {![
+                                  "cash",
+                                  "debit_card",
+                                  "credit_card",
+                                  "transfer",
+                                  "deposit",
+                                  "installments",
+                                ].includes(order.payment_method_type) &&
+                                  (order.payment_method_type || "N/A")}
+                              </Badge>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Badge

@@ -20,12 +20,12 @@ export function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white pt-20">
       {/* Background patterns */}
-      <div className="absolute inset-0 z-0 overflow-hidden opacity-30">
+      <div className="absolute inset-0 z-0 overflow-hidden opacity-30 bg-[var(--admin-bg-tertiary)]">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px]"></div>
         <div className="absolute top-[40%] -right-[10%] w-[30%] h-[50%] bg-blue-100 rounded-full blur-[100px]"></div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-20">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-20 bg-[var(--admin-bg-primary)]">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           {/* Left Column - Text Content */}
           <div className="text-center lg:text-left space-y-10">

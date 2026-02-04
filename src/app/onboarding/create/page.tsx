@@ -50,7 +50,7 @@ export default function CreateOrganizationPage() {
   } = useForm<any>({
     resolver: zodResolver(createOrganizationSchema),
     defaultValues: {
-      subscription_tier: "basic",
+      subscription_tier: "pro",
       branchName: "Casa Matriz",
     },
   });
@@ -62,10 +62,17 @@ export default function CreateOrganizationPage() {
   const slugValidation = useSlugValidation(slug || "");
 
   // Auto-generar slug desde el nombre
+  // Generate slug automatically when name changes, but only if slug is empty or very short (like "o")
   useEffect(() => {
-    if (organizationName && !slug) {
-      const autoSlug = generateSlug(organizationName);
-      setValue("slug", autoSlug);
+    if (organizationName && organizationName.trim().length > 0) {
+      // Only auto-generate if slug is empty or very short (1-2 characters, likely accidental input)
+      if (!slug || slug.trim().length <= 2) {
+        const autoSlug = generateSlug(organizationName);
+        // Only set if the generated slug is different and meaningful
+        if (autoSlug && autoSlug.length > 0 && autoSlug !== slug) {
+          setValue("slug", autoSlug);
+        }
+      }
     }
   }, [organizationName, slug, setValue]);
 
@@ -176,7 +183,7 @@ export default function CreateOrganizationPage() {
   const showSlugValidation = slug && slug.length >= 2;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 relative overflow-hidden px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--admin-bg-primary)] relative overflow-hidden px-4 py-12">
       {/* Premium Background Elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] animate-premium-float" />
@@ -189,8 +196,8 @@ export default function CreateOrganizationPage() {
       <div className="w-full max-w-2xl relative z-10">
         {/* Header */}
         <div className="text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl mb-6 relative group">
-            <div className="absolute inset-0 bg-primary/10 rounded-[2rem] scale-90 group-hover:scale-110 transition-transform duration-500" />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-[var(--admin-border-primary)] rounded-[2rem] shadow-2xl mb-6 relative group">
+            <div className="absolute inset-0 bg-[var(--admin-bg-tertiary)] rounded-[2rem] scale-90 group-hover:scale-110 transition-transform duration-500" />
             <Building2 className="h-10 w-10 text-primary relative z-10" />
           </div>
           <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">
@@ -211,7 +218,7 @@ export default function CreateOrganizationPage() {
             <CardTitle size="lg" theme="modern">
               Identidad de la Organización
             </CardTitle>
-            <CardDescription size="lg">
+            <CardDescription size="lg" className="text-accent-foreground">
               Esta información será la base de tu perfil empresarial y aparecerá
               en tus documentos oficiales.
             </CardDescription>
@@ -243,7 +250,7 @@ export default function CreateOrganizationPage() {
                       {...register("name")}
                       placeholder="Ej. Óptica Visión Premium"
                       className={cn(
-                        "h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10",
+                        "h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10",
                         errors.name && "border-red-500 focus:ring-red-500/10",
                       )}
                       disabled={isSubmitting}
@@ -281,7 +288,7 @@ export default function CreateOrganizationPage() {
                       {...register("slug")}
                       placeholder="vision-premium"
                       className={cn(
-                        "h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10 pr-12",
+                        "h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10 pr-12",
                         (errors.slug || isSlugInvalid) &&
                           "border-red-500 focus:ring-red-500/10",
                         isSlugValid &&
@@ -332,7 +339,7 @@ export default function CreateOrganizationPage() {
                     id="branchName"
                     {...register("branchName")}
                     placeholder="Ej. Sucursal Central o Casa Matriz"
-                    className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                    className="h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10"
                     disabled={isSubmitting}
                   />
                   <p className="text-[11px] text-slate-500 font-medium italic">
@@ -348,7 +355,7 @@ export default function CreateOrganizationPage() {
                   variant="outline"
                   onClick={() => router.back()}
                   disabled={isSubmitting}
-                  className="flex-1 h-12 border-2"
+                  className="flex-1 h-12 border-2 bg-[var(--admin-bg-tertiary)] border-[var(--admin-accent-primary)]"
                 >
                   Regresar
                 </Button>

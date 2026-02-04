@@ -61,8 +61,6 @@ import businessConfig from "@/config/business";
 import { DashboardSearch } from "@/components/admin/DashboardSearch";
 import { useBranch } from "@/hooks/useBranch";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { SmartContextWidget } from "@/components/ai/SmartContextWidget";
-
 const CreateAppointmentForm = dynamic(
   () => import("@/components/admin/CreateAppointmentForm"),
   {
@@ -403,9 +401,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* AI Insights Widget */}
-      <SmartContextWidget section="dashboard" />
-
       {/* Stock Alert Banner - Compact */}
       {data.lowStockProducts.length > 0 && (
         <Card className="border-none bg-admin-bg-tertiary shadow-soft overflow-hidden animate-in slide-in-from-top duration-500">
@@ -501,7 +496,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.5] transition-opacity">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.2] group-hover:opacity-[0.5] transition-opacity">
                   <DollarSign size={80} />
                 </div>
               </CardContent>
@@ -540,7 +535,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.5] transition-opacity">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.2] group-hover:opacity-[0.5] transition-opacity">
                   <Calendar size={80} />
                 </div>
               </CardContent>
@@ -592,7 +587,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.5] transition-opacity">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.2] group-hover:opacity-[0.5] transition-opacity">
                   <Package size={80} />
                 </div>
               </CardContent>
@@ -625,7 +620,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.5] transition-opacity">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.2] group-hover:opacity-[0.5] transition-opacity">
                   <Users size={80} />
                 </div>
               </CardContent>
@@ -857,7 +852,7 @@ export default function AdminDashboard() {
 
       {/* Top Products Chart */}
       {data.charts.topProducts.length > 0 && (
-        <Card className="border-none bg-admin-bg-secondary shadow-soft overflow-hidden">
+        <Card className="border-none bg-admin-bg-tertiary shadow-soft overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 bg-admin-accent-primary/10 rounded-lg flex items-center justify-center">

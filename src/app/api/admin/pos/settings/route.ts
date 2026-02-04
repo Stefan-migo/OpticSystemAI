@@ -55,31 +55,43 @@ export async function GET(request: NextRequest) {
         }
 
         // Get POS settings for the branch
-        const query = supabase
-          .from("pos_settings")
-          .select("*")
-          .eq("branch_id", branchContext.branchId!);
+        let settings = null;
 
-        const { data: settings, error: settingsError } =
-          await query.maybeSingle();
+        if (branchContext.branchId) {
+          const { data, error: settingsError } = await supabase
+            .from("pos_settings")
+            .select("*")
+            .eq("branch_id", branchContext.branchId)
+            .maybeSingle();
 
-        if (settingsError && settingsError.code !== "PGRST116") {
-          // PGRST116 = not found, which is OK
-          logger.error("Error fetching POS settings", settingsError);
-          return NextResponse.json(
-            { error: "Error al obtener configuración" },
-            { status: 500 },
-          );
+          if (settingsError && settingsError.code !== "PGRST116") {
+            logger.error("Error fetching POS settings", settingsError);
+          } else {
+            settings = data;
+          }
         }
 
-        // Return default settings if not found
+        // Return default settings if not found in branch
         if (!settings) {
-          return NextResponse.json({
-            settings: {
+          // Try to get from organization_settings
+          const { data: orgSettings } = await supabase
+            .from("organization_settings")
+            .select("*")
+            .eq("organization_id", branchContext.organizationId!)
+            .maybeSingle();
+
+          if (orgSettings) {
+            settings = {
+              min_deposit_percent: orgSettings.min_deposit_percent,
+              min_deposit_amount: orgSettings.min_deposit_amount,
+            };
+          } else {
+            // Hardcoded defaults
+            settings = {
               min_deposit_percent: 50.0,
               min_deposit_amount: null,
-            },
-          });
+            };
+          }
         }
 
         return NextResponse.json({
@@ -146,62 +158,127 @@ export async function PUT(request: NextRequest) {
         const body = await request.json();
         const validatedData = posSettingsSchema.parse(body);
 
-        // Check if settings exist
-        const { data: existingSettings } = await supabase
-          .from("pos_settings")
-          .select("id")
-          .eq("branch_id", branchContext.branchId!)
-          .maybeSingle();
-
         let result;
-        if (existingSettings) {
-          // Update existing settings
-          const { data: updatedSettings, error: updateError } = await supabase
-            .from("pos_settings")
-            .update({
-              min_deposit_percent: validatedData.min_deposit_percent,
-              min_deposit_amount: validatedData.min_deposit_amount,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("branch_id", branchContext.branchId!)
+
+        // GLOBAL UPDATE LOGIC for Super Admins
+        if (!branchContext.branchId && branchContext.isSuperAdmin) {
+          logger.info("Global POS settings update initiated", {
+            organizationId: branchContext.organizationId,
+          });
+
+          // 1. Update organization-level settings
+          const { data: orgSettings, error: orgError } = await supabase
+            .from("organization_settings")
+            .upsert(
+              {
+                organization_id: branchContext.organizationId,
+                min_deposit_percent: validatedData.min_deposit_percent,
+                min_deposit_amount: validatedData.min_deposit_amount,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "organization_id" },
+            )
             .select()
             .single();
 
-          if (updateError) {
-            logger.error("Error updating POS settings", updateError);
+          if (orgError) {
+            logger.error(
+              "Error updating global organization settings",
+              orgError,
+            );
             return NextResponse.json(
-              { error: "Error al actualizar configuración" },
+              {
+                error:
+                  "Error al actualizar configuración global de organización",
+              },
               { status: 500 },
             );
           }
 
-          result = updatedSettings;
+          // 2. Sync ALL branches of the organization
+          const { data: branches } = await supabase
+            .from("branches")
+            .select("id")
+            .eq("organization_id", branchContext.organizationId!);
+
+          if (branches && branches.length > 0) {
+            const branchIds = branches.map((b) => b.id);
+
+            // Perform bulk upsert for all branches
+            // First we need to get existing settings to know which to update and which to insert
+            // or we can just use upsert if we have a unique constraint on branch_id
+            for (const bId of branchIds) {
+              await supabase.from("pos_settings").upsert(
+                {
+                  branch_id: bId,
+                  min_deposit_percent: validatedData.min_deposit_percent,
+                  min_deposit_amount: validatedData.min_deposit_amount,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "branch_id" },
+              );
+            }
+          }
+
+          result = orgSettings;
         } else {
-          // Create new settings
-          const { data: newSettings, error: insertError } = await supabase
+          // BRANCH-SPECIFIC UPDATE
+          // Check if settings exist
+          const { data: existingSettings } = await supabase
             .from("pos_settings")
-            .insert({
-              branch_id: branchContext.branchId!,
-              min_deposit_percent: validatedData.min_deposit_percent || 50.0,
-              min_deposit_amount: validatedData.min_deposit_amount || null,
-            })
-            .select()
-            .single();
+            .select("id")
+            .eq("branch_id", branchContext.branchId!)
+            .maybeSingle();
 
-          if (insertError) {
-            logger.error("Error creating POS settings", insertError);
-            return NextResponse.json(
-              { error: "Error al crear configuración" },
-              { status: 500 },
-            );
+          if (existingSettings) {
+            // Update existing settings
+            const { data: updatedSettings, error: updateError } = await supabase
+              .from("pos_settings")
+              .update({
+                min_deposit_percent: validatedData.min_deposit_percent,
+                min_deposit_amount: validatedData.min_deposit_amount,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("branch_id", branchContext.branchId!)
+              .select()
+              .single();
+
+            if (updateError) {
+              logger.error("Error updating POS settings", updateError);
+              return NextResponse.json(
+                { error: "Error al actualizar configuración" },
+                { status: 500 },
+              );
+            }
+
+            result = updatedSettings;
+          } else {
+            // Create new settings
+            const { data: newSettings, error: insertError } = await supabase
+              .from("pos_settings")
+              .insert({
+                branch_id: branchContext.branchId!,
+                min_deposit_percent: validatedData.min_deposit_percent || 50.0,
+                min_deposit_amount: validatedData.min_deposit_amount || null,
+              })
+              .select()
+              .single();
+
+            if (insertError) {
+              logger.error("Error creating POS settings", insertError);
+              return NextResponse.json(
+                { error: "Error al crear configuración" },
+                { status: 500 },
+              );
+            }
+
+            result = newSettings;
           }
-
-          result = newSettings;
         }
 
         logger.info("POS settings updated successfully", {
-          branchId: branchContext.branchId,
-          settings: result,
+          branchId: branchContext.branchId || "GLOBAL",
+          organizationId: branchContext.organizationId,
         });
 
         return NextResponse.json({

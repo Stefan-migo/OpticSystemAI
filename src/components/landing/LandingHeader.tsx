@@ -8,6 +8,7 @@ import { Menu, X, Building2, LayoutDashboard, Eye } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import Image from "next/image";
 import businessConfig from "@/config/business";
+import { useTheme } from "@/components/theme-provider";
 
 type OrgStatus = {
   hasOrganization: boolean;
@@ -16,7 +17,39 @@ type OrgStatus = {
 
 export function LandingHeader() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Mapeo de logos por tema
+  const getThemeLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-opttius-dark.png";
+      case "blue":
+        return "/logo-opttius-blue.png";
+      case "green":
+        return "/logo-opttius-green.png";
+      case "red":
+        return "/logo-opttius-red.png";
+      default:
+        return "/logo-opttius.png";
+    }
+  };
+
+  const getThemeTextLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-text-dark.svg";
+      case "blue":
+        return "/logo-text-blue.svg";
+      case "green":
+        return "/logo-text-green.svg";
+      case "red":
+        return "/logo-text-red.svg";
+      default:
+        return "/logo-text-default.svg";
+    }
+  };
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [orgStatus, setOrgStatus] = useState<OrgStatus>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,27 +113,28 @@ export function LandingHeader() {
   };
 
   return (
-    <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 z-50 transition-all duration-300">
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="fixed top-0 w-full bg-[var(--admin-bg-tertiary)] backdrop-blur-md border-b border-gray-100 z-50 transition-all duration-300">
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-[var(--admin-bg-tertiary)]">
         <div className="flex justify-between items-center h-20">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative overflow-hidden rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-105">
+            <div className="relative overflow-hidden rounded-[50px] shadow-lg transition-transform duration-300 group-hover:scale-105">
               <Image
-                src={businessConfig.admin.logo}
+                src={getThemeLogo()}
                 alt="Opttius Logo"
-                width={44}
-                height={44}
-                className="object-contain"
+                width={50}
+                height={50}
+                className="object-contain rounded-[50px]"
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-2xl font-malisha text-gray-900 leading-tight tracking-tight">
-                {businessConfig.name}
-              </span>
-              <span className="text-[10px] font-caption text-gray-500 uppercase tracking-[0.2em] font-bold">
-                Optical Management
-              </span>
+              <Image
+                src={getThemeTextLogo()}
+                alt="Opttius"
+                width={150}
+                height={40}
+                className="object-contain pt-[5px]"
+              />
             </div>
           </Link>
 

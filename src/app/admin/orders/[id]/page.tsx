@@ -46,18 +46,29 @@ export default function AdminOrderDetailPage() {
     }
   };
 
+  const paidAmount =
+    order?.order_payments?.reduce(
+      (sum: number, p: any) => sum + Number(p.amount),
+      0,
+    ) || 0;
+  const pendingAmount = Math.max(0, (order?.total_amount || 0) - paidAmount);
+
   const paymentMethodLabel =
-    order?.mp_payment_method === "cash"
-      ? "Efectivo"
-      : order?.mp_payment_method === "debit"
-        ? "Débito"
-        : order?.mp_payment_method === "credit"
-          ? "Crédito"
-          : order?.mp_payment_method === "card"
-            ? "Tarjeta"
-            : order?.mp_payment_method === "transfer"
-              ? "Transferencia"
-              : order?.mp_payment_method || "N/A";
+    order?.order_payments && order.order_payments.length > 0
+      ? Array.from(
+          new Set(order.order_payments.map((p: any) => p.payment_method)),
+        ).join(", ")
+      : order?.mp_payment_method === "cash"
+        ? "Efectivo"
+        : order?.mp_payment_method === "debit"
+          ? "Débito"
+          : order?.mp_payment_method === "credit"
+            ? "Crédito"
+            : order?.mp_payment_method === "card"
+              ? "Tarjeta"
+              : order?.mp_payment_method === "transfer"
+                ? "Transferencia"
+                : order?.mp_payment_method || "N/A";
 
   if (loading) {
     return (
@@ -204,6 +215,22 @@ export default function AdminOrderDetailPage() {
               <p className="font-semibold text-lg">
                 {formatCurrency(order.total_amount)}
               </p>
+            </div>
+            <div className="pt-2 border-t">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Monto Pagado</span>
+                <span className="font-medium text-green-600">
+                  {formatCurrency(paidAmount)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm mt-1">
+                <span className="text-gray-600">Saldo Pendiente</span>
+                <span
+                  className={`font-bold ${pendingAmount > 0 ? "text-red-600" : "text-gray-600"}`}
+                >
+                  {formatCurrency(pendingAmount)}
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>

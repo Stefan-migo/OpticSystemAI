@@ -85,13 +85,33 @@ export async function GET(request: NextRequest) {
            )`
           : "id, name, price, price_includes_tax, inventory_quantity, status, featured_image, sku, barcode, product_type, frame_brand, frame_model, frame_color, frame_size";
 
-        // Products are global - don't filter by branch_id in products table
-        // Only filter by status and search conditions
+        // CRITICAL: Filter by organization_id FIRST to ensure multi-tenancy isolation
+        // Products must be filtered by organization_id before search to prevent cross-organization data leakage
         let productsQuery = supabase
           .from("products")
           .select(selectFields)
-          .or(searchConditions)
           .eq("status", "active");
+
+        // Apply organization filter - CRITICAL for multi-tenancy
+        if (branchContext.organizationId) {
+          productsQuery = productsQuery.eq(
+            "organization_id",
+            branchContext.organizationId,
+          );
+          logger.debug("Filtering products by organization_id", {
+            organizationId: branchContext.organizationId,
+          });
+        } else if (!branchContext.isSuperAdmin) {
+          // If no organization_id and not super admin, return empty results
+          // This prevents data leakage
+          return NextResponse.json({
+            success: true,
+            products: [],
+          });
+        }
+
+        // Apply search conditions after organization filter
+        productsQuery = productsQuery.or(searchConditions);
 
         // Filter by product type if provided
         // For "frame" type, also search by category "Marcos" as fallback

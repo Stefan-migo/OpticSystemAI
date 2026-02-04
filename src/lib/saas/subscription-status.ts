@@ -28,11 +28,20 @@ export interface SubscriptionStatusResult {
 
 /**
  * Get subscription status for an organization
+ * CRITICAL: Demo and Root organizations never expire
  */
 export async function getSubscriptionStatus(
   organizationId: string,
 ): Promise<SubscriptionStatusResult> {
   const supabase = createServiceRoleClient();
+
+  // CRITICAL: Demo and Root organizations never expire
+  // Demo: 00000000-0000-0000-0000-000000000001
+  // Root: 00000000-0000-0000-0000-000000000010
+  const DEMO_ORG_ID = "00000000-0000-0000-0000-000000000001";
+  const ROOT_ORG_ID = "00000000-0000-0000-0000-000000000010";
+  const isDemoOrRoot =
+    organizationId === DEMO_ORG_ID || organizationId === ROOT_ORG_ID;
 
   const { data: sub } = await supabase
     .from("subscriptions")
@@ -44,6 +53,25 @@ export async function getSubscriptionStatus(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // For demo/root: always return active status, never expired
+  if (isDemoOrRoot) {
+    return {
+      status: "active",
+      isExpired: false,
+      isTrialExpired: false,
+      trialEndsAt: null,
+      currentPeriodStart: sub?.current_period_start
+        ? new Date(sub.current_period_start)
+        : null,
+      currentPeriodEnd: sub?.current_period_end
+        ? new Date(sub.current_period_end)
+        : null,
+      cancelAt: null,
+      canceledAt: null,
+      organizationId,
+    };
+  }
 
   if (!sub) {
     return {

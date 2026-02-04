@@ -7,7 +7,7 @@
 
 export type PaymentStatus = "pending" | "succeeded" | "failed" | "refunded";
 
-export type PaymentGateway = "flow" | "mercadopago" | "paypal";
+export type PaymentGateway = "flow" | "mercadopago" | "paypal" | "nowpayments";
 
 export type Payment = {
   id: string;

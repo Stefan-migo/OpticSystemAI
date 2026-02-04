@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { NotificationService } from "@/lib/notifications/notification-service";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
+import { normalizeRUT } from "@/lib/utils/rut";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 import { ValidationError } from "@/lib/api/errors";
@@ -38,20 +39,76 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get("status") || "all";
     const customerId = searchParams.get("customer_id");
+    const customerRut = searchParams.get("customer_rut")?.trim() || null;
+    const customerEmail = searchParams.get("customer_email")?.trim() || null;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
     // Get branch context
     const branchContext = await getBranchContext(request, user.id);
 
+    // Get user's organization_id for multi-tenancy filtering
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = adminUser?.organization_id;
+
+    // When listing quotes by customer_id or customer_rut (e.g. POS dropdown), show ALL
+    // quotes for that customer/person in the organization (any branch).
+    const forCustomerQuotesOnly = Boolean(
+      customerId || customerRut || customerEmail,
+    );
+
     // Build branch filter function
     const applyBranchFilter = (query: ReturnType<typeof supabase.from>) => {
-      return addBranchFilter(
-        query,
-        branchContext.branchId,
-        branchContext.isSuperAdmin,
-        branchContext.organizationId,
-      );
+      // CRITICAL: Always filter by organization_id first for multi-tenancy isolation
+      // Then apply branch filter if needed (skip branch when listing by customer for POS)
+      let filteredQuery = query;
+
+      if (userOrganizationId && !branchContext.isSuperAdmin) {
+        // For POS/customer lookup: include legacy quotes with organization_id NULL
+        if (forCustomerQuotesOnly) {
+          filteredQuery = filteredQuery.or(
+            `organization_id.eq.${userOrganizationId},organization_id.is.null`,
+          );
+        } else {
+          filteredQuery = filteredQuery.eq(
+            "organization_id",
+            userOrganizationId,
+          );
+        }
+        // For POS customer quotes: do NOT filter by branch so all org quotes for customer are visible
+        if (!forCustomerQuotesOnly && branchContext.branchId) {
+          filteredQuery = filteredQuery.eq("branch_id", branchContext.branchId);
+        }
+      } else if (branchContext.isSuperAdmin) {
+        if (!forCustomerQuotesOnly && branchContext.branchId) {
+          filteredQuery = filteredQuery.eq("branch_id", branchContext.branchId);
+        } else if (branchContext.organizationId) {
+          if (forCustomerQuotesOnly) {
+            filteredQuery = filteredQuery.or(
+              `organization_id.eq.${branchContext.organizationId},organization_id.is.null`,
+            );
+          } else {
+            filteredQuery = filteredQuery.eq(
+              "organization_id",
+              branchContext.organizationId,
+            );
+          }
+        }
+      } else {
+        filteredQuery = addBranchFilter(
+          filteredQuery,
+          forCustomerQuotesOnly ? null : branchContext.branchId,
+          branchContext.isSuperAdmin,
+          branchContext.organizationId,
+        );
+      }
+
+      return filteredQuery;
     };
 
     // Check and expire quotes before fetching (use service role for proper permissions)
@@ -67,8 +124,53 @@ export async function GET(request: NextRequest) {
       query = query.eq("status", status);
     }
 
-    if (customerId) {
-      query = query.eq("customer_id", customerId);
+    // When listing for POS: allow customer_id and optional customer_rut.
+    // If customer_rut is provided, include quotes for ALL customers in the org with that RUT
+    // (same person may have different customer rows per branch).
+    if (customerId || customerRut || customerEmail) {
+      logger.info("Quotes filter (customer):", {
+        customerId,
+        customerRut,
+        customerEmail,
+        userOrganizationId,
+      });
+      if (userOrganizationId && (customerRut || customerEmail)) {
+        const normalizedRut = customerRut ? normalizeRUT(customerRut) : "";
+        const normalizedEmail = customerEmail?.toLowerCase() || "";
+        const { data: customersInOrg } = await supabaseServiceRole
+          .from("customers")
+          .select("id, rut, email")
+          .eq("organization_id", userOrganizationId)
+          .limit(1000);
+        const matchingIds = (customersInOrg || [])
+          .filter((c: { rut?: string | null; email?: string | null }) => {
+            const rutMatches =
+              normalizedRut && c.rut && normalizeRUT(c.rut) === normalizedRut;
+            const emailMatches =
+              normalizedEmail &&
+              c.email &&
+              c.email.toLowerCase() === normalizedEmail;
+            return rutMatches || emailMatches;
+          })
+          .map((c: { id: string }) => c.id);
+        logger.info("Quotes filter (customer) matches:", {
+          normalizedRut,
+          normalizedEmail,
+          matchingCount: matchingIds.length,
+        });
+        if (matchingIds.length > 0) {
+          query = query.in("customer_id", matchingIds);
+        } else if (customerId) {
+          query = query.eq("customer_id", customerId);
+        } else {
+          query = query.eq(
+            "customer_id",
+            "00000000-0000-0000-0000-000000000000",
+          );
+        }
+      } else if (customerId) {
+        query = query.eq("customer_id", customerId);
+      }
     }
 
     const from = (page - 1) * limit;

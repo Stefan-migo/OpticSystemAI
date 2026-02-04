@@ -251,12 +251,12 @@ export default function HelpPage() {
       </div>
 
       {/* Info Card */}
-      <Card className="bg-blue-50 border-blue-200">
+      <Card className="bg-[var(--admin-bg-tertiary)] border-[var(--accent-foreground)]">
         <CardContent className="pt-6">
           <div className="flex items-start gap-3">
             <HelpCircle className="h-5 w-5 text-blue-600 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-blue-900 mb-1">
+              <p className="text-sm font-medium text-[var(--accent-foreground)] mb-1">
                 ¿Necesitas ayuda?
               </p>
               <p className="text-sm text-blue-700">

@@ -26,9 +26,17 @@ import type {
 
 interface SmartContextWidgetProps {
   section: InsightSection;
+  /** "embedded" = solo contenido del panel (sin trigger ni popover); "popover" = botón + popover (default) */
+  variant?: "popover" | "embedded";
+  /** Solo en variant="embedded": llamar al cerrar (ej. cerrar Sheet) */
+  onClose?: () => void;
 }
 
-export function SmartContextWidget({ section }: SmartContextWidgetProps) {
+export function SmartContextWidget({
+  section,
+  variant = "popover",
+  onClose,
+}: SmartContextWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const queryClient = useQueryClient();
@@ -154,6 +162,126 @@ export function SmartContextWidget({ section }: SmartContextWidgetProps) {
   const hasInsights = insights && insights.length > 0;
   const badgeCount = insights.length;
 
+  const handleClose = () => {
+    setIsOpen(false);
+    onClose?.();
+  };
+
+  const panelContent = (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-blue-600" />
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            Insights Inteligentes
+          </span>
+          {hasInsights && (
+            <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">
+              {badgeCount}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              regenerateInsights();
+            }}
+            disabled={isRegenerating}
+            title="Regenerar insights"
+          >
+            <RefreshCw
+              className={cn(
+                "w-3.5 h-3.5 text-gray-600",
+                isRegenerating && "animate-spin",
+              )}
+            />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClose();
+            }}
+          >
+            <X className="w-4 h-4 text-gray-600" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-h-[600px] overflow-y-auto">
+        {isLoading ? (
+          <div className="p-6 flex flex-col items-center justify-center gap-2">
+            <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+            <span className="text-sm text-gray-600">Cargando insights...</span>
+          </div>
+        ) : !hasInsights ? (
+          <div className="p-6 flex flex-col items-center justify-center gap-3">
+            <Sparkles className="w-8 h-8 text-gray-400" />
+            <p className="text-sm text-gray-600 text-center">
+              No hay insights disponibles aún
+            </p>
+            <Button
+              onClick={regenerateInsights}
+              disabled={isRegenerating}
+              variant="outline"
+              size="sm"
+              className="mt-2"
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3 mr-2" />
+                  Generar Insights
+                </>
+              )}
+            </Button>
+          </div>
+        ) : (
+          <>
+            {sortedInsights.map((insight, index) => (
+              <div
+                key={insight.id}
+                className={cn(
+                  "p-3 border-b border-gray-100 last:border-b-0 dark:border-gray-800",
+                  index === 0 && "bg-blue-50/50 dark:bg-blue-950/20",
+                )}
+              >
+                <InsightCard
+                  insight={insight}
+                  onDismiss={() => dismissInsight.mutate(insight.id)}
+                  onFeedback={(score) =>
+                    sendFeedback.mutate({ insightId: insight.id, score })
+                  }
+                  compact={true}
+                />
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </>
+  );
+
+  if (variant === "embedded") {
+    return (
+      <div className="w-full p-0 rounded-2xl overflow-hidden">
+        {panelContent}
+      </div>
+    );
+  }
+
   return (
     <div className="fixed bottom-6 left-6 z-40">
       <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -166,7 +294,8 @@ export function SmartContextWidget({ section }: SmartContextWidgetProps) {
               hasInsights
                 ? "border-blue-300 hover:border-blue-400"
                 : "border-gray-200 hover:border-gray-300",
-              isLoading && "opacity-50 cursor-not-allowed",
+              isLoading &&
+                "opacity-50 cursor-not-allowed border-[var(--accent-foreground)]",
             )}
             disabled={isLoading}
           >
@@ -202,110 +331,7 @@ export function SmartContextWidget({ section }: SmartContextWidgetProps) {
           side="top"
           sideOffset={10}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-semibold text-gray-800">
-                Insights Inteligentes
-              </span>
-              {hasInsights && (
-                <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">
-                  {badgeCount}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  regenerateInsights();
-                }}
-                disabled={isRegenerating}
-                title="Regenerar insights"
-              >
-                <RefreshCw
-                  className={cn(
-                    "w-3.5 h-3.5 text-gray-600",
-                    isRegenerating && "animate-spin",
-                  )}
-                />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsOpen(false);
-                }}
-              >
-                <X className="w-4 h-4 text-gray-600" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="max-h-[600px] overflow-y-auto">
-            {isLoading ? (
-              <div className="p-6 flex flex-col items-center justify-center gap-2">
-                <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-                <span className="text-sm text-gray-600">
-                  Cargando insights...
-                </span>
-              </div>
-            ) : !hasInsights ? (
-              <div className="p-6 flex flex-col items-center justify-center gap-3">
-                <Sparkles className="w-8 h-8 text-gray-400" />
-                <p className="text-sm text-gray-600 text-center">
-                  No hay insights disponibles aún
-                </p>
-                <Button
-                  onClick={regenerateInsights}
-                  disabled={isRegenerating}
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                >
-                  {isRegenerating ? (
-                    <>
-                      <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                      Generando...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3 h-3 mr-2" />
-                      Generar Insights
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <>
-                {sortedInsights.map((insight, index) => (
-                  <div
-                    key={insight.id}
-                    className={cn(
-                      "p-3 border-b border-gray-100 last:border-b-0",
-                      index === 0 && "bg-blue-50/50",
-                    )}
-                  >
-                    <InsightCard
-                      insight={insight}
-                      onDismiss={() => dismissInsight.mutate(insight.id)}
-                      onFeedback={(score) =>
-                        sendFeedback.mutate({ insightId: insight.id, score })
-                      }
-                      compact={true}
-                    />
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
+          {panelContent}
         </PopoverContent>
       </Popover>
     </div>

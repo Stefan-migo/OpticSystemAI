@@ -261,8 +261,7 @@ export async function GET(
       .eq("id", user.id)
       .single();
 
-    const userOrganizationId = (adminUser as { organization_id?: string })
-      ?.organization_id;
+    const userOrganizationId = (adminUser as any)?.organization_id;
 
     // Get order details
     let query = supabase
@@ -277,6 +276,13 @@ export async function GET(
           quantity,
           unit_price,
           total_price
+        ),
+        order_payments (
+          id,
+          amount,
+          payment_method,
+          paid_at,
+          notes
         )
       `,
       )

@@ -48,7 +48,6 @@ import {
 } from "lucide-react";
 import { EnhancedPieChart } from "@/components/admin/charts/EnhancedPieChart";
 import { EnhancedBarChart } from "@/components/admin/charts/EnhancedBarChart";
-import { SmartContextWidget } from "@/components/ai/SmartContextWidget";
 import { EnhancedAreaChart } from "@/components/admin/charts/EnhancedAreaChart";
 import { EnhancedColumnChart } from "@/components/admin/charts/EnhancedColumnChart";
 import { EnhancedLineChart } from "@/components/admin/charts/EnhancedLineChart";
@@ -344,9 +343,6 @@ export default function AnalyticsPage() {
           </Button>
         </div>
       </div>
-
-      {/* AI Insights Widget */}
-      {currentBranchId && <SmartContextWidget section="analytics" />}
 
       {/* Main KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

@@ -127,6 +127,35 @@ function ProfilePageContent() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Admin and Subscription state
+  const [adminData, setAdminData] = useState<any>(null);
+  const [subscriptionData, setSubscriptionData] = useState<any>(null);
+
+  // Load admin and subscription data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [adminRes, subRes] = await Promise.all([
+          fetch("/api/admin/check-status"),
+          fetch("/api/checkout/current-subscription"),
+        ]);
+
+        if (adminRes.ok) {
+          const data = await adminRes.json();
+          setAdminData(data);
+        }
+
+        if (subRes.ok) {
+          const data = await subRes.json();
+          setSubscriptionData(data);
+        }
+      } catch (error) {
+        console.error("Error loading profile secondary data:", error);
+      }
+    };
+    loadData();
+  }, []);
+
   // Preferences state
   const [preferences, setPreferences] = useState({
     timezone: profile?.timezone || "America/Santiago",
@@ -298,7 +327,7 @@ function ProfilePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-12 relative overflow-hidden">
+    <div className="min-h-screen bg-[var(--admin-bg-primary)] px-4 py-12 relative overflow-hidden">
       {/* Premium Background Elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-premium-float" />
@@ -325,14 +354,14 @@ function ProfilePageContent() {
         <Card
           variant="glass"
           rounded="lg"
-          className="mb-10 overflow-hidden border-white/20 dark:border-slate-800/50 shadow-2xl animate-in zoom-in-95 duration-500 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl"
+          className="mb-10 overflow-hidden border-white/20 dark:border-slate-800/50 shadow-2xl animate-in zoom-in-95 duration-500 bg-[var(--admin-bg-tertiary)] backdrop-blur-xl"
         >
           <CardContent className="p-8 md:p-10">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-10">
               {/* Avatar Section */}
               <div className="relative group">
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-500 scale-75" />
-                <div className="relative z-10 p-1 bg-white dark:bg-slate-800 rounded-full shadow-xl">
+                <div className="relative z-10 rounded-full shadow-xl overflow-hidden">
                   <AvatarUpload
                     currentAvatarUrl={profile?.avatar_url || undefined}
                     onUploadSuccess={handleAvatarUpload}
@@ -353,9 +382,9 @@ function ProfilePageContent() {
                     </h2>
                     <Badge
                       variant="healty"
-                      className="w-fit mx-auto md:mx-0 bg-green-500/10 text-green-600 border-none px-3 py-1 font-bold text-[10px]"
+                      className="w-fit mx-auto md:mx-0 bg-green-500/10 text-green-600 border-none px-3 py-1 font-bold text-[10px] uppercase"
                     >
-                      ADMINISTRADOR
+                      {adminData?.adminCheck?.role || "ADMINISTRADOR"}
                     </Badge>
                   </div>
                   <p className="text-lg text-slate-500 dark:text-slate-400 font-medium">
@@ -405,10 +434,12 @@ function ProfilePageContent() {
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
-                className="rounded-xl py-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-lg data-[state=active]:text-primary transition-all duration-300"
+                className="rounded-xl py-3 data-[state=active]:bg-[var(--admin-bg-secondary)] data-[state=active]:shadow-lg data-[state=active]:text-[var(--admin-accent-secondary)] transition-all duration-300"
               >
-                <tab.icon className="h-4 w-4 mr-2" />
-                <span className="font-bold tracking-tight">{tab.label}</span>
+                <tab.icon className="h-4 w-4 mr-2 text-[var(--admin-accent-secondary)]" />
+                <span className="font-bold tracking-tight text-[var(--admin-accent-secondary)]">
+                  {tab.label}
+                </span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -422,7 +453,7 @@ function ProfilePageContent() {
               <Card variant="interactive" className="group">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight text-slate-800 dark:text-white group-hover:text-primary transition-colors">
-                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl group-hover:bg-primary/10 transition-colors">
+                    <div className="p-2 bg-[var(--admin-bg-tertiary)] rounded-xl group-hover:bg-primary/10 transition-colors">
                       <User className="h-5 w-5 text-slate-600 dark:text-slate-400 group-hover:text-primary" />
                     </div>
                     Información Base
@@ -430,7 +461,7 @@ function ProfilePageContent() {
                 </CardHeader>
                 <CardContent spacing="relaxed" className="p-6 pt-0">
                   <div className="space-y-4">
-                    <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 group-hover:border-primary/30 transition-all">
+                    <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-[var(--admin-border-secondary)] group-hover:border-primary/30 transition-all">
                       <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         Nombre Completo
                       </Label>
@@ -440,7 +471,7 @@ function ProfilePageContent() {
                           : "Pendiente de completar"}
                       </p>
                     </div>
-                    <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 group-hover:border-primary/30 transition-all">
+                    <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-[var(--admin-border-secondary)] group-hover:border-primary/30 transition-all">
                       <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         Canal de Acceso
                       </Label>
@@ -449,7 +480,7 @@ function ProfilePageContent() {
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 group-hover:border-primary/30 transition-all">
+                      <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-[var(--admin-border-secondary)] group-hover:border-primary/30 transition-all">
                         <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           Teléfono
                         </Label>
@@ -457,7 +488,7 @@ function ProfilePageContent() {
                           {profile?.phone || "Sin registro"}
                         </p>
                       </div>
-                      <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 group-hover:border-primary/30 transition-all">
+                      <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-[var(--admin-border-secondary)] group-hover:border-primary/30 transition-all">
                         <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           Cumpleaños
                         </Label>
@@ -471,7 +502,7 @@ function ProfilePageContent() {
                   </div>
                   <Button
                     variant="outline"
-                    className="w-full mt-6 border-slate-200 dark:border-slate-800 rounded-2xl font-bold h-12 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300"
+                    className="w-full mt-6 border-2 border-[var(--accent-foreground)] text-[var(--accent-foreground)] rounded-2xl font-bold h-12 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300"
                     onClick={() => {
                       setActiveTab("personal");
                       setIsEditingPersonal(true);
@@ -485,16 +516,16 @@ function ProfilePageContent() {
 
               <Card variant="interactive" className="group">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight text-slate-800 dark:text-white group-hover:text-amber-500 transition-colors">
-                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl group-hover:bg-amber-500/10 transition-colors">
-                      <MapPin className="h-5 w-5 text-slate-600 dark:text-slate-400 group-hover:text-amber-500" />
+                  <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight text-[var(--accent-foreground)] transition-colors">
+                    <div className="p-2 bg-[var(--admin-bg-tertiary)] rounded-xl transition-colors">
+                      <MapPin className="h-5 w-5 text-[var(--accent-foreground)]" />
                     </div>
                     Ubicación Principal
                   </CardTitle>
                 </CardHeader>
                 <CardContent spacing="relaxed" className="p-6 pt-0">
                   <div className="space-y-4">
-                    <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 group-hover:border-amber-500/30 transition-all min-h-[84px]">
+                    <div className="bg-slate-100/50 dark:bg-slate-900/50 p-5 rounded-3xl border border-[var(--admin-border-secondary)] transition-all min-h-[84px]">
                       <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         Dirección Lineal
                       </Label>
@@ -510,7 +541,7 @@ function ProfilePageContent() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-admin-bg-tertiary p-5 rounded-3xl border border-admin-border-primary group-hover:border-primary/30 transition-all">
+                      <div className="bg-admin-bg-tertiary p-5 rounded-3xl border border-[var(--admin-border-secondary)] group-hover:border-primary/30 transition-all">
                         <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           Ciudad
                         </Label>
@@ -518,7 +549,7 @@ function ProfilePageContent() {
                           {profile?.city || "—"}
                         </p>
                       </div>
-                      <div className="bg-admin-bg-tertiary p-5 rounded-3xl border border-admin-border-primary group-hover:border-primary/30 transition-all">
+                      <div className="bg-admin-bg-tertiary p-5 rounded-3xl border border-[var(--admin-border-secondary)] group-hover:border-primary/30 transition-all">
                         <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           País
                         </Label>
@@ -530,7 +561,7 @@ function ProfilePageContent() {
                   </div>
                   <Button
                     variant="outline"
-                    className="w-full mt-6 border-slate-200 dark:border-slate-800 rounded-2xl font-bold h-12 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all duration-300"
+                    className="w-full mt-6 bg-[var(--accent-foreground)] border-2 border-[var(--admin-border-secondary)] text-[var(--admin-bg-primary)] rounded-2xl font-bold h-12 hover:bg-[var(--accent-foreground)] hover:text-white hover:border-[var(--accent-foreground)] transition-all duration-300"
                     onClick={() => {
                       setActiveTab("address");
                       setIsEditingAddress(true);
@@ -553,17 +584,14 @@ function ProfilePageContent() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 pt-0">
-                  <div className="bg-primary/5 dark:bg-primary/10 rounded-[2rem] p-8 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-8">
+                  <div className="bg-primary/5 dark:bg-primary/10 rounded-[2rem] p-8 border border-[var(--admin-border-secondary)] flex flex-col md:flex-row items-center justify-between gap-8">
                     <div className="flex items-center gap-6">
                       <div className="w-16 h-16 rounded-3xl bg-primary flex items-center justify-center text-white shadow-xl shadow-primary/30">
                         <Zap className="h-8 w-8" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-black text-primary/60 uppercase tracking-[0.2em] mb-1">
-                          Tu Nivel Actual
-                        </p>
                         <h3 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">
-                          Plan Premium Enterprise
+                          Plan {subscriptionData?.currentTier || "Básico"}
                         </h3>
                       </div>
                     </div>
@@ -602,7 +630,7 @@ function ProfilePageContent() {
                     <Button
                       onClick={() => setIsEditingPersonal(true)}
                       variant="outline"
-                      className="border-2 font-bold px-6"
+                      className="border-2 font-bold px-6 text-[var(--accent-foreground)] bg-[var(--admin-border-primary)] border-[var(--admin-border-secondary)]"
                     >
                       <Edit3 className="h-4 w-4 mr-2" />
                       Editar Información
@@ -627,7 +655,7 @@ function ProfilePageContent() {
                         id="firstName"
                         {...personalForm.register("firstName")}
                         disabled={!isEditingPersonal || isLoading}
-                        className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                        className="h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10"
                       />
                       {personalForm.formState.errors.firstName && (
                         <p className="text-xs font-medium text-red-500 flex items-center gap-1">
@@ -648,7 +676,7 @@ function ProfilePageContent() {
                         id="lastName"
                         {...personalForm.register("lastName")}
                         disabled={!isEditingPersonal || isLoading}
-                        className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                        className="h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10"
                       />
                       {personalForm.formState.errors.lastName && (
                         <p className="text-xs font-medium text-red-500 flex items-center gap-1">
@@ -672,7 +700,7 @@ function ProfilePageContent() {
                         type="tel"
                         {...personalForm.register("phone")}
                         disabled={!isEditingPersonal || isLoading}
-                        className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                        className="h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10"
                       />
                     </div>
 
@@ -706,7 +734,7 @@ function ProfilePageContent() {
                       disabled={!isEditingPersonal || isLoading}
                       rows={5}
                       placeholder="Cuéntanos un poco sobre ti, tu rol en la óptica, etc."
-                      className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10 rounded-2xl p-4"
+                      className="bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10 rounded-2xl p-4 disabled:opacity-100"
                     />
                     {personalForm.formState.errors.bio && (
                       <p className="text-xs font-medium text-red-500">
@@ -794,7 +822,7 @@ function ProfilePageContent() {
                           id="addressLine1"
                           {...addressForm.register("addressLine1")}
                           disabled={!isEditingAddress || isLoading}
-                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                          className="h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10"
                         />
                       </div>
 
@@ -809,7 +837,7 @@ function ProfilePageContent() {
                           id="addressLine2"
                           {...addressForm.register("addressLine2")}
                           disabled={!isEditingAddress || isLoading}
-                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                          className="h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10"
                         />
                       </div>
                     </div>
@@ -841,7 +869,7 @@ function ProfilePageContent() {
                           id="state"
                           {...addressForm.register("state")}
                           disabled={!isEditingAddress || isLoading}
-                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                          className="h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10"
                         />
                       </div>
                     </div>
@@ -858,7 +886,7 @@ function ProfilePageContent() {
                           id="postalCode"
                           {...addressForm.register("postalCode")}
                           disabled={!isEditingAddress || isLoading}
-                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                          className="h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10"
                         />
                       </div>
 
@@ -873,7 +901,7 @@ function ProfilePageContent() {
                           id="country"
                           {...addressForm.register("country")}
                           disabled={!isEditingAddress || isLoading}
-                          className="h-12 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 transition-all focus:ring-4 focus:ring-primary/10"
+                          className="h-12 bg-[var(--admin-bg-primary)] border-[var(--admin-border-secondary)] transition-all focus:ring-4 focus:ring-primary/10"
                         />
                       </div>
                     </div>
@@ -934,7 +962,7 @@ function ProfilePageContent() {
             >
               <CardHeader
                 padding="lg"
-                className="bg-slate-50 dark:bg-slate-800/20 border-b border-slate-100 dark:border-slate-800"
+                className="bg-[var(--admin-bg-tertiary)]"
               >
                 <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight">
                   <div className="p-2 bg-primary/10 rounded-xl">
@@ -942,13 +970,13 @@ function ProfilePageContent() {
                   </div>
                   Seguridad de la Cuenta
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-[var(--accent-foreground)]">
                   Administra tu contraseña y métodos de acceso.
                 </CardDescription>
               </CardHeader>
               <CardContent padding="lg">
                 {!isChangingPassword ? (
-                  <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between p-6 bg-[var(--admin-bg-primary)] rounded-2xl border border-dashed border-[var(--admin-border-secondary)]">
                     <div>
                       <h4 className="font-bold text-slate-900 dark:text-white">
                         Contraseña
@@ -1113,7 +1141,7 @@ function ProfilePageContent() {
             >
               <CardHeader
                 padding="lg"
-                className="bg-slate-50 dark:bg-slate-800/20 border-b border-slate-100 dark:border-slate-800"
+                className="bg-[var(--admin-bg-tertiary)]"
               >
                 <CardTitle className="flex items-center gap-3 text-xl font-bold tracking-tight">
                   <div className="p-2 bg-amber-500/10 rounded-xl">

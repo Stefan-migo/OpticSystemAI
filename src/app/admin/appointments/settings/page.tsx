@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useBranch } from "@/hooks/useBranch";
 import { getBranchHeader } from "@/lib/utils/branch";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { BranchSelector } from "@/components/admin/BranchSelector";
 
 interface DayConfig {
   enabled: boolean;
@@ -52,7 +53,11 @@ interface ScheduleSettings {
 export default function ScheduleSettingsPage() {
   const { user, loading: authLoading } = useAuthContext();
   const router = useRouter();
-  const { currentBranchId, isLoading: branchLoading } = useBranch();
+  const {
+    currentBranchId,
+    isSuperAdmin,
+    isLoading: branchLoading,
+  } = useBranch();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<ScheduleSettings | null>(null);
@@ -138,8 +143,17 @@ export default function ScheduleSettingsPage() {
     });
   };
 
+  const isGlobalView = !currentBranchId && isSuperAdmin;
+
   const handleSave = async () => {
     if (!settings) return;
+
+    if (isGlobalView) {
+      const confirmGlobal = window.confirm(
+        "¿Está seguro de que desea guardar esta configuración de horarios GLOBALMENTE? Se aplicará a todas las sucursales existentes y futuras.",
+      );
+      if (!confirmGlobal) return;
+    }
 
     setSaving(true);
     try {
@@ -228,30 +242,35 @@ export default function ScheduleSettingsPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-black text-admin-text-primary tracking-tight">
-              Configuración de Horarios
+              Configuración de Horarios {isGlobalView && "(VISTA GLOBAL)"}
             </h1>
             <p className="text-xs font-bold text-admin-text-tertiary uppercase tracking-widest mt-1">
-              Personaliza los horarios de trabajo y disponibilidad
+              {isGlobalView
+                ? "Configura los horarios de operación para toda la organización"
+                : "Personaliza los horarios de trabajo y disponibilidad de esta sucursal"}
             </p>
           </div>
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="h-12 px-8 rounded-xl bg-admin-accent-primary hover:bg-admin-accent-primary/90 text-white shadow-premium-md font-bold uppercase text-[11px] tracking-widest transition-all active:scale-[0.98]"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Sincronizando...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              Guardar Cambios
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-4">
+          {isSuperAdmin && <BranchSelector />}
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="h-12 px-8 rounded-xl bg-admin-accent-primary hover:bg-admin-accent-primary/90 text-white shadow-premium-md font-bold uppercase text-[11px] tracking-widest transition-all active:scale-[0.98]"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Sincronizando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Guardar Cambios
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

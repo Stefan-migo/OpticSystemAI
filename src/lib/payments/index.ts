@@ -8,8 +8,13 @@ import type { IPaymentGateway, PaymentIntentResponse } from "./interfaces";
 import { FlowGateway } from "./flow/gateway";
 import { MercadoPagoGateway } from "./mercadopago/gateway";
 import { PayPalGateway } from "./paypal/gateway";
+import { NowPaymentsGateway } from "./nowpayments/gateway";
 
-export type PaymentGatewayType = "flow" | "mercadopago" | "paypal";
+export type PaymentGatewayType =
+  | "flow"
+  | "mercadopago"
+  | "paypal"
+  | "nowpayments";
 
 export class PaymentGatewayFactory {
   static getGateway(type: PaymentGatewayType): IPaymentGateway {
@@ -20,6 +25,8 @@ export class PaymentGatewayFactory {
         return new MercadoPagoGateway();
       case "paypal":
         return new PayPalGateway();
+      case "nowpayments":
+        return new NowPaymentsGateway();
       default:
         throw new Error(`Payment gateway ${type} is not supported.`);
     }

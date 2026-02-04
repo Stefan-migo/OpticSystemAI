@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTheme } from "@/components/theme-provider";
 import {
   Card,
   CardContent,
@@ -41,8 +42,39 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const { signIn, loading } = useAuthContext();
+  const { theme } = useTheme();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const getThemeLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-opttius-dark.png";
+      case "blue":
+        return "/logo-opttius-blue.png";
+      case "green":
+        return "/logo-opttius-green.png";
+      case "red":
+        return "/logo-opttius-red.png";
+      default:
+        return "/logo-opttius.png";
+    }
+  };
+
+  const getThemeTextLogo = () => {
+    switch (theme) {
+      case "dark":
+        return "/logo-text-dark.svg";
+      case "blue":
+        return "/logo-text-blue.svg";
+      case "green":
+        return "/logo-text-green.svg";
+      case "red":
+        return "/logo-text-red.svg";
+      default:
+        return "/logo-text-default.svg";
+    }
+  };
 
   const {
     register,
@@ -235,16 +267,20 @@ export default function LoginPage() {
           <div className="flex items-center gap-5 group cursor-pointer">
             <div className="h-16 w-16 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[2rem] flex items-center justify-center shadow-2xl transition-all duration-500 group-hover:bg-white group-hover:scale-110">
               <Image
-                src="/logo-opttius.png"
+                src={getThemeLogo()}
                 alt="Opttius Logo"
                 width={44}
                 height={44}
-                className="object-contain transition-all duration-500 group-hover:brightness-100 invert group-hover:invert-0"
+                className="object-contain transition-all duration-500 group-hover:brightness-100"
               />
             </div>
-            <span className="text-4xl font-black text-white tracking-tighter uppercase font-heading">
-              Opttius
-            </span>
+            <Image
+              src={getThemeTextLogo()}
+              alt="Opttius"
+              width={160}
+              height={50}
+              className="object-contain brightness-0 invert"
+            />
           </div>
 
           <div className="max-w-xl animate-in fade-in slide-in-from-left-10 duration-1000">
@@ -284,15 +320,19 @@ export default function LoginPage() {
         {/* Mobile Logo */}
         <div className="absolute top-8 left-8 flex items-center gap-3 lg:hidden">
           <Image
-            src="/logo-opttius.png"
+            src={getThemeLogo()}
             alt="Opttius Logo"
             width={36}
             height={36}
             className="object-contain"
           />
-          <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">
-            Opttius
-          </span>
+          <Image
+            src={getThemeTextLogo()}
+            alt="Opttius"
+            width={100}
+            height={30}
+            className="object-contain"
+          />
         </div>
 
         <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-10 duration-700">
@@ -344,13 +384,13 @@ export default function LoginPage() {
                       placeholder="admin@opttius.com"
                       {...register("email")}
                       className={cn(
-                        "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-14 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold text-slate-700 dark:text-slate-200",
+                        "h-14 rounded-2xl border-[var(--admin-border-secondary)] bg-[var(--admin-bg-primary)] pl-14 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold text-slate-700 dark:text-slate-200",
                         errors.email &&
                           "border-red-500 focus-visible:ring-red-500",
                       )}
                       disabled={loading}
                     />
-                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 transition-colors group-focus-within:text-primary" />
+                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 transition-colors group-focus-within:text-accent-foreground" />
                   </div>
                   {errors.email && (
                     <p className="text-[10px] text-red-500 font-black uppercase tracking-tight ml-1 flex items-center gap-1">
@@ -381,7 +421,7 @@ export default function LoginPage() {
                       placeholder="••••••••"
                       {...register("password")}
                       className={cn(
-                        "h-14 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 pl-14 pr-14 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold text-slate-700 dark:text-slate-200",
+                        "h-14 rounded-2xl border-[var(--admin-border-secondary)] bg-[var(--admin-bg-primary)] pl-14 pr-14 focus:bg-white dark:focus:bg-slate-900 transition-all font-bold text-slate-700 dark:text-slate-200",
                         errors.password &&
                           "border-red-500 focus-visible:ring-red-500",
                       )}
@@ -437,7 +477,7 @@ export default function LoginPage() {
                 </p>
                 <Link
                   href="/signup"
-                  className="inline-flex items-center gap-3 h-14 px-8 rounded-2xl border-2 border-slate-100 dark:border-slate-800 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-900 hover:border-primary/20 transition-all hover:-translate-y-1 shadow-sm hover:shadow-xl"
+                  className="inline-flex items-center gap-3 h-14 px-8 rounded-2xl border-2 border-[var(--accent-foreground)] text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest hover:bg-[var(--admin-border-primary)] hover:border-[var(--accent-foreground)] transition-all hover:-translate-y-1 shadow-sm hover:shadow-xl"
                 >
                   Crear Nueva Identidad
                   <ArrowRight className="h-4 w-4 text-primary" />

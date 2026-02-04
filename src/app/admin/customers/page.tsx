@@ -45,8 +45,6 @@ import { useRouter } from "next/navigation";
 import { useBranch } from "@/hooks/useBranch";
 import { BranchSelector } from "@/components/admin/BranchSelector";
 import { getBranchHeader } from "@/lib/utils/branch";
-import { SmartContextWidget } from "@/components/ai/SmartContextWidget";
-
 interface Customer {
   id: string;
   first_name?: string;
@@ -240,9 +238,6 @@ export default function CustomersPage() {
           </Button>
         </div>
       </div>
-
-      {/* AI Insights Widget */}
-      {currentBranchId && <SmartContextWidget section="clients" />}
 
       {/* Stats Cards */}
       {stats &&

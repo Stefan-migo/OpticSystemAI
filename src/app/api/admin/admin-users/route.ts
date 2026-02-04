@@ -78,6 +78,9 @@ export async function GET(request: NextRequest) {
       user_id: user.id,
     });
 
+    // CRITICAL: Use organization_id from currentAdminUser as fallback
+    const effectiveOrgId = userOrgId || currentAdminUser?.organization_id;
+
     // Usar service role para la consulta de lista y relación admin_branch_access:
     // RLS en admin_branch_access solo permite ver la propia fila (o todas si super_admin),
     // por lo que con createClient() la relación venía vacía para otros usuarios.
@@ -105,10 +108,25 @@ export async function GET(request: NextRequest) {
         )
       `);
 
-    // Aplicar filtro por organización SOLO si no es root/dev ni super admin
-    if (!isRoot && !isSuperAdmin && userOrgId) {
-      query = query.eq("organization_id", userOrgId);
+    // CRITICAL: Apply organization filter - only root/dev can see all organizations
+    // Super admins within an organization should only see users from their organization
+    if (!isRoot && effectiveOrgId) {
+      // Filter by organization_id - CRITICAL for multi-tenancy isolation
+      query = query.eq("organization_id", effectiveOrgId);
+      logger.debug("Filtering admin users by organization_id", {
+        organizationId: effectiveOrgId,
+        isRoot,
+        isSuperAdmin,
+      });
+    } else if (!isRoot && !effectiveOrgId) {
+      // If not root and no organization_id, return empty (shouldn't happen but safety check)
+      logger.warn("User has no organization_id and is not root", {
+        userId: user.id,
+        role: currentAdminUser?.role,
+      });
+      return NextResponse.json({ adminUsers: [] });
     }
+    // Root/dev users can see all admin users (no filter applied)
 
     // Apply filters
     if (role && role !== "all") {

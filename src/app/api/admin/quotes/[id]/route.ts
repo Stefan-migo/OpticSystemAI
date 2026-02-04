@@ -33,10 +33,19 @@ export async function GET(
 
     const { id } = await params;
 
-    // Get branch context
+    // Get user's organization_id for multi-tenancy
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+    const userOrganizationId =
+      (adminUser as { organization_id?: string } | null)?.organization_id ??
+      null;
+
     const branchContext = await getBranchContext(request, user.id);
 
-    // Build branch filter function
+    // Build branch filter function (used later for PUT)
     const applyBranchFilter = (query: ReturnType<typeof supabase.from>) => {
       return addBranchFilter(
         query,
@@ -52,10 +61,9 @@ export async function GET(
     await supabaseServiceRole.rpc("check_and_expire_quotes");
 
     // First, try to fetch the quote directly with service role to check if it exists
-    // This bypasses RLS to verify existence
     const { data: quoteCheck, error: checkError } = await supabaseServiceRole
       .from("quotes")
-      .select("id, branch_id, quote_number")
+      .select("id, branch_id, organization_id, quote_number")
       .eq("id", id)
       .single();
 
@@ -65,8 +73,6 @@ export async function GET(
         quoteId: id,
         errorCode: checkError?.code,
         errorMessage: checkError?.message,
-        errorDetails: checkError?.details,
-        errorHint: checkError?.hint,
         branchContext: {
           branchId: branchContext.branchId,
           isGlobalView: branchContext.isGlobalView,
@@ -86,33 +92,34 @@ export async function GET(
       quoteId: id,
       quoteNumber: quoteCheck.quote_number,
       quoteBranchId: quoteCheck.branch_id,
+      quoteOrganizationId: quoteCheck.organization_id,
+      userOrganizationId,
       userBranchId: branchContext.branchId,
       isGlobalView: branchContext.isGlobalView,
       isSuperAdmin: branchContext.isSuperAdmin,
     });
 
-    // Check branch access if not super admin in global view
-    // Allow access if:
-    // 1. User is super admin in global view (isGlobalView = true)
-    // 2. Quote branch_id matches user's branch_id
-    // 3. Quote branch_id is NULL (legacy quote, accessible by all)
+    // Access: allow if quote belongs to the same organization (so POS can load any org quote from any branch).
+    // Deny only when quote belongs to another organization.
+    const quoteOrgId =
+      (quoteCheck as { organization_id?: string | null }).organization_id ??
+      null;
     if (
-      !branchContext.isGlobalView &&
-      quoteCheck.branch_id !== null &&
-      quoteCheck.branch_id !== branchContext.branchId
+      quoteOrgId !== null &&
+      userOrganizationId !== null &&
+      quoteOrgId !== userOrganizationId
     ) {
-      logger.warn("Branch access denied:", {
+      logger.warn("Organization access denied:", {
         quoteId: id,
-        quoteBranchId: quoteCheck.branch_id,
-        userBranchId: branchContext.branchId,
-        isSuperAdmin: branchContext.isSuperAdmin,
-        isGlobalView: branchContext.isGlobalView,
+        quoteOrganizationId: quoteOrgId,
+        userOrganizationId,
       });
       return NextResponse.json(
         { error: "Access denied to this quote" },
         { status: 403 },
       );
     }
+    // Same org, legacy (null org), or super admin: allow access.
 
     // Now fetch the full quote with relations
     // Since we already verified access, we can use service role to bypass RLS

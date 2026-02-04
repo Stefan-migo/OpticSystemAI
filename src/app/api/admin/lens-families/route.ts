@@ -33,6 +33,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get user's organization_id for multi-tenancy
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = (
+      adminUser as { organization_id?: string; role?: string }
+    )?.organization_id;
+    const isSuperAdmin =
+      (adminUser as { role?: string })?.role === "super_admin";
+
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get("include_inactive") === "true";
 
@@ -40,6 +53,18 @@ export async function GET(request: NextRequest) {
     let query = supabase.from("lens_families").select("*").order("created_at", {
       ascending: false,
     });
+
+    // CRITICAL: Filter by organization_id (each organization has its own lens families)
+    // Even super admins should only see families from their organization (unless root/dev)
+    if (userOrganizationId) {
+      // Filter by organization_id - this ensures multi-tenancy isolation
+      query = query.eq("organization_id", userOrganizationId);
+    } else if (!isSuperAdmin) {
+      // If no organization_id and not super admin, return empty (no families)
+      return NextResponse.json({ families: [] });
+    }
+    // Note: Root/dev users (super_admin role) without organization_id can see all families
+    // This is intentional for platform administration
 
     // Filter by active status if needed
     if (!includeInactive) {
@@ -90,13 +115,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get user's organization_id (required for new lens families)
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = (adminUser as { organization_id?: string })
+      ?.organization_id;
+
+    if (!userOrganizationId) {
+      return NextResponse.json(
+        { error: "Organization not found" },
+        { status: 404 },
+      );
+    }
+
     // Validate body
     const body = await parseAndValidateBody(request, createLensFamilySchema);
 
-    // Insert lens family
+    // Insert lens family with organization_id
     const { data: family, error } = await supabase
       .from("lens_families")
-      .insert(body)
+      .insert({ ...body, organization_id: userOrganizationId })
       .select()
       .single();
 

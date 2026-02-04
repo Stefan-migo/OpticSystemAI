@@ -37,7 +37,7 @@ const benefits = [
 export function BenefitsSection() {
   return (
     <section
-      className="py-32 bg-white relative overflow-hidden"
+      className="py-32 bg-[var(--admin-bg-primary)] relative overflow-hidden"
       id="beneficios"
     >
       {/* Decorative blurry background highlights */}
@@ -65,15 +65,15 @@ export function BenefitsSection() {
             return (
               <div
                 key={index}
-                className="group relative p-10 bg-white rounded-[2.5rem] border border-gray-100 shadow-premium hover:shadow-premium-lg transition-all duration-500 hover:-translate-y-2 overflow-hidden"
+                className="group relative p-10 bg-[var(--admin-bg-tertiary)] rounded-[2.5rem] border border-gray-100 shadow-premium hover:shadow-premium-lg transition-all duration-500 hover:-translate-y-2 overflow-hidden"
               >
                 {/* Background Stat Number */}
-                <div className="absolute -top-4 -right-2 text-7xl font-malisha text-gray-50/50 transition-colors group-hover:text-primary/5 select-none pointer-events-none">
+                <div className="absolute -top-4 -right-2 text-7xl font-malisha text-[var(--accent-foreground)] transition-colors group-hover:text-primary/5 select-none pointer-events-none">
                   {benefit.stat}
                 </div>
 
                 <div className="relative z-10">
-                  <div className="inline-flex p-5 bg-gray-50 rounded-[1.5rem] mb-8 text-gray-400 group-hover:bg-primary/10 group-hover:text-primary transition-all duration-500 shadow-sm">
+                  <div className="inline-flex p-5 bg-[var(--admin-bg-secondary)] rounded-[1.5rem] mb-8 text-gray-400 group-hover:bg-primary/10 group-hover:text-[rgba(22,101,52,0.99)] transition-all duration-500 shadow-sm">
                     <benefit.icon className="h-8 w-8" />
                   </div>
 
@@ -87,7 +87,7 @@ export function BenefitsSection() {
                 </div>
 
                 {/* Bottom decorative line */}
-                <div className="absolute bottom-0 left-0 w-full h-1.5 bg-gray-50 transition-colors group-hover:bg-primary/20"></div>
+                <div className="absolute bottom-0 left-0 w-full h-1.5 bg-[var(--admin-bg-tertiary)] transition-colors group-hover:bg-primary/20"></div>
               </div>
             );
           })}

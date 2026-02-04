@@ -82,6 +82,8 @@ Un sistema completo de gestión para ópticas y laboratorios ópticos, construid
 - **Actualizaciones en Tiempo Real** y notificaciones
 - **Multi-Provider AI Support**: OpenAI, Anthropic, Google Gemini, DeepSeek
 - **AI Agent con Tool Calling**: Operaciones autónomas de base de datos mediante lenguaje natural
+- **Pagos con Criptomonedas**: Acepta 300+ criptomonedas vía NOWPayments (Bitcoin, Ethereum, USDT, etc.)
+- **Múltiples Pasarelas de Pago**: Mercado Pago, PayPal, NOWPayments (Crypto)
 
 ## 📋 Prerrequisitos
 
@@ -147,7 +149,7 @@ cp env.example .env.local
 
 Actualiza `.env.local` con los valores de `supabase:status`:
 
-```env
+````env
 # Supabase Configuration (Local)
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<tu_anon_key_del_status>
@@ -163,13 +165,23 @@ RESEND_API_KEY=<tu_resend_api_key>
 # Pagos (Opcional - para MercadoPago)
 MERCADOPAGO_ACCESS_TOKEN=<tu_mercadopago_token>
 NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=<tu_mercadopago_public_key>
-```
+
+# Pagos con Criptomonedas (Opcional - para NOWPayments)
+NOWPAYMENTS_API_KEY=<tu_nowpayments_api_key>
+NOWPAYMENTS_IPN_SECRET=<tu_nowpayments_ipn_secret>
+NOWPAYMENTS_SANDBOX_MODE=true
+
+# PayPal (Opcional)
+PAYPAL_CLIENT_ID=<tu_paypal_client_id>
+PAYPAL_CLIENT_SECRET=<tu_paypal_client_secret>
+PAYPAL_API_BASE_URL=https://api-m.sandbox.paypal.com
+
 
 #### Aplicar Migraciones de Base de Datos
 
 ```bash
 npm run supabase:reset
-```
+````
 
 Esto:
 

@@ -15,10 +15,14 @@ import {
   FileText,
   Image as ImageIcon,
   CheckCircle,
+  Copy,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useBranch } from "@/hooks/useBranch";
 import { getBranchHeader } from "@/lib/utils/branch";
+import ImageUpload from "@/components/ui/ImageUpload";
+import Image from "next/image";
 
 interface BillingSettings {
   id?: string;
@@ -123,18 +127,25 @@ export default function BillingSettingsPage() {
     }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // TODO: Implement actual file upload to Supabase Storage
-    // For now, just show a placeholder
-    toast.info("Subida de logo: Por implementar (Supabase Storage)");
-
-    // In production:
-    // 1. Upload to Supabase Storage
-    // 2. Get public URL
-    // 3. Update settings.logo_url
+  const handleReuseMainLogo = async () => {
+    try {
+      const response = await fetch("/api/admin/organizations/current");
+      if (response.ok) {
+        const data = await response.json();
+        if (data.organization?.logo_url) {
+          setSettings((prev) => ({
+            ...prev,
+            logo_url: data.organization.logo_url,
+          }));
+          toast.success("Logo de la óptica copiado correctamente");
+        } else {
+          toast.error("No se ha configurado un logo para la óptica aún");
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching main logo:", error);
+      toast.error("Error al obtener el logo de la óptica");
+    }
   };
 
   if (loading) {
@@ -249,27 +260,49 @@ export default function BillingSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Logo de la Empresa</Label>
-              <div className="mt-2 flex items-center gap-4">
-                {settings.logo_url && (
-                  <img
-                    src={settings.logo_url}
-                    alt="Logo"
-                    className="h-20 w-auto object-contain border rounded p-2"
-                  />
-                )}
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                    className="hidden"
-                  />
-                  <Button type="button" variant="outline" size="sm">
-                    <Upload className="h-4 w-4 mr-2" />
-                    {settings.logo_url ? "Cambiar Logo" : "Subir Logo"}
-                  </Button>
-                </label>
+              <Label className="text-sm font-bold text-azul-profundo mb-2 block">
+                Logo de la Empresa (Boleta/Factura)
+              </Label>
+              <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 mb-4">
+                <p className="text-xs text-blue-800 font-medium flex items-center gap-2">
+                  <Sparkles className="h-3 w-3" />
+                  Dimensiones Requeridas:
+                </p>
+                <ul className="text-[11px] text-blue-700/80 list-disc list-inside mt-1 space-y-0.5">
+                  <li>
+                    Formato horizontal:{" "}
+                    <strong>400px ancho × 120px alto</strong>
+                  </li>
+                  <li>
+                    Fondo sugerido: <strong>Transparente (PNG)</strong> o{" "}
+                    <strong>Blanco</strong>
+                  </li>
+                  <li>
+                    Este logo aparecerá en el encabezado de sus documentos
+                    fiscales.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="space-y-4">
+                <ImageUpload
+                  value={settings.logo_url || ""}
+                  onChange={(url) =>
+                    setSettings({ ...settings, logo_url: url })
+                  }
+                  folder="billing"
+                />
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={handleReuseMainLogo}
+                >
+                  <Copy className="h-3 w-3 mr-2" />
+                  Reutilizar Logo de la Óptica (Header)
+                </Button>
               </div>
             </div>
             <div>

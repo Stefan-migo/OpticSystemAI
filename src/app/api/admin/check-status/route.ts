@@ -84,14 +84,16 @@ export async function GET(request: NextRequest) {
     // Get organization details if exists
     let organizationName = null;
     let organizationLogo = null;
+    let organizationSlogan = null;
     if (organizationId) {
       const { data: orgData } = await supabase
         .from("organizations")
-        .select("name, logo_url")
+        .select("name, logo_url, slogan")
         .eq("id", organizationId)
         .single();
       organizationName = orgData?.name || null;
       organizationLogo = orgData?.logo_url || null;
+      organizationSlogan = orgData?.slogan || null;
     }
 
     // Determine if onboarding is required
@@ -127,6 +129,7 @@ export async function GET(request: NextRequest) {
         organizationId,
         organizationName,
         organizationLogo,
+        organizationSlogan,
         hasOrganization: !!organizationId,
         isDemoMode,
         isSuperAdmin,

@@ -33,9 +33,43 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get user's organization_id for multi-tenancy (matrices follow lens_family's org)
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = (
+      adminUser as { organization_id?: string; role?: string }
+    )?.organization_id;
+    const isSuperAdmin =
+      (adminUser as { role?: string })?.role === "super_admin";
+
     const { searchParams } = new URL(request.url);
     const familyId = searchParams.get("family_id");
     const includeInactive = searchParams.get("include_inactive") === "true";
+
+    // CRITICAL: Restrict to matrices whose lens_family belongs to user's organization
+    // This ensures multi-tenancy isolation - each organization only sees its own matrices
+    let allowedFamilyIds: string[] | null = null;
+    if (userOrganizationId) {
+      // Always filter by organization_id - even super admins should only see their org's families
+      const { data: orgFamilies } = await supabase
+        .from("lens_families")
+        .select("id")
+        .eq("organization_id", userOrganizationId);
+      allowedFamilyIds = (orgFamilies || []).map((f) => f.id);
+      if (allowedFamilyIds.length === 0) {
+        // New organizations start with empty lens families - this is correct
+        return NextResponse.json({ matrices: [] });
+      }
+    } else if (!isSuperAdmin) {
+      // If no organization_id and not super admin, return empty (no matrices)
+      return NextResponse.json({ matrices: [] });
+    }
+    // Note: Root/dev users (super_admin role) without organization_id can see all matrices
+    // This is intentional for platform administration
 
     // Build query
     let query = supabase
@@ -53,6 +87,10 @@ export async function GET(request: NextRequest) {
       `,
       )
       .order("created_at", { ascending: false });
+
+    if (allowedFamilyIds !== null) {
+      query = query.in("lens_family_id", allowedFamilyIds);
+    }
 
     // Filter by family if provided
     if (familyId && familyId !== "all") {
@@ -113,6 +151,37 @@ export async function POST(request: NextRequest) {
       request,
       createLensPriceMatrixSchema,
     );
+
+    // Ensure the lens_family belongs to user's organization
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+
+    const userOrganizationId = (
+      adminUser as { organization_id?: string; role?: string }
+    )?.organization_id;
+    const isSuperAdmin =
+      (adminUser as { role?: string })?.role === "super_admin";
+
+    if (!isSuperAdmin && userOrganizationId) {
+      const { data: family } = await supabase
+        .from("lens_families")
+        .select("id")
+        .eq("id", body.lens_family_id)
+        .eq("organization_id", userOrganizationId)
+        .maybeSingle();
+      if (!family) {
+        return NextResponse.json(
+          {
+            error:
+              "La familia de lentes no existe o no pertenece a tu organización",
+          },
+          { status: 403 },
+        );
+      }
+    }
 
     // Insert price matrix
     const { data: matrix, error } = await supabase

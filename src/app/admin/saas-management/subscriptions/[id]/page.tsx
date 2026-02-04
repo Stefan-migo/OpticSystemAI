@@ -14,12 +14,21 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  AlertCircle,
   Loader2,
   DollarSign,
   Save,
   Pencil,
   Trash2,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -76,6 +85,7 @@ export default function SubscriptionDetailsPage() {
   const [editTrialEndsAt, setEditTrialEndsAt] = useState("");
   const [saveLoading, setSaveLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (subscriptionId) {
@@ -124,10 +134,6 @@ export default function SubscriptionDetailsPage() {
   };
 
   const handleDelete = async () => {
-    if (
-      !confirm("¿Eliminar esta suscripción? Esta acción no se puede deshacer.")
-    )
-      return;
     setDeleteLoading(true);
     try {
       const res = await fetch(
@@ -137,6 +143,7 @@ export default function SubscriptionDetailsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al eliminar");
       toast.success("Suscripción eliminada.");
+      setShowDeleteConfirm(false);
       router.push("/admin/saas-management/subscriptions");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error desconocido");
@@ -320,7 +327,7 @@ export default function SubscriptionDetailsPage() {
           <Button
             variant="destructive"
             size="sm"
-            onClick={handleDelete}
+            onClick={() => setShowDeleteConfirm(true)}
             disabled={deleteLoading}
           >
             {deleteLoading ? (
@@ -606,6 +613,41 @@ export default function SubscriptionDetailsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="mx-auto bg-red-100 dark:bg-red-500/20 p-4 rounded-3xl w-fit mb-4">
+              <AlertCircle className="h-10 w-10 text-red-600 dark:text-red-500" />
+            </div>
+            <DialogTitle>¿Eliminar esta suscripción?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el registro de
+              suscripción.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              Volver
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteLoading}
+              onClick={handleDelete}
+            >
+              {deleteLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

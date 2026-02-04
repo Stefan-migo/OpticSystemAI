@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,30 +16,39 @@ interface ImageUploadProps {
   folder?: string;
 }
 
-export default function ImageUpload({ 
-  value, 
-  onChange, 
+export default function ImageUpload({
+  value,
+  onChange,
   placeholder = "Seleccionar imagen...",
   className = "",
-  folder = "products"
+  folder = "products",
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(value || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Sync internal preview with external value
+  useEffect(() => {
+    if (value !== preview) {
+      setPreview(value || null);
+    }
+  }, [value]);
+
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Por favor selecciona un archivo de imagen válido');
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor selecciona un archivo de imagen válido");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('La imagen debe ser menor a 5MB');
+      toast.error("La imagen debe ser menor a 5MB");
       return;
     }
 
@@ -48,32 +57,34 @@ export default function ImageUpload({
     try {
       // Create FormData
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', folder);
+      formData.append("file", file);
+      formData.append("folder", folder);
 
       // Upload to Supabase Storage
-      const response = await fetch('/api/upload', {
-        method: 'POST',
+      const response = await fetch("/api/upload", {
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Error al subir la imagen');
+        throw new Error("Error al subir la imagen");
       }
 
       const data = await response.json();
-      
+
       if (data.url) {
         onChange(data.url);
         setPreview(data.url);
-        toast.success('Imagen subida exitosamente');
+        // Use setTimeout to avoid updating state during render
+        setTimeout(() => {
+          toast.success("Imagen subida exitosamente");
+        }, 0);
       } else {
-        throw new Error('No se recibió URL de la imagen');
+        throw new Error("No se recibió URL de la imagen");
       }
-
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Error al subir la imagen. Inténtalo de nuevo.');
+      console.error("Error uploading image:", error);
+      toast.error("Error al subir la imagen. Inténtalo de nuevo.");
     } finally {
       setUploading(false);
     }
@@ -85,10 +96,10 @@ export default function ImageUpload({
   };
 
   const clearImage = () => {
-    onChange('');
+    onChange("");
     setPreview(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -101,9 +112,9 @@ export default function ImageUpload({
       {/* Upload Methods */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* File Upload */}
-        <Card 
-          className='bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'
-          style={{ backgroundColor: 'var(--admin-border-primary)' }}
+        <Card
+          className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+          style={{ backgroundColor: "var(--admin-border-primary)" }}
         >
           <CardContent className="p-4">
             <Label className="text-sm font-medium mb-2 block">
@@ -144,9 +155,9 @@ export default function ImageUpload({
         </Card>
 
         {/* Manual URL */}
-        <Card 
-          className='bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'
-          style={{ backgroundColor: 'var(--admin-border-primary)' }}
+        <Card
+          className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+          style={{ backgroundColor: "var(--admin-border-primary)" }}
         >
           <CardContent className="p-4">
             <Label className="text-sm font-medium mb-2 block">
@@ -168,9 +179,9 @@ export default function ImageUpload({
 
       {/* Preview */}
       {(preview || value) && (
-        <Card 
-          className='bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'
-          style={{ backgroundColor: 'var(--admin-border-primary)' }}
+        <Card
+          className="bg-admin-bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+          style={{ backgroundColor: "var(--admin-border-primary)" }}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -188,9 +199,9 @@ export default function ImageUpload({
               <img
                 src={preview || value}
                 alt="Preview"
-                className="w-full h-48 object-cover rounded-md border"
+                className="w-full h-auto max-h-48 object-contain rounded-md border bg-white p-2"
                 onError={() => {
-                  toast.error('Error al cargar la imagen');
+                  toast.error("Error al cargar la imagen");
                   setPreview(null);
                 }}
               />

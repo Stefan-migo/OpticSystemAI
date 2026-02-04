@@ -187,52 +187,117 @@ export async function PUT(request: NextRequest) {
       updateData.notes_template = body.notes_template;
 
     let result;
-    if (existingSettings) {
-      // Update existing
-      const { data, error } = await supabaseServiceRole
+
+    // GLOBAL UPDATE LOGIC for Super Admins
+    if (!branchContext.branchId && branchContext.isSuperAdmin) {
+      logger.info("Global Quote settings update initiated", {
+        organizationId: branchContext.organizationId,
+      });
+
+      // 1. Update organization-level settings (using branch_id NULL but with organization_id)
+      const { data: orgSettings, error: orgError } = await supabaseServiceRole
         .from("quote_settings")
-        .update(updateData)
-        .eq("id", existingSettings.id)
+        .upsert(
+          {
+            organization_id: branchContext.organizationId,
+            branch_id: null,
+            ...updateData,
+            updated_at: new Date().toISOString(),
+            updated_by: user.id,
+          },
+          { onConflict: "organization_id" },
+        )
         .select()
         .single();
 
-      if (error) {
-        logger.error("Error updating quote settings", error);
+      if (orgError) {
+        logger.error(
+          "Error updating global organization quote settings",
+          orgError,
+        );
         return NextResponse.json(
-          {
-            error: "Failed to update quote settings",
-            details: error.message,
-          },
+          { error: "Error al actualizar configuración global de presupuestos" },
           { status: 500 },
         );
       }
 
-      result = data;
+      // 2. Sync ALL branches of the organization
+      const { data: branches } = await supabase
+        .from("branches")
+        .select("id")
+        .eq("organization_id", branchContext.organizationId!);
+
+      if (branches && branches.length > 0) {
+        const branchIds = branches.map((b) => b.id);
+
+        for (const bId of branchIds) {
+          await supabaseServiceRole.from("quote_settings").upsert(
+            {
+              branch_id: bId,
+              organization_id: branchContext.organizationId,
+              ...updateData,
+              updated_at: new Date().toISOString(),
+              updated_by: user.id,
+            },
+            { onConflict: "branch_id" },
+          );
+        }
+      }
+
+      result = orgSettings;
     } else {
-      // Insert new with branch_id
-      const insertData = {
-        ...updateData,
-        branch_id: branchContext.branchId || null,
-      };
+      // BRANCH-SPECIFIC UPDATE
+      if (existingSettings) {
+        // Update existing
+        const { data, error } = await supabaseServiceRole
+          .from("quote_settings")
+          .update({
+            ...updateData,
+            organization_id: branchContext.organizationId,
+          })
+          .eq("id", existingSettings.id)
+          .select()
+          .single();
 
-      const { data, error } = await supabaseServiceRole
-        .from("quote_settings")
-        .insert(insertData)
-        .select()
-        .single();
+        if (error) {
+          logger.error("Error updating quote settings", error);
+          return NextResponse.json(
+            {
+              error: "Failed to update quote settings",
+              details: error.message,
+            },
+            { status: 500 },
+          );
+        }
 
-      if (error) {
-        logger.error("Error creating quote settings", error);
-        return NextResponse.json(
-          {
-            error: "Failed to create quote settings",
-            details: error.message,
-          },
-          { status: 500 },
-        );
+        result = data;
+      } else {
+        // Insert new with branch_id
+        const insertData = {
+          ...updateData,
+          organization_id: branchContext.organizationId,
+          branch_id: branchContext.branchId || null,
+        };
+
+        const { data, error } = await supabaseServiceRole
+          .from("quote_settings")
+          .insert(insertData)
+          .select()
+          .single();
+
+        if (error) {
+          logger.error("Error creating quote settings", error);
+          return NextResponse.json(
+            {
+              error: "Failed to create quote settings",
+              details: error.message,
+            },
+            { status: 500 },
+          );
+        }
+
+        result = data;
       }
-
-      result = data;
     }
 
     return NextResponse.json({

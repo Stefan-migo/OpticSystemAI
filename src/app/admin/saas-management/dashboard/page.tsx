@@ -14,6 +14,7 @@ import {
   Settings,
   HelpCircle,
   ArrowRight,
+  Zap,
 } from "lucide-react";
 
 interface SaasMetrics {
@@ -402,6 +403,31 @@ export default function SaasManagementDashboardPage() {
                       <h3 className="font-semibold text-lg">Soporte</h3>
                       <p className="text-sm text-muted-foreground">
                         Búsqueda rápida y resolución
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pasarelas de Pago */}
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => router.push("/admin/saas-management/payments")}
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
+                      <Zap className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">
+                        Pasarelas de Pago
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Habilitar/deshabilitar métodos de pago
                       </p>
                     </div>
                   </div>

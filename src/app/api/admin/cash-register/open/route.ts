@@ -201,15 +201,12 @@ export async function GET(request: NextRequest) {
         // Get branch context
         const branchContext = await getBranchContext(request, user.id);
 
-        // Validate branch access for non-super admins
-        if (!branchContext.isSuperAdmin && !branchContext.branchId) {
-          return NextResponse.json(
-            {
-              error:
-                "Debe seleccionar una sucursal para ver el estado de la caja",
-            },
-            { status: 400 },
-          );
+        // No branch selected (global view or no branches): return closed state so POS can load
+        if (!branchContext.branchId) {
+          return NextResponse.json({
+            isOpen: false,
+            session: null,
+          });
         }
 
         // Check if there's an open session for this branch
@@ -217,16 +214,22 @@ export async function GET(request: NextRequest) {
           await supabaseServiceRole
             .from("pos_sessions")
             .select("id, status, opening_time, opening_cash_amount, branch_id")
-            .eq("branch_id", branchContext.branchId!)
+            .eq("branch_id", branchContext.branchId)
             .eq("status", "open")
             .order("opening_time", { ascending: false })
             .limit(1)
             .maybeSingle();
 
-        if (sessionError && sessionError.code !== "PGRST116") {
+        if (sessionError) {
           logger.error("Error checking open session", sessionError);
           return NextResponse.json(
-            { error: "Error al verificar estado de caja" },
+            {
+              error: "Error al verificar estado de caja",
+              details:
+                process.env.NODE_ENV === "development"
+                  ? sessionError.message
+                  : undefined,
+            },
             { status: 500 },
           );
         }
@@ -237,10 +240,15 @@ export async function GET(request: NextRequest) {
         });
       },
     );
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error("Error in cash register open GET API", error);
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        ...(process.env.NODE_ENV === "development" && { details: message }),
+      },
       { status: 500 },
     );
   }

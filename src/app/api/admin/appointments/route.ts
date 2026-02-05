@@ -5,6 +5,7 @@ import { NotificationService } from "@/lib/notifications/notification-service";
 import { formatRUT } from "@/lib/utils/rut";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import { EmailNotificationService } from "@/lib/email/notifications";
 import type {
   IsAdminParams,
   IsAdminResult,
@@ -489,6 +490,7 @@ export async function POST(request: NextRequest) {
       follow_up_date: (body as any)?.follow_up_date || null,
       created_by: user.id,
       branch_id: finalBranchId, // Always include branch_id (required by database)
+      organization_id: branchContext.organizationId, // Set organization_id for multi-tenancy
     };
 
     // Add guest customer data if present
@@ -530,7 +532,7 @@ export async function POST(request: NextRequest) {
     let customer = null;
     if (appointment.customer_id) {
       const { data: customerData } = await supabaseServiceRole
-        .from("profiles")
+        .from("customers")
         .select("id, first_name, last_name, email, phone")
         .eq("id", appointment.customer_id)
         .maybeSingle();
@@ -567,6 +569,57 @@ export async function POST(request: NextRequest) {
         appointmentWithCustomer.appointment_time,
         appointmentWithCustomer.branch_id ?? undefined,
       ).catch((err) => logger.error("Error creating notification", err));
+
+      // Send Customer Email Confirmation (non-blocking)
+      const customerEmail =
+        appointmentWithCustomer.customer?.email ||
+        appointmentWithCustomer.guest_email;
+
+      if (customerEmail) {
+        (async () => {
+          try {
+            // Get branch info for email
+            const { data: branch } = await supabaseServiceRole
+              .from("branches")
+              .select("name")
+              .eq("id", appointmentWithCustomer.branch_id)
+              .single();
+
+            // Get professional name if assigned
+            let professionalName = "Especialista";
+            if (appointmentWithCustomer.assigned_to) {
+              const { data: staff } = await supabaseServiceRole
+                .from("profiles")
+                .select("first_name, last_name")
+                .eq("id", appointmentWithCustomer.assigned_to)
+                .single();
+              if (staff)
+                professionalName = `${staff.first_name} ${staff.last_name}`;
+            }
+
+            await EmailNotificationService.sendAppointmentConfirmation(
+              {
+                customer_name: customerName,
+                customer_email: customerEmail,
+                date: new Date(
+                  appointmentWithCustomer.appointment_date,
+                ).toLocaleDateString("es-AR", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                }),
+                time: appointmentWithCustomer.appointment_time.substring(0, 5),
+                professional_name: professionalName,
+                type: appointmentWithCustomer.appointment_type,
+                branch_name: branch?.name || "",
+              },
+              branchContext.organizationId || undefined,
+            );
+          } catch (err) {
+            logger.error("Error sending appointment email", err);
+          }
+        })();
+      }
     }
 
     return NextResponse.json(

@@ -334,6 +334,7 @@ export async function POST(request: NextRequest) {
         permissions: getDefaultPermissions(role),
         is_active: true,
         organization_id: organizationId, // HEREDADO o null para root/dev
+        created_by: currentUser.id,
       })
       .select()
       .single();

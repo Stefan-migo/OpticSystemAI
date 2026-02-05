@@ -430,18 +430,25 @@ function ProfilePageContent() {
               { id: "address", label: "Dirección", icon: MapPin },
               { id: "subscription", label: "Suscripción", icon: CreditCard },
               { id: "settings", label: "Ajustes", icon: Settings },
-            ].map((tab) => (
-              <TabsTrigger
-                key={tab.id}
-                value={tab.id}
-                className="rounded-xl py-3 data-[state=active]:bg-[var(--admin-bg-secondary)] data-[state=active]:shadow-lg data-[state=active]:text-[var(--admin-accent-secondary)] transition-all duration-300"
-              >
-                <tab.icon className="h-4 w-4 mr-2 text-[var(--admin-accent-secondary)]" />
-                <span className="font-bold tracking-tight text-[var(--admin-accent-secondary)]">
-                  {tab.label}
-                </span>
-              </TabsTrigger>
-            ))}
+            ]
+              .filter((tab) => {
+                if (tab.id === "subscription") {
+                  return adminData?.adminCheck?.isOwner;
+                }
+                return true;
+              })
+              .map((tab) => (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className="rounded-xl py-3 data-[state=active]:bg-[var(--admin-bg-secondary)] data-[state=active]:shadow-lg data-[state=active]:text-[var(--admin-accent-secondary)] transition-all duration-300"
+                >
+                  <tab.icon className="h-4 w-4 mr-2 text-[var(--admin-accent-secondary)]" />
+                  <span className="font-bold tracking-tight text-[var(--admin-accent-secondary)]">
+                    {tab.label}
+                  </span>
+                </TabsTrigger>
+              ))}
           </TabsList>
 
           {/* Overview Tab Content */}
@@ -600,6 +607,7 @@ function ProfilePageContent() {
                         size="lg"
                         className="flex-1 md:flex-none h-14 rounded-2xl font-bold px-8 shadow-xl shadow-primary/20"
                         onClick={() => setActiveTab("subscription")}
+                        disabled={!adminData?.adminCheck?.isOwner}
                         shimmer
                       >
                         Gestionar Suscripción

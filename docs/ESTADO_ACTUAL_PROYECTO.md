@@ -1,8 +1,8 @@
 # Estado Actual del Proyecto - Opttius
 
-**Fecha de Análisis:** 2026-02-03  
-**Versión:** 3.0.0 (Premium SaaS)  
-**Última Actualización:** 2026-02-03
+**Fecha de Análisis:** 2026-02-04  
+**Versión:** 3.0.2 (Fix Security & POS Settings)  
+**Última Actualización:** 2026-02-04
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### Estado General: 🟢 **Plataforma SaaS con IA y Pagos Globales Operativa**
 
-El proyecto ha evolucionado hacia una plataforma SaaS robusta con capacidades de inteligencia artificial y un ecosistema de pagos diversificado. Se han implementado con éxito integraciones con **Mercado Pago**, **PayPal** y **Crypto (NOWPayments)**. El motor de IA ahora genera **Insights** estratégicos basados en el comportamiento del negocio (Smart Context). La suite de testing se ha expandido cubriendo flujos críticos de API y lógica de negocio, alcanzando un estado de madurez profesional.
+El proyecto ha evolucionado hacia una plataforma SaaS robusta con capacidades de inteligencia artificial y un ecosistema de pagos diversificado. Se han implementado con éxito integraciones con **Mercado Pago**, **PayPal** y **Crypto (NOWPayments)**. El motor de IA ahora genera **Insights** estratégicos basados en el comportamiento del negocio (Smart Context). La suite de testing se ha expandido cubriendo flujos críticos de API y lógica de negocio, alcanzando un estado de madurez profesional. Las recientes mejoras han estabilizado la visibilidad multi-sucursal y la configuración de documentos legales (Boletas).
 
 ### Progreso por Fases
 
@@ -19,7 +19,7 @@ El proyecto ha evolucionado hacia una plataforma SaaS robusta con capacidades de
 | **Fase 0: Preparación**     | ✅ Completada | 100%     | 4/4       | Testing, Logging, Hooks, Error Boundaries           |
 | **Fase 1: Estabilización**  | ✅ Completada | 100%     | 3/3       | Console.log reducido, Tipos RPC, Rate Limiting      |
 | **Fase 2: Refactorización** | 🟡 Parcial    | 80%      | 2/3       | CreateWorkOrderForm ✅, System Page ✅, Products ⏳ |
-| **Fase 3: Seguridad**       | ✅ Completada | 100%     | 2/2       | Validación Zod, Headers de Seguridad                |
+| **Fase 3: Seguridad**       | ✅ Completada | 100%     | 2/2       | Validación Zod, Headers de Seguridad, Customer RLS  |
 | **Fase 4: Performance**     | ✅ Completada | 100%     | 3/3       | Memoización, Lazy Loading, Optimización Queries     |
 | **Gestión SaaS (root/dev)** | ✅ Completada | 100%     | -         | Dashboard, orgs, users, subs, tiers, support        |
 | **Phase SaaS 1: Billing**   | ✅ Completada | 100%     | 4/4       | Mercado Pago, PayPal, Crypto, Tier Enforcement      |
@@ -34,10 +34,13 @@ El proyecto ha evolucionado hacia una plataforma SaaS robusta con capacidades de
 
 #### 1. **Infraestructura SaaS Core**
 
-- ✅ **Multi-Tenancy:** Aislamiento de datos por `organization_id` mediante RLS.
+- ✅ **Multi-Tenancy:** Aislamiento de datos por `organization_id` mediante RLS (ahora extendido a Recetas).
 - ✅ **Tier System:** Gestión de límites y accesos por planes (Basic, Pro, Premium, Enterprise).
 - ✅ **Gestión SaaS (Root):** Panel administrativo para control global de organizaciones, usuarios y soporte.
 - ✅ **Onboarding:** Flujo de configuración inicial para nuevas ópticas.
+- ✅ **Dashboard Fixes:** Optimización de conteo de citas (Timezone) y stock global de productos.
+- ✅ **Security Hardening:** Corrección de visibilidad de clientes para SuperAdmins y aislamiento de recetas.
+- ✅ **POS & Billing Config:** Sistema de configuración de boletas con herencia de organización y overrides por sucursal.
 
 #### 2. **Mejoras Estructurales & Calidad**
 
@@ -45,6 +48,7 @@ El proyecto ha evolucionado hacia una plataforma SaaS robusta con capacidades de
 - ✅ **Clean Code:** Eliminación masiva de `console.log` y logs de debug en producción.
 - ✅ **Logging Pro:** Sistema estructurado con Pino para trazabilidad en servidor.
 - ✅ **Seguridad:** Zod para validación de esquemas y Headers de seguridad (CSP, HSTS) activos.
+- ✅ **Inventario Inteligente:** Independencia de stock por sucursal y visibilidad granular de productos (Global vs Local).
 
 #### 3. **Pagos Globales y Suscripciones (Phase SaaS 1)** ✅ **COMPLETADO**
 
@@ -376,9 +380,9 @@ Febrero 2026:
 
 ---
 
-**Última Actualización:** 2026-02-03  
+**Última Actualización:** 2026-02-04  
 **Próxima Revisión:** Después de validar tests restantes / Phase SaaS 1 (Billing)  
-**Estado General:** 🟢 **Gestión SaaS operativa; listo para Phase SaaS 1 (Billing) o tests E2E**
+**Estado General:** 🟢 **Gestión SaaS operativa; Dashboard optimizado y corregido**
 
 ### Gestión SaaS (30-Ene-2026)
 

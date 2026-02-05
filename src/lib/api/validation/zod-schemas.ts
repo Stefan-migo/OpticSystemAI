@@ -32,10 +32,27 @@ import { isValidRUTFormat, normalizeRUT } from "@/lib/utils/rut";
 export const emailSchema = z
   .string()
   .email("Debe ser un email válido")
-  .min(1, "El email es requerido")
   .max(255, "El email es demasiado largo")
   .toLowerCase()
   .trim();
+
+/**
+ * Schema para validar email opcional
+ * Permite string vacío, null, o undefined
+ */
+export const emailOptionalSchema = z
+  .union([
+    z.string().email("Debe ser un email válido").toLowerCase().trim(),
+    z.literal(""),
+    z.null(),
+    z.undefined(),
+  ])
+  .optional()
+  .nullable()
+  .transform((val) => {
+    if (!val || val === "") return null;
+    return val;
+  });
 
 /**
  * Schema para validar RUT chileno
@@ -411,7 +428,7 @@ export const customerBaseSchema = z
         // Trim after validation
         return val !== undefined && val !== null ? String(val).trim() : val;
       }),
-    email: emailSchema.optional().nullable(),
+    email: emailOptionalSchema,
     phone: phoneOptionalSchema,
     rut: rutOptionalSchema,
     date_of_birth: dateISOOptionalSchema,
@@ -493,7 +510,7 @@ export const updateCustomerSchema = z.object({
     .max(100)
     .trim()
     .optional(),
-  email: emailSchema.optional().nullable(),
+  email: emailOptionalSchema,
   phone: phoneOptionalSchema,
   rut: rutOptionalSchema,
   date_of_birth: dateISOOptionalSchema,
@@ -733,15 +750,7 @@ const frameDataSchema = z
  */
 export const processSaleSchema = z
   .object({
-    email: z
-      .union([
-        z.string().email("Debe ser un email válido").toLowerCase().trim(),
-        z.null(),
-        z.literal(""),
-      ])
-      .optional()
-      .nullable()
-      .transform((val) => (val === "" ? null : val)),
+    email: emailOptionalSchema,
     customer_id: uuidOptionalSchema, // Optional - allow sales without registered customer
     customer_name: z.string().max(200).trim().optional().nullable(),
     customer_rut: rutOptionalSchema, // Optional RUT for unregistered customers
@@ -999,6 +1008,12 @@ export const lensFamilyBaseSchema = z.object({
 
 export const createLensFamilySchema = lensFamilyBaseSchema;
 export const updateLensFamilySchema = lensFamilyBaseSchema.partial();
+
+export const createLensFamilyFullSchema = lensFamilyBaseSchema.extend({
+  matrices: z
+    .array(lensPriceMatrixBaseSchema.omit({ lens_family_id: true }))
+    .min(1, "Debe agregar al menos una matriz de precios"),
+});
 
 // ============================================================================
 // Lens Price Matrices Schemas

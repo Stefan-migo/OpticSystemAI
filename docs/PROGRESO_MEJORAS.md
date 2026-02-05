@@ -3,8 +3,8 @@
 ## Tracking Detallado del Avance
 
 **Fecha de Inicio:** 2025-01-27  
-**Última Actualización:** 2026-01-28  
-**Estado General:** 🟢 Fase 6.2 Completada — Phase SaaS 1 (Billing) en progreso: DB, Backend, Flow, Env doc, UI checkout
+**Última Actualización:** 2026-02-04  
+**Estado General:** 🟢 Fase 6.2 Completada — Dashboard corregido y optimizado (Timezone & Product filtering)
 
 ---
 
@@ -907,3 +907,13 @@ Razón: Los tests validarán que el aislamiento de datos por tenant funciona cor
   - ✅ Merge a main completado (commit merge)
   - ✅ 17 archivos modificados/creados, 4,736 inserciones
   - ✅ **Nota:** Problema de autenticación en tests resuelto (2026-01-27) - Solución híbrida implementada
+
+### 2026-02-04 (Seguridad, Recetas y Configuración de Boletas)
+
+- ✅ **Seguridad y Visibilidad:**
+  - ✅ **Dashboard Fixes:** Optimización de filtrado de productos y citas (manejo de zonas horarias y stock global).
+- ✅ **Security Hardening:** Aislamiento estricto de clientes por organización para SuperAdmins y multi-tenancy nativo en recetas médicas.
+- ✅ **POS & Billing Config:** Sistema de configuración de boletas con soporte para branding global y excepciones por sucursal.
+- ✅ **Base de Datos:**
+  - ✅ Migración `20260204000001_add_multitenancy_to_prescriptions.sql` aplicada.
+- ✅ **Documentación:** Actualizados `ESTADO_ACTUAL_PROYECTO.md` e `PROGRESO_MEJORAS.md`.

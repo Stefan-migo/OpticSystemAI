@@ -76,14 +76,15 @@ export async function GET(request: NextRequest) {
         const currentBranchId = branchContext.branchId;
         // Use left join (without !inner) to include products even if they don't have stock
         const selectFields = currentBranchId
-          ? `id, name, price, price_includes_tax, status, featured_image, sku, barcode, product_type, frame_brand, frame_model, frame_color, frame_size,
+          ? `id, name, price, price_includes_tax, status, featured_image, sku, barcode, product_type, category_id, frame_brand, frame_model, frame_color, frame_size,
            product_branch_stock (
              quantity,
+             available_quantity,
              reserved_quantity,
              low_stock_threshold,
              branch_id
            )`
-          : "id, name, price, price_includes_tax, inventory_quantity, status, featured_image, sku, barcode, product_type, frame_brand, frame_model, frame_color, frame_size";
+          : "id, name, price, price_includes_tax, category_id, inventory_quantity, status, featured_image, sku, barcode, product_type, frame_brand, frame_model, frame_color, frame_size";
 
         // CRITICAL: Filter by organization_id FIRST to ensure multi-tenancy isolation
         // Products must be filtered by organization_id before search to prevent cross-organization data leakage
@@ -98,8 +99,17 @@ export async function GET(request: NextRequest) {
             "organization_id",
             branchContext.organizationId,
           );
-          logger.debug("Filtering products by organization_id", {
+
+          // Apply branch filter: global products (branch_id is null) OR current branch products
+          if (currentBranchId) {
+            productsQuery = productsQuery.or(
+              `branch_id.is.null,branch_id.eq.${currentBranchId}`,
+            );
+          }
+
+          logger.debug("Filtering products by organization and branch", {
             organizationId: branchContext.organizationId,
+            currentBranchId,
           });
         } else if (!branchContext.isSuperAdmin) {
           // If no organization_id and not super admin, return empty results
@@ -196,10 +206,10 @@ export async function GET(request: NextRequest) {
             if (branchStock) {
               processedProduct = {
                 ...product,
-                available_quantity: branchStock.available_quantity || 0,
-                quantity: branchStock.quantity || 0,
-                reserved_quantity: branchStock.reserved_quantity || 0,
-                inventory_quantity: branchStock.quantity || 0, // For backward compatibility
+                available_quantity: branchStock.available_quantity ?? 0,
+                quantity: branchStock.quantity ?? 0,
+                reserved_quantity: branchStock.reserved_quantity ?? 0,
+                inventory_quantity: branchStock.quantity ?? 0, // For backward compatibility
               };
             } else {
               // Product exists but has no stock in this branch

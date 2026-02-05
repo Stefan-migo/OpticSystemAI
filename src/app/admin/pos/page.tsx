@@ -31,7 +31,9 @@ import {
   DollarSign,
   Wallet,
   Send,
+  Download,
 } from "lucide-react";
+import { POSReceipt } from "@/components/admin/POS/POSReceipt";
 import { toast } from "sonner";
 import Link from "next/link";
 import {
@@ -164,6 +166,9 @@ export default function POSPage() {
   const [cashPartialAmount, setCashPartialAmount] = useState<number>(0); // Monto parcial para efectivo
   const [isCashOpen, setIsCashOpen] = useState<boolean | null>(null);
   const [checkingCashStatus, setCheckingCashStatus] = useState(true);
+  const [billingSettings, setBillingSettings] = useState<any>(null);
+  const [organization, setOrganization] = useState<any>(null);
+  const [lastProcessedOrder, setLastProcessedOrder] = useState<any>(null);
   const [siiInvoiceType, setSiiInvoiceType] = useState<
     "boleta" | "factura" | "none"
   >("boleta");
@@ -342,6 +347,8 @@ export default function POSPage() {
     discount_amount: 0,
   });
 
+  const printRef = useRef<HTMLDivElement>(null);
+
   // Tab activo del formulario "Crear orden completa" (para abrir Lentes al cargar presupuesto de lentes de contacto)
   const [orderFormTab, setOrderFormTab] = useState("customer");
 
@@ -451,6 +458,39 @@ export default function POSPage() {
       setCheckingCashStatus(false);
     }
   };
+
+  // Fetch billing settings and organization info
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!currentBranchId && !isSuperAdmin) return;
+
+      try {
+        const headers = { ...getBranchHeader(currentBranchId) };
+
+        // Fetch Billing settings
+        const billingRes = await fetch("/api/admin/billing/settings", {
+          headers,
+        });
+        if (billingRes.ok) {
+          const billingData = await billingRes.json();
+          if (billingData?.settings) setBillingSettings(billingData.settings);
+        }
+
+        // Fetch Organization info
+        const orgRes = await fetch("/api/admin/organizations/current", {
+          headers,
+        });
+        if (orgRes.ok) {
+          const orgData = await orgRes.json();
+          setOrganization(orgData.organization);
+        }
+      } catch (error) {
+        console.error("Error fetching POS prerequisites:", error);
+      }
+    };
+
+    fetchData();
+  }, [currentBranchId, isSuperAdmin]);
 
   // Focus search on mount
   useEffect(() => {
@@ -2730,8 +2770,20 @@ export default function POSPage() {
       }
 
       // Clear cart and reset
+      setLastProcessedOrder(
+        result.order || result.work_order?.order || result.work_order,
+      );
+
+      // Clear cart and reset
       clearCart();
       setShowPaymentDialog(false);
+
+      // Trigger automatic print if configured (default to true for POS)
+      if (billingSettings?.auto_print_receipt !== false) {
+        setTimeout(() => {
+          window.print();
+        }, 1000);
+      }
     } catch (error: any) {
       console.error("Error processing payment:", error);
       toast.error(error.message || "Error al procesar el pago");
@@ -6006,6 +6058,17 @@ export default function POSPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Container for printing - hidden on screen, becomes visible only during print */}
+      <div className="hidden print:block">
+        <POSReceipt
+          ref={printRef}
+          order={lastProcessedOrder}
+          settings={billingSettings}
+          branch={branches.find((b) => b.id === currentBranchId)}
+          organization={organization}
+        />
+      </div>
     </div>
   );
 }

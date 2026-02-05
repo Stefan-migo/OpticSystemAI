@@ -25,12 +25,23 @@ export function replaceTemplateVariables(
 /**
  * Get default variables for email templates
  */
-export function getDefaultVariables(): Record<string, string> {
+export function getDefaultVariables(organization?: {
+  name?: string;
+  email?: string;
+  support_email?: string;
+}): Record<string, string> {
+  const websiteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://opttius.com";
+
   return {
-    company_name: "OPTTIUS CONSCIENTE",
-    support_email: "soporte@opttius.com",
-    contact_email: "contacto@opttius.com",
-    website_url: process.env.NEXT_PUBLIC_APP_URL || "https://opttius.com",
+    organization_name: organization?.name || "Opttius",
+    organization_email: organization?.email || "contacto@opttius.com",
+    organization_support_email:
+      organization?.support_email || "soporte@opttius.com",
+    website_url: websiteUrl,
+    // Add legacy variables for backward compatibility if needed
+    company_name: organization?.name || "Opttius",
+    support_email: organization?.support_email || "soporte@opttius.com",
+    contact_email: organization?.email || "contacto@opttius.com",
   };
 }
 

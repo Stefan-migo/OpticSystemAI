@@ -5,6 +5,7 @@ import { NotificationService } from "@/lib/notifications/notification-service";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { normalizeRUT } from "@/lib/utils/rut";
 import { appLogger as logger } from "@/lib/logger";
+import { EmailNotificationService } from "@/lib/email/notifications";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 import { ValidationError } from "@/lib/api/errors";
 import { createQuoteSchema } from "@/lib/api/validation/zod-schemas";
@@ -501,6 +502,39 @@ export async function POST(request: NextRequest) {
         newQuote.total_amount,
         newQuote.branch_id ?? undefined,
       ).catch((err) => logger.error("Error creating notification", err));
+
+      // Send email if status is 'sent'
+      if (
+        newQuote.status === "sent" &&
+        (newQuote.customer?.email || (newQuote as any).guest_email)
+      ) {
+        (async () => {
+          try {
+            // Get branch info
+            const { data: branch } = await supabaseServiceRole
+              .from("branches")
+              .select("name")
+              .eq("id", newQuote.branch_id)
+              .single();
+
+            await EmailNotificationService.sendQuoteSent(
+              {
+                customer_name: customerName,
+                customer_email:
+                  newQuote.customer?.email || (newQuote as any).guest_email,
+                quote_number: newQuote.quote_number,
+                total_amount: newQuote.total_amount,
+                expiration_date: newQuote.expiration_date,
+                branch_name: branch?.name || "",
+                items: [], // Could be expanded later
+              },
+              branchContext.organizationId,
+            );
+          } catch (err) {
+            logger.error("Error sending quote email", err);
+          }
+        })();
+      }
     }
 
     return NextResponse.json({

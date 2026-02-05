@@ -1,5 +1,5 @@
-import { createClient } from '@/utils/supabase/server';
-import { createServiceRoleClient } from '@/utils/supabase/server';
+import { createClient } from "@/utils/supabase/server";
+import { createServiceRoleClient } from "@/utils/supabase/server";
 
 export interface EmailTemplate {
   id: string;
@@ -18,26 +18,43 @@ export interface EmailTemplate {
  */
 export async function loadEmailTemplate(
   type: string,
-  useServiceRole: boolean = false
+  useServiceRole: boolean = false,
+  organizationId?: string,
 ): Promise<EmailTemplate | null> {
   try {
-    const supabase = useServiceRole 
+    const supabase = useServiceRole
       ? createServiceRoleClient()
       : await createClient();
 
-    const { data: template, error } = await supabase
-      .from('system_email_templates')
-      .select('*')
-      .eq('type', type)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    // Strategy: Search for organization-specific template first
+    // If not found, fall back to the system default template (organization_id IS NULL)
+    let query = supabase
+      .from("system_email_templates")
+      .select("*")
+      .eq("type", type)
+      .eq("is_active", true);
 
-    if (error || !template) {
+    if (organizationId) {
+      // Prioritize organization template then system default
+      query = query.or(
+        `organization_id.eq.${organizationId},organization_id.is.null`,
+      );
+    } else {
+      query = query.is("organization_id", null);
+    }
+
+    const { data: templates, error } = await query.order("organization_id", {
+      ascending: false,
+      nullsFirst: false,
+    });
+
+    if (error || !templates || templates.length === 0) {
       console.warn(`⚠️ No active template found for type: ${type}`);
       return null;
     }
+
+    // Since we order by organization_id DESC (nulls last), the one with organizationId will be first
+    const template = templates[0];
 
     return {
       id: template.id,
@@ -45,12 +62,12 @@ export async function loadEmailTemplate(
       type: template.type,
       subject: template.subject,
       content: template.content,
-      variables: Array.isArray(template.variables) 
-        ? template.variables 
-        : typeof template.variables === 'string' 
-          ? JSON.parse(template.variables) 
+      variables: Array.isArray(template.variables)
+        ? template.variables
+        : typeof template.variables === "string"
+          ? JSON.parse(template.variables)
           : [],
-      is_active: template.is_active
+      is_active: template.is_active,
     };
   } catch (error) {
     console.error(`Error loading email template for type ${type}:`, error);
@@ -62,36 +79,37 @@ export async function loadEmailTemplate(
  * Increment usage count for a template
  * SERVER-ONLY: This function requires server-side access
  */
-export async function incrementTemplateUsage(templateId: string): Promise<void> {
+export async function incrementTemplateUsage(
+  templateId: string,
+): Promise<void> {
   try {
     const supabase = createServiceRoleClient();
 
     // Get current usage count
     const { data: template } = await supabase
-      .from('system_email_templates')
-      .select('usage_count')
-      .eq('id', templateId)
+      .from("system_email_templates")
+      .select("usage_count")
+      .eq("id", templateId)
       .single();
 
     // Update usage count and last_used_at
     await supabase
-      .from('system_email_templates')
+      .from("system_email_templates")
       .update({
         usage_count: (template?.usage_count || 0) + 1,
-        last_used_at: new Date().toISOString()
+        last_used_at: new Date().toISOString(),
       })
-      .eq('id', templateId);
+      .eq("id", templateId);
   } catch (error) {
-    console.error('Error incrementing template usage:', error);
+    console.error("Error incrementing template usage:", error);
     // Don't fail email sending if usage tracking fails
   }
 }
 
 // Re-export client-side utilities for convenience
-export { 
-  replaceTemplateVariables, 
+export {
+  replaceTemplateVariables,
   getDefaultVariables,
   formatOrderItemsHTML,
-  formatOrderItemsText
-} from './template-utils';
-
+  formatOrderItemsText,
+} from "./template-utils";

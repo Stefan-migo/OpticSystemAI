@@ -66,14 +66,17 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const supabase = await createClient();
-    const body = await request.json();
-    const { id, is_enabled, display_order, name, description } = body;
-
-    if (!id)
+    let body;
+    try {
+      body = await request.json();
+    } catch (err) {
       return NextResponse.json(
-        { error: "ID de pasarela requerido" },
+        { error: "Cuerpo de solicitud inválido (no es JSON)" },
         { status: 400 },
       );
+    }
+
+    const { id, is_enabled, display_order, name, description } = body;
 
     const {
       data: { user },
@@ -95,20 +98,45 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Prohibido" }, { status: 403 });
     }
 
+    logger.info("Intentando actualizar pasarela", {
+      id,
+      is_enabled,
+      role: adminUser?.role,
+    });
+
+    if (!id)
+      return NextResponse.json(
+        { error: "ID de pasarela requerido" },
+        { status: 400 },
+      );
+
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (is_enabled !== undefined) updateData.is_enabled = is_enabled;
+    if (display_order !== undefined) updateData.display_order = display_order;
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+
     const { data, error } = await supabase
       .from("payment_gateways_config")
-      .update({
-        is_enabled,
-        display_order,
-        name,
-        description,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq("id", id)
       .select()
-      .single();
+      .maybeSingle(); // Better than single() if id might not exist
 
-    if (error) throw error;
+    if (error) {
+      logger.error("Error en query de Supabase al actualizar pasarela", error);
+      throw error;
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        { error: "Pasarela no encontrada" },
+        { status: 404 },
+      );
+    }
 
     logger.info("Configuración de pasarela actualizada", {
       gateway: data.gateway_id,
@@ -116,8 +144,14 @@ export async function PATCH(request: Request) {
     });
 
     return NextResponse.json({ success: true, gateway: data });
-  } catch (error) {
-    logger.error("Error al actualizar pasarela", error as Error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  } catch (error: any) {
+    logger.error("Error al actualizar pasarela", {
+      message: error?.message || String(error),
+      error,
+    });
+    return NextResponse.json(
+      { error: "Error interno", details: error?.message },
+      { status: 500 },
+    );
   }
 }

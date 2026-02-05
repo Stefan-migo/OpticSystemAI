@@ -1095,12 +1095,7 @@ export async function POST(request: NextRequest) {
 
             return NextResponse.json({
               success: true,
-              order: {
-                id: newOrder.id,
-                order_number: newOrder.order_number,
-                internal_folio: billingResult?.folio,
-                pdf_url: billingResult?.pdfUrl,
-              },
+              order: { ...newOrder, order_items: orderItems },
               billing: billingResult
                 ? {
                     folio: billingResult.folio,
@@ -1390,14 +1385,25 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          // Construct full order object for frontend
+          const fullOrder = {
+            ...newOrder,
+            order_items: orderItems,
+            order_payments: [
+              {
+                amount: paymentAmount,
+                payment_method: dbPaymentMethod,
+              },
+            ],
+            sii_invoice_number: siiInvoiceNumber,
+            customer_name: customerName,
+            billing_first_name: billingFirstName,
+            billing_last_name: billingLastName,
+          };
+
           return NextResponse.json({
             success: true,
-            order: {
-              id: newOrder.id,
-              order_number: newOrder.order_number,
-              internal_folio: billingResult?.folio,
-              pdf_url: billingResult?.pdfUrl,
-            },
+            order: fullOrder,
             work_order: {
               ...newWorkOrder,
               sii_invoice_number: siiInvoiceNumber,

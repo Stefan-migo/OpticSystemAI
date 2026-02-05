@@ -253,6 +253,11 @@ export async function GET(request: NextRequest) {
         query = query.eq("organization_id", userOrganizationId);
       }
 
+      // Re-apply branch filter after search because .or() overrides previous .or()
+      if (currentBranchId) {
+        query = query.or(`branch_id.is.null,branch_id.eq.${currentBranchId}`);
+      }
+
       logger.debug("Applied search filter", {
         search,
         escapedSearch,

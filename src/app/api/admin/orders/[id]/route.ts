@@ -132,6 +132,7 @@ export async function PATCH(
           .select(
             `
             *,
+            organization_id,
             order_items (
               id,
               product_name,
@@ -141,6 +142,7 @@ export async function PATCH(
               total_price
             ),
             profiles (
+              id,
               full_name,
               email
             )
@@ -186,6 +188,7 @@ export async function PATCH(
             carrier: fullOrder.carrier,
             shipped_at: fullOrder.shipped_at,
             delivered_at: fullOrder.delivered_at,
+            organization_id: fullOrder.organization_id,
             profiles: fullOrder.profiles,
           };
 

@@ -130,6 +130,8 @@ export async function getBranchContext(
 #### ✅ **Características Avanzadas**
 
 - **Chatbot AI:** Sistema multi-proveedor con fallback automático
+- **Stock por Sucursal:** Independencia total de inventario por sede.
+- **Visibilidad Inteligente:** Separación entre catálogo global (Super Admin) y productos locales de sucursal.
 - **Tool Calling:** Agente AI puede ejecutar operaciones en BD
 - **Búsqueda Inteligente:** RUT chileno con normalización
 - **Sistema de Impuestos:** Configuración flexible de IVA

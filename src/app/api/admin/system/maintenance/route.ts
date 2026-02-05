@@ -29,7 +29,9 @@ export async function POST(request: NextRequest) {
       data: GetAdminRoleResult | null;
       error: Error | null;
     };
-    if (adminRole !== "admin") {
+    if (
+      !["admin", "super_admin", "root", "dev"].includes(adminRole as string)
+    ) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },

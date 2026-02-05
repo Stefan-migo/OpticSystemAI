@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import { EmailNotificationService } from "@/lib/email/notifications";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function GET(
@@ -482,6 +483,42 @@ export async function PUT(
         { error: "Failed to update quote" },
         { status: 500 },
       );
+    }
+
+    // Send email if status changed to 'sent'
+    if (
+      body.status === "sent" &&
+      updatedQuote.status === "sent" &&
+      (updatedQuote.customer?.email || (updatedQuote as any).guest_email)
+    ) {
+      (async () => {
+        try {
+          const { data: branch } = await supabaseServiceRole
+            .from("branches")
+            .select("name")
+            .eq("id", updatedQuote.branch_id)
+            .single();
+
+          await EmailNotificationService.sendQuoteSent(
+            {
+              customer_name:
+                `${updatedQuote.customer?.first_name || ""} ${updatedQuote.customer?.last_name || ""}`.trim() ||
+                "Cliente",
+              customer_email:
+                updatedQuote.customer?.email ||
+                (updatedQuote as any).guest_email,
+              quote_number: updatedQuote.quote_number,
+              total_amount: updatedQuote.total_amount,
+              expiration_date: updatedQuote.expiration_date,
+              branch_name: branch?.name || "",
+              items: [],
+            },
+            branchContext.organizationId ?? undefined,
+          );
+        } catch (err) {
+          logger.error("Error sending quote email on update", err);
+        }
+      })();
     }
 
     return NextResponse.json({

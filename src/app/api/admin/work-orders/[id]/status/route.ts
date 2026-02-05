@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/utils/supabase/server";
 import { NotificationService } from "@/lib/notifications/notification-service";
 import { validateBranchAccess } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import { EmailNotificationService } from "@/lib/email/notifications";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
 export async function PUT(
@@ -185,6 +186,40 @@ export async function PUT(
           customerName,
           updatedWorkOrder.branch_id ?? undefined,
         ).catch((err) => logger.warn("Error creating notification", err));
+      }
+
+      // If status is ready_for_pickup, send email to customer
+      if (
+        status === "ready_for_pickup" &&
+        (updatedWorkOrder.customer?.email || (updatedWorkOrder as any).email)
+      ) {
+        (async () => {
+          try {
+            // Get organization_id
+            const { data: adminUser } = await supabaseServiceRole
+              .from("admin_users")
+              .select("organization_id")
+              .eq("id", user.id)
+              .single();
+
+            const organizationId = adminUser?.organization_id;
+
+            await EmailNotificationService.sendWorkOrderReady(
+              {
+                customer_name:
+                  `${updatedWorkOrder.customer?.first_name || ""} ${updatedWorkOrder.customer?.last_name || ""}`.trim() ||
+                  "Cliente",
+                customer_email:
+                  updatedWorkOrder.customer?.email ||
+                  (updatedWorkOrder as any).email,
+                work_order_number: updatedWorkOrder.work_order_number,
+              },
+              organizationId ?? undefined,
+            );
+          } catch (err) {
+            logger.error("Error sending work order ready email", err);
+          }
+        })();
       }
     }
 

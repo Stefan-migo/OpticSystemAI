@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Settings,
   Upload,
@@ -62,6 +63,7 @@ interface BillingSettings {
   printer_type?: "thermal" | "a4" | "letter" | "custom";
   printer_width_mm?: number;
   printer_height_mm?: number;
+  auto_print_receipt?: boolean;
 }
 
 export default function POSBillingSettingsPage() {
@@ -599,6 +601,25 @@ export default function POSBillingSettingsPage() {
                       <SelectItem value="factura">Factura</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50/50">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Impresión Automática</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Imprimir el comprobante automáticamente al finalizar cada
+                      venta en el POS.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={billingSettings.auto_print_receipt !== false}
+                    onCheckedChange={(checked) =>
+                      setBillingSettings({
+                        ...billingSettings,
+                        auto_print_receipt: checked,
+                      })
+                    }
+                  />
                 </div>
                 <div>
                   <Label>Texto de Encabezado (opcional)</Label>

@@ -97,8 +97,9 @@ export async function GET(request: NextRequest) {
     const applyBranchFilter = (query: any) => {
       // For customers, we should filter by organization_id first
       // Then optionally filter by branch_id if a specific branch is selected
-      if (userOrganizationId && !branchContext.isSuperAdmin) {
+      if (userOrganizationId) {
         // Filter by organization_id - this ensures multi-tenancy isolation
+        // Even for super admins, unless they are platform staff (null org)
         query = query.eq("organization_id", userOrganizationId);
 
         // If a specific branch is selected, also filter by branch_id
@@ -107,13 +108,12 @@ export async function GET(request: NextRequest) {
           query = query.eq("branch_id", branchContext.branchId);
         }
       } else if (branchContext.isSuperAdmin) {
-        // Super admin: use branch filter if branch is selected, otherwise show all
+        // Platform Super admin (no organization_id): sees only what branch filter says
         if (branchContext.branchId) {
           query = query.eq("branch_id", branchContext.branchId);
         }
-        // If no branch selected, super admin sees all (no filter)
       } else {
-        // Fallback: no organization_id found, use branch filter only
+        // Fallback: use generic branch filter
         query = addBranchFilter(
           query,
           branchContext.branchId,

@@ -51,7 +51,7 @@ export async function GET(
     // Fetch customer
     if (appointment.customer_id) {
       const { data: customer } = await supabase
-        .from("profiles")
+        .from("customers")
         .select("id, first_name, last_name, email, phone")
         .eq("id", appointment.customer_id)
         .single();
@@ -229,6 +229,19 @@ export async function PUT(
         if (body.cancellation_reason) {
           updateData.cancellation_reason = body.cancellation_reason;
         }
+        // Discard guest info on cancellation as requested
+        updateData.guest_first_name = null;
+        updateData.guest_last_name = null;
+        updateData.guest_rut = null;
+        updateData.guest_email = null;
+        updateData.guest_phone = null;
+      } else if (body.status === "no_show") {
+        // Discard guest info on no-show as requested
+        updateData.guest_first_name = null;
+        updateData.guest_last_name = null;
+        updateData.guest_rut = null;
+        updateData.guest_email = null;
+        updateData.guest_phone = null;
       }
     }
     if (body.assigned_to !== undefined)
@@ -264,15 +277,100 @@ export async function PUT(
       );
     }
 
+    // AUTO-REGISTRATION LOGIC: If appointment status is completed and it's a guest, register them
+    let finalAppointmentSnapshot = updatedAppointment;
+    if (
+      updatedAppointment.status === "completed" &&
+      !updatedAppointment.customer_id &&
+      updatedAppointment.guest_first_name
+    ) {
+      try {
+        // Get organization_id (ensuring we have it)
+        let orgId = updatedAppointment.organization_id;
+        if (!orgId) {
+          const { data: adminUser } = await supabaseServiceRole
+            .from("admin_users")
+            .select("organization_id")
+            .eq("id", user.id)
+            .maybeSingle();
+          orgId = adminUser?.organization_id;
+        }
+
+        if (orgId) {
+          // Search for existing customer with same RUT in this organization
+          const { data: existingCustomer } = await supabaseServiceRole
+            .from("customers")
+            .select("id")
+            .eq("rut", updatedAppointment.guest_rut)
+            .eq("organization_id", orgId)
+            .maybeSingle();
+
+          let targetCustomerId = existingCustomer?.id;
+
+          // Create customer if not found
+          if (!targetCustomerId) {
+            const { data: newCustomer, error: createError } =
+              await supabaseServiceRole
+                .from("customers")
+                .insert({
+                  first_name: updatedAppointment.guest_first_name,
+                  last_name: updatedAppointment.guest_last_name,
+                  rut: updatedAppointment.guest_rut,
+                  email: updatedAppointment.guest_email,
+                  phone: updatedAppointment.guest_phone,
+                  organization_id: orgId,
+                  branch_id: updatedAppointment.branch_id,
+                  is_active: true,
+                })
+                .select("id")
+                .single();
+
+            if (!createError && newCustomer) {
+              targetCustomerId = newCustomer.id;
+              logger.info(
+                `Auto-registered guest as customer: ${targetCustomerId}`,
+              );
+            } else {
+              logger.error("Error auto-registering customer", createError);
+            }
+          }
+
+          // Update appointment with customer_id and clear guest fields
+          if (targetCustomerId) {
+            const { data: finalUpdate, error: updateGuestError } =
+              await supabaseServiceRole
+                .from("appointments")
+                .update({
+                  customer_id: targetCustomerId,
+                  guest_first_name: null,
+                  guest_last_name: null,
+                  guest_rut: null,
+                  guest_email: null,
+                  guest_phone: null,
+                })
+                .eq("id", id)
+                .select("*")
+                .single();
+
+            if (!updateGuestError && finalUpdate) {
+              finalAppointmentSnapshot = finalUpdate;
+            }
+          }
+        }
+      } catch (err) {
+        logger.error("Error in guest auto-registration process", err);
+      }
+    }
+
     // Fetch related data manually
-    const appointmentWithRelations = { ...updatedAppointment };
+    const appointmentWithRelations = { ...finalAppointmentSnapshot };
 
     // Fetch customer
-    if (updatedAppointment.customer_id) {
+    if (appointmentWithRelations.customer_id) {
       const { data: customer } = await supabaseServiceRole
-        .from("profiles")
+        .from("customers")
         .select("id, first_name, last_name, email, phone")
-        .eq("id", updatedAppointment.customer_id)
+        .eq("id", appointmentWithRelations.customer_id)
         .single();
       appointmentWithRelations.customer = customer || null;
     }

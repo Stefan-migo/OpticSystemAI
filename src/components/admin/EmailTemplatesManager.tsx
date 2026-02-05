@@ -63,7 +63,13 @@ interface EmailTemplate {
   updated_at: string;
 }
 
-export default function EmailTemplatesManager() {
+interface EmailTemplatesManagerProps {
+  mode?: "organization" | "saas";
+}
+
+export default function EmailTemplatesManager({
+  mode = "organization",
+}: EmailTemplatesManagerProps) {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("all");
@@ -87,10 +93,16 @@ export default function EmailTemplatesManager() {
       if (typeFilter !== "all") {
         params.set("type", typeFilter);
       }
+      if (mode === "saas") {
+        params.set("category", "saas");
+      }
 
-      const response = await fetch(
-        `/api/admin/system/email-templates?${params}`,
-      );
+      const apiUrl =
+        mode === "saas"
+          ? `/api/admin/saas-management/email-templates?${params}`
+          : `/api/admin/system/email-templates?${params}`;
+
+      const response = await fetch(apiUrl);
       if (!response.ok) {
         throw new Error("Failed to fetch templates");
       }
@@ -213,6 +225,13 @@ export default function EmailTemplatesManager() {
       low_stock_alert: "Alerta de Stock Bajo",
       marketing: "Marketing",
       custom: "Personalizado",
+      // SaaS types
+      saas_welcome: "Bienvenida SaaS",
+      saas_trial_ending: "Fin de Prueba",
+      saas_subscription_success: "Suscripción Exitosa",
+      saas_subscription_failed: "Error Suscripción",
+      saas_payment_reminder: "Recordatorio Pago",
+      saas_onboarding_step_1: "Onboarding Paso 1",
     };
     return labels[type] || type;
   };
@@ -264,9 +283,19 @@ export default function EmailTemplatesManager() {
                   Restablecer Contraseña
                 </SelectItem>
                 <SelectItem value="account_welcome">Bienvenida</SelectItem>
-                <SelectItem value="membership_welcome">
-                  Bienvenida Membresía
-                </SelectItem>
+                {mode === "saas" && (
+                  <>
+                    <SelectItem value="saas_welcome">
+                      Bienvenida SaaS
+                    </SelectItem>
+                    <SelectItem value="saas_trial_ending">
+                      Fin de Prueba
+                    </SelectItem>
+                    <SelectItem value="saas_subscription_success">
+                      Suscripción Exitosa
+                    </SelectItem>
+                  </>
+                )}
                 <SelectItem value="low_stock_alert">Alerta de Stock</SelectItem>
                 <SelectItem value="marketing">Marketing</SelectItem>
                 <SelectItem value="custom">Personalizado</SelectItem>

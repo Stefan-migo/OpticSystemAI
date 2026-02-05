@@ -20,6 +20,7 @@ const billingSettingsSchema = z.object({
   printer_type: z.enum(["thermal", "a4", "letter", "custom"]).optional(),
   printer_width_mm: z.number().optional(),
   printer_height_mm: z.number().optional(),
+  auto_print_receipt: z.boolean().optional().default(true),
 });
 
 export async function GET(request: NextRequest) {
@@ -55,8 +56,7 @@ export async function GET(request: NextRequest) {
         const branchContext = await getBranchContext(request, user.id);
 
         // Get settings for the branch
-        let settings = null;
-
+        let branchSettings = null;
         if (branchContext.branchId) {
           const { data, error: settingsError } = await supabase
             .from("pos_settings")
@@ -70,33 +70,60 @@ export async function GET(request: NextRequest) {
               settingsError,
             );
           } else {
-            // Check if any billing fields are set in branch settings
-            if (data && data.business_name) {
-              settings = data;
-            }
+            branchSettings = data;
           }
         }
 
-        // Fallback to organization_settings if not found in branch
-        if (!settings) {
-          const { data: orgSettings } = await supabase
-            .from("organization_settings")
-            .select("*")
-            .eq("organization_id", branchContext.organizationId!)
-            .maybeSingle();
+        // Get organization-level settings
+        const { data: orgSettings } = await supabase
+          .from("organization_settings")
+          .select("*")
+          .eq("organization_id", branchContext.organizationId!)
+          .maybeSingle();
 
-          if (orgSettings) {
-            settings = orgSettings;
+        // Merge logic: Branch settings > Organization settings > Defaults
+        const getMergedValue = (field: string, defaultValue: any = null) => {
+          if (
+            branchSettings &&
+            branchSettings[field] !== null &&
+            branchSettings[field] !== undefined &&
+            branchSettings[field] !== ""
+          ) {
+            return branchSettings[field];
           }
-        }
+          if (
+            orgSettings &&
+            orgSettings[field] !== null &&
+            orgSettings[field] !== undefined &&
+            orgSettings[field] !== ""
+          ) {
+            return orgSettings[field];
+          }
+          return defaultValue;
+        };
+
+        const mergedSettings = {
+          business_name: getMergedValue("business_name"),
+          business_rut: getMergedValue("business_rut"),
+          business_address: getMergedValue("business_address"),
+          business_phone: getMergedValue("business_phone"),
+          business_email: getMergedValue("business_email"),
+          logo_url: getMergedValue("logo_url"),
+          header_text: getMergedValue("header_text"),
+          footer_text: getMergedValue("footer_text"),
+          terms_and_conditions: getMergedValue("terms_and_conditions"),
+          default_document_type: getMergedValue(
+            "default_document_type",
+            "boleta",
+          ),
+          printer_type: getMergedValue("printer_type", "thermal"),
+          printer_width_mm: getMergedValue("printer_width_mm", 80),
+          printer_height_mm: getMergedValue("printer_height_mm", 297),
+          auto_print_receipt: getMergedValue("auto_print_receipt", true),
+        };
 
         return NextResponse.json({
-          settings: settings || {
-            default_document_type: "boleta",
-            printer_type: "thermal",
-            printer_width_mm: 80,
-            printer_height_mm: 297,
-          },
+          settings: mergedSettings,
         });
       },
     );

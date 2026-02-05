@@ -18,11 +18,32 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: template, error } = await supabase
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+
+    if (!adminUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    let query = supabase
       .from("system_email_templates")
       .select("*")
-      .eq("id", params.id)
-      .single();
+      .eq("id", params.id);
+
+    // Apply tenant isolation
+    if (adminUser.role !== "super_admin") {
+      const orgId = adminUser.organization_id;
+      if (orgId) {
+        query = query.or(`organization_id.eq.${orgId},organization_id.is.null`);
+      } else {
+        query = query.is("organization_id", null);
+      }
+    }
+
+    const { data: template, error } = await query.single();
 
     if (error) {
       logger.error("Error fetching email template", {
@@ -78,6 +99,47 @@ export async function PUT(
     } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+
+    if (!adminUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    // Check if user owns the template OR is super admin
+    const { data: existingTemplate } = await supabase
+      .from("system_email_templates")
+      .select("organization_id, is_system")
+      .eq("id", params.id)
+      .single();
+
+    if (!existingTemplate) {
+      return NextResponse.json(
+        { error: "Template not found" },
+        { status: 404 },
+      );
+    }
+
+    if (
+      adminUser.role !== "super_admin" &&
+      existingTemplate.organization_id !== adminUser.organization_id
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Organizations cannot update system-level templates (is_system = true)
+    if (adminUser.role !== "super_admin" && existingTemplate.is_system) {
+      return NextResponse.json(
+        {
+          error: "Cannot modify system templates. Create a custom one instead.",
+        },
+        { status: 403 },
+      );
     }
 
     // Build update object
@@ -155,6 +217,38 @@ export async function DELETE(
     } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+
+    if (!adminUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    // Check ownership and system flag
+    const { data: existingTemplate } = await supabase
+      .from("system_email_templates")
+      .select("organization_id, is_system")
+      .eq("id", params.id)
+      .single();
+
+    if (!existingTemplate) {
+      return NextResponse.json(
+        { error: "Template not found" },
+        { status: 404 },
+      );
+    }
+
+    if (
+      adminUser.role !== "super_admin" &&
+      (existingTemplate.organization_id !== adminUser.organization_id ||
+        existingTemplate.is_system)
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { error } = await supabase

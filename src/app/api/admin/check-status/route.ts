@@ -85,19 +85,23 @@ export async function GET(request: NextRequest) {
     let organizationName = null;
     let organizationLogo = null;
     let organizationSlogan = null;
+    let ownerId = null;
+    let isOwner = isRootUser;
+
     if (organizationId) {
       const { data: orgData } = await supabase
         .from("organizations")
-        .select("name, logo_url, slogan")
+        .select("name, logo_url, slogan, owner_id")
         .eq("id", organizationId)
         .single();
       organizationName = orgData?.name || null;
       organizationLogo = orgData?.logo_url || null;
       organizationSlogan = orgData?.slogan || null;
+      ownerId = orgData?.owner_id || null;
+      isOwner = ownerId === user.id || isRootUser;
     }
 
     // Determine if onboarding is required
-    // Onboarding required if: user is admin but has no organization_id (and not super_admin and not root/dev)
     const onboardingRequired =
       isAdmin && !organizationId && !isSuperAdmin && !isRootUser;
 
@@ -124,16 +128,19 @@ export async function GET(request: NextRequest) {
         roleError: roleError?.message,
         adminRecord: adminRecord,
         adminRecordError: adminRecordError?.message,
+        isOwner,
       },
       organization: {
         organizationId,
         organizationName,
         organizationLogo,
         organizationSlogan,
+        ownerId,
         hasOrganization: !!organizationId,
         isDemoMode,
         isSuperAdmin,
         isRootUser,
+        isOwner,
         onboardingRequired,
       },
       productsTest: {

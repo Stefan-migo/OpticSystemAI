@@ -489,13 +489,31 @@ html.dark .admin-header {
   animation: fadeIn 0.4s ease-out forwards;
 }
 
-/* Print styles for Weekly Report */
+/* Print styles for Receipts and Reports */
 @media print {
-  [data-radix-dialog-overlay] {
-    background: transparent !important;
+  body * {
+    visibility: hidden;
+  }
+
+  #pos-receipt-print,
+  #pos-receipt-print *,
+  .print-visible,
+  .print-visible * {
+    visibility: visible;
+  }
+
+  #pos-receipt-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
   }
 
   #weekly-report-print {
     max-width: none !important;
+    visibility: visible;
   }
 }

@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "";
     const active_only = searchParams.get("active_only") === "true";
+    const category = searchParams.get("category") || "organization";
 
     const supabase = await createClient();
 
@@ -20,15 +21,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = (await supabase.rpc("is_admin", {
-      user_id: user.id,
-    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
-    if (!isAdmin) {
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+
+    if (!adminUser) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },
       );
     }
+
+    const isGlobalAdmin =
+      adminUser.role === "root" ||
+      adminUser.role === "dev" ||
+      adminUser.role === "super_admin";
 
     // Build the query for system email templates
     let query = supabase.from("system_email_templates").select(`
@@ -40,11 +49,35 @@ export async function GET(request: NextRequest) {
         variables,
         is_active,
         is_system,
+        category,
+        organization_id,
         usage_count,
         created_by,
         created_at,
         updated_at
       `);
+
+    // Multi-tenant filtering:
+    // 1. If global admin (root/dev/super_admin), they can see everything or filter by category
+    // 2. If organization admin, they see: system templates (org_id is null AND category='organization')
+    //    OR their own templates.
+    if (isGlobalAdmin) {
+      if (category && category !== "all") {
+        query = query.eq("category", category);
+      }
+    } else {
+      // Organization admin
+      const orgId = adminUser.organization_id;
+      if (orgId) {
+        query = query.or(
+          `organization_id.eq.${orgId},and(organization_id.is.null,category.eq.organization)`,
+        );
+      } else {
+        query = query
+          .is("organization_id", null)
+          .eq("category", "organization");
+      }
+    }
 
     // Apply filters
     if (active_only) {
@@ -55,10 +88,10 @@ export async function GET(request: NextRequest) {
       query = query.eq("type", type);
     }
 
-    // Order by type and name
+    // Order by organization_id (to put custom ones first in list) then type
     const { data: templates, error } = await query
-      .order("type", { ascending: true })
-      .order("name", { ascending: true });
+      .order("organization_id", { ascending: false, nullsFirst: false })
+      .order("type", { ascending: true });
 
     if (error) {
       logger.error("Error fetching email templates", { error });
@@ -101,10 +134,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: isAdmin } = (await supabase.rpc("is_admin", {
-      user_id: user.id,
-    } as IsAdminParams)) as { data: IsAdminResult | null; error: Error | null };
-    if (!isAdmin) {
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+
+    if (!adminUser) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },
@@ -127,8 +163,11 @@ export async function POST(request: NextRequest) {
       "order_delivered",
       "password_reset",
       "account_welcome",
-      "membership_welcome",
-      "membership_reminder",
+      "appointment_confirmation",
+      "appointment_reminder",
+      "prescription_ready",
+      "quote_sent",
+      "work_order_ready",
       "low_stock_alert",
       "payment_success",
       "payment_failed",
@@ -154,6 +193,8 @@ export async function POST(request: NextRequest) {
         variables: JSON.stringify(variables),
         is_active,
         is_system: false,
+        organization_id: adminUser.organization_id,
+        category: "organization",
         usage_count: 0,
         created_by: user.id,
       })

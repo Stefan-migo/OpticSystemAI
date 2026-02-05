@@ -78,6 +78,7 @@ export async function POST(
       created_at: order.created_at,
       payment_id: order.mp_payment_id,
       status: order.status,
+      organization_id: order.organization_id,
     };
 
     // Send email notification

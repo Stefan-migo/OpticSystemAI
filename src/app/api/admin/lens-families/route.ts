@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
-import { createLensFamilySchema } from "@/lib/api/validation/zod-schemas";
+import {
+  createLensFamilySchema,
+  createLensFamilyFullSchema,
+} from "@/lib/api/validation/zod-schemas";
 import {
   parseAndValidateBody,
   parseAndValidateQuery,
@@ -132,28 +135,82 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate body
-    const body = await parseAndValidateBody(request, createLensFamilySchema);
+    // Parse body as JSON once
+    const bodyRaw = await request.json();
+    let body: any;
 
-    // Insert lens family with organization_id
-    const { data: family, error } = await supabase
-      .from("lens_families")
-      .insert({ ...body, organization_id: userOrganizationId })
-      .select()
-      .single();
+    // Check if we are doing a full creation (with matrices)
+    if (
+      bodyRaw.matrices &&
+      Array.isArray(bodyRaw.matrices) &&
+      bodyRaw.matrices.length > 0
+    ) {
+      // Validate with proper schema
+      const validation = createLensFamilyFullSchema.safeParse(bodyRaw);
+      if (!validation.success) {
+        return validationErrorResponse(validation.error);
+      }
+      body = validation.data;
 
-    if (error) {
-      logger.error("Error creating lens family", error);
-      return NextResponse.json(
-        { error: "Error al crear familia de lentes" },
-        { status: 500 },
+      // Extract matrices and family data
+      const { matrices, ...familyData } = body;
+
+      // Use RPC for atomic insertion
+      const { data: familyId, error } = await supabase.rpc(
+        "create_lens_family_full",
+        {
+          p_family_data: {
+            ...familyData,
+            organization_id: userOrganizationId, // Enforce organization_id
+          },
+          p_matrices_data: matrices,
+        },
       );
-    }
 
-    return NextResponse.json({ family }, { status: 201 });
+      if (error) {
+        logger.error("Error creating lens family full (RPC)", error);
+        return NextResponse.json(
+          { error: "Error al crear familia de lentes completa" },
+          { status: 500 },
+        );
+      }
+
+      // Fetch the created family to return it (optional, but good practice)
+      const { data: createdFamily } = await supabase
+        .from("lens_families")
+        .select("*")
+        .eq("id", (familyId as any).id) // RPC returns object with id
+        .single();
+
+      return NextResponse.json({ family: createdFamily }, { status: 201 });
+    } else {
+      // Legacy/Simple creation (without matrices)
+      const validation = createLensFamilySchema.safeParse(bodyRaw);
+      if (!validation.success) {
+        return validationErrorResponse(validation.error);
+      }
+      body = validation.data;
+
+      // Insert lens family with organization_id
+      const { data: family, error } = await supabase
+        .from("lens_families")
+        .insert({ ...body, organization_id: userOrganizationId })
+        .select()
+        .single();
+
+      if (error) {
+        logger.error("Error creating lens family", error);
+        return NextResponse.json(
+          { error: "Error al crear familia de lentes" },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({ family }, { status: 201 });
+    }
   } catch (error) {
     if (error instanceof Error && error.name === "ValidationError") {
-      return validationErrorResponse(error);
+      return validationErrorResponse(error); // Should theoretically be caught above
     }
     logger.error("Error in lens families API POST", error);
     return NextResponse.json(

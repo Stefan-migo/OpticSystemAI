@@ -3,6 +3,7 @@ import { requireRoot } from "@/lib/api/root-middleware";
 import { createServiceRoleClient } from "@/utils/supabase/service-role";
 import { appLogger as logger } from "@/lib/logger";
 import { AuthorizationError } from "@/lib/api/errors";
+import { EmailNotificationService } from "@/lib/email/notifications";
 
 /**
  * GET /api/admin/saas-management/organizations
@@ -250,6 +251,32 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info(`Organization created: ${newOrg.id} (${slug})`);
+
+    // Send SaaS Welcome Email (B2B)
+    if (owner_id) {
+      try {
+        const { data: ownerProfile } = await supabaseServiceRole
+          .from("profiles")
+          .select("email, first_name")
+          .eq("id", owner_id)
+          .single();
+
+        if (ownerProfile?.email) {
+          await EmailNotificationService.sendSaaSNotification(
+            "saas_welcome",
+            ownerProfile.email,
+            {
+              customer_name: ownerProfile.first_name || "Admin",
+              organization_name: name,
+              dashboard_url: `${process.env.NEXT_PUBLIC_APP_URL}/admin`,
+            },
+          );
+        }
+      } catch (emailError) {
+        logger.error("Failed to send saas_welcome email", emailError);
+        // Non-blocking
+      }
+    }
 
     return NextResponse.json({ organization: newOrg }, { status: 201 });
   } catch (error) {

@@ -4,6 +4,16 @@ import { getBranchContext, addBranchFilter } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 
+/**
+ * Helper to get YYYY-MM-DD date string in local timezone (not UTC)
+ */
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export async function GET(request: NextRequest) {
   logger.info("Dashboard API endpoint called");
 
@@ -97,11 +107,35 @@ export async function GET(request: NextRequest) {
       ordersQuery = applyBranchFilter(ordersBaseQuery);
     }
 
-    // Fetch all data in parallel with branch filtering
+    // Products query: include products of the branch OR global products (branch_id IS NULL)
+    // This ensures that when a branch is selected, we still see products that aren't tied to any specific branch
+    let productsBaseQuery = supabase
+      .from("products")
+      .select("*")
+      .eq("status", "active");
+    let productsQuery;
+
+    if (branchContext.isSuperAdmin && !branchContext.branchId) {
+      // Global View: filtering by organization_id is enough
+      if (branchContext.organizationId) {
+        productsQuery = productsBaseQuery.eq(
+          "organization_id",
+          branchContext.organizationId,
+        );
+      } else {
+        productsQuery = applyBranchFilter(productsBaseQuery);
+      }
+    } else if (branchContext.branchId) {
+      // Branch View: branch_id = current OR branch_id IS NULL, scoped to org
+      productsQuery = productsBaseQuery
+        .eq("organization_id", branchContext.organizationId)
+        .or(`branch_id.eq.${branchContext.branchId},branch_id.is.null`);
+    } else {
+      productsQuery = applyBranchFilter(productsBaseQuery);
+    }
+
     const [productsResult, ordersResult, customersResult] = await Promise.all([
-      applyBranchFilter(
-        supabase.from("products").select("*").eq("status", "active"),
-      ),
+      productsQuery,
       ordersQuery,
       applyBranchFilter(supabase.from("customers").select("*")),
     ]);
@@ -120,24 +154,10 @@ export async function GET(request: NextRequest) {
     const orders = ordersResult.data || [];
     const customers = customersResult.data || []; // Now from customers table, not profiles
 
-    // Additional filtering: if branch is selected, exclude products without branch_id
-    // This is a safety check in case RLS policies allow legacy products (branch_id IS NULL)
-    // When a specific branch is selected, we only want products from that branch
-    let filteredProducts = products;
-    if (branchContext.branchId && !branchContext.isGlobalView) {
-      filteredProducts = products.filter((p: { branch_id: string | null }) => {
-        // Only include products that belong to the selected branch
-        return p.branch_id === branchContext.branchId;
-      });
-      logger.info("Filtering products by branch", {
-        branchId: branchContext.branchId,
-        before: products.length,
-        after: filteredProducts.length,
-        productsWithoutBranch: products.filter(
-          (p: { branch_id: string | null }) => !p.branch_id,
-        ).length,
-      });
-    }
+    // We no longer strictly filter products by branch_id in post-processing
+    // because we want to include global products (branch_id IS NULL).
+    // The query above already handles the correct filtering.
+    const filteredProducts = products;
 
     logger.info("Dashboard - Products fetched", {
       total: products.length,
@@ -257,19 +277,56 @@ export async function GET(request: NextRequest) {
 
     // === APPOINTMENTS METRICS (Optical Shop) ===
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const todayStr = getLocalDateString(today);
 
-    const { data: appointmentsData } = await applyBranchFilter(
-      supabase
+    // Filter appointments by organization AND branch (if selected)
+    // Use or for global view to support legacy data where organization_id might be null but branch_id is in org
+    let appointmentsQuery;
+
+    if (
+      branchContext.isSuperAdmin &&
+      !branchContext.branchId &&
+      branchContext.organizationId &&
+      orgBranchIds.length > 0
+    ) {
+      // Global View: include by organization_id OR by branch in org (legacy)
+      appointmentsQuery = supabase
         .from("appointments")
         .select("*")
-        .gte("appointment_date", today.toISOString().split("T")[0])
-        .lt("appointment_date", tomorrow.toISOString().split("T")[0]),
-    );
+        .or(
+          `organization_id.eq.${branchContext.organizationId},branch_id.in.(${orgBranchIds.join(",")})`,
+        );
+    } else if (branchContext.branchId) {
+      // Branch View: branch_id = current OR branch_id IS NULL (global appointments)
+      // We don't strictly filter by organization_id here to stay resilient to null-org legacy data
+      // but the branch_id isolation is provided by the branchId filter
+      appointmentsQuery = supabase
+        .from("appointments")
+        .select("*")
+        .or(`branch_id.eq.${branchContext.branchId},branch_id.is.null`);
+    } else {
+      appointmentsQuery = applyBranchFilter(
+        supabase.from("appointments").select("*"),
+      );
+    }
+
+    const { data: appointmentsData, error: appointmentsError } =
+      await appointmentsQuery.eq("appointment_date", todayStr);
+
+    if (appointmentsError) {
+      logger.error("Error fetching appointments", appointmentsError);
+    }
 
     const appointments = appointmentsData || [];
+
+    logger.info("Dashboard - Appointments fetched", {
+      count: appointments.length,
+      today: todayStr,
+      orgId: branchContext.organizationId,
+      branchId: branchContext.branchId,
+      isSuperAdmin: branchContext.isSuperAdmin,
+    });
+
     const todayAppointments = appointments.length;
     const scheduledAppointments = appointments.filter(
       (a: { status: string }) => a.status === "scheduled",
@@ -326,15 +383,39 @@ export async function GET(request: NextRequest) {
         q.status === "accepted" || q.converted_to_work_order_id,
     ).length;
 
-    // === TODAY'S APPOINTMENTS ===
-    const { data: todayAppointmentsData } = await applyBranchFilter(
-      supabase
+    // === TODAY'S APPOINTMENTS LIST ===
+    let todayAppointmentsListQuery;
+    if (
+      branchContext.isSuperAdmin &&
+      !branchContext.branchId &&
+      branchContext.organizationId &&
+      orgBranchIds.length > 0
+    ) {
+      todayAppointmentsListQuery = supabase
         .from("appointments")
         .select("*")
-        .eq("appointment_date", today.toISOString().split("T")[0])
-        .order("appointment_time", { ascending: true })
-        .limit(10),
-    );
+        .eq("appointment_date", todayStr)
+        .or(
+          `organization_id.eq.${branchContext.organizationId},branch_id.in.(${orgBranchIds.join(",")})`,
+        );
+    } else if (branchContext.branchId) {
+      todayAppointmentsListQuery = supabase
+        .from("appointments")
+        .select("*")
+        .eq("appointment_date", todayStr)
+        .or(`branch_id.eq.${branchContext.branchId},branch_id.is.null`);
+    } else {
+      todayAppointmentsListQuery = applyBranchFilter(
+        supabase
+          .from("appointments")
+          .select("*")
+          .eq("appointment_date", todayStr),
+      );
+    }
+
+    const { data: todayAppointmentsData } = await todayAppointmentsListQuery
+      .order("appointment_time", { ascending: true })
+      .limit(10);
 
     // Fetch customer data manually
     const customerIds = [
@@ -347,7 +428,7 @@ export async function GET(request: NextRequest) {
     const { data: customersData } =
       customerIds.length > 0
         ? await supabase
-            .from("profiles")
+            .from("customers")
             .select("id, first_name, last_name, email, phone")
             .in("id", customerIds)
         : { data: [] };
@@ -414,7 +495,7 @@ export async function GET(request: NextRequest) {
       );
 
       last7Days.push({
-        date: date.toISOString().split("T")[0],
+        date: getLocalDateString(date),
         revenue: dayRevenue,
         orders: dayOrders.length,
       });

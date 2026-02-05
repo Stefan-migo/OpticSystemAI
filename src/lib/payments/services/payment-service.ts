@@ -13,6 +13,8 @@ import type {
   WebhookEvent,
 } from "@/types/payment";
 import { appLogger as logger } from "@/lib/logger";
+import { EmailNotificationService } from "@/lib/email/notifications";
+import { createServiceRoleClient } from "@/utils/supabase/server";
 
 export class PaymentService {
   private supabase: SupabaseClient;
@@ -401,6 +403,45 @@ export class PaymentService {
       organizationId,
       gateway: payment.gateway,
     });
+
+    // Send SaaS Subscription Success Email (B2B)
+    try {
+      // Get organization owner email
+      const { data: orgData } = await this.supabase
+        .from("organizations")
+        .select("name, owner_id")
+        .eq("id", organizationId)
+        .single();
+
+      if (orgData?.owner_id) {
+        const { data: ownerData } = await this.supabase
+          .from("profiles")
+          .select("email, first_name")
+          .eq("id", orgData.owner_id)
+          .single();
+
+        if (ownerData?.email) {
+          await EmailNotificationService.sendSaaSNotification(
+            "saas_subscription_success",
+            ownerData.email,
+            {
+              customer_name: ownerData.first_name || "Admin",
+              organization_name: orgData.name,
+              plan_name: tier.toUpperCase(),
+              amount: payment.amount.toString(),
+              currency: payment.currency,
+              next_billing_date: periodEnd.toLocaleDateString("es-AR"),
+            },
+          );
+        }
+      }
+    } catch (emailError) {
+      logger.error(
+        "Failed to send saas_subscription_success email",
+        emailError,
+      );
+      // Non-blocking
+    }
   }
 
   /**

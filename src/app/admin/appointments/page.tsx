@@ -926,7 +926,13 @@ export default function AppointmentsPage() {
                             status: newStatus,
                           });
                           fetchAppointments();
-                          toast.success("Estado actualizado");
+                          if (newStatus === "completed") {
+                            toast.success(
+                              "Cita completada. El cliente ha sido registrado exitosamente en la base de datos de esta sucursal.",
+                            );
+                          } else {
+                            toast.success("Estado actualizado");
+                          }
                         }
                       } catch (error) {
                         toast.error("Error al actualizar");

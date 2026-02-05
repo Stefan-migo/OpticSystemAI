@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClientFromRequest } from "@/utils/supabase/server";
 import { getBranchContext } from "@/lib/api/branch-middleware";
 import { appLogger as logger } from "@/lib/logger";
+import { EmailNotificationService } from "@/lib/email/notifications";
 import type { IsAdminParams, IsAdminResult } from "@/types/supabase-rpc";
 import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
 import { RateLimitError } from "@/lib/api/errors";
@@ -606,12 +607,41 @@ export async function POST(request: NextRequest) {
             "@/lib/notifications/notification-service"
           );
           NotificationService.notifyNewSale(
-            newOrder.id,
-            newOrder.order_number,
-            newOrder.email,
-            newOrder.total_amount,
-            newOrder.branch_id ?? undefined,
+            (newOrder as any).id,
+            (newOrder as any).order_number,
+            (newOrder as any).email,
+            (newOrder as any).total_amount,
+            (newOrder as any).branch_id ?? undefined,
           ).catch((err) => logger.error("Error creating notification", err));
+
+          // Send Customer Order Confirmation (non-blocking)
+          if ((newOrder as any).email) {
+            (async () => {
+              try {
+                // Prepare order object for email service
+                const emailOrder = {
+                  ...(newOrder as any),
+                  user_email: (newOrder as any).email,
+                  customer_name: (newOrder as any).customer_name || "Cliente",
+                  items:
+                    orderData.items?.map((item: any) => ({
+                      id: item.product_id,
+                      name: item.product_name,
+                      quantity: item.quantity,
+                      price: item.unit_price,
+                      variant_title: item.variant_title,
+                    })) || [],
+                  organization_id: (newOrder as any).organization_id,
+                };
+
+                await EmailNotificationService.sendOrderConfirmation(
+                  emailOrder as any,
+                );
+              } catch (err) {
+                logger.error("Error sending order confirmation email", err);
+              }
+            })();
+          }
 
           return NextResponse.json({
             success: true,

@@ -15,6 +15,7 @@ import {
   HelpCircle,
   ArrowRight,
   Zap,
+  Mail,
 } from "lucide-react";
 
 interface SaasMetrics {
@@ -403,6 +404,29 @@ export default function SaasManagementDashboardPage() {
                       <h3 className="font-semibold text-lg">Soporte</h3>
                       <p className="text-sm text-muted-foreground">
                         Búsqueda rápida y resolución
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Gestión de Emails */}
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => router.push("/admin/saas-management/emails")}
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-violet-100 dark:bg-violet-900 rounded-lg">
+                      <Mail className="h-6 w-6 text-violet-600 dark:text-violet-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">Emails</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Configurar plantillas y comunicaciones SaaS
                       </p>
                     </div>
                   </div>

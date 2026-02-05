@@ -59,7 +59,7 @@ export async function GET(
       `,
       )
       .eq("id", params.id)
-      .eq("organization_id", organizationId) // Solo tickets de su organización
+      .eq("organization_id", adminUser.organization_id) // Solo tickets de su organización
       .single();
 
     if (ticketError || !ticket) {
@@ -121,7 +121,7 @@ export async function PATCH(
         .from("optical_internal_support_tickets")
         .select("id, organization_id, status, assigned_to, resolved_at")
         .eq("id", params.id)
-        .eq("organization_id", organizationIdPatch)
+        .eq("organization_id", adminUser.organization_id)
         .single();
 
     if (currentError || !currentTicket) {

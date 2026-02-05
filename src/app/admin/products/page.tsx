@@ -1257,6 +1257,59 @@ export default function ProductsPage() {
           <LensMatricesTabContent />
         </TabsContent>
       </Tabs>
+
+      {/* Single Product Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-red-600">
+              <AlertTriangle className="h-5 w-5 mr-2" />
+              Eliminar Producto
+            </DialogTitle>
+            <DialogDescription className="py-3">
+              ¿Estás seguro de que deseas eliminar el producto{" "}
+              <span className="font-bold">
+                &quot;{productToDelete?.name}&quot;
+              </span>
+              ?
+              <br />
+              <br />
+              Esta acción eliminará el producto permanentemente de la base de
+              datos y no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setProductToDelete(null);
+              }}
+              disabled={deleteLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteProduct}
+              disabled={deleteLoading}
+              className="min-w-[100px]"
+            >
+              {deleteLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -449,11 +449,17 @@ export default function CreateAppointmentForm({
         throw new Error(error.error || "Error al guardar cita");
       }
 
-      toast.success(
-        initialData?.id
-          ? "Cita actualizada exitosamente"
-          : "Cita creada exitosamente",
-      );
+      if (formData.status === "completed") {
+        toast.success(
+          "Cita completada. El cliente ha sido registrado exitosamente en la base de datos de esta sucursal.",
+        );
+      } else {
+        toast.success(
+          initialData?.id
+            ? "Cita actualizada exitosamente"
+            : "Cita creada exitosamente",
+        );
+      }
       onSuccess();
     } catch (error: any) {
       console.error("Error saving appointment:", error);

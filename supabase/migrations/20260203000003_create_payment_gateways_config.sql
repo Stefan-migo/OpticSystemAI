@@ -38,14 +38,14 @@ CREATE POLICY "Public read payment_gateways_config"
 ON public.payment_gateways_config FOR SELECT
 USING (true);
 
--- Only super admins can manage
-CREATE POLICY "Super admins can manage payment_gateways_config"
+-- Only elevated roles can manage
+CREATE POLICY "Elevated roles can manage payment_gateways_config"
 ON public.payment_gateways_config FOR ALL
 USING (
   EXISTS (
     SELECT 1 FROM public.admin_users
     WHERE id = auth.uid()
-    AND role = 'super_admin'
+    AND role IN ('super_admin', 'root', 'dev')
     AND is_active = true
   )
 );

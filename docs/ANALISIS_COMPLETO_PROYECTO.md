@@ -692,6 +692,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
 - [x] Integrar Smart Context e Insights AI
 - [x] Refactorizar `CreateWorkOrderForm.tsx` (de 1,286 a 377 líneas)
 - [x] Reducción masiva de `console.log` (de 1,077 a 207)
+- [x] Implementación de **Stock Independiente por Sucursal** y **Visibilidad Granular de Productos** (Global vs Local)
 
 ### Fase 2: Escalabilidad SaaS y Seguridad (En Progreso)
 

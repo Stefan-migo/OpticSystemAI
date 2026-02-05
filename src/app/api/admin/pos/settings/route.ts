@@ -9,6 +9,21 @@ import { z } from "zod";
 const posSettingsSchema = z.object({
   min_deposit_percent: z.number().min(0).max(100).optional(),
   min_deposit_amount: z.number().min(0).optional().nullable(),
+  // Billing/Boleta fields
+  business_name: z.string().optional().nullable(),
+  business_rut: z.string().optional().nullable(),
+  business_address: z.string().optional().nullable(),
+  business_phone: z.string().optional().nullable(),
+  business_email: z.string().optional().nullable(),
+  logo_url: z.string().optional().nullable(),
+  header_text: z.string().optional().nullable(),
+  footer_text: z.string().optional().nullable(),
+  terms_and_conditions: z.string().optional().nullable(),
+  default_document_type: z.string().optional().nullable(),
+  printer_type: z.string().optional().nullable(),
+  printer_width_mm: z.number().optional().nullable(),
+  printer_height_mm: z.number().optional().nullable(),
+  auto_print_receipt: z.boolean().optional().default(true),
 });
 
 export async function GET(request: NextRequest) {
@@ -71,33 +86,52 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Return default settings if not found in branch
-        if (!settings) {
-          // Try to get from organization_settings
-          const { data: orgSettings } = await supabase
-            .from("organization_settings")
-            .select("*")
-            .eq("organization_id", branchContext.organizationId!)
-            .maybeSingle();
+        // Merge logic: Branch settings > Organization settings > Defaults
+        const { data: orgSettings } = await supabase
+          .from("organization_settings")
+          .select("*")
+          .eq("organization_id", branchContext.organizationId!)
+          .maybeSingle();
 
-          if (orgSettings) {
-            settings = {
-              min_deposit_percent: orgSettings.min_deposit_percent,
-              min_deposit_amount: orgSettings.min_deposit_amount,
-            };
-          } else {
-            // Hardcoded defaults
-            settings = {
-              min_deposit_percent: 50.0,
-              min_deposit_amount: null,
-            };
+        const getMergedValue = (field: string, defaultValue: any = null) => {
+          if (
+            settings &&
+            settings[field] !== null &&
+            settings[field] !== undefined
+          ) {
+            return settings[field];
           }
-        }
+          if (
+            orgSettings &&
+            orgSettings[field] !== null &&
+            orgSettings[field] !== undefined
+          ) {
+            return orgSettings[field];
+          }
+          return defaultValue;
+        };
 
         return NextResponse.json({
           settings: {
-            min_deposit_percent: settings.min_deposit_percent,
-            min_deposit_amount: settings.min_deposit_amount,
+            min_deposit_percent: getMergedValue("min_deposit_percent", 50.0),
+            min_deposit_amount: getMergedValue("min_deposit_amount", null),
+            business_name: getMergedValue("business_name"),
+            business_rut: getMergedValue("business_rut"),
+            business_address: getMergedValue("business_address"),
+            business_phone: getMergedValue("business_phone"),
+            business_email: getMergedValue("business_email"),
+            logo_url: getMergedValue("logo_url"),
+            header_text: getMergedValue("header_text"),
+            footer_text: getMergedValue("footer_text"),
+            terms_and_conditions: getMergedValue("terms_and_conditions"),
+            default_document_type: getMergedValue(
+              "default_document_type",
+              "boleta",
+            ),
+            printer_type: getMergedValue("printer_type", "thermal"),
+            printer_width_mm: getMergedValue("printer_width_mm", 80),
+            printer_height_mm: getMergedValue("printer_height_mm", 297),
+            auto_print_receipt: getMergedValue("auto_print_receipt", true),
           },
         });
       },
@@ -172,8 +206,7 @@ export async function PUT(request: NextRequest) {
             .upsert(
               {
                 organization_id: branchContext.organizationId,
-                min_deposit_percent: validatedData.min_deposit_percent,
-                min_deposit_amount: validatedData.min_deposit_amount,
+                ...validatedData,
                 updated_at: new Date().toISOString(),
               },
               { onConflict: "organization_id" },
@@ -195,7 +228,11 @@ export async function PUT(request: NextRequest) {
             );
           }
 
-          // 2. Sync ALL branches of the organization
+          // 2. Sync ALL branches of the organization (Optional: only if you want to force override)
+          // For now, let's keep it consistent: Global update only updates Org table.
+          // Branches will fallback to Org table unless they have their own specific values.
+          // IF the user wants a SYNC, we can do it here.
+          // The prompt says: "todas las sucursales deben guardar esa configuracion general"
           const { data: branches } = await supabase
             .from("branches")
             .select("id")
@@ -203,16 +240,12 @@ export async function PUT(request: NextRequest) {
 
           if (branches && branches.length > 0) {
             const branchIds = branches.map((b) => b.id);
-
-            // Perform bulk upsert for all branches
-            // First we need to get existing settings to know which to update and which to insert
-            // or we can just use upsert if we have a unique constraint on branch_id
             for (const bId of branchIds) {
               await supabase.from("pos_settings").upsert(
                 {
                   branch_id: bId,
-                  min_deposit_percent: validatedData.min_deposit_percent,
-                  min_deposit_amount: validatedData.min_deposit_amount,
+                  organization_id: branchContext.organizationId,
+                  ...validatedData,
                   updated_at: new Date().toISOString(),
                 },
                 { onConflict: "branch_id" },
@@ -235,8 +268,7 @@ export async function PUT(request: NextRequest) {
             const { data: updatedSettings, error: updateError } = await supabase
               .from("pos_settings")
               .update({
-                min_deposit_percent: validatedData.min_deposit_percent,
-                min_deposit_amount: validatedData.min_deposit_amount,
+                ...validatedData,
                 updated_at: new Date().toISOString(),
               })
               .eq("branch_id", branchContext.branchId!)
@@ -258,8 +290,8 @@ export async function PUT(request: NextRequest) {
               .from("pos_settings")
               .insert({
                 branch_id: branchContext.branchId!,
-                min_deposit_percent: validatedData.min_deposit_percent || 50.0,
-                min_deposit_amount: validatedData.min_deposit_amount || null,
+                organization_id: branchContext.organizationId,
+                ...validatedData,
               })
               .select()
               .single();
@@ -283,10 +315,7 @@ export async function PUT(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          settings: {
-            min_deposit_percent: result.min_deposit_percent,
-            min_deposit_amount: result.min_deposit_amount,
-          },
+          settings: result,
         });
       },
     );

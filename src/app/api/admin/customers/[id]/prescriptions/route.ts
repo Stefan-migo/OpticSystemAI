@@ -96,10 +96,19 @@ export async function POST(
         .eq("is_current", true);
     }
 
+    // Get customer's org and branch to link prescription correctly
+    const { data: customerData } = await supabaseServiceRole
+      .from("customers")
+      .select("organization_id, branch_id")
+      .eq("id", id)
+      .single();
+
     const { data: prescription, error } = await supabaseServiceRole
       .from("prescriptions")
       .insert({
         customer_id: id,
+        organization_id: customerData?.organization_id || null,
+        branch_id: customerData?.branch_id || null,
         prescription_date:
           body.prescription_date || new Date().toISOString().split("T")[0],
         expiration_date: body.expiration_date || null,

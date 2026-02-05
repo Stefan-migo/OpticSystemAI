@@ -1045,7 +1045,14 @@ export const lensPriceMatrixBaseSchema = lensPriceMatrixBaseObject.refine(
 
 export const createLensFamilyFullSchema = lensFamilyBaseSchema.extend({
   matrices: z
-    .array(lensPriceMatrixBaseSchema.omit({ lens_family_id: true }))
+    .array(
+      lensPriceMatrixBaseObject
+        .omit({ lens_family_id: true })
+        .refine((data) => data.sphere_min <= data.sphere_max, {
+          message: "sphere_min debe ser menor o igual a sphere_max",
+          path: ["sphere_max"],
+        }),
+    )
     .min(1, "Debe agregar al menos una matriz de precios"),
 });
 

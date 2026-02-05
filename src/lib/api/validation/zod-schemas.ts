@@ -1009,11 +1009,7 @@ export const lensFamilyBaseSchema = z.object({
 export const createLensFamilySchema = lensFamilyBaseSchema;
 export const updateLensFamilySchema = lensFamilyBaseSchema.partial();
 
-export const createLensFamilyFullSchema = lensFamilyBaseSchema.extend({
-  matrices: z
-    .array(lensPriceMatrixBaseSchema.omit({ lens_family_id: true }))
-    .min(1, "Debe agregar al menos una matriz de precios"),
-});
+// Moved createLensFamilyFullSchema to after lensPriceMatrixBaseSchema to avoid ReferenceError
 
 // ============================================================================
 // Lens Price Matrices Schemas
@@ -1046,6 +1042,12 @@ export const lensPriceMatrixBaseSchema = lensPriceMatrixBaseObject.refine(
     path: ["sphere_max"],
   },
 );
+
+export const createLensFamilyFullSchema = lensFamilyBaseSchema.extend({
+  matrices: z
+    .array(lensPriceMatrixBaseSchema.omit({ lens_family_id: true }))
+    .min(1, "Debe agregar al menos una matriz de precios"),
+});
 
 export const lensPriceMatrixV2RangeRefine = lensPriceMatrixBaseSchema.refine(
   (data) => data.cylinder_min <= data.cylinder_max,

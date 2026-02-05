@@ -67,7 +67,7 @@ import ProductList from "./components/ProductList";
 import ProductPagination from "./components/ProductPagination";
 import QuickActions from "./components/QuickActions";
 import { formatCurrency } from "@/lib/utils";
-import LensFamiliesPage from "@/app/admin/lens-families/page";
+import LensFamiliesList from "@/components/admin/lenses/LensFamiliesList";
 
 export default function ProductsPage() {
   const { currentBranchId, isSuperAdmin, branches } = useBranch();
@@ -1247,7 +1247,7 @@ export default function ProductsPage() {
 
         {/* Lens Families Tab - Unified View */}
         <TabsContent value="lens-families" className="space-y-6 mt-6">
-          <LensFamiliesPage />
+          <LensFamiliesList />
         </TabsContent>
       </Tabs>
 

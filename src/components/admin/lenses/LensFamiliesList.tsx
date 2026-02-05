@@ -57,7 +57,7 @@ const LENS_MATERIALS = [
   { value: "glass", label: "Vidrio" },
 ];
 
-export default function LensFamiliesPage() {
+export default function LensFamiliesList() {
   const router = useRouter();
   const [families, setFamilies] = useState<LensFamily[]>([]);
   const [loading, setLoading] = useState(true);

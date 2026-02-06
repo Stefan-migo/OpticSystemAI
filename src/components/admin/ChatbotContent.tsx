@@ -155,6 +155,7 @@ export function ChatbotContent({
   // Load messages when session changes, but only once per session
   const lastLoadedSessionId = useRef<string | null>(null);
   const isLoadingMessages = useRef(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   useEffect(() => {
     if (currentSession?.id) {
@@ -162,22 +163,26 @@ export function ChatbotContent({
       // and we're not already loading
       if (
         lastLoadedSessionId.current !== currentSession.id &&
-        !isLoadingMessages.current
+        !isLoadingMessages.current &&
+        !isHistoryLoading
       ) {
         lastLoadedSessionId.current = currentSession.id;
-        isLoadingMessages.current = true;
+        setIsHistoryLoading(true);
         // Clear messages first to prevent showing old messages
         setMessages([]);
+
         loadMessagesFromSession(currentSession.id).finally(() => {
+          setIsHistoryLoading(false);
           isLoadingMessages.current = false;
         });
       }
     } else {
       lastLoadedSessionId.current = null;
+      setIsHistoryLoading(false);
       isLoadingMessages.current = false;
       setMessages([]);
     }
-  }, [currentSession?.id, loadMessagesFromSession]);
+  }, [currentSession?.id, loadMessagesFromSession, isHistoryLoading]);
 
   const handleNewSession = async () => {
     clearSession();
@@ -271,10 +276,6 @@ export function ChatbotContent({
     };
 
     setMessages((prev) => [...prev, userMessage]);
-
-    if (sessionToUse) {
-      await saveMessage(sessionToUse.id, "user", content);
-    }
 
     setIsStreaming(true);
     setCurrentStreamingContent("");
@@ -399,22 +400,6 @@ export function ChatbotContent({
                   }
                   return updated;
                 });
-
-                if (currentSession && accumulatedContent) {
-                  await saveMessage(
-                    currentSession.id,
-                    "assistant",
-                    accumulatedContent,
-                  );
-                }
-
-                if (sessionToUse && accumulatedContent) {
-                  await saveMessage(
-                    sessionToUse.id,
-                    "assistant",
-                    accumulatedContent,
-                  );
-                }
 
                 setCurrentStreamingContent("");
                 setIsStreaming(false);

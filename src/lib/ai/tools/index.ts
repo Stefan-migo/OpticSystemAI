@@ -4,6 +4,11 @@ import { orderTools } from "./orders";
 import { customerTools } from "./customers";
 import { analyticsTools } from "./analytics";
 import { supportTools } from "./support";
+import { businessFlowTools } from "./analyzeBusinessFlow";
+import { diagnoseSystemTools } from "./diagnoseSystem";
+import { marketTrendsTools } from "./analyzeMarketTrends";
+import { inventoryTools } from "./optimizeInventory";
+import { recommendationTools } from "./generateRecommendations";
 import type { ToolDefinition } from "./types";
 import type { LLMTool } from "../types";
 
@@ -14,6 +19,11 @@ export const allTools: ToolDefinition[] = [
   ...customerTools,
   ...analyticsTools,
   ...supportTools,
+  ...businessFlowTools,
+  ...diagnoseSystemTools,
+  ...marketTrendsTools,
+  ...inventoryTools,
+  ...recommendationTools,
 ];
 
 export function getAllTools(): ToolDefinition[] {

@@ -12,6 +12,7 @@ import {
 } from "@/lib/api/validation/zod-helpers";
 import { z } from "zod";
 import { withRateLimit, rateLimitConfigs } from "@/lib/api/middleware";
+import { createOrganizationalMemory } from "@/lib/ai/memory/organizational";
 
 const generateQuerySchema = z.object({
   section: InsightSectionSchema.optional(),
@@ -77,7 +78,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Calculate organization age
+      // Use organizational memory to get maturity level and context
+      const orgMemory = createOrganizationalMemory(
+        adminUser.organization_id,
+        supabase,
+      );
+      const maturityLevel = await orgMemory.getMaturityLevel();
+
+      logger.info("Organization maturity calculated", {
+        organizationId: adminUser.organization_id,
+        maturityLevel: maturityLevel.level,
+        daysSinceCreation: maturityLevel.daysSinceCreation,
+        totalOrders: maturityLevel.totalOrders,
+      });
+
+      // Calculate organization age (for backward compatibility)
       const orgCreatedAt = new Date(organization.created_at);
       const now = new Date();
       const organizationAge = Math.floor(
@@ -116,10 +131,11 @@ export async function POST(request: NextRequest) {
         totalOrders: totalOrders || 0,
       };
 
-      // Generate insights using LLM
-      logger.info("Generating insights", {
+      // Generate insights using LLM with maturity adaptation
+      logger.info("Generating insights with maturity adaptation", {
         section,
         organizationId: adminUser.organization_id,
+        maturityLevel: maturityLevel.level,
         organizationAge,
         isNewOrganization,
       });
@@ -128,8 +144,11 @@ export async function POST(request: NextRequest) {
         section,
         data,
         organizationName: organization.name,
+        organizationId: adminUser.organization_id,
+        maturityLevel: maturityLevel,
         additionalContext: enhancedContext,
         temperature: 0.7,
+        useMaturityAdaptation: true,
       });
 
       // Save insights to database

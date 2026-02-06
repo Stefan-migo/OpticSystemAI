@@ -3,6 +3,7 @@
  *
  * Generates contextual insights using LLMs with structured output validation.
  * Handles LLM calls, response parsing, and schema validation.
+ * Now enhanced with organizational maturity awareness for adaptive prompts.
  *
  * @module lib/ai/insights/generator
  */
@@ -14,15 +15,20 @@ import {
   type InsightSection,
 } from "./schemas";
 import { getSectionPrompt, getUserMessage } from "./prompts";
+import { OrganizationalMaturitySystem } from "./maturity";
 import { appLogger as logger } from "@/lib/logger";
+import type { MaturityLevel } from "../memory/organizational";
 
 export interface GenerateInsightsOptions {
   section: InsightSection;
   data: any;
   organizationName: string;
+  organizationId?: string;
+  maturityLevel?: MaturityLevel;
   additionalContext?: Record<string, any>;
   temperature?: number;
   maxRetries?: number;
+  useMaturityAdaptation?: boolean;
 }
 
 /**
@@ -39,9 +45,12 @@ export async function generateInsights(
     section,
     data,
     organizationName,
+    organizationId,
+    maturityLevel,
     additionalContext,
     temperature = 0.7,
     maxRetries = 2,
+    useMaturityAdaptation = true,
   } = options;
 
   const factory = LLMFactory.getInstance();
@@ -61,13 +70,35 @@ export async function generateInsights(
     throw new Error("No available LLM providers configured");
   }
 
-  // Get prompts
-  const systemPrompt = getSectionPrompt(
-    section,
-    data,
-    organizationName,
-    additionalContext,
-  );
+  // Get prompts - with maturity adaptation if available
+  let systemPrompt: string;
+
+  if (useMaturityAdaptation && maturityLevel && organizationId) {
+    // Use maturity-adapted prompts
+    const maturitySystem = new OrganizationalMaturitySystem(organizationId);
+    systemPrompt = await maturitySystem.getAdaptivePrompts(
+      section,
+      maturityLevel,
+      data,
+      organizationName,
+      additionalContext,
+    );
+
+    logger.info("Using maturity-adapted prompts", {
+      section,
+      maturityLevel: maturityLevel.level,
+      organizationAge: maturityLevel.daysSinceCreation,
+    });
+  } else {
+    // Use standard prompts
+    systemPrompt = getSectionPrompt(
+      section,
+      data,
+      organizationName,
+      additionalContext,
+    );
+  }
+
   const userMessage = getUserMessage(section, data);
 
   // Retry logic for LLM calls

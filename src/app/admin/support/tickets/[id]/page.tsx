@@ -22,6 +22,14 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Loader2,
   ArrowLeft,
   Calendar,
@@ -194,6 +202,13 @@ export default function OpticalInternalSupportTicketDetailPage() {
     Array<{ id: string; email: string; role: string }>
   >([]);
 
+  // Debug logging for render phase issues
+  console.log(
+    "OpticalInternalSupportTicketDetailPage rendering, ticketId:",
+    ticketId,
+  );
+  console.log("Current state - showUpdateDialog:", showUpdateDialog);
+
   const {
     register: registerMessage,
     handleSubmit: handleSubmitMessage,
@@ -204,6 +219,7 @@ export default function OpticalInternalSupportTicketDetailPage() {
     defaultValues: {
       is_internal: false,
       message_type: "message",
+      attachments: [],
     },
   });
 
@@ -229,16 +245,19 @@ export default function OpticalInternalSupportTicketDetailPage() {
   }, [ticket, setUpdateValue]);
 
   useEffect(() => {
+    console.log("useEffect triggered with ticketId:", ticketId);
     fetchTicket();
     fetchMessages();
     fetchAdminUsers();
   }, [ticketId]);
 
   const fetchAdminUsers = async () => {
+    console.log("fetchAdminUsers called");
     try {
       const response = await fetch("/api/admin/admin-users");
       if (response.ok) {
         const data = await response.json();
+        console.log("Admin users fetched:", data.users?.length || 0);
         setAdminUsers(data.users || []);
       }
     } catch (err) {
@@ -247,6 +266,7 @@ export default function OpticalInternalSupportTicketDetailPage() {
   };
 
   const fetchTicket = async () => {
+    console.log("fetchTicket called for ticketId:", ticketId);
     try {
       const response = await fetch(
         `/api/admin/optical-support/tickets/${ticketId}`,
@@ -257,15 +277,18 @@ export default function OpticalInternalSupportTicketDetailPage() {
       }
 
       const data = await response.json();
+      console.log("Ticket fetched:", data.ticket?.id);
       setTicket(data.ticket);
     } catch (err) {
       toast.error("Error al cargar el ticket");
     } finally {
       setLoading(false);
+      console.log("Loading set to false");
     }
   };
 
   const fetchMessages = async () => {
+    console.log("fetchMessages called for ticketId:", ticketId);
     try {
       const response = await fetch(
         `/api/admin/optical-support/tickets/${ticketId}/messages`,
@@ -273,6 +296,7 @@ export default function OpticalInternalSupportTicketDetailPage() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log("Messages fetched:", data.messages?.length || 0);
         setMessages(data.messages || []);
       }
     } catch (err) {
@@ -396,7 +420,15 @@ export default function OpticalInternalSupportTicketDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowUpdateDialog(true)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                console.log(
+                  "Edit button clicked, setting showUpdateDialog to true",
+                );
+                setShowUpdateDialog(true);
+              }}
+            >
               <Edit className="h-4 w-4 mr-2" />
               Editar
             </Button>

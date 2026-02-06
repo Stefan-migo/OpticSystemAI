@@ -62,6 +62,10 @@ const translateConfigKey = (key: string): string => {
     // General
     site_name: "Nombre del Sitio",
     site_description: "Descripción del Sitio",
+    timezone: "Zona Horaria",
+    date_format: "Formato de Fecha",
+    time_format: "Formato de Hora",
+    language: "Idioma Predeterminado",
 
     // Contact
     address: "Dirección",
@@ -69,15 +73,18 @@ const translateConfigKey = (key: string): string => {
     phone_number: "Número de Teléfono",
     support_email: "Email de Soporte",
 
-    // E-commerce
+    // E-commerce & Billing
     currency: "Moneda",
+    currency_symbol: "Símbolo de Moneda",
     tax_rate: "Tasa de Impuesto (IVA)",
     shipping_cost: "Costo de Envío",
     free_shipping_threshold: "Umbral de Envío Gratis",
+    invoice_footer_text: "Texto Pie de Factura",
 
     // Inventory
     low_stock_threshold: "Umbral de Stock Bajo",
     auto_low_stock_alerts: "Alertas Automáticas de Stock",
+    enable_negative_stock: "Permitir Stock Negativo",
 
     // Membership
     membership_trial_days: "Días de Prueba",
@@ -88,9 +95,19 @@ const translateConfigKey = (key: string): string => {
     smtp_port: "Puerto SMTP",
     smtp_username: "Usuario SMTP",
     smtp_password: "Contraseña SMTP",
+    from_name: "Nombre Remitente",
+    from_email: "Email Remitente",
 
-    // System
+    // System & Security
     maintenance_mode: "Modo Mantenimiento",
+    debug_mode: "Modo Depuración",
+    session_timeout: "Tiempo de Expiración de Sesión (min)",
+    max_login_attempts: "Intentos Máximos de Login",
+    password_expiry_days: "Expiración de Contraseña (días)",
+
+    // Business
+    business_hours: "Horarios de Atención",
+    enable_online_appointments: "Habilitar Citas Online",
   };
 
   return (
@@ -136,6 +153,20 @@ export default function SystemConfig({
 
   const filteredConfigs = useMemo(() => {
     return configs.filter((config) => {
+      // Filter out overlapping or irrelevant categories
+      // 'appointments' is plural in DB. 'branches' handles isolation.
+      if (["appointments", "branches"].includes(config.category)) return false;
+
+      // Filter out redundant keys that are handled by the specific Organization Card
+      const redundancyKeys = [
+        "site_name",
+        "site_description",
+        "clinic_name", // Handled by Organization Name
+        "clinic_rut", // Handled by Organization settings if added
+        "clinic_specialty", // Handled by Organization Slogan/Desc
+      ];
+      if (redundancyKeys.includes(config.config_key)) return false;
+
       if (categoryFilter !== "all" && config.category !== categoryFilter)
         return false;
       if (config.is_sensitive && !showSensitive) return false;
@@ -165,7 +196,13 @@ export default function SystemConfig({
     business: "Negocio",
   };
 
-  const uniqueCategories = Array.from(new Set(configs.map((c) => c.category)));
+  const uniqueCategories = Array.from(
+    new Set(
+      configs
+        .filter((c) => !["appointments", "branches"].includes(c.category))
+        .map((c) => c.category),
+    ),
+  );
 
   // Initialize local config values from props
   useEffect(() => {

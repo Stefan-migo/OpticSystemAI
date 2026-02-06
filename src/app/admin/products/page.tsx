@@ -852,7 +852,7 @@ export default function ProductsPage() {
         }
         className="w-full"
       >
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="products">
             <Package className="h-4 w-4 mr-2" />
             Productos
